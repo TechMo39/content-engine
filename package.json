@@ -1,0 +1,28 @@
+{
+  "name": "tot-content-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tale of Tiles content-engine — fase 1: tegel-voor-tegel opbouw-video's uit opgeslagen ontwerpen.",
+  "scripts": {
+    "studio": "remotion studio remotion/index.ts",
+    "build": "node src/build.mjs",
+    "preview-fixture": "node src/preview-fixture.mjs",
+    "test": "node src/test-reveal.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.330",
+    "@remotion/cli": "^4.0.330",
+    "@remotion/renderer": "^4.0.330",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.330"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/react": "^18.3.12",
+    "esbuild": "^0.24.0",
+    "playwright": "^1.48.0",
+    "typescript": "^5.6.3"
+  }
+}
