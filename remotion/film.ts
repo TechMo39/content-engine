@@ -9,8 +9,8 @@ export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084"
 export const BLANK = "#e8e5e2";
 export const PLUM = "#2a2335";
 
-export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number };
-export type Parsed = { svg: string; view: number[]; tiles: Tile[] };
+export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };
+export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] } };
 
 // Scene-beschrijving = pure data (serialiseerbaar):
 export type Scene =
@@ -21,20 +21,67 @@ export type Scene =
 export type Segment = { scene: Scene; hold: number; trans: number };
 export type Storyboard = { buildSec: number; popSec: number; segments: Segment[] };
 
+// ---- PATROON TEGELEN (exacte port van mTileField uit de site) --------------
+// Neemt de kale patroon-eenheid + de lock {n,gx,gy} en legt 'm naadloos als
+// raster neer. stepX = contentbreedte + gx. Elke cel krijgt data-cell="i_j" en
+// elke tegel data-idx -> samen de sleutel c{i}_{j}_i{idx} (zoals de site).
+export type Lock = { n?: number; gx?: number; gy?: number };
+
+function contentBBox(inner: string) {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  const push = (x: number, y: number) => { if (x < minx) minx = x; if (y < miny) miny = y; if (x > maxx) maxx = x; if (y > maxy) maxy = y; };
+  let m: RegExpExecArray | null;
+  const rp = /points="([^"]*)"/g; while ((m = rp.exec(inner))) { const n = (m[1].match(/-?[0-9.]+/g) || []).map(Number); for (let i = 0; i + 1 < n.length; i += 2) push(n[i], n[i + 1]); }
+  const rr = /<rect\b([^>]*)>/gi; while ((m = rr.exec(inner))) { const a = m[1]; const g = (k: string) => parseFloat((a.match(new RegExp('(?:^|\\s)' + k + '="([^"]*)"')) || [])[1] || "NaN"); const x = g("x"), y = g("y"), w = g("width"), h = g("height"); if (isFinite(x) && isFinite(y) && isFinite(w) && isFinite(h)) { push(x, y); push(x + w, y + h); } }
+  const rd = /<path\b[^>]*\bd="([^"]*)"/gi; while ((m = rd.exec(inner))) { const n = (m[1].match(/-?[0-9.]+/g) || []).map(Number); for (let i = 0; i + 1 < n.length; i += 2) push(n[i], n[i + 1]); }
+  if (!isFinite(minx)) { minx = 0; miny = 0; maxx = 700; maxy = 700; }
+  return { minx, miny, w: maxx - minx, h: maxy - miny };
+}
+// nummer elke vorm (polygon/rect/path) met data-idx, zodat elke tegel een adres heeft
+function numberShapes(inner: string): string {
+  let i = 0;
+  return inner.replace(/<(polygon|rect|path)\b/gi, (_m, t) => `<${t} data-idx="${i++}"`);
+}
+
+export function tilePattern(baseSvg: string, lock: Lock, nX: number, nY: number): string {
+  const gt = baseSvg.indexOf(">", baseSvg.indexOf("<svg"));
+  const end = baseSvg.lastIndexOf("</svg>");
+  let inner = gt >= 0 && end > gt ? baseSvg.slice(gt + 1, end) : baseSvg;
+  inner = numberShapes(inner);
+  const bb = contentBBox(inner);
+  const gx = lock && lock.gx ? lock.gx : 0, gy = lock && lock.gy ? lock.gy : 0;
+  const stepX = bb.w + gx, stepY = bb.h + gy;
+  const offX = -gx / 2, offY = -gy / 2;
+  const canvasW = stepX * nX, canvasH = stepY * nY;
+  let cells = "";
+  for (let j = 0; j < nY; j++) for (let i = 0; i < nX; i++) {
+    const tx = (i * stepX - bb.minx - offX).toFixed(1), ty = (j * stepY - bb.miny - offY).toFixed(1);
+    cells += `<g data-cell="${i}_${j}" transform="translate(${tx},${ty})">${inner}</g>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvasW.toFixed(0)} ${canvasH.toFixed(0)}">${cells}</svg>`;
+}
+
 export function parseTiles(svg: string): Parsed {
   const view = (svg.match(/viewBox="([^"]+)"/) || [])[1].split(/\s+/).map(Number);
-  const tokenRe = /<(g)\b([^>]*)>|<\/g>|<polygon\b([^>]*?)\/?>/gi;
+  const tokenRe = /<(g)\b([^>]*)>|<\/g>|<(polygon|rect|path)\b([^>]*?)\/?>/gi;
   const translate = (t: string) => { let tx = 0, ty = 0, m: RegExpExecArray | null; const re = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\)/gi; while ((m = re.exec(t))) { tx += +m[1]; ty += +m[2]; } return { tx, ty }; };
-  const centroid = (pts: string): [number, number] => { const n = pts.trim().split(/[\s,]+/).map(Number); let sx = 0, sy = 0, c = 0; for (let i = 0; i + 1 < n.length; i += 2) { sx += n[i]; sy += n[i + 1]; c++; } return c ? [sx / c, sy / c] : [0, 0]; };
-  const tiles: Tile[] = []; const stack: { tx: number; ty: number }[] = []; let m: RegExpExecArray | null;
+  // middelpunt van een vorm, ongeacht type (polygon/rect/path)
+  const centerOf = (tag: string, tagName: string): [number, number] => {
+    if (tagName === "rect") { const g = (k: string) => parseFloat((tag.match(new RegExp(k + '="([^"]*)"')) || [])[1] || "0"); return [g("x") + g("width") / 2, g("y") + g("height") / 2]; }
+    const src = tagName === "path" ? (tag.match(/\bd="([^"]*)"/) || [])[1] || "" : (tag.match(/points="([^"]*)"/) || [])[1] || "";
+    const n = (src.match(/-?[0-9.]+/g) || []).map(Number); let sx = 0, sy = 0, c = 0; for (let i = 0; i + 1 < n.length; i += 2) { sx += n[i]; sy += n[i + 1]; c++; } return c ? [sx / c, sy / c] : [0, 0];
+  };
+  const tiles: Tile[] = []; const stack: { tx: number; ty: number }[] = []; const cellStack: string[] = []; let m: RegExpExecArray | null;
   while ((m = tokenRe.exec(svg))) {
-    if (m[1]) stack.push(translate(m[2] || ""));
-    else if (/^<\/g>/i.test(m[0])) stack.pop();
+    if (m[1]) { stack.push(translate(m[2] || "")); const cm = (m[2] || "").match(/data-cell="([^"]+)"/); cellStack.push(cm ? cm[1] : (cellStack[cellStack.length - 1] || "")); }
+    else if (/^<\/g>/i.test(m[0])) { stack.pop(); cellStack.pop(); }
     else if (m[3] !== undefined) {
-      const pts = (m[0].match(/points="([^"]+)"/) || [])[1] || ""; const [cx, cy] = centroid(pts);
+      const [cx, cy] = centerOf(m[0], m[3].toLowerCase());
       const off = stack.reduce((a, s) => ({ tx: a.tx + s.tx, ty: a.ty + s.ty }), { tx: 0, ty: 0 });
       const gx = cx + off.tx, gy = cy + off.ty;
-      tiles.push({ start: m.index, end: m.index + m[0].length, gx, gy, nx: gx / view[2], ny: gy / view[3], order: 0 });
+      const cell = cellStack[cellStack.length - 1] || "";
+      const idx = (m[0].match(/data-idx="([0-9-]+)"/) || [])[1] || "";
+      tiles.push({ start: m.index, end: m.index + m[0].length, gx, gy, nx: gx / view[2], ny: gy / view[3], order: 0, key: cell ? `c${cell}_i${idx}` : "" });
     }
   }
   let s = 7; const h = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
@@ -86,7 +133,11 @@ export function totalDuration(story: Storyboard): number {
 
 export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[] {
   const { tiles, view } = parsed;
-  const segColors = story.segments.map((seg) => tiles.map((tile, i) => sceneColor(seg.scene, tile, i, view)));
+  // Scene-kleuren 1x berekenen en cachen (niet elk frame opnieuw) — scheelt enorm.
+  if (!parsed._cache || parsed._cache.story !== story) {
+    parsed._cache = { story, seg: story.segments.map((seg) => tiles.map((tile, i) => sceneColor(seg.scene, tile, i, view))) };
+  }
+  const segColors = parsed._cache.seg;
   const out = new Array<string>(tiles.length);
   if (t < story.buildSec) {
     for (let i = 0; i < tiles.length; i++) {

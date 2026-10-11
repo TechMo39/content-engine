@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tale of Tiles · Studio</title>
+<style>
+  :root{ --bg:#1a1327; --bg2:#241a3a; --gold:#d6b35a; --cream:#f4ecdc; --line:#3a3450; --panel:#201a33; }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg));color:var(--cream);
+    font-family:Georgia,'Times New Roman',serif;min-height:100vh}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  header h1{font-size:20px;letter-spacing:3px;text-transform:uppercase;margin:0;color:var(--gold);font-weight:400}
+  header span{color:#9b93ad;font-size:13px}
+  .wrap{display:grid;grid-template-columns:340px 1fr 340px;gap:0;min-height:calc(100vh - 61px)}
+  .left{padding:22px;border-right:1px solid var(--line);overflow:auto}
+  .right{padding:28px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px}
+  .logcol{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .logcol h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#9b93ad;margin:0;padding:16px 18px 10px;font-weight:400;border-bottom:1px solid var(--line)}
+  .logbox{flex:1;overflow:auto;padding:12px 16px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.7;color:#b9b2c9;white-space:pre-wrap}
+  .logbox .ln{display:block}
+  .logbox .err{color:#ff8a7a;font-weight:600}
+  .logbox .ok{color:#9ad3a0}
+  .logbox .run{color:var(--gold)}
+  .sec{margin-bottom:22px}
+  .sec h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#9b93ad;margin:0 0 10px;font-weight:400}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .card{border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel);transition:.15s}
+  .card.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+  .card img{width:100%;height:58px;object-fit:cover;display:block;background:#140f1e}
+  .card .nm{font-size:10px;padding:4px 5px;color:#cfc7de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button,.chip{background:var(--panel);border:1px solid var(--line);color:var(--cream);border-radius:100px;
+    padding:8px 14px;cursor:pointer;font-family:inherit;font-size:13px;transition:.15s}
+  .seg button.on,.chip.on{background:var(--gold);color:#2a2010;border-color:var(--gold);font-weight:600}
+  label.row{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#cfc7de;margin:8px 0}
+  select,input[type=range]{font-family:inherit}
+  select{background:var(--panel);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .render{width:100%;background:var(--gold);color:#2a2010;border:none;border-radius:100px;padding:15px;
+    font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px}
+  .render:disabled{opacity:.5;cursor:wait}
+  video{width:300px;max-width:80vw;border-radius:12px;border:1px solid var(--line);background:#000}
+  .ph{width:300px;height:533px;border-radius:12px;border:1px dashed var(--line);display:flex;align-items:center;
+    justify-content:center;color:#6b6480;text-align:center;font-size:14px;padding:20px}
+  .save{background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:100px;padding:11px 22px;
+    cursor:pointer;font-family:inherit;font-size:14px}
+  .hint{font-size:12px;color:#6b6480;margin-top:6px}
+  .msg{font-size:13px;color:#9b93ad;min-height:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tale of Tiles</h1><span>Studio</span>
+</header>
+<div class="wrap">
+  <div class="left">
+    <div class="sec">
+      <h2>1 · Patroon</h2>
+      <div class="grid" id="patterns" style="max-height:260px;overflow:auto"></div>
+      <div class="hint" id="patHint">Patronen laden…</div>
+    </div>
+
+    <div class="sec">
+      <h2>2 · Soort video</h2>
+      <div class="seg" id="template">
+        <button data-t="film" class="on">Tekenfilm</button>
+        <button data-t="build">Opbouw</button>
+      </div>
+    </div>
+
+    <div class="sec" id="filmOpts">
+      <h2>3 · Stijl</h2>
+      <label class="row">Basis
+        <span class="seg"><button data-base="confetti" class="on">Confetti</button><button data-base="fields">Vlakken</button></span>
+      </label>
+      <label class="row">Palet
+        <span class="seg"><button data-pal="modern" class="on">Modern</button><button data-pal="warm">Warm</button><button data-pal="cool">Koel</button></span>
+      </label>
+      <div style="margin:10px 0 4px;font-size:13px;color:#cfc7de">Vormen (morphen)</div>
+      <div class="seg" id="shapes">
+        <button data-shape="heart" class="on">Hart</button>
+        <button data-shape="star" class="on">Ster</button>
+        <button data-shape="diamond">Ruit</button>
+      </div>
+      <label class="row" style="margin-top:12px">Tempo
+        <span class="seg"><button data-tempo="snel">Snel</button><button data-tempo="normaal" class="on">Normaal</button><button data-tempo="rustig">Rustig</button></span>
+      </label>
+    </div>
+
+    <div class="sec">
+      <h2>4 · Muziek &amp; formaat</h2>
+      <label class="row">Muziek <select id="music"><option value="">(geen)</option></select></label>
+      <label class="row">Formaat
+        <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span>
+      </label>
+    </div>
+
+    <button class="render" id="renderBtn" disabled>Kies eerst een ontwerp</button>
+    <div class="hint">Muziek leeg? Leg tracks in <code>assets/audio/</code>.</div>
+  </div>
+
+  <div class="right">
+    <div id="player"><div class="ph">Je video verschijnt hier<br>na het renderen.</div></div>
+    <div class="msg" id="msg"></div>
+    <button class="save" id="saveBtn" style="display:none">Opslaan als showcase</button>
+  </div>
+
+  <div class="logcol">
+    <h2>Operaties</h2>
+    <div class="logbox" id="logbox"></div>
+  </div>
+</div>
+
+<script>
+const state={ pattern:null, token:null, template:"film", base:"confetti", palette:"modern", shapes:["heart","star"], tempo:"normaal", format:"9:16", music:"" };
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+function segPick(sel,key,isState){ $$(sel+' button').forEach(b=>b.onclick=()=>{
+  $$(sel+' button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state[key]=b.dataset[Object.keys(b.dataset)[0]]; if(key==='template') toggleFilm();
+});}
+segPick('#template','template'); segPick('#filmOpts [data-base]','base'); segPick('#filmOpts [data-pal]','palette');
+segPick('#filmOpts [data-tempo]','tempo'); segPick('#template','template');
+$$('#template button').forEach(b=>b.onclick=()=>{$$('#template button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=b.dataset.t;toggleFilm();});
+$$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.format=b.dataset.fmt;});
+$$('#filmOpts [data-base]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-base]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.base=b.dataset.base;});
+$$('#filmOpts [data-pal]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-pal]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.palette=b.dataset.pal;});
+$$('#filmOpts [data-tempo]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-tempo]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.tempo=b.dataset.tempo;});
+$$('#shapes button').forEach(b=>b.onclick=()=>{ b.classList.toggle('on');
+  state.shapes=$$('#shapes button.on').map(x=>x.dataset.shape); });
+function toggleFilm(){ $('#filmOpts').style.display = state.template==='film'?'':'none'; }
+
+async function loadPatterns(){
+  const r=await fetch('/api/patterns'); const j=await r.json(); const g=$('#patterns'); g.innerHTML='';
+  (j.patterns||[]).forEach(id=>{ const d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<img src="${j.thumbBase}${id}" style="height:58px;object-fit:contain;padding:4px;background:#140f1e" onerror="this.style.visibility='hidden'"><div class="nm">${id}</div>`;
+    d.onclick=()=>{ $$('.card').forEach(c=>c.classList.remove('on')); d.classList.add('on'); state.pattern=id;
+      $('#renderBtn').disabled=false; $('#renderBtn').textContent='Render video'; };
+    g.appendChild(d); });
+  $('#patHint').textContent=(j.patterns&&j.patterns.length)?`${j.patterns.length} patronen. Klik om te kiezen.`:'Geen patronen.';
+}
+async function loadMusic(){ const r=await fetch('/api/music'); const j=await r.json();
+  (j.files||[]).forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; $('#music').appendChild(o); }); }
+$('#music').onchange=e=>state.music=e.target.value;
+
+$('#renderBtn').onclick=async()=>{
+  const btn=$('#renderBtn'); btn.disabled=true; btn.textContent='Renderen…'; $('#msg').textContent='Even geduld, de video wordt gemaakt.'; $('#saveBtn').style.display='none';
+  try{
+    const opts={ base:state.base, palette:state.palette, shapes:state.shapes, tempo:state.tempo, endColorway:true, buildSec:2.6 };
+    const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({ pattern:state.pattern, template:state.template, opts, format:state.format, music:state.music })});
+    const j=await r.json();
+    if(j.url){ state.token=j.token; $('#player').innerHTML=`<video src="${j.url}?t=${Date.now()}" controls autoplay loop></video>`; $('#msg').textContent='Klaar.'; $('#saveBtn').style.display=''; }
+    else { $('#msg').textContent='Mislukt: '+(j.error||'onbekend'); }
+  }catch(e){ $('#msg').textContent='Fout: '+e.message; }
+  btn.disabled=false; btn.textContent='Render video';
+};
+$('#saveBtn').onclick=async()=>{
+  const name=prompt('Naam voor dit ontwerp in je showcase:', state.pattern+' kleurset')||'';
+  $('#msg').textContent='Opslaan als showcase…';
+  const r=await fetch('/api/save-showcase',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:state.token,name})});
+  const j=await r.json(); $('#msg').textContent=j.ok?'✓ Opgeslagen als showcase.':'Niet opgeslagen: '+(j.log||'').trim().split('\n').pop();
+};
+// live operatie-log (SSE)
+(function(){
+  const box=$('#logbox');
+  function add(line){ const d=document.createElement('span'); d.className='ln';
+    if(/FOUT|✗|kon niet|mislukt/i.test(line)) d.classList.add('err');
+    else if(/✓|klaar/i.test(line)) d.classList.add('ok');
+    else if(/▶|render gestart/i.test(line)) d.classList.add('run');
+    d.textContent=line; box.appendChild(d); box.scrollTop=box.scrollHeight;
+    while(box.children.length>400) box.removeChild(box.firstChild);
+  }
+  try{ const es=new EventSource('/api/log'); es.onmessage=e=>{ try{ add(JSON.parse(e.data)); }catch{ add(e.data); } };
+    es.onerror=()=>{ add('— logverbinding onderbroken, opnieuw verbinden… —'); };
+  }catch(e){ add('Log niet beschikbaar: '+e.message); }
+})();
+loadPatterns(); loadMusic();
+</script>
+</body>
+</html>
