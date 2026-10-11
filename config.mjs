@@ -44,10 +44,10 @@ export const config = {
   tileSelector: "polygon,path",
   // Het patroon staat meteen VOLLEDIG (nog neutraal/ongekleurd); daarna kleurt
   // elk steentje in. Volgorde = willekeurig (niet vanuit het midden).
-  revealMode: "random", // random | radial | sweep-x | sweep-y | diagonal
+  revealMode: "wave", // wave | random | radial | sweep-x | sweep-y | diagonal
   revealStartSec: 0.6, // eerste steentje kleurt in
   revealEndSec: 12.6, // laatste steentje kleurt in (inkleuren vult bijna de clip)
-  popDurSec: 0.3, // hoe lang 1 steentje doet over inkleuren (blank -> kleur)
+  popDurSec: 0.6, // hoe lang 1 steentje doet over inkleuren (bredere, zachtere golf-rand)
 
   // ---- Overlay / merk --------------------------------------------------------
   brand: "Tale of Tiles",

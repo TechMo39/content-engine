@@ -29,6 +29,7 @@ export type ParsedSvg = {
 };
 
 export type RevealMode =
+  | "wave"
   | "radial"
   | "sweep-x"
   | "sweep-y"
@@ -173,11 +174,15 @@ export function parseSvg(svg: string, tileSelector = "polygon,path"): ParsedSvg 
 }
 
 // ---- Reveal-volgorde (zet alleen .order, herschikt NIET) --------------------
-export function orderTiles(p: ParsedSvg, mode: RevealMode = "radial"): void {
+export function orderTiles(p: ParsedSvg, mode: RevealMode = "wave"): void {
   const { x, y, w, h } = p.view;
   const mx = x + w / 2, my = y + h / 2;
+  // Golf: diagonaal front dat voortbeweegt, met een rafelige rand (jitter) zodat
+  // het handgemaakt oogt i.p.v. een kaarsrechte veeg. Het oog volgt de rand.
+  const jitter = (w + h) * 0.05;
   const key = (t: Tile) => {
     switch (mode) {
+      case "wave": return t.gx + t.gy + (stableHash(t.openTag) - 0.5) * 2 * jitter;
       case "sweep-x": return t.gx;
       case "sweep-y": return t.gy;
       case "diagonal": return t.gx + t.gy;
