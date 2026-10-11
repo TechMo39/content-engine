@@ -79,7 +79,7 @@ ${capLayer(frame)}
 </svg>`;
 
 await fs.mkdir(path.resolve(ROOT, "out"), { recursive: true });
-for (const t of [1.5, 3.5, 5.5, 7.5]) {
+for (const t of [0.4, 2.5, 4.5, 7.5]) {
   const r = new Resvg(scene(Math.round(t * FPS)), { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } });
   await fs.writeFile(path.resolve(ROOT, `out/real-t${t}.png`), r.render().asPng());
   console.log("geschreven: out/real-t" + t + ".png");

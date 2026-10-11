@@ -9,12 +9,17 @@
 
 export type Tile = {
   openTag: string; // het <polygon ...> openingstag (zonder </polygon>)
-  cx: number; // lokaal middelpunt (voor schaal-rond-midden)
+  cx: number; // lokaal middelpunt
   cy: number;
   gx: number; // globaal middelpunt (lokaal + ouder-translates) voor volgorde
   gy: number;
-  order: number; // reveal-rang 0..N-1 (bepaalt timing, niet de positie)
+  order: number; // inkleur-rang 0..N-1 (bepaalt timing, niet de positie)
+  realFill: string; // de echte kleur van dit steentje
 };
+
+// Neutrale "nog niet ingekleurd"-kleur (voeg/raw). Elk steentje start hierop en
+// kleurt dan in naar zijn echte kleur.
+const BLANK_FILL = "#e8e5e2";
 
 export type ParsedSvg = {
   // Rebuild = statics[0] + tile[0] + statics[1] + tile[1] + ... + statics[N]
@@ -107,7 +112,7 @@ export function parseSvg(svg: string, tileSelector = "polygon,path"): ParsedSvg 
   // Eerst: bevat de SVG tiles met class="mtile"? Dan is dat de selector.
   const hasMtile = /class\s*=\s*"[^"]*\bmtile\b[^"]*"/i.test(svg);
 
-  type Raw = { start: number; end: number; openTag: string; cx: number; cy: number; gx: number; gy: number };
+  type Raw = { start: number; end: number; openTag: string; cx: number; cy: number; gx: number; gy: number; realFill: string };
   const raws: Raw[] = [];
   const stack: Array<{ tx: number; ty: number }> = [];
   let m: RegExpExecArray | null;
@@ -147,6 +152,7 @@ export function parseSvg(svg: string, tileSelector = "polygon,path"): ParsedSvg 
         cy: c.cy,
         gx: c.cx + off.tx,
         gy: c.cy + off.ty,
+        realFill: fillOf(openTag),
       });
     }
   }
@@ -158,7 +164,7 @@ export function parseSvg(svg: string, tileSelector = "polygon,path"): ParsedSvg 
   let cursor = 0;
   for (const r of raws) {
     statics.push(svg.slice(cursor, r.start));
-    tiles.push({ openTag: r.openTag, cx: r.cx, cy: r.cy, gx: r.gx, gy: r.gy, order: 0 });
+    tiles.push({ openTag: r.openTag, cx: r.cx, cy: r.cy, gx: r.gx, gy: r.gy, order: 0, realFill: r.realFill });
     cursor = r.end;
   }
   statics.push(svg.slice(cursor));
@@ -194,11 +200,7 @@ function stableHash(s: string): number {
   return (h >>> 0) / 4294967295;
 }
 
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-const easeOutBack = (t: number) => {
-  const c1 = 1.70158, c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-};
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 export function tileProgress(order: number, total: number, frame: number, o: RevealOpts): number {
   const startF = o.revealStartSec * o.fps;
@@ -210,38 +212,64 @@ export function tileProgress(order: number, total: number, frame: number, o: Rev
   return Math.max(0, Math.min(1, (frame - tileStart) / popF));
 }
 
-// Bouw de volledige SVG-string voor 1 frame: statics met daartussen de
-// (gestylede) tile-openingstags in documentvolgorde.
+// Bouw de volledige SVG-string voor 1 frame: het patroon staat er VOLLEDIG
+// (alle vormen zichtbaar), maar elk steentje heeft z'n kleur pas als het is
+// "ingekleurd". Voor die tijd toont het de neutrale voegkleur. De voeg/stroke
+// blijft altijd zichtbaar.
 export function buildFrameSvg(p: ParsedSvg, frame: number, o: RevealOpts): string {
   const total = p.tiles.length;
   let out = p.statics[0];
   for (let i = 0; i < total; i++) {
     const t = p.tiles[i];
     const prog = tileProgress(t.order, total, frame, o);
-    out += styleTile(t, prog);
+    out += colorTile(t, prog);
     out += p.statics[i + 1];
   }
   return out;
 }
 
-function styleTile(t: Tile, prog: number): string {
-  if (prog <= 0) {
-    // nog niet onthuld -> onzichtbaar, maar wel op z'n plek laten
-    return addAttr(t.openTag, 'opacity="0"');
-  }
-  const op = easeOutCubic(prog);
-  const sc = 0.35 + 0.65 * easeOutBack(prog);
-  const tf =
-    `translate(${t.cx.toFixed(2)} ${t.cy.toFixed(2)}) ` +
-    `scale(${sc.toFixed(3)}) ` +
-    `translate(${(-t.cx).toFixed(2)} ${(-t.cy).toFixed(2)})`;
-  let tag = addAttr(t.openTag, `transform="${tf}"`);
-  tag = addAttr(tag, `opacity="${op.toFixed(3)}"`);
-  return tag;
+function colorTile(t: Tile, prog: number): string {
+  let fill: string;
+  if (prog <= 0) fill = BLANK_FILL;
+  else if (prog >= 1) fill = t.realFill;
+  else fill = mixHex(BLANK_FILL, t.realFill, easeInOut(prog));
+  return setFill(t.openTag, fill);
 }
 
-// Voeg attribuut toe net na de tagnaam (overschrijft niet; tiles hebben deze
-// attrs van zichzelf niet). openTag eindigt op ">".
-function addAttr(openTag: string, attr: string): string {
-  return openTag.replace(/^<([a-zA-Z]+)/, `<$1 ${attr}`);
+// Lees de echte fill uit style="fill:#..." of fill="#...".
+function fillOf(tag: string): string {
+  const s = tag.match(/style\s*=\s*"([^"]*)"/i);
+  if (s) {
+    const f = s[1].match(/fill\s*:\s*([^;"']+)/i);
+    if (f) return f[1].trim();
+  }
+  const fa = tag.match(/\bfill\s*=\s*"([^"]+)"/i);
+  return fa ? fa[1].trim() : "#b0a99c";
+}
+
+// Zet de fill (in de style als die er is, anders als attribuut).
+function setFill(tag: string, fill: string): string {
+  if (/style\s*=\s*"[^"]*fill\s*:/i.test(tag)) {
+    return tag.replace(/(style\s*=\s*"[^"]*?fill\s*:\s*)[^;"']+/i, `$1${fill}`);
+  }
+  if (/\bfill\s*=\s*"/i.test(tag)) {
+    return tag.replace(/\bfill\s*=\s*"[^"]*"/i, `fill="${fill}"`);
+  }
+  return tag.replace(/^<([a-zA-Z]+)/, `<$1 fill="${fill}"`);
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = hex(a), pb = hex(b);
+  if (!pa || !pb) return t >= 0.5 ? b : a;
+  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+function hex(c: string): [number, number, number] | null {
+  const m = c.trim().match(/^#([0-9a-f]{6})$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }

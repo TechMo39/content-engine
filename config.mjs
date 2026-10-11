@@ -25,13 +25,15 @@ export const config = {
   durationSec: 8,
 
   // ---- Reveal (de "satisfying" opbouw) --------------------------------------
-  // Welke elementen zijn "steentjes" om te onthullen. path+polygon dekt de meeste
-  // patronen. Gebruikt een patroon <rect> voor vierkante tegels -> "path,polygon,rect".
-  tileSelector: "path,polygon",
-  revealMode: "radial", // radial | sweep-x | sweep-y | diagonal | random
-  revealStartSec: 0.5, // mozaiek begint met opbouwen
-  revealEndSec: 6.6, // laatste steentje valt hier (opbouw vult bijna de hele clip)
-  popDurSec: 0.7, // hoe lang 1 steentje doet over inploppen
+  // Welke elementen zijn "steentjes". polygon+path dekt de meeste patronen.
+  // Gebruikt een patroon <rect> voor vierkante tegels -> "polygon,path,rect".
+  tileSelector: "polygon,path",
+  // Het patroon staat meteen VOLLEDIG (nog neutraal/ongekleurd); daarna kleurt
+  // elk steentje in. Volgorde = willekeurig (niet vanuit het midden).
+  revealMode: "random", // random | radial | sweep-x | sweep-y | diagonal
+  revealStartSec: 0.3, // eerste steentje kleurt in
+  revealEndSec: 6.8, // laatste steentje kleurt in (inkleuren vult bijna de clip)
+  popDurSec: 0.22, // hoe lang 1 steentje doet over inkleuren (blank -> kleur)
 
   // ---- Overlay / merk --------------------------------------------------------
   brand: "Tale of Tiles",
