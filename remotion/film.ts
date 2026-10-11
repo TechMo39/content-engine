@@ -67,7 +67,7 @@ export function parseTiles(svg: string): Parsed {
   const translate = (t: string) => { let tx = 0, ty = 0, m: RegExpExecArray | null; const re = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\)/gi; while ((m = re.exec(t))) { tx += +m[1]; ty += +m[2]; } return { tx, ty }; };
   // middelpunt van een vorm, ongeacht type (polygon/rect/path)
   const centerOf = (tag: string, tagName: string): [number, number] => {
-    if (tagName === "rect") { const g = (k: string) => parseFloat((tag.match(new RegExp(k + '="([^"]*)"')) || [])[1] || "0"); return [g("x") + g("width") / 2, g("y") + g("height") / 2]; }
+    if (tagName === "rect") { const g = (k: string) => parseFloat((tag.match(new RegExp('(?:^|\\s)' + k + '="([^"]*)"')) || [])[1] || "0"); return [g("x") + g("width") / 2, g("y") + g("height") / 2]; }
     const src = tagName === "path" ? (tag.match(/\bd="([^"]*)"/) || [])[1] || "" : (tag.match(/points="([^"]*)"/) || [])[1] || "";
     const n = (src.match(/-?[0-9.]+/g) || []).map(Number); let sx = 0, sy = 0, c = 0; for (let i = 0; i + 1 < n.length; i += 2) { sx += n[i]; sy += n[i + 1]; c++; } return c ? [sx / c, sy / c] : [0, 0];
   };
@@ -90,7 +90,7 @@ export function parseTiles(svg: string): Parsed {
   return { svg, view, tiles };
 }
 
-function hx(c: string): [number, number, number] { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function hx(c: string): [number, number, number] { if (typeof c !== "string" || c.charCodeAt(0) !== 35) c = "#140f1e"; const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function mix(a: string, b: string, t: number): string { const A = hx(a), B = hx(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
 function seeded(i: number): number { let s = (i * 2654435761) >>> 0; s ^= s >>> 15; return (s >>> 0) / 4294967295; }
 const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.length) % arr.length];
@@ -108,7 +108,7 @@ function sceneColor(scene: Scene, tile: Tile, i: number, view: number[]): string
   if (scene.type === "fields") {
     const pal = scene.palette || PAL; const x = tile.nx * 6, y = tile.ny * 6;
     const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
-    let idx = Math.floor(((n + 4) / 8) * pal.length); idx = Math.max(0, Math.min(pal.length - 1, idx)); return pal[idx];
+    let idx = Math.floor(((n + 4) / 8) * pal.length); if (!Number.isFinite(idx)) idx = 0; idx = Math.max(0, Math.min(pal.length - 1, idx)); return pal[idx];
   }
   return shapeInside(scene.shape, tile.nx, tile.ny, view) ? rndFrom(scene.fg || WARM, seeded(i)) : (scene.bg || PLUM);
 }

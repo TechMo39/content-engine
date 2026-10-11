@@ -67,11 +67,14 @@ function unitSize(base, lock) {
 // kies nX/nY zodat de getegelde verhouding ~panelAspect is én de tegels vierkant blijven
 function tileCounts(base, lock, panelAspect) {
   const u = unitSize(base, lock);
-  const ua = u.w / u.h;                // native eenheid-verhouding
+  let ua = u.w / u.h;                  // native eenheid-verhouding
+  if (!Number.isFinite(ua) || ua <= 0) ua = 1;  // degenereerde eenheid -> vierkant aannemen
   const SHORT = 3;                     // ~3 eenheden op de korte as -> rustige, premium dichtheid
   let nX, nY;
   if (panelAspect <= 1) { nX = SHORT; nY = Math.max(2, Math.round(nX * ua / panelAspect)); }
   else { nY = SHORT; nX = Math.max(2, Math.round(nY * panelAspect / ua)); }
+  if (!Number.isFinite(nX) || nX < 2) nX = 2;
+  if (!Number.isFinite(nY) || nY < 2) nY = 2;
   nX = Math.min(10, nX); nY = Math.min(12, nY);
   return { nX, nY };
 }
