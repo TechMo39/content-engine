@@ -44,21 +44,22 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "ontwerp";
 
-// Haal het logo op (URL of lokaal pad) en zet het in remotion/public zodat
-// Remotion het als staticFile kan laden. Jouw laptop kan bij taleoftiles.com.
+const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml", gif: "image/gif" };
+
+// Haal het logo op (URL of lokaal pad) en geef het terug als data-URI, zodat het
+// RECHTSTREEKS in de video wordt gebakken (geen static-server nodig -> kan nooit
+// 404'en). Jouw laptop kan bij taleoftiles.com.
 async function prepareLogo() {
-  const pub = path.resolve(ROOT, "remotion/public");
-  await fs.mkdir(pub, { recursive: true });
   const src = config.logoUrl || "";
+  const toDataUri = (buf, ext) => {
+    const mime = MIME[(ext || "png").toLowerCase()] || "image/png";
+    return `data:${mime};base64,${Buffer.from(buf).toString("base64")}`;
+  };
   if (!src) {
-    // lokaal assets/logo.* ?
     try {
       const a = path.resolve(ROOT, "assets");
-      const f = (await fs.readdir(a)).find((x) => /^logo\.(png|jpg|jpeg|webp|svg)$/i.test(x));
-      if (f) {
-        await fs.copyFile(path.join(a, f), path.join(pub, f));
-        return f;
-      }
+      const f = (await fs.readdir(a)).find((x) => /^logo\.(png|jpg|jpeg|webp|svg|gif)$/i.test(x));
+      if (f) return toDataUri(await fs.readFile(path.join(a, f)), f.split(".").pop());
     } catch {}
     return "";
   }
@@ -66,21 +67,15 @@ async function prepareLogo() {
     try {
       const res = await fetch(src);
       if (!res.ok) throw new Error(`logo ${res.status}`);
-      const ext = (src.split(".").pop() || "png").split(/[?#]/)[0].toLowerCase();
-      const name = `logo.${ext.length <= 4 ? ext : "png"}`;
-      const buf = Buffer.from(await res.arrayBuffer());
-      await fs.writeFile(path.join(pub, name), buf);
-      return name;
+      const ext = (src.split(".").pop() || "png").split(/[?#]/)[0];
+      return toDataUri(await res.arrayBuffer(), ext);
     } catch (e) {
       console.log(`  (logo niet opgehaald: ${e.message} — ga door zonder logo)`);
       return "";
     }
   }
-  // lokaal pad
   try {
-    const name = "logo." + (src.split(".").pop() || "png");
-    await fs.copyFile(path.resolve(ROOT, src), path.join(pub, name));
-    return name;
+    return toDataUri(await fs.readFile(path.resolve(ROOT, src)), src.split(".").pop());
   } catch {
     return "";
   }
@@ -121,14 +116,17 @@ async function main() {
   const audioSrc = await pickAudio();
   console.log(audioSrc ? `• Muziek: ${audioSrc}` : "• Muziek: (geen)");
   const logoSrc = await prepareLogo();
-  console.log(logoSrc ? `• Logo: ${logoSrc}` : "• Logo: (geen)");
+  console.log(logoSrc ? `• Logo: ingebakken (${Math.round(logoSrc.length / 1024)} KB)` : "• Logo: (geen)");
 
   const outDir = path.resolve(ROOT, config.outDir);
   await fs.mkdir(outDir, { recursive: true });
 
   console.log("• Remotion bundelen...");
+  const publicDir = path.resolve(ROOT, "remotion/public");
+  await fs.mkdir(publicDir, { recursive: true });
   const serveUrl = await bundle({
     entryPoint: path.resolve(ROOT, "remotion/index.ts"),
+    publicDir,
     onProgress: () => {},
   });
 
@@ -179,6 +177,7 @@ async function main() {
         serveUrl,
         id: "TileBuild",
         inputProps,
+        publicDir,
       });
 
       const outputLocation = path.join(outDir, `${slug}.mp4`);
@@ -188,6 +187,7 @@ async function main() {
         codec: "h264",
         inputProps,
         outputLocation,
+        publicDir,
       });
       console.log(`klaar -> out/${slug}.mp4`);
     }

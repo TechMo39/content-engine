@@ -150,7 +150,7 @@ export const TileBuild: React.FC<TileBuildProps> = ({
       >
         {logoSrc ? (
           <Img
-            src={staticFile(logoSrc)}
+            src={logoSrc}
             style={{ height: height * 0.07, objectFit: "contain" }}
           />
         ) : (
@@ -237,7 +237,7 @@ export const TileBuild: React.FC<TileBuildProps> = ({
             key={i}
             style={{
               position: "absolute",
-              bottom: height * 0.16,
+              bottom: height * 0.23,
               width: "100%",
               textAlign: "center",
               opacity: vis,
