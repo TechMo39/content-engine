@@ -3,3 +3,4 @@ out/
 remotion/public/
 *.log
 .DS_Store
+.env

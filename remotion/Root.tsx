@@ -1,6 +1,8 @@
 import React from "react";
 import { Composition } from "remotion";
 import { TileBuild, TileBuildProps } from "./TileBuild";
+import { TileFilm, TileFilmProps } from "./TileFilm";
+import { defaultStoryboard, totalDuration } from "./film";
 
 // Kleine ingebouwde fixture zodat `remotion studio` meteen iets toont.
 const FIXTURE_SVG = `<svg viewBox="0 0 100 70"><rect x="0" y="0" width="100" height="70" fill="#eae4d7"/>
@@ -41,32 +43,51 @@ const defaultProps: TileBuildProps = {
   logoSrc: "",
 };
 
+const filmDefaults: TileFilmProps = {
+  svg: FIXTURE_SVG,
+  storyboard: defaultStoryboard(),
+  brand: "Tale of Tiles",
+  site: "taleoftiles.com",
+  audioSrc: "",
+  logoSrc: "",
+  colBg: "#1a1327",
+  colBg2: "#241a3a",
+  colGold: "#d6b35a",
+  colCream: "#f4ecdc",
+};
+
 export const RemotionRoot: React.FC = () => {
   return (
-    <Composition
-      id="TileBuild"
-      component={TileBuild}
-      durationInFrames={8 * 30}
-      fps={30}
-      width={1080}
-      height={1920}
-      defaultProps={defaultProps}
-      // Laat de orchestrator formaat/duur/fps via inputProps overschrijven.
-      calculateMetadata={({ props }) => {
-        const anyProps = props as TileBuildProps & {
-          _fps?: number;
-          _width?: number;
-          _height?: number;
-          _durationSec?: number;
-        };
-        const fps = anyProps._fps ?? 30;
-        return {
-          fps,
-          width: anyProps._width ?? 1080,
-          height: anyProps._height ?? 1920,
-          durationInFrames: Math.round((anyProps._durationSec ?? 8) * fps),
-        };
-      }}
-    />
+    <>
+      <Composition
+        id="TileBuild"
+        component={TileBuild}
+        durationInFrames={8 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={defaultProps}
+        calculateMetadata={({ props }) => {
+          const p = props as TileBuildProps & { _fps?: number; _width?: number; _height?: number; _durationSec?: number };
+          const fps = p._fps ?? 30;
+          return { fps, width: p._width ?? 1080, height: p._height ?? 1920, durationInFrames: Math.round((p._durationSec ?? 8) * fps) };
+        }}
+      />
+      <Composition
+        id="TileFilm"
+        component={TileFilm}
+        durationInFrames={12 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={filmDefaults}
+        calculateMetadata={({ props }) => {
+          const p = props as TileFilmProps & { _fps?: number; _width?: number; _height?: number };
+          const fps = p._fps ?? 30;
+          const dur = totalDuration(p.storyboard || defaultStoryboard());
+          return { fps, width: p._width ?? 1080, height: p._height ?? 1920, durationInFrames: Math.round(dur * fps) };
+        }}
+      />
+    </>
   );
 };

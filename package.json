@@ -7,6 +7,9 @@
   "scripts": {
     "studio": "remotion studio remotion/index.ts",
     "build": "node src/build.mjs",
+    "film": "node src/build.mjs --template=film",
+    "film-preview": "node src/render-film.mjs",
+    "save-showcase": "node src/save-showcase.mjs",
     "preview-fixture": "node src/preview-fixture.mjs",
     "test": "node src/test-reveal.mjs"
   },

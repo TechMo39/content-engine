@@ -44,6 +44,21 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "ontwerp";
 
+// Codeer een ontwerp als de serverloze deel-code (zelfde formaat als de site).
+export function encodeDesign(d) {
+  const b64 = Buffer.from(JSON.stringify(d), "utf8").toString("base64");
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// Laad de film-engine (remotion/film.ts) voor het film-storyboard.
+import esbuild from "esbuild";
+import { pathToFileURL } from "node:url";
+async function loadFilm() {
+  const out = path.resolve(ROOT, "out/.filmlib.mjs");
+  await esbuild.build({ entryPoints: [path.resolve(ROOT, "remotion/film.ts")], bundle: true, format: "esm", platform: "node", logLevel: "silent", outfile: out });
+  return import(pathToFileURL(out).href + "?t=" + Date.now());
+}
+
 const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml", gif: "image/gif" };
 
 // Haal het logo op (URL of lokaal pad) en geef het terug als data-URI, zodat het
@@ -130,6 +145,10 @@ async function main() {
     onProgress: () => {},
   });
 
+  const template = args.template || "build"; // build | film
+  const film = template === "film" ? await loadFilm() : null;
+  console.log(`• Template: ${template}`);
+
   console.log("• Configurator headless starten...");
   const extractor = await createExtractor({ verbose: !!args.verbose });
 
@@ -142,54 +161,50 @@ async function main() {
 
       const svg = await extractor.extract(d);
 
-      const inputProps = {
-        svg,
-        name,
-        captions: defaultCaptions(name),
-        brand: config.brand,
-        site: config.site,
-        audioSrc,
-        revealMode: mode,
-        revealStartSec: config.revealStartSec,
-        revealEndSec: config.revealEndSec,
-        popDurSec: config.popDurSec,
-        tileSelector: config.tileSelector,
-        // naamplaat-velden uit het ontwerp
-        namefont: d.namefont || "serif",
-        ink: d.ink || "gold",
-        textScale: Number(d.textScale) || 1,
-        plateScale: Number(d.plateScale) || 1,
-        // branding
-        theme: config.theme,
-        colBg: config.brandColors.bg,
-        colBg2: config.brandColors.bg2,
-        colGold: config.brandColors.gold,
-        colCream: config.brandColors.cream,
-        colInkOnPlate: config.brandColors.inkOnPlate,
-        logoSrc,
-        _fps: config.fps,
-        _width: aspect.w,
-        _height: aspect.h,
-        _durationSec: config.durationSec,
-      };
+      let compId, inputProps;
+      if (template === "film") {
+        compId = "TileFilm";
+        inputProps = {
+          svg,
+          storyboard: film.defaultStoryboard(),
+          brand: config.brand,
+          site: config.site,
+          audioSrc,
+          logoSrc,
+          colBg: config.brandColors.bg,
+          colBg2: config.brandColors.bg2,
+          colGold: config.brandColors.gold,
+          colCream: config.brandColors.cream,
+          _fps: config.fps,
+          _width: aspect.w,
+          _height: aspect.h,
+        };
+      } else {
+        compId = "TileBuild";
+        inputProps = {
+          svg, name, captions: defaultCaptions(name),
+          brand: config.brand, site: config.site, audioSrc,
+          revealMode: mode, revealStartSec: config.revealStartSec, revealEndSec: config.revealEndSec,
+          popDurSec: config.popDurSec, tileSelector: config.tileSelector,
+          namefont: d.namefont || "serif", ink: d.ink || "gold",
+          textScale: Number(d.textScale) || 1, plateScale: Number(d.plateScale) || 1,
+          theme: config.theme, colBg: config.brandColors.bg, colBg2: config.brandColors.bg2,
+          colGold: config.brandColors.gold, colCream: config.brandColors.cream, colInkOnPlate: config.brandColors.inkOnPlate,
+          logoSrc, _fps: config.fps, _width: aspect.w, _height: aspect.h, _durationSec: config.durationSec,
+        };
+      }
 
-      const composition = await selectComposition({
-        serveUrl,
-        id: "TileBuild",
-        inputProps,
-        publicDir,
-      });
-
+      const composition = await selectComposition({ serveUrl, id: compId, inputProps, publicDir });
       const outputLocation = path.join(outDir, `${slug}.mp4`);
-      await renderMedia({
-        composition,
-        serveUrl,
-        codec: "h264",
-        inputProps,
-        outputLocation,
-        publicDir,
-      });
-      console.log(`klaar -> out/${slug}.mp4`);
+      await renderMedia({ composition, serveUrl, codec: "h264", inputProps, outputLocation, publicDir });
+
+      // Kaartje per video: het exacte ontwerp + de deel-code, zodat je 'm later
+      // als showcase kunt opslaan zonder natekenen. (save-showcase gebruikt dit.)
+      const code = encodeDesign(d);
+      await fs.writeFile(path.join(outDir, `${slug}.design.json`),
+        JSON.stringify({ name, design: d, code, shareUrl: `${config.site.replace(/\/$/, "")}/#studio?d=${code}` }, null, 2));
+
+      console.log(`klaar -> out/${slug}.mp4 (+ .design.json)`);
     }
   } finally {
     await extractor.close();

@@ -1,88 +1,81 @@
-# Tale of Tiles — Content Engine (fase 1)
+# Tale of Tiles — Content Engine
 
-Lokale, gratis renderer die per opgeslagen ontwerp een **satisfying tegel-voor-tegel
-opbouw-video** maakt (9:16, TikTok/Reels). Geen SaaS, draait op je laptop.
+Lokale, gratis machine die uit je opgeslagen ontwerpen video's maakt. Draait op je
+laptop (praat over HTTP met de live site). Zie `docs/content-strategy.md` voor het waarom.
 
-Dit is **fase 1** uit `content-engine-plan.md`: renderer + 1 sjabloon (opbouw + captions,
-muziek optioneel). Scriptwriter, voice-over, outreach-mail en posten komen later.
+## Wat het doet
+1. Haalt ontwerpen op uit `/api/showcase-designs`.
+2. Opent de configurator **headless** en leest het echte mozaïek-SVG uit (`mApplyFullDesign`
+   → `#mSvgStage`). Pixel-getrouw, blijft in sync met de site.
+3. Rendert met **Remotion** een video (9:16), in je plum/goud-branding met logo.
 
-## Hoe het werkt (kort)
-1. Haalt de ontwerpen op uit `GET /api/showcase-designs`.
-2. Opent de **echte configurator headless** (Playwright), past per ontwerp
-   `mApplyFullDesign(design)` toe en leest de mozaiek-SVG uit `#mSvgStage`.
-   → pixel-getrouw: zelfde tiling, kleuren en voeg als de site, blijft in sync.
-3. **Remotion** onthult die SVG steentje voor steentje (radiaal), met merk-frame,
-   captions en CTA, en rendert naar `out/<naam>.mp4`.
+## Twee templates (zelfde motor)
+- **build** — satisfying opbouw: tegel-voor-tegel inkleuren (golf) + naamplaat. `npm run build`
+- **film** — tegel-canvas tekenfilm: opbouw → vormen (hart/ster) → kleuren-wissel, morphend
+  op één patroon. `npm run film`
 
-De reveal-logica zit in `remotion/svg.ts` en wordt door zowel de render als de
-test gebruikt (één bron van waarheid).
+De animatie-engine zit in `remotion/film.ts` (de "scenes" en het storyboard — kleuren en
+vormen zijn data, dus makkelijk uit te breiden).
 
 ## Eenmalige setup
 ```
-cd ~/Desktop/content-engine
 npm install
 npx playwright install chromium
 ```
 
-## Meteen zien (geen site nodig)
-Rendert een preview tegen een fixture-mozaiek met resvg + ffmpeg:
+## Video's maken
 ```
-npm run preview-fixture      # -> out/preview-fixture.mp4
+npm run build                 # satisfying-opbouw, alle ontwerpen
+npm run film                  # tekenfilm, alle ontwerpen
+node src/build.mjs --template=film --limit=1        # 1 ontwerp
+node src/build.mjs --only=<id> --aspect=1:1         # 9:16 (default) | 1:1 | 16:9
 ```
-Toont puur de beweging/compositie (niet een echt patroon).
+Output in `out/`. Per video komt er ook een `out/<naam>.design.json` — dat is het **kaartje**
+met het exacte ontwerp + de deel-code, zodat je 'm later als showcase kunt opslaan.
 
-## Echte video's maken
+## Snel de tekenfilm zien (zonder site)
 ```
-npm run build                              # alle ontwerpen, live
-node src/build.mjs --limit=1               # alleen de eerste
-node src/build.mjs --only=<ontwerp-id>     # één specifiek ontwerp
-node src/build.mjs --aspect=1:1            # 9:16 (default) | 1:1 | 16:9
-node src/build.mjs --mode=sweep-x          # radial (default) | sweep-x | sweep-y | diagonal | random
+npm run film-preview          # -> out/film-proof.mp4 (resvg+ffmpeg, fixture-patroon)
 ```
-Output in `out/`.
 
-## Interactief afstellen
+## Een winnaar opslaan als showcase
+Niks wordt automatisch opgeslagen. Vind je een video mooi, sla dan dát ene ontwerp op:
 ```
-npm run studio               # Remotion Studio, opent met een fixture-ontwerp
+node src/save-showcase.mjs --slug=<naam-uit-out>
 ```
-Schuif door de tijdlijn, pas `remotion/TileBuild.tsx` aan, zie het live.
+Vereist je admin-wachtwoord in `.env` (nooit in de chat, nooit in git — staat in `.gitignore`):
+```
+TOT_ADMIN_PW=jouwwachtwoord
+```
+Het gebruikt hetzelfde endpoint als de builder (`/api/showcase-save`). Verschijnt daarna in
+je admin + op de site.
 
 ## Muziek
-Zet royaltyvrije tracks in `assets/audio/`. De engine kiest er dan één en zet 'm
-onder de video. Leeg = **geen** muziek (bewust: geen willekeurige muziek onder het merk).
+Leg royaltyvrije tracks in `assets/audio/`. De engine kiest er een en zet 'm onder de video.
+Leeg = geen muziek.
 
 ## Afstellen — `config.mjs`
-Alles op één plek: formaat (`aspect`), duur, reveal-stijl/tempo (`revealMode`,
-`revealStartSec/EndSec`, `popDurSec`), captions (`defaultCaptions`), merk-copy.
-
-**Als de extractie niks vindt:** de site-namen staan in `config.mjs`
-(`applyFn` = `mApplyFullDesign`, `stageSelector` = `#mSvgStage`,
-`tileSelector` = `path,polygon`). Gebruikt een patroon vierkante `<rect>`-steentjes,
-zet `tileSelector` op `"path,polygon,rect"`. Eén regel, niet de code in.
-
-## Test
-```
-npm test                     # controleert de reveal-logica (zonder browser)
-```
-
-## Wat draait waar
-- **Op je laptop:** extractie (Chromium via Playwright) + eindrender (Remotion).
-- **Offline/overal:** `preview-fixture` en `test` (geen site/Chromium nodig).
+Formaat, duur, branding-kleuren, logo-URL, en (voor build) reveal-stijl/tempo. De tekenfilm
+stel je af in `remotion/film.ts` (het storyboard: welke vormen, welke kleuren, tempo).
 
 ## Mappen
 ```
-config.mjs            alle instellingen
+config.mjs              instellingen + branding
 remotion/
-  svg.ts              parse + reveal-volgorde + per-frame opbouw (gedeeld)
-  TileBuild.tsx       de compositie (frame, captions, CTA, muziek)
-  Root.tsx, index.ts  Remotion-registratie
+  film.ts               tegel-canvas animatie-engine (scenes + storyboard)
+  TileFilm.tsx          film-compositie
+  svg.ts, TileBuild.tsx satisfying-opbouw compositie
+  Root.tsx, index.ts    Remotion-registratie
 src/
-  build.mjs           orchestrator (ophalen -> extractie -> render)
-  extract-svg.mjs     headless configurator -> echte SVG
-  fetch-designs.mjs   ontwerpen ophalen (live of --file)
-  preview-fixture.mjs offline preview (resvg + ffmpeg)
-  test-reveal.mjs     logica-test
-fixtures/             fixture-mozaiek + voorbeeld-JSON
-out/                  gerenderde video's
-assets/audio/         jouw muziek (leeg = geen muziek)
+  build.mjs             orchestrator (ophalen -> extractie -> render -> sidecar)
+  render-film.mjs       offline tekenfilm-preview (resvg+ffmpeg)
+  save-showcase.mjs     1 ontwerp opslaan als showcase (admin)
+  extract-svg.mjs       headless configurator -> echte SVG
+  fetch-designs.mjs     ontwerpen ophalen
+  dump-svg.mjs          diagnose: echte SVG + structuur
+  test-*.mjs            tests
+fixtures/               fixture + echte dump.svg + voorbeeld-JSON
+docs/content-strategy.md
+out/                    video's + .design.json kaartjes
+assets/audio/           jouw muziek
 ```
