@@ -232,8 +232,23 @@ function colorTile(t: Tile, prog: number): string {
   let fill: string;
   if (prog <= 0) fill = BLANK_FILL;
   else if (prog >= 1) fill = t.realFill;
-  else fill = mixHex(BLANK_FILL, t.realFill, easeInOut(prog));
+  else {
+    const base = mixHex(BLANK_FILL, t.realFill, easeInOut(prog));
+    // Glans: korte oplichting die piekt rond het midden en op 0 settelt bij prog=1,
+    // zodat de eindkleur exact klopt. Geeft het "glanzende zellige"-gevoel.
+    const sheen = Math.sin(Math.min(1, prog) * Math.PI) * 0.22 * (1 - prog);
+    fill = sheen > 0.003 ? lighten(base, sheen) : base;
+  }
   return setFill(t.openTag, fill);
+}
+
+function lighten(c: string, amt: number): string {
+  const p = hex(c);
+  if (!p) return c;
+  const r = Math.round(p[0] + (255 - p[0]) * amt);
+  const g = Math.round(p[1] + (255 - p[1]) * amt);
+  const b = Math.round(p[2] + (255 - p[2]) * amt);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
 // Lees de echte fill uit style="fill:#..." of fill="#...".

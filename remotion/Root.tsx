@@ -32,6 +32,13 @@ const defaultProps: TileBuildProps = {
   ink: "gold",
   textScale: 1.35,
   plateScale: 1,
+  theme: "dark",
+  colBg: "#1a1327",
+  colBg2: "#241a3a",
+  colGold: "#d6b35a",
+  colCream: "#f4ecdc",
+  colInkOnPlate: "#4a3a2a",
+  logoSrc: "",
 };
 
 export const RemotionRoot: React.FC = () => {

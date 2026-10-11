@@ -22,7 +22,21 @@ export const config = {
   fps: 30,
   // 9:16 voor TikTok/Reels. Voor 1:1 -> {w:1080,h:1080}, 16:9 -> {w:1920,h:1080}.
   aspect: { w: 1080, h: 1920 },
-  durationSec: 8,
+  durationSec: 15,
+
+  // ---- Branding (exact uit taleoftiles.com) ---------------------------------
+  brandColors: {
+    bg: "#1a1327", // diep plum (hero-achtergrond)
+    bg2: "#241a3a", // iets warmer plum voor de radial
+    gold: "#d6b35a", // goud (knop/accent)
+    cream: "#f4ecdc", // crème (tekst)
+    inkOnPlate: "#4a3a2a", // tekstkleur op de naamplaat
+  },
+  // Logo: de engine haalt dit bij het renderen op van je site (jouw laptop kan
+  // erbij). Leeg laten of een lokaal pad (assets/logo.png) kan ook.
+  logoUrl: "https://taleoftiles.com/logo.png",
+  // "dark" = plum merk-achtergrond (aanbevolen, zoals de site). "light" = beige.
+  theme: "dark",
 
   // ---- Reveal (de "satisfying" opbouw) --------------------------------------
   // Welke elementen zijn "steentjes". polygon+path dekt de meeste patronen.
@@ -31,9 +45,9 @@ export const config = {
   // Het patroon staat meteen VOLLEDIG (nog neutraal/ongekleurd); daarna kleurt
   // elk steentje in. Volgorde = willekeurig (niet vanuit het midden).
   revealMode: "random", // random | radial | sweep-x | sweep-y | diagonal
-  revealStartSec: 0.3, // eerste steentje kleurt in
-  revealEndSec: 6.8, // laatste steentje kleurt in (inkleuren vult bijna de clip)
-  popDurSec: 0.22, // hoe lang 1 steentje doet over inkleuren (blank -> kleur)
+  revealStartSec: 0.6, // eerste steentje kleurt in
+  revealEndSec: 12.6, // laatste steentje kleurt in (inkleuren vult bijna de clip)
+  popDurSec: 0.3, // hoe lang 1 steentje doet over inkleuren (blank -> kleur)
 
   // ---- Overlay / merk --------------------------------------------------------
   brand: "Tale of Tiles",

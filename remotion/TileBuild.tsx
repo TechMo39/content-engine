@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import {
   AbsoluteFill,
+  Img,
   useCurrentFrame,
   useVideoConfig,
   interpolate,
@@ -35,6 +36,14 @@ export type TileBuildProps = {
   ink: string; // gold | terra | ...
   textScale: number;
   plateScale: number;
+  // branding
+  theme: string; // "dark" (plum) | "light" (beige)
+  colBg: string;
+  colBg2: string;
+  colGold: string;
+  colCream: string;
+  colInkOnPlate: string;
+  logoSrc: string; // bestandsnaam in public/ ; "" = geen logo
 };
 
 const INK_HEX: Record<string, string> = {
@@ -46,11 +55,6 @@ const FONT_STACK: Record<string, string> = {
   grieks: "'Optima', 'Palatino Linotype', Georgia, serif",
   serif: "Georgia, 'Times New Roman', serif",
 };
-
-const BG_TOP = "#f3efe8";
-const BG_BOT = "#e4ddd1";
-const INK = "#1c1a17";
-const ACCENT = "#9a7b46";
 
 export const TileBuild: React.FC<TileBuildProps> = ({
   svg,
@@ -68,6 +72,13 @@ export const TileBuild: React.FC<TileBuildProps> = ({
   ink,
   textScale,
   plateScale,
+  theme,
+  colBg,
+  colBg2,
+  colGold,
+  colCream,
+  colInkOnPlate,
+  logoSrc,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -104,31 +115,56 @@ export const TileBuild: React.FC<TileBuildProps> = ({
     extrapolateRight: "clamp",
   });
 
+  const isDark = theme !== "light";
+  const INK = isDark ? colCream : "#1c1a17";
+  const ACCENT = colGold;
+  const bg = isDark
+    ? `radial-gradient(120% 90% at 50% 26%, ${colBg2} 0%, ${colBg} 70%)`
+    : `radial-gradient(120% 90% at 50% 28%, #f3efe8 0%, #e4ddd1 100%)`;
+
+  // Logo verschijnt met een zachte fade.
+  const logoOpacity = interpolate(frame, [4, 20], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
   return (
     <AbsoluteFill
       style={{
-        background: `radial-gradient(120% 90% at 50% 28%, ${BG_TOP} 0%, ${BG_BOT} 100%)`,
+        background: bg,
         fontFamily: "Georgia, 'Times New Roman', serif",
       }}
     >
       {audioSrc ? <Audio src={staticFile(audioSrc)} /> : null}
 
-      {/* Merk-woordmerk bovenaan */}
+      {/* Logo bovenaan (valt terug op woordmerk als er geen logo is) */}
       <div
         style={{
           position: "absolute",
-          top: height * 0.07,
+          top: height * 0.055,
           width: "100%",
-          textAlign: "center",
-          color: INK,
-          letterSpacing: 8,
-          fontSize: 34,
-          fontWeight: 400,
-          textTransform: "uppercase",
-          opacity: 0.9,
+          display: "flex",
+          justifyContent: "center",
+          opacity: logoOpacity,
         }}
       >
-        {brand}
+        {logoSrc ? (
+          <Img
+            src={staticFile(logoSrc)}
+            style={{ height: height * 0.07, objectFit: "contain" }}
+          />
+        ) : (
+          <div
+            style={{
+              color: ACCENT,
+              letterSpacing: 8,
+              fontSize: 34,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand}
+          </div>
+        )}
       </div>
 
       {/* Paneel */}
@@ -147,11 +183,13 @@ export const TileBuild: React.FC<TileBuildProps> = ({
             transform: `scale(${introScale})`,
             opacity: introOpacity,
             // Zwart metalen frame als basis (merk), subtiele slagschaduw.
-            padding: 14,
-            background: "linear-gradient(145deg,#2a2a2a,#111)",
+            padding: 16,
+            // Donker frame met een subtiele gouden binnenrand (merk).
+            background: "linear-gradient(145deg,#2a2335,#0e0a16)",
+            border: `2px solid ${colGold}`,
             borderRadius: 6,
             boxShadow:
-              "0 40px 80px rgba(0,0,0,0.28), 0 8px 20px rgba(0,0,0,0.18)",
+              "0 40px 90px rgba(0,0,0,0.45), 0 8px 22px rgba(0,0,0,0.3)",
           }}
         >
           <div
@@ -166,7 +204,8 @@ export const TileBuild: React.FC<TileBuildProps> = ({
           <Nameplate
             name={name}
             namefont={namefont}
-            ink={ink}
+            plateEdge={colGold}
+            plateInk={colInkOnPlate}
             textScale={textScale}
             plateScale={plateScale}
             panelW={panelW}
@@ -222,19 +261,35 @@ export const TileBuild: React.FC<TileBuildProps> = ({
         );
       })}
 
-      {/* (CTA onderaan) */}
+      {/* CTA onderaan: gouden pil + site */}
       <div
         style={{
           position: "absolute",
           bottom: height * 0.07,
           width: "100%",
-          textAlign: "center",
-          color: ACCENT,
-          fontSize: 40,
-          letterSpacing: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: height * 0.018,
         }}
       >
-        {site}
+        <div
+          style={{
+            background: colGold,
+            color: "#2a2010",
+            fontSize: 38,
+            fontWeight: 600,
+            letterSpacing: 1,
+            padding: "18px 46px",
+            borderRadius: 999,
+            boxShadow: "0 8px 22px rgba(0,0,0,0.35)",
+          }}
+        >
+          Ontwerp jouw paneel
+        </div>
+        <div style={{ color: isDark ? colCream : "#6b5a3a", fontSize: 30, letterSpacing: 2, opacity: 0.85 }}>
+          {site}
+        </div>
       </div>
     </AbsoluteFill>
   );
@@ -245,7 +300,8 @@ export const TileBuild: React.FC<TileBuildProps> = ({
 const Nameplate: React.FC<{
   name: string;
   namefont: string;
-  ink: string;
+  plateEdge: string; // randkleur (brand goud)
+  plateInk: string; // tekstkleur
   textScale: number;
   plateScale: number;
   panelW: number;
@@ -253,9 +309,9 @@ const Nameplate: React.FC<{
   frame: number;
   fps: number;
   appearSec: number;
-}> = ({ name, namefont, ink, textScale, plateScale, panelW, panelH, frame, fps, appearSec }) => {
+}> = ({ name, namefont, plateEdge, plateInk, textScale, plateScale, panelW, panelH, frame, fps, appearSec }) => {
   if (!name) return null;
-  const inkHex = INK_HEX[ink] || INK_HEX.gold;
+  const inkHex = plateEdge;
   const font = FONT_STACK[namefont] || FONT_STACK.serif;
 
   const inF = appearSec * fps;
@@ -307,7 +363,7 @@ const Nameplate: React.FC<{
             fontSize,
             lineHeight: 1.05,
             letterSpacing: fontSize * 0.08,
-            color: "#4a3a2a",
+            color: plateInk,
             textTransform: "uppercase",
             fontWeight: 600,
           }}

@@ -44,6 +44,48 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "ontwerp";
 
+// Haal het logo op (URL of lokaal pad) en zet het in remotion/public zodat
+// Remotion het als staticFile kan laden. Jouw laptop kan bij taleoftiles.com.
+async function prepareLogo() {
+  const pub = path.resolve(ROOT, "remotion/public");
+  await fs.mkdir(pub, { recursive: true });
+  const src = config.logoUrl || "";
+  if (!src) {
+    // lokaal assets/logo.* ?
+    try {
+      const a = path.resolve(ROOT, "assets");
+      const f = (await fs.readdir(a)).find((x) => /^logo\.(png|jpg|jpeg|webp|svg)$/i.test(x));
+      if (f) {
+        await fs.copyFile(path.join(a, f), path.join(pub, f));
+        return f;
+      }
+    } catch {}
+    return "";
+  }
+  if (/^https?:\/\//i.test(src)) {
+    try {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error(`logo ${res.status}`);
+      const ext = (src.split(".").pop() || "png").split(/[?#]/)[0].toLowerCase();
+      const name = `logo.${ext.length <= 4 ? ext : "png"}`;
+      const buf = Buffer.from(await res.arrayBuffer());
+      await fs.writeFile(path.join(pub, name), buf);
+      return name;
+    } catch (e) {
+      console.log(`  (logo niet opgehaald: ${e.message} — ga door zonder logo)`);
+      return "";
+    }
+  }
+  // lokaal pad
+  try {
+    const name = "logo." + (src.split(".").pop() || "png");
+    await fs.copyFile(path.resolve(ROOT, src), path.join(pub, name));
+    return name;
+  } catch {
+    return "";
+  }
+}
+
 async function pickAudio() {
   const dir = path.resolve(ROOT, config.audioDir);
   try {
@@ -78,6 +120,8 @@ async function main() {
 
   const audioSrc = await pickAudio();
   console.log(audioSrc ? `• Muziek: ${audioSrc}` : "• Muziek: (geen)");
+  const logoSrc = await prepareLogo();
+  console.log(logoSrc ? `• Logo: ${logoSrc}` : "• Logo: (geen)");
 
   const outDir = path.resolve(ROOT, config.outDir);
   await fs.mkdir(outDir, { recursive: true });
@@ -117,6 +161,14 @@ async function main() {
         ink: d.ink || "gold",
         textScale: Number(d.textScale) || 1,
         plateScale: Number(d.plateScale) || 1,
+        // branding
+        theme: config.theme,
+        colBg: config.brandColors.bg,
+        colBg2: config.brandColors.bg2,
+        colGold: config.brandColors.gold,
+        colCream: config.brandColors.cream,
+        colInkOnPlate: config.brandColors.inkOnPlate,
+        logoSrc,
         _fps: config.fps,
         _width: aspect.w,
         _height: aspect.h,
