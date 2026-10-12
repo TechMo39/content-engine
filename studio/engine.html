@@ -42,7 +42,8 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
     <div class="sec" id="tplSec"><h2>3 · Template</h2><div class="seg" id="templates"></div></div>
     <div class="sec" id="optSec"><h2>4 · Opties</h2><div id="opts"></div></div>
     <div class="sec"><h2>5 · Muziek & formaat</h2>
-      <label class="row">Muziek <select id="music"><option value="">(automatisch — op type)</option></select></label>
+      <label class="row">Muziek <span style="display:flex;gap:6px;align-items:center"><select id="music"><option value="">(automatisch — op type)</option></select><button id="mprev" title="Beluister" style="background:#1b1430;border:1px solid #3a2f52;color:var(--gold);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:13px">▶</button></span></label>
+      <audio id="maud" style="display:none"></audio>
       <label class="row">Formaat <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span></label>
     </div>
     <button class="render" id="go" disabled>Kies eerst een onderwerp</button>
@@ -110,6 +111,13 @@ $('#subjToggle').onclick=()=>setSubjOpen($('#subjWrap').style.display==='none');
 $$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.format=b.dataset.fmt;});
 fetch('/api/music').then(r=>r.json()).then(j=>(j.files||[]).forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;$('#music').appendChild(o);}));
 $('#music').onchange=e=>state.music=e.target.value;
+// Muziek-preview: ▶ speelt de gekozen track (of een willekeurige bij 'automatisch'); nogmaals = stop.
+(function(){const aud=$('#maud'),btn=$('#mprev');
+  btn.onclick=()=>{ if(!aud.paused){aud.pause();btn.textContent='▶';return;}
+    let f=$('#music').value; if(!f){const opts=[...$('#music').options].map(o=>o.value).filter(Boolean); if(!opts.length)return; f=opts[Math.floor(Math.random()*opts.length)];}
+    aud.src='/api/audio?f='+encodeURIComponent(f); aud.play().then(()=>btn.textContent='⏸').catch(()=>{}); };
+  aud.onended=()=>btn.textContent='▶';
+})();
 
 $('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;btn.textContent='Renderen…';$('#msg').textContent='Even geduld…';
   try{const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:state.brand,subject:state.subject,template:state.template,format:state.format,music:state.music,opts:state.opts})});
