@@ -130,6 +130,13 @@ export function makeBrand({ ROOT, config }) {
     if (segs.length === 1) segs.push({ scene: { type: "fields", palette: pal }, hold: tempo, trans: 0.9 });
     return { buildSec: Number(opts.buildSec) || 3.0, popSec: 0.3, segments: segs };
   }
+  // Vrij instelbare duur (seconden) vanuit de UI-schuif; valt terug op de oude
+  // presets of 24s. Alle satisfying-timing (opbouw, flow, bookend, naam) schaalt hiermee.
+  function resolveDuration(opts) {
+    const n = Number(opts.durationSec ?? opts.duration);
+    if (Number.isFinite(n) && n > 0) return Math.max(6, Math.min(60, n));
+    return { kort: 14, middel: 24, lang: 38 }[opts.duration] || 24;
+  }
   // SATISFYING (template 1, geperfectioneerd): langer + trager + naadloze loop.
   // Begint neutraal -> kleurt rustig in -> ademt door kleurlagen -> vervaagt aan het eind
   // weer naar neutraal, zodat de video naadloos opnieuw begint (loop).
@@ -189,9 +196,13 @@ export function makeBrand({ ROOT, config }) {
     if (!parsed.tiles.length) throw new Error(`patroon ${subjectId} heeft 0 tegels`);
     const tpl = templates.find((t) => t.id === templateId) || templates[0];
     const autoMusic = await pickMusic(tpl.music || ["calm"]);   // engine kiest zelf de muziek per type
-    const story = templateId === "colorway" ? storyboardColorway(opts) : templateId === "satisfying" ? storyboardSatisfying(opts) : storyboardFrom(opts);
-    const loop = templateId === "satisfying";   // naadloze loop: eindig neutraal
-    const durSec = film.totalDuration(story);
+    const isFlow = templateId === "satisfying";
+    const loop = isFlow;   // naadloze loop
+    // SATISFYING = doorlopend stromend kleurveld met vrij instelbare duur.
+    // Andere templates = de storyboard-weg (losse scènes).
+    let story = null, durSec, buildSec = 0;
+    if (isFlow) { durSec = resolveDuration(opts); buildSec = Math.min(6, Math.max(2.5, durSec * 0.22)); }
+    else { story = templateId === "colorway" ? storyboardColorway(opts) : storyboardFrom(opts); durSec = film.totalDuration(story); }
     const A = parsed.view[2] / parsed.view[3];
     const bandTop = Math.round(H * 0.155), bandBot = Math.round(H * 0.905);
     const fit = fitRect(Math.round(W * 0.86), bandBot - bandTop, A);
@@ -218,33 +229,54 @@ export function makeBrand({ ROOT, config }) {
     }
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
+    // CAMERA-REGIE (alleen met foto-bookend): intro zoomt in op de tegels in de foto,
+    // lost op in het kale mozaïek dat inkleurt terwijl de camera terugtrekt; aan het eind
+    // zoomt de camera weer in op het patroon, lost op in de foto, die langzaam uitzoomt.
+    const camZoom = 2.15;
+    let Ti = 2.4, Dt = 0.5, Tb = buildSec, To = 2.6;
+    if (bookend) { const want = Ti + Tb + To, f = Math.min(want, durSec * 0.72) / want; Ti *= f; Tb *= f; To *= f; }
+    const buildStart = bookend ? Ti : 0;   // opbouw/inkleuren start ná de intro-inzoom
+    const pw = parsed.view[2], ph = parsed.view[3];
+
     function sceneAt(frame) {
       const t = frame / FPS, tleft = durSec - t;
-      // Begin en eind op de sfeerfoto (bookend) => naadloze loop + merk-context.
-      // Geen foto: val terug op het oude "vervaag naar neutraal" voor de loop.
-      let heroK = 0, tailK = 0;
+      // Camera: photoK = hoeveel de foto zichtbaar is; zMos/zPho = inzoom op mozaïek/foto.
+      let photoK = 0, zMos = 1, zPho = 1, tailK = 0;
       if (bookend) {
-        if (t < bk) heroK = Math.max(heroK, 1 - smooth(t / bk));
-        if (tleft < bk) heroK = Math.max(heroK, 1 - smooth(tleft / bk));
+        const oStart = durSec - To, oZi = oStart + To * 0.42, oDis = oZi + Math.min(Dt, To * 0.28);
+        if (t < Ti) {                                   // intro: foto zoomt in op de tegels, dan dissolve naar kaal mozaïek
+          zPho = 1 + (camZoom - 1) * smooth(t / Ti); zMos = camZoom;
+          photoK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);
+        } else if (t < Ti + Tb) {                       // camera trekt terug terwijl het inkleurt
+          zMos = camZoom - (camZoom - 1) * smooth((t - Ti) / Tb);
+        } else if (t < oStart) {                        // vrije flow
+          zMos = 1;
+        } else if (t < oZi) {                           // outro: inzoomen op het patroon
+          zMos = 1 + (camZoom - 1) * smooth((t - oStart) / (oZi - oStart));
+        } else if (t < oDis) {                          // dissolve mozaïek -> foto (beide ingezoomd)
+          zMos = camZoom; zPho = camZoom; photoK = smooth((t - oZi) / (oDis - oZi));
+        } else {                                        // foto zoomt langzaam uit -> naadloos terug naar begin
+          photoK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
+        }
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
-      let colors = film.colorsAt(parsed, story, t);
+      let colors = isFlow ? film.flowColorsAt(parsed, { palette: palArr, durSec, buildSec: Tb, buildStart }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
+      const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
-        `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
+        `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid meet">`);
       let overlay = "";
-      // sfeerfoto over het paneel (cross-dissolve met het mozaïek)
-      if (bookend && heroK > 0.002) {
-        const k = heroK.toFixed(3);
+      // sfeerfoto over het paneel, met Ken-Burns inzoom (groter tekenen + clippen)
+      if (bookend && photoK > 0.002) {
+        const k = photoK.toFixed(3), iw = panelW * zPho, ih = panelH * zPho, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
         overlay += `<clipPath id="heroclip"><rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6"/></clipPath>`
-          + `<image href="${hero}" x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroclip)" opacity="${k}"/>`
+          + `<image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroclip)" opacity="${k}"/>`
           + `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="none" stroke="${branding.gold}" stroke-width="2" opacity="${k}"/>`;
       }
       overlay += badge;
-      // De NAAM is de payoff: graveert ~5.5s voor het eind van de opbouw, blijft staan,
-      // verdwijnt pas met de bookend/blank. Zo flitst 'ie niet meer kort voorbij.
+      // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
-        const outK = bookend ? heroK : tailK;
-        const nameStart = Math.max(story.buildSec + 1, durSec - (bookend ? bk : 1.3) - 5.5);
+        const outK = bookend ? photoK : tailK;
+        const nameStart = Math.max(buildStart + Tb + 0.8, durSec - (bookend ? To : 1.3) - 5.0);
         const op = Math.max(0, Math.min(1, (t - nameStart) / 1.1)) * (1 - outK);
         if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
