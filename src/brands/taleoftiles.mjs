@@ -153,11 +153,24 @@ export function makeBrand({ ROOT, config }) {
     return { buildSec: Number(opts.buildSec) || 2.4, popSec: 0.3, segments: segs };
   }
 
+  // Elk template zegt welke muziek-categorieën erbij passen. De engine kiest er
+  // automatisch een track uit (op prefix in assets/audio, bv. "oriental-03.mp3").
   const templates = [
-    { id: "satisfying", name: "Satisfying Build", defaults: { base: "confetti", endColorway: true, shapes: [] } },
-    { id: "colorway", name: "Colorway A/B/C", defaults: {} },
-    { id: "shapes", name: "Vormen", defaults: { base: "fields", shapes: ["heart", "star"], endColorway: true } },
+    { id: "satisfying", name: "Satisfying Build", music: ["calm", "oriental", "spanish"], defaults: { base: "confetti", endColorway: true, shapes: [] } },
+    { id: "colorway", name: "Colorway A/B/C", music: ["upbeat", "lofi", "boombap"], defaults: {} },
+    { id: "shapes", name: "Vormen", music: ["lofi", "calm"], defaults: { base: "fields", shapes: ["heart", "star"], endColorway: true } },
   ];
+
+  // Kies automatisch een track uit de categorieën van een template. Val terug op
+  // alles als er (nog) niks in die categorie staat.
+  async function pickMusic(cats) {
+    let files = [];
+    try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|wav|m4a|aac|ogg)$/i.test(f)); } catch {}
+    if (!files.length) return "";
+    const want = files.filter((f) => (cats || []).some((c) => f.toLowerCase().startsWith(c + "-")));
+    const pool = want.length ? want : files;
+    return path.resolve(ROOT, config.audioDir, pool[Math.floor(Math.random() * pool.length)]);
+  }
 
   async function listSubjects() {
     return (patternList || []).map((id) => ({ id, thumb: "/api/tot-thumb?p=" + id }));
@@ -174,6 +187,8 @@ export function makeBrand({ ROOT, config }) {
     const svg = await getPatternSvg(subjectId, nX, nY);
     const parsed = film.parseTiles(svg, opts.reveal || "radial");
     if (!parsed.tiles.length) throw new Error(`patroon ${subjectId} heeft 0 tegels`);
+    const tpl = templates.find((t) => t.id === templateId) || templates[0];
+    const autoMusic = await pickMusic(tpl.music || ["calm"]);   // engine kiest zelf de muziek per type
     const story = templateId === "colorway" ? storyboardColorway(opts) : templateId === "satisfying" ? storyboardSatisfying(opts) : storyboardFrom(opts);
     const loop = templateId === "satisfying";   // naadloze loop: eindig neutraal
     const durSec = film.totalDuration(story);
@@ -239,7 +254,7 @@ export function makeBrand({ ROOT, config }) {
       }
       return composeChrome({ branding, W, H, panel: { x: panelX, y: panelY, w: panelW, h: panelH }, innerField: inner, overlay, logoUri: branding.logoUri });
     }
-    return { W, H, FPS, SS, durSec, sceneAt };
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic };
   }
 
   // thumbnail: kaal patroon leesbaar (cream op plum) — voor de patroonkiezer

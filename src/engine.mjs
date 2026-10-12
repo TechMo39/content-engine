@@ -51,7 +51,9 @@ const server = http.createServer(async (req, res) => {
       log(`▶ render — ${brand.id}/${bd.subject || "-"}/${bd.template || "-"} (${bd.format || "9:16"})`);
       try {
         const render = await brand.makeRender({ subjectId: bd.subject, templateId: bd.template, opts: bd.opts || {}, format: bd.format || "9:16" });
-        const music = bd.music ? path.resolve(ROOT, config.audioDir, bd.music) : "";
+        // Muziek: handmatige keuze wint; anders de track die het merk automatisch per type koos.
+        const music = bd.music ? path.resolve(ROOT, config.audioDir, bd.music) : (render.music || "");
+        if (music) log(`♪ muziek: ${path.basename(music)}${bd.music ? "" : " (automatisch)"}`);
         const r = await renderToMp4({ render, music, outDir: OUT, log, namePrefix: brand.id });
         log(`✓ klaar: /out/${r.outName}`);
         json(res, { url: "/out/" + r.outName });
