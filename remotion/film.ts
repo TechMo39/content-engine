@@ -81,9 +81,16 @@ export function parseTiles(svg: string): Parsed {
       const gx = cx + off.tx, gy = cy + off.ty;
       const cell = cellStack[cellStack.length - 1] || "";
       const idx = (m[0].match(/data-idx="([0-9-]+)"/) || [])[1] || "";
-      tiles.push({ start: m.index, end: m.index + m[0].length, gx, gy, nx: gx / view[2], ny: gy / view[3], order: 0, key: cell ? `c${cell}_i${idx}` : "" });
+      tiles.push({ start: m.index, end: m.index + m[0].length, gx, gy, nx: 0, ny: 0, order: 0, key: cell ? `c${cell}_i${idx}` : "" });
     }
   }
+  // Genormaliseerde positie (0..1) op basis van de ECHTE tegel-grenzen, niet het
+  // tekenvak/viewBox — robuust als een patroon een rare viewBox of coördinaten heeft
+  // (voorkomt dat Vlakken/vormen omvallen naar één egale kleur).
+  let miX = Infinity, maX = -Infinity, miY = Infinity, maY = -Infinity;
+  for (const t of tiles) { if (Number.isFinite(t.gx)) { if (t.gx < miX) miX = t.gx; if (t.gx > maX) maX = t.gx; } if (Number.isFinite(t.gy)) { if (t.gy < miY) miY = t.gy; if (t.gy > maY) maY = t.gy; } }
+  const spanX = maX - miX || 1, spanY = maY - miY || 1;
+  for (const t of tiles) { t.nx = Number.isFinite(t.gx) ? (t.gx - miX) / spanX : 0.5; t.ny = Number.isFinite(t.gy) ? (t.gy - miY) / spanY : 0.5; }
   let s = 7; const h = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const jit = 0.1; const keyed = tiles.map((t, i) => ({ i, k: t.nx + t.ny + (h() - 0.5) * jit }));
   keyed.sort((a, b) => a.k - b.k); keyed.forEach((o, rank) => (tiles[o.i].order = rank / (tiles.length - 1 || 1)));
@@ -97,7 +104,7 @@ const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.lengt
 const smooth = (p: number) => p * p * (3 - 2 * p);
 
 function shapeInside(shape: string, nx: number, ny: number, view: number[]): boolean {
-  const AR = view[2] / view[3];
+  let AR = view[2] / view[3]; if (!Number.isFinite(AR) || AR <= 0) AR = 1;
   if (shape === "heart") { const u = (nx - 0.5) * AR * 2.5, v = (0.46 - ny) * 2.5; return Math.pow(u * u + v * v - 1, 3) - u * u * v * v * v < 0; }
   if (shape === "star") { const u = (nx - 0.5) * AR * 2.2, v = (ny - 0.5) * 2.2; const r = Math.hypot(u, v), a = Math.atan2(v, u); return r < 0.92 + 0.33 * Math.cos(8 * a); }
   const u = Math.abs(nx - 0.5) * AR, v = Math.abs(ny - 0.5); return u + v < 0.42; // diamond
