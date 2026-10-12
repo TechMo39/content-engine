@@ -98,7 +98,7 @@ async function buildImagePicker(){
   const strip=$('#imgStrip');
   if(!j.images.length){strip.innerHTML='<div class="hint">Nog geen foto\'s. Leg ze in <code>assets/images/taleoftiles/</code>.</div>';return;}
   const mk=(id,uri,label)=>{const d=document.createElement('div');d.className='ithumb'+(state.opts.image===id?' on':'');d.title=label||id;d.innerHTML=uri?`<img src="${uri}">`:`<span>auto</span>`;d.onclick=()=>{$$('.ithumb').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.opts.image=id;};strip.appendChild(d);};
-  mk('', '', 'Automatisch (eerste foto)');
+  mk('', '', 'Automatisch (willekeurig per render)');
   j.images.forEach(im=>mk(im.id,im.uri,im.id));
 }
 function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}

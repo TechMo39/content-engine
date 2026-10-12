@@ -203,7 +203,8 @@ export function makeBrand({ ROOT, config }) {
     const palArr = PALS()[opts.palette] || film.PAL;
     const np = name ? plateColours(palArr) : null;
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
-    const hero = (opts.image && imgById(opts.image)) ? imgById(opts.image).uri : (imagePool[0] ? imagePool[0].uri : "");
+    // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
+    const hero = (opts.image && imgById(opts.image)) ? imgById(opts.image).uri : (imagePool.length ? imagePool[Math.floor(Math.random() * imagePool.length)].uri : "");
     const bookend = loop && !!hero;   // naadloze foto-bookend: alleen satisfying + er is een foto
     const bk = 1.5;                   // duur van de in-/uit-dissolve naar de foto
     // klein gekaderd productbeeld bovenin links — zelfde foto als het sfeerbeeld
