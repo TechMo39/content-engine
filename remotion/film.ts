@@ -8,6 +8,10 @@ export const WARM = ["#c75a4e","#f79f45","#e4ce8c","#f6ae91","#e7c077","#c67765"
 export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084","#a1c981","#663959"];
 export const BLANK = "#e8e5e2";
 export const PLUM = "#2a2335";
+// Voeg (zoals de configurator): crème naad tussen ingekleurde tegels,
+// dun donker contour op de nog-neutrale (raw) tegels.
+export const VOEG = "#eae4d7";
+export const VOEG_RAW = "#b9a98c";
 
 export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };
 export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] } };
@@ -61,7 +65,7 @@ export function tilePattern(baseSvg: string, lock: Lock, nX: number, nY: number)
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvasW.toFixed(0)} ${canvasH.toFixed(0)}">${cells}</svg>`;
 }
 
-export function parseTiles(svg: string): Parsed {
+export function parseTiles(svg: string, reveal: string = "diag"): Parsed {
   const view = (svg.match(/viewBox="([^"]+)"/) || [])[1].split(/\s+/).map(Number);
   const tokenRe = /<(g)\b([^>]*)>|<\/g>|<(polygon|rect|path)\b([^>]*?)\/?>/gi;
   const translate = (t: string) => { let tx = 0, ty = 0, m: RegExpExecArray | null; const re = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\)/gi; while ((m = re.exec(t))) { tx += +m[1]; ty += +m[2]; } return { tx, ty }; };
@@ -91,14 +95,27 @@ export function parseTiles(svg: string): Parsed {
   for (const t of tiles) { if (Number.isFinite(t.gx)) { if (t.gx < miX) miX = t.gx; if (t.gx > maX) maX = t.gx; } if (Number.isFinite(t.gy)) { if (t.gy < miY) miY = t.gy; if (t.gy > maY) maY = t.gy; } }
   const spanX = maX - miX || 1, spanY = maY - miY || 1;
   for (const t of tiles) { t.nx = Number.isFinite(t.gx) ? (t.gx - miX) / spanX : 0.5; t.ny = Number.isFinite(t.gy) ? (t.gy - miY) / spanY : 0.5; }
-  let s = 7; const h = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  const jit = 0.1; const keyed = tiles.map((t, i) => ({ i, k: t.nx + t.ny + (h() - 0.5) * jit }));
-  keyed.sort((a, b) => a.k - b.k); keyed.forEach((o, rank) => (tiles[o.i].order = rank / (tiles.length - 1 || 1)));
+  setReveal({ svg, view, tiles }, reveal);
   return { svg, view, tiles };
 }
 
+// Bepaalt de volgorde waarin tegels inkleuren (de "opbouw"-beweging).
+export function setReveal(parsed: Parsed, reveal: string = "diag"): void {
+  const { tiles } = parsed;
+  let s = 7; const h = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const jit = 0.045;
+  const keyFn = (t: Tile): number => {
+    if (reveal === "radial") return Math.hypot(t.nx - 0.5, (t.ny - 0.5) * 1.2);   // bloei vanuit midden
+    if (reveal === "down") return t.ny;                                            // van boven naar beneden
+    if (reveal === "up") return 1 - t.ny;                                          // van onder naar boven
+    return t.nx + t.ny;                                                            // diagonaal (standaard)
+  };
+  const keyed = tiles.map((t, i) => ({ i, k: keyFn(t) + (h() - 0.5) * jit }));
+  keyed.sort((a, b) => a.k - b.k); keyed.forEach((o, rank) => (tiles[o.i].order = rank / (tiles.length - 1 || 1)));
+}
+
 function hx(c: string): [number, number, number] { if (typeof c !== "string" || c.charCodeAt(0) !== 35) c = "#140f1e"; const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-function mix(a: string, b: string, t: number): string { const A = hx(a), B = hx(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
+function mix(a: string, b: string, t: number): string { t = t < 0 ? 0 : t > 1 ? 1 : t; const A = hx(a), B = hx(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
 function seeded(i: number): number { let s = (i * 2654435761) >>> 0; s ^= s >>> 15; return (s >>> 0) / 4294967295; }
 const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.length) % arr.length];
 const smooth = (p: number) => p * p * (3 - 2 * p);
@@ -155,6 +172,8 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
     return out;
   }
   const tt = t - story.buildSec;
+  // Eerste scène houdt vast tot segments[0].hold -> toon die direct (geen transitie)
+  if (tt < story.segments[0].hold) { for (let i = 0; i < tiles.length; i++) out[i] = segColors[0][i]; return out; }
   let acc = story.segments[0].hold; let k = 0;
   for (let s = 1; s < story.segments.length; s++) { const dur = story.segments[s].trans + story.segments[s].hold; if (tt < acc + dur) { k = s; break; } acc += dur; k = s; }
   if (k === 0) { for (let i = 0; i < tiles.length; i++) out[i] = segColors[0][i]; return out; }
@@ -164,12 +183,28 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
   return out;
 }
 
+// Zet fill + voeg-rand + randbreedte op één tegel-tag (werkt of 'style' bestaat of niet)
+function paintTile(tag: string, fill: string, stroke: string, sw: number): string {
+  const set = (t: string, prop: string, val: string, re: RegExp) => re.test(t) ? t.replace(re, `${prop}:${val}`) : (/style="/i.test(t) ? t.replace(/style="/i, `style="${prop}:${val};`) : t);
+  tag = set(tag, "fill", fill, /fill:\s*[^;"']+/i);
+  tag = set(tag, "stroke", stroke, /stroke:\s*[^;"'-][^;"']*/i);
+  tag = set(tag, "stroke-width", String(sw), /stroke-width:\s*[^;"']+/i);
+  tag = set(tag, "stroke-linejoin", "round", /stroke-linejoin:\s*[^;"']+/i);
+  if (!/style="/i.test(tag)) tag = tag.replace(/\s*\/?>$/, ` style="fill:${fill};stroke:${stroke};stroke-width:${sw};stroke-linejoin:round"$&`);
+  return tag;
+}
+
 export function buildSvg(parsed: Parsed, colors: string[]): string {
-  const { svg, tiles } = parsed; let out = ""; let cur = 0;
+  const { svg, tiles, view } = parsed; let out = ""; let cur = 0;
+  // voeg-breedte schaalt met de tegelgrootte van dit patroon
+  const tileSize = Math.sqrt((view[2] * view[3]) / (tiles.length || 1));
+  const groutW = Math.max(1.5, tileSize * 0.07), rawW = Math.max(0.8, tileSize * 0.028);
   for (let i = 0; i < tiles.length; i++) {
     out += svg.slice(cur, tiles[i].start);
     let tag = svg.slice(tiles[i].start, tiles[i].end);
-    tag = tag.replace(/(style="[^"]*?fill:\s*)[^;"']+/i, `$1${colors[i]}`);
+    const col = colors[i] || BLANK;
+    const raw = col === BLANK;
+    tag = paintTile(tag, col, raw ? VOEG_RAW : VOEG, raw ? rawW : groutW);
     out += tag; cur = tiles[i].end;
   }
   out += svg.slice(cur);

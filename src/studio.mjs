@@ -110,7 +110,7 @@ function storyboardFrom(opts) {
   for (const sh of (opts.shapes || [])) segs.push({ scene: { type: "shape", shape: sh, fg: pal }, hold: tempo, trans: 0.9 });
   if (opts.endColorway) segs.push({ scene: { type: "fields", palette: pal }, hold: tempo, trans: 0.9 });
   if (segs.length === 1) segs.push({ scene: { type: "fields", palette: pal }, hold: tempo, trans: 0.9 });
-  return { buildSec: Number(opts.buildSec) || 2.6, popSec: 0.6, segments: segs };
+  return { buildSec: Number(opts.buildSec) || 2.6, popSec: 0.3, segments: segs };
 }
 
 // bouw een opslaanbaar ontwerp uit de eind-kleuren (tegel-voor-tegel -> tileColors)
@@ -129,11 +129,11 @@ async function renderVideo({ pattern, template, opts, format, music }) {
   const base = await getBase(pattern);
   const { nX, nY } = tileCounts(base, LOCKS[pattern] || {}, PANEL_ASPECT);
   const svg = await getPatternSvg(pattern, nX, nY);
-  const parsed = film.parseTiles(svg);
+  const parsed = film.parseTiles(svg, opts.reveal || "radial");
   if (!parsed.tiles.length) throw new Error(`patroon ${pattern} heeft 0 tegels (raster-type, nog niet ondersteund) — kies een polygoon-patroon zoals S101`);
   const story = storyboardFrom(opts);
   const DUR = template === "film" ? film.totalDuration(story) : 7;
-  const buildOnly = { buildSec: DUR - 1, popSec: 0.6, segments: [{ scene: { type: opts.base === "fields" ? "fields" : "confetti", palette: ({ modern: film.PAL, warm: film.WARM, cool: film.COOL })[opts.palette] || film.PAL }, hold: 1, trans: 0 }] };
+  const buildOnly = { buildSec: DUR - 1, popSec: 0.3, segments: [{ scene: { type: opts.base === "fields" ? "fields" : "confetti", palette: ({ modern: film.PAL, warm: film.WARM, cool: film.COOL })[opts.palette] || film.PAL }, hold: 1, trans: 0 }] };
   const activeStory = template === "film" ? story : buildOnly;
   // echte getegelde verhouding -> paneel krijgt exact deze vorm (geen letterbox, geen rek)
   const A = parsed.view[2] / parsed.view[3];
@@ -153,7 +153,7 @@ async function renderVideo({ pattern, template, opts, format, music }) {
     return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${C.bg2}"/><stop offset="70%" stop-color="${C.bg}"/></radialGradient></defs>
 <rect width="${W}" height="${H}" fill="url(#bg)"/>${logoTag}
-<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="#140f1e" stroke="${C.gold}" stroke-width="2"/>${inner}
+<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="#eae4d7" stroke="${C.gold}" stroke-width="2"/>${inner}
 <text x="${W / 2}" y="${H * 0.95}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="2" fill="${C.cream}" opacity="0.85">taleoftiles.com</text></svg>`;
   }
 

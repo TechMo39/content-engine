@@ -85,6 +85,9 @@
       <label class="row" style="margin-top:12px">Tempo
         <span class="seg"><button data-tempo="snel">Snel</button><button data-tempo="normaal" class="on">Normaal</button><button data-tempo="rustig">Rustig</button></span>
       </label>
+      <label class="row" style="margin-top:12px">Opbouw
+        <span class="seg"><button data-reveal="radial" class="on">Bloei</button><button data-reveal="diag">Diagonaal</button><button data-reveal="up">Omhoog</button></span>
+      </label>
     </div>
 
     <div class="sec">
@@ -112,7 +115,7 @@
 </div>
 
 <script>
-const state={ pattern:null, token:null, template:"film", base:"confetti", palette:"modern", shapes:["heart","star"], tempo:"normaal", format:"9:16", music:"" };
+const state={ pattern:null, token:null, template:"film", base:"confetti", palette:"modern", shapes:["heart","star"], tempo:"normaal", reveal:"radial", format:"9:16", music:"" };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 
 function segPick(sel,key,isState){ $$(sel+' button').forEach(b=>b.onclick=()=>{
@@ -126,6 +129,7 @@ $$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classLi
 $$('#filmOpts [data-base]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-base]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.base=b.dataset.base;});
 $$('#filmOpts [data-pal]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-pal]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.palette=b.dataset.pal;});
 $$('#filmOpts [data-tempo]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-tempo]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.tempo=b.dataset.tempo;});
+$$('#filmOpts [data-reveal]').forEach(b=>b.onclick=()=>{$$('#filmOpts [data-reveal]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.reveal=b.dataset.reveal;});
 $$('#shapes button').forEach(b=>b.onclick=()=>{ b.classList.toggle('on');
   state.shapes=$$('#shapes button.on').map(x=>x.dataset.shape); });
 function toggleFilm(){ $('#filmOpts').style.display = state.template==='film'?'':'none'; }
@@ -146,7 +150,7 @@ $('#music').onchange=e=>state.music=e.target.value;
 $('#renderBtn').onclick=async()=>{
   const btn=$('#renderBtn'); btn.disabled=true; btn.textContent='Renderen…'; $('#msg').textContent='Even geduld, de video wordt gemaakt.'; $('#saveBtn').style.display='none';
   try{
-    const opts={ base:state.base, palette:state.palette, shapes:state.shapes, tempo:state.tempo, endColorway:true, buildSec:2.6 };
+    const opts={ base:state.base, palette:state.palette, shapes:state.shapes, tempo:state.tempo, reveal:state.reveal, endColorway:true, buildSec:3.0 };
     const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({ pattern:state.pattern, template:state.template, opts, format:state.format, music:state.music })});
     const j=await r.json();
