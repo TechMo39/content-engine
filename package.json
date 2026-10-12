@@ -13,7 +13,8 @@
     "film-preview": "node src/render-film.mjs",
     "save-showcase": "node src/save-showcase.mjs",
     "preview-fixture": "node src/preview-fixture.mjs",
-    "test": "node src/test-reveal.mjs"
+    "test": "node src/test-reveal.mjs",
+    "engine": "node src/engine.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.330",

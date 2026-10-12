@@ -1,0 +1,97 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Content Engine</title>
+<style>
+:root{--bg:#1a1327;--bg2:#241a3a;--pl:#2a1f3d;--gold:#d6b35a;--cream:#f4ecdc;--ink:#cfc7de}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--cream)}
+.top{display:flex;align-items:baseline;gap:14px;padding:18px 26px;background:var(--bg2);border-bottom:1px solid #3a2f52}
+.top h1{font-family:"DejaVu Serif",Georgia,serif;letter-spacing:4px;font-size:20px;margin:0;color:var(--gold)}
+.top .sub{color:var(--ink);font-size:13px}
+.wrap{display:grid;grid-template-columns:320px 1fr 300px;min-height:calc(100vh - 60px)}
+.col{padding:22px;overflow:auto}.mid{border-left:1px solid #3a2f52;border-right:1px solid #3a2f52;display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:28px}
+h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;margin:0 0 10px}
+.sec{margin-bottom:22px}
+.seg{display:inline-flex;gap:8px;flex-wrap:wrap}
+.seg button,.chip{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:8px 14px;font-size:14px;cursor:pointer}
+.seg button.on,.chip.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.card{border:1px solid #3a2f52;border-radius:10px;overflow:hidden;cursor:pointer;background:#1b1430}.card.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+.card img{width:100%;height:58px;object-fit:contain;padding:4px;background:#140f1e;display:block}.card .nm{font-size:11px;text-align:center;padding:3px;color:var(--ink)}
+input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:8px;padding:8px 10px;font-size:14px}
+.render{width:100%;background:var(--gold);color:#241a10;border:0;border-radius:24px;padding:14px;font-weight:700;font-size:16px;cursor:pointer;margin-top:8px}
+.render:disabled{opacity:.5;cursor:default}
+#player{width:300px;aspect-ratio:9/16;background:#120d1f;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#6a5f85;text-align:center;overflow:hidden}
+#player video{width:100%;height:100%}
+.logbox{background:#120d1f;border:1px solid #3a2f52;border-radius:10px;padding:10px;height:72vh;overflow:auto;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5}
+.logbox .ok{color:#7fd8a0}.logbox .err{color:#e88}.logbox .run{color:var(--gold)}
+.hint{color:#8a7fae;font-size:12px}
+</style></head><body>
+<div class="top"><h1>CONTENT ENGINE</h1><span class="sub">merk → onderwerp → template → render</span></div>
+<div class="wrap">
+  <div class="col">
+    <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
+    <div class="sec" id="subjSec"><h2>2 · Onderwerp</h2><div id="subjects"></div><div class="hint" id="subjHint"></div></div>
+    <div class="sec" id="tplSec"><h2>3 · Template</h2><div class="seg" id="templates"></div></div>
+    <div class="sec" id="optSec"><h2>4 · Opties</h2><div id="opts"></div></div>
+    <div class="sec"><h2>5 · Muziek & formaat</h2>
+      <label class="row">Muziek <select id="music"><option value="">(geen)</option></select></label>
+      <label class="row">Formaat <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span></label>
+    </div>
+    <button class="render" id="go" disabled>Kies eerst een onderwerp</button>
+  </div>
+  <div class="col mid"><div id="player"><div>Je video verschijnt hier<br>na het renderen.</div></div><div id="msg" class="hint"></div></div>
+  <div class="col"><h2>Operaties</h2><div class="logbox" id="logbox"></div></div>
+</div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",reveal:"radial",tempo:"normaal",name:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+let BRANDOPTS=[];
+
+function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
+
+async function loadBrands(){const j=await (await fetch('/api/brands')).json();const g=$('#brands');g.innerHTML='';
+  j.brands.forEach((b,i)=>{const el=document.createElement('button');el.textContent=b.name;el.onclick=()=>selectBrand(b.id,el);g.appendChild(el);if(i===0)selectBrand(b.id,el);});}
+
+async function selectBrand(id,el){state.brand=id;state.subject=null;$$('#brands button').forEach(x=>x.classList.remove('on'));if(el)el.classList.add('on');
+  const [sj,tp]=await Promise.all([fetch('/api/subjects?brand='+id).then(r=>r.json()),fetch('/api/templates?brand='+id).then(r=>r.json())]);
+  BRANDOPTS=tp.options||[];
+  // onderwerpen
+  const sc=$('#subjects');sc.innerHTML='';
+  if((sj.subjects||[]).length && sj.subjects[0].thumb){ sc.className='grid';
+    sj.subjects.forEach(s=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<img src="${s.thumb}" onerror="this.style.visibility='hidden'"><div class="nm">${s.id}</div>`;d.onclick=()=>{$$('.card').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.subject=s.id;ready();};sc.appendChild(d);});
+    $('#subjHint').textContent=sj.subjects.length+' onderwerpen';
+  } else { sc.className='seg';
+    (sj.subjects||[]).forEach(s=>{const b=document.createElement('button');b.className='chip';b.textContent=s.id;b.onclick=()=>{$$('#subjects .chip').forEach(c=>c.classList.remove('on'));b.classList.add('on');state.subject=s.id;ready();};sc.appendChild(b);});
+    $('#subjHint').textContent='Kies een onderwerp of vul hieronder een naam in.';
+  }
+  // templates
+  const tc=$('#templates');tc.innerHTML='';state.template=null;
+  (tp.templates||[]).forEach((t,i)=>{const b=document.createElement('button');b.textContent=t.name;b.onclick=()=>{$$('#templates button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});ready();};tc.appendChild(b);if(i===0){b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});}});
+  buildOpts();ready();
+}
+
+function buildOpts(){const o=$('#opts');o.innerHTML='';
+  const add=(label,html)=>{const r=document.createElement('label');r.className='row';r.innerHTML=label+' '+html;o.appendChild(r);};
+  if(BRANDOPTS.includes('palette')) add('Palet','<span class="seg" id="o_pal"><button data-v="modern" class="on">Modern</button><button data-v="warm">Warm</button><button data-v="cool">Koel</button></span>');
+  if(BRANDOPTS.includes('reveal')) add('Opbouw','<span class="seg" id="o_rev"><button data-v="radial" class="on">Bloei</button><button data-v="diag">Diagonaal</button><button data-v="up">Omhoog</button></span>');
+  if(BRANDOPTS.includes('tempo')) add('Tempo','<span class="seg" id="o_tmp"><button data-v="snel">Snel</button><button data-v="normaal" class="on">Normaal</button><button data-v="rustig">Rustig</button></span>');
+  if(BRANDOPTS.includes('name')) add('Naam','<input type="text" id="o_name" placeholder="bijv. Café De Hoek" style="flex:1;margin-left:10px">');
+  const seg=(id,key)=>{const el=$('#'+id);if(!el)return;$$('#'+id+' button').forEach(b=>b.onclick=()=>{$$('#'+id+' button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.opts[key]=b.dataset.v;});};
+  seg('o_pal','palette');seg('o_rev','reveal');seg('o_tmp','tempo');
+  const nm=$('#o_name');if(nm)nm.oninput=e=>{state.opts.name=e.target.value;if(state.brand==='unclerank'&&e.target.value)ready();};
+}
+function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}
+
+$$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.format=b.dataset.fmt;});
+fetch('/api/music').then(r=>r.json()).then(j=>(j.files||[]).forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;$('#music').appendChild(o);}));
+$('#music').onchange=e=>state.music=e.target.value;
+
+$('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;btn.textContent='Renderen…';$('#msg').textContent='Even geduld…';
+  try{const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:state.brand,subject:state.subject,template:state.template,format:state.format,music:state.music,opts:state.opts})});
+    const j=await r.json();
+    if(j.url){$('#player').innerHTML=`<video src="${j.url}?t=${Date.now()}" controls autoplay loop></video>`;$('#msg').textContent='Klaar.';}
+    else $('#msg').textContent='Mislukt: '+(j.error||'onbekend');
+  }catch(e){$('#msg').textContent='Fout: '+e.message;}
+  btn.disabled=false;btn.textContent='Render video';};
+log();loadBrands();
+</script></body></html>
