@@ -8,9 +8,9 @@ export const WARM = ["#c75a4e","#f79f45","#e4ce8c","#f6ae91","#e7c077","#c67765"
 export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084","#a1c981","#663959"];
 export const BLANK = "#e8e5e2";
 export const PLUM = "#2a2335";
-// Voeg (zoals de configurator): crème naad tussen ingekleurde tegels,
-// dun donker contour op de nog-neutrale (raw) tegels.
-export const VOEG = "#eae4d7";
+// Voeg (zoals de live configurator): cementgrijze naad #9a9488 tussen ingekleurde
+// tegels, dun contour op de nog-neutrale (raw) tegels.
+export const VOEG = "#9a9488";
 export const VOEG_RAW = "#b9a98c";
 
 export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };

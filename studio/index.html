@@ -92,6 +92,7 @@
 
     <div class="sec">
       <h2>4 · Muziek &amp; formaat</h2>
+      <label class="row">Naam op plaat <input id="plateName" type="text" placeholder="bijv. Café De Hoek" style="flex:1;margin-left:10px;background:#1b1430;border:1px solid #3a2f52;color:#f4ecdc;border-radius:8px;padding:7px 10px;font-size:14px"></label>
       <label class="row">Muziek <select id="music"><option value="">(geen)</option></select></label>
       <label class="row">Formaat
         <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span>
@@ -115,7 +116,7 @@
 </div>
 
 <script>
-const state={ pattern:null, token:null, template:"film", base:"confetti", palette:"modern", shapes:["heart","star"], tempo:"normaal", reveal:"radial", format:"9:16", music:"" };
+const state={ pattern:null, token:null, template:"film", base:"confetti", palette:"modern", shapes:["heart","star"], tempo:"normaal", reveal:"radial", format:"9:16", music:"", name:"" };
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 
 function segPick(sel,key,isState){ $$(sel+' button').forEach(b=>b.onclick=()=>{
@@ -146,13 +147,14 @@ async function loadPatterns(){
 async function loadMusic(){ const r=await fetch('/api/music'); const j=await r.json();
   (j.files||[]).forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; $('#music').appendChild(o); }); }
 $('#music').onchange=e=>state.music=e.target.value;
+$('#plateName').oninput=e=>state.name=e.target.value;
 
 $('#renderBtn').onclick=async()=>{
   const btn=$('#renderBtn'); btn.disabled=true; btn.textContent='Renderen…'; $('#msg').textContent='Even geduld, de video wordt gemaakt.'; $('#saveBtn').style.display='none';
   try{
     const opts={ base:state.base, palette:state.palette, shapes:state.shapes, tempo:state.tempo, reveal:state.reveal, endColorway:true, buildSec:3.0 };
     const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({ pattern:state.pattern, template:state.template, opts, format:state.format, music:state.music })});
+      body:JSON.stringify({ pattern:state.pattern, template:state.template, opts, format:state.format, music:state.music, name:state.name })});
     const j=await r.json();
     if(j.url){ state.token=j.token; $('#player').innerHTML=`<video src="${j.url}?t=${Date.now()}" controls autoplay loop></video>`; $('#msg').textContent='Klaar.'; $('#saveBtn').style.display=''; }
     else { $('#msg').textContent='Mislukt: '+(j.error||'onbekend'); }

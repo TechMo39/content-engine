@@ -99,6 +99,7 @@ async function loadLogo() {
   return logoDataUri;
 }
 
+function escapeXml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function json(res, o, c = 200) { res.writeHead(c, { "content-type": "application/json" }); res.end(JSON.stringify(o)); }
 function readBody(req) { return new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { r(JSON.parse(b || "{}")); } catch { r({}); } }); }); }
 
@@ -114,13 +115,14 @@ function storyboardFrom(opts) {
 }
 
 // bouw een opslaanbaar ontwerp uit de eind-kleuren (tegel-voor-tegel -> tileColors)
-function designFromColors(pattern, parsed, colors) {
+function designFromColors(pattern, parsed, colors, name = "") {
   const tileColors = {};
   for (let i = 0; i < parsed.tiles.length; i++) { const k = parsed.tiles[i].key; if (!k) continue; const id = HEX2ID[(colors[i] || "").toLowerCase()]; if (id) tileColors[k] = id; }
-  return { pattern, groupColors: {}, tileColors, size: { w: 100, h: 70, tile: 5 }, shape: "rect", border: { on: false, pattern: "S900", groupColors: {}, tileColors: {} }, name: "", namefont: "romeins", ink: "auto", textScale: 1, plateScale: 1, tileGrade: "normaal" };
+  return { pattern, groupColors: {}, tileColors, size: { w: 100, h: 70, tile: 5 }, shape: "rect", border: { on: false, pattern: "S900", groupColors: {}, tileColors: {} }, name, namefont: "romeins", ink: "auto", textScale: 1, plateScale: 1, tileGrade: "normaal" };
 }
 
-async function renderVideo({ pattern, template, opts, format, music }) {
+async function renderVideo({ pattern, template, opts, format, music, name }) {
+  name = (name || "").trim();
   // ontwerp-ruimte op basis-formaat; raster op 2x -> scherpere tegelranden & tekst
   const FMT = { "9:16": [540, 960], "1:1": [720, 720], "16:9": [960, 540] }[format] || [540, 960];
   const [W, H] = FMT, SS = 2, FPS = 24;
@@ -150,10 +152,29 @@ async function renderVideo({ pattern, template, opts, format, music }) {
       `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
     const logoTag = logo ? `<image href="${logo}" x="${W / 2 - 90}" y="${H * 0.05}" width="180" height="${H * 0.07}" preserveAspectRatio="xMidYMid meet"/>`
       : `<text x="${W / 2}" y="${H * 0.1}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="4" fill="${C.gold}">TALE OF TILES</text>`;
+    // Naamplaat (verschijnt aan het eind, zet het ontwerp neer als product): naam op
+    // een stenen plaat, "romeins" serif, inkt #4a3a2a — zoals de configurator.
+    let plate = "";
+    if (name) {
+      const t = frame / FPS, fadeStart = DUR - 2.2;
+      const op = Math.max(0, Math.min(1, (t - fadeStart) / 1.0));
+      if (op > 0) {
+        const plateW = Math.round(panelW * 0.80), plateH = Math.max(40, Math.round(panelH * 0.14));
+        const plateX = Math.round((W - plateW) / 2);
+        const plateY = panelY + panelH - plateH - Math.round(panelH * 0.06) + Math.round((1 - op) * 14);
+        const fs = Math.min(Math.round(plateH * 0.44), Math.round(plateW * 1.5 / Math.max(3, name.length)));
+        plate = `<g opacity="${op.toFixed(3)}">`
+          + `<rect x="${plateX + 4}" y="${plateY + 6}" width="${plateW}" height="${plateH}" rx="9" fill="#000000" opacity="0.20"/>`
+          + `<rect x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" rx="9" fill="#efe9dd" stroke="#c9bfa6" stroke-width="1.5"/>`
+          + `<rect x="${plateX + 5}" y="${plateY + 5}" width="${plateW - 10}" height="${plateH - 10}" rx="6" fill="none" stroke="#d8cdb4" stroke-width="1"/>`
+          + `<text x="${W / 2}" y="${plateY + plateH / 2}" text-anchor="middle" dominant-baseline="central" font-family="DejaVu Serif,serif" font-size="${fs}" letter-spacing="1.5" fill="#4a3a2a">${escapeXml(name)}</text>`
+          + `</g>`;
+      }
+    }
     return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${C.bg2}"/><stop offset="70%" stop-color="${C.bg}"/></radialGradient></defs>
 <rect width="${W}" height="${H}" fill="url(#bg)"/>${logoTag}
-<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="#eae4d7" stroke="${C.gold}" stroke-width="2"/>${inner}
+<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="#eae4d7" stroke="${C.gold}" stroke-width="2"/>${inner}${plate}
 <text x="${W / 2}" y="${H * 0.95}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="2" fill="${C.cream}" opacity="0.85">taleoftiles.com</text></svg>`;
   }
 
@@ -187,7 +208,7 @@ async function renderVideo({ pattern, template, opts, format, music }) {
   // opslaanbaar ontwerp uit de eind-kleuren bewaren
   const finalColors = film.colorsAt(parsed, activeStory, DUR - 0.01);
   const token = outName.replace(/\.mp4$/, "");
-  designCache.set(token, designFromColors(pattern, parsed, finalColors));
+  designCache.set(token, designFromColors(pattern, parsed, finalColors, name));
   log("mp4 geschreven: " + outName);
   return { url: "/out/" + outName, token };
 }
@@ -225,7 +246,7 @@ const server = http.createServer(async (req, res) => {
       busy = true;
       log(`▶ render gestart — patroon ${b.pattern}, ${b.template || "film"}, ${b.format || "9:16"}`);
       try {
-        const r = await renderVideo({ pattern: b.pattern, template: b.template || "film", opts: b.opts || {}, format: b.format || "9:16", music: b.music || "" });
+        const r = await renderVideo({ pattern: b.pattern, template: b.template || "film", opts: b.opts || {}, format: b.format || "9:16", music: b.music || "", name: b.name || "" });
         log(`✓ klaar: ${r.url}`);
         json(res, r);
       } catch (e) { log(`✗ FOUT: ${e.message}`); json(res, { error: e.message }, 500); }

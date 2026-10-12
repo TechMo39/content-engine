@@ -23,6 +23,13 @@ npm install
 npx playwright install chromium
 ```
 
+## De studio als desktop-app (eigen venster, geen browser)
+```
+npm run app
+```
+Opent de studio in een eigen app-venster. (Of `npm run studio-app` voor de versie die
+in je browser opent.) Een los te delen .exe/zip voor iemand anders is een aparte verpak-stap.
+
 ## Video's maken
 ```
 npm run build                 # satisfying-opbouw, alle ontwerpen
