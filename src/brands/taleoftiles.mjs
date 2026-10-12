@@ -11,6 +11,8 @@ import { composeChrome, fitRect, loadLogo, FORMATS, escapeXml } from "../core/re
 function _hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function _mix(a, b, t) { const A = _hexRgb(a), B = _hexRgb(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
 function _lum(h) { const r = _hexRgb(h); return 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2]; }
+// 8-puntige zellige-ster (khatim) als sier bij het woordmerk
+function star8(cx, cy, R, r) { const p = []; for (let i = 0; i < 16; i++) { const a = Math.PI / 8 * i - Math.PI / 2, rad = i % 2 ? r : R; p.push((cx + rad * Math.cos(a)).toFixed(1) + "," + (cy + rad * Math.sin(a)).toFixed(1)); } return p.join(" "); }
 function plateColours(cols) {
   cols = (cols || []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
   if (!cols.length) cols = ["#7d8f6e", "#2f4858", "#e8e5e2"];
@@ -54,6 +56,13 @@ export function makeBrand({ ROOT, config }) {
   const branding = {
     name: "Tale of Tiles", footer: "taleoftiles.com",
     bg: "#1a1327", bg2: "#241a3a", gold: "#d6b35a", cream: "#f4ecdc", plate: "#eae4d7",
+    // premium woordmerk (altijd herkenbaar bovenin): zellige-ster + serif-caps + goud lijntje
+    markSvg: ({ W, H }) => {
+      const gold = "#d6b35a", midY = Math.round(H * 0.082), fs = Math.round(W * 0.05), ruleW = fs * 4.3;
+      return `<polygon points="${star8(W / 2, midY - fs * 1.02, fs * 0.52, fs * 0.22)}" fill="${gold}"/>`
+        + `<text x="${W / 2}" y="${midY + fs * 0.32}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fs}" letter-spacing="${(fs * 0.16).toFixed(1)}" fill="${gold}">TALE OF TILES</text>`
+        + `<line x1="${W / 2 - ruleW}" y1="${midY + fs * 0.66}" x2="${W / 2 + ruleW}" y2="${midY + fs * 0.66}" stroke="${gold}" stroke-width="1.3" opacity="0.75"/>`;
+    },
   };
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
   let film = null, LOCKS = {}, patternList = [];
@@ -101,6 +110,21 @@ export function makeBrand({ ROOT, config }) {
     if (segs.length === 1) segs.push({ scene: { type: "fields", palette: pal }, hold: tempo, trans: 0.9 });
     return { buildSec: Number(opts.buildSec) || 3.0, popSec: 0.3, segments: segs };
   }
+  // SATISFYING (template 1, geperfectioneerd): langer + trager + naadloze loop.
+  // Begint neutraal -> kleurt rustig in -> ademt door kleurlagen -> vervaagt aan het eind
+  // weer naar neutraal, zodat de video naadloos opnieuw begint (loop).
+  function storyboardSatisfying(opts) {
+    const dur = { kort: 14, middel: 24, lang: 38 }[opts.duration] || 24;
+    const pal = PALS()[opts.palette] || film.PAL;
+    const buildSec = Math.min(7, dur * 0.3);
+    const rest = dur - buildSec;
+    const breaths = Math.max(2, Math.round(rest / 7));   // aantal rustige kleur-ademhalingen
+    const hold = rest / (breaths + 1);
+    const palOrder = ["modern", "warm", "cool"];
+    const segs = [{ scene: { type: "fields", palette: pal }, hold, trans: 0 }];
+    for (let i = 1; i <= breaths; i++) segs.push({ scene: { type: "fields", palette: PALS()[palOrder[i % palOrder.length]] }, hold, trans: Math.min(1.6, hold * 0.55) });
+    return { buildSec, popSec: 0.4, segments: segs };
+  }
   // COLORWAY-SWITCH (template 2): zelfde patroon, kleuren fietsen door 3 paletten op de beat.
   function storyboardColorway(opts) {
     const order = ["modern", "warm", "cool"];
@@ -130,7 +154,8 @@ export function makeBrand({ ROOT, config }) {
     const svg = await getPatternSvg(subjectId, nX, nY);
     const parsed = film.parseTiles(svg, opts.reveal || "radial");
     if (!parsed.tiles.length) throw new Error(`patroon ${subjectId} heeft 0 tegels`);
-    const story = templateId === "colorway" ? storyboardColorway(opts) : storyboardFrom(opts);
+    const story = templateId === "colorway" ? storyboardColorway(opts) : templateId === "satisfying" ? storyboardSatisfying(opts) : storyboardFrom(opts);
+    const loop = templateId === "satisfying";   // naadloze loop: eindig neutraal
     const durSec = film.totalDuration(story);
     const A = parsed.view[2] / parsed.view[3];
     const bandTop = Math.round(H * 0.155), bandBot = Math.round(H * 0.905);
@@ -144,12 +169,16 @@ export function makeBrand({ ROOT, config }) {
     const np = name ? plateColours(palArr) : null;
 
     function sceneAt(frame) {
-      const inner = film.buildSvg(parsed, film.colorsAt(parsed, story, frame / FPS)).replace(/<svg\b[^>]*>/i,
+      const t = frame / FPS;
+      let colors = film.colorsAt(parsed, story, t);
+      let tailK = 0;
+      if (loop) { const tail = 1.3, tleft = durSec - t; if (tleft < tail) tailK = Math.min(1, Math.max(0, 1 - tleft / tail)); if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK)); }
+      const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
         `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
       let overlay = "";
       if (name && np) {
-        const t = frame / FPS, op = Math.max(0, Math.min(1, (t - (durSec - 2.2)) / 1.0));
-        if (op > 0) {
+        let op = Math.max(0, Math.min(1, (t - (durSec - 2.2)) / 1.0)) * (1 - tailK);
+        if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
           const plateX = Math.round(panelX + (panelW - plateW) / 2), plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - op) * 10);
           const pl = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
@@ -171,6 +200,6 @@ export function makeBrand({ ROOT, config }) {
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
     init, listSubjects, templates, makeRender, thumbSvg,
-    options: ["palette", "reveal", "tempo", "name"],
+    options: ["palette", "duration", "reveal", "tempo", "name"],
   };
 }

@@ -41,14 +41,18 @@ export function fitRect(Wmax, Hmax, A) {
 // branding = { bg, bg2, gold, cream, name, footer, logoUri, panel:true/false }
 export function composeChrome({ branding, W, H, panel, innerField, overlay = "", logoUri = "" }) {
   const b = branding;
-  const logoTag = logoUri
-    ? `<image href="${logoUri}" x="${W / 2 - 90}" y="${H * 0.05}" width="180" height="${H * 0.07}" preserveAspectRatio="xMidYMid meet"/>`
+  // merk-mark boven: merk levert eigen premium woordmerk (markSvg), anders logo-afbeelding, anders tekst
+  const logoTag = b.markSvg ? b.markSvg({ W, H })
+    : logoUri ? `<image href="${logoUri}" x="${W / 2 - 90}" y="${H * 0.05}" width="180" height="${H * 0.07}" preserveAspectRatio="xMidYMid meet"/>`
     : `<text x="${W / 2}" y="${H * 0.1}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="4" fill="${b.gold}">${escapeXml((b.name || "").toUpperCase())}</text>`;
   const panelRect = panel
     ? `<rect x="${panel.x}" y="${panel.y}" width="${panel.w}" height="${panel.h}" rx="6" fill="${b.plate || "#eae4d7"}" stroke="${b.gold}" stroke-width="2"/>`
     : "";
+  // footer: altijd duidelijk in beeld (subliminale merkherhaling) — goud, in een subtiele pill
+  const fSize = Math.round(W * 0.034), fy = Math.round(H * 0.955), fw = fSize * (String(b.footer || "").length) * 0.64;
   const footer = b.footer
-    ? `<text x="${W / 2}" y="${H * 0.95}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="2" fill="${b.cream}" opacity="0.85">${escapeXml(b.footer)}</text>`
+    ? `<g><rect x="${W / 2 - fw / 2 - 16}" y="${fy - fSize}" width="${fw + 32}" height="${fSize * 1.7}" rx="${fSize}" fill="#000000" opacity="0.22"/>`
+      + `<text x="${W / 2}" y="${fy + fSize * 0.3}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fSize}" letter-spacing="${fSize * 0.08}" fill="${b.gold}">${escapeXml(b.footer)}</text></g>`
     : "";
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${b.bg2}"/><stop offset="70%" stop-color="${b.bg}"/></radialGradient></defs>

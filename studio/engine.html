@@ -15,6 +15,10 @@ h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;marg
 .seg button.on,.chip.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.acc{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px}
+.acc .arr{transition:transform .15s}.acc.open .arr{transform:rotate(90deg)}
+.acc .pick{color:var(--cream);text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
+#subjWrap{max-height:52vh;overflow:auto;margin-top:8px;padding-right:4px}
 .card{border:1px solid #3a2f52;border-radius:10px;overflow:hidden;cursor:pointer;background:#1b1430}.card.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
 .card img{width:100%;height:58px;object-fit:contain;padding:4px;background:#140f1e;display:block}.card .nm{font-size:11px;text-align:center;padding:3px;color:var(--ink)}
 input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:8px;padding:8px 10px;font-size:14px}
@@ -30,7 +34,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 <div class="wrap">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
-    <div class="sec" id="subjSec"><h2>2 · Onderwerp</h2><div id="subjects"></div><div class="hint" id="subjHint"></div></div>
+    <div class="sec" id="subjSec"><h2 class="acc" id="subjToggle"><span class="arr">▸</span> 2 · Onderwerp <span class="pick" id="subjPick"></span></h2><div id="subjWrap" style="display:none"><div id="subjects"></div><div class="hint" id="subjHint"></div></div></div>
     <div class="sec" id="tplSec"><h2>3 · Template</h2><div class="seg" id="templates"></div></div>
     <div class="sec" id="optSec"><h2>4 · Opties</h2><div id="opts"></div></div>
     <div class="sec"><h2>5 · Muziek & formaat</h2>
@@ -44,7 +48,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 </div>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",reveal:"radial",tempo:"normaal",name:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",duration:"middel",reveal:"radial",tempo:"normaal",name:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
 let BRANDOPTS=[];
 
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
@@ -52,16 +56,16 @@ function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.on
 async function loadBrands(){const j=await (await fetch('/api/brands')).json();const g=$('#brands');g.innerHTML='';
   j.brands.forEach((b,i)=>{const el=document.createElement('button');el.textContent=b.name;el.onclick=()=>selectBrand(b.id,el);g.appendChild(el);if(i===0)selectBrand(b.id,el);});}
 
-async function selectBrand(id,el){state.brand=id;state.subject=null;$$('#brands button').forEach(x=>x.classList.remove('on'));if(el)el.classList.add('on');
+async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick').textContent='';setSubjOpen(false);$$('#brands button').forEach(x=>x.classList.remove('on'));if(el)el.classList.add('on');
   const [sj,tp]=await Promise.all([fetch('/api/subjects?brand='+id).then(r=>r.json()),fetch('/api/templates?brand='+id).then(r=>r.json())]);
   BRANDOPTS=tp.options||[];
   // onderwerpen
   const sc=$('#subjects');sc.innerHTML='';
   if((sj.subjects||[]).length && sj.subjects[0].thumb){ sc.className='grid';
-    sj.subjects.forEach(s=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<img src="${s.thumb}" onerror="this.style.visibility='hidden'"><div class="nm">${s.id}</div>`;d.onclick=()=>{$$('.card').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.subject=s.id;ready();};sc.appendChild(d);});
+    sj.subjects.forEach(s=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<img src="${s.thumb}" onerror="this.style.visibility='hidden'"><div class="nm">${s.id}</div>`;d.onclick=()=>{$$('.card').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.subject=s.id;$('#subjPick').textContent='— '+s.id;setSubjOpen(false);ready();};sc.appendChild(d);});
     $('#subjHint').textContent=sj.subjects.length+' onderwerpen';
   } else { sc.className='seg';
-    (sj.subjects||[]).forEach(s=>{const b=document.createElement('button');b.className='chip';b.textContent=s.id;b.onclick=()=>{$$('#subjects .chip').forEach(c=>c.classList.remove('on'));b.classList.add('on');state.subject=s.id;ready();};sc.appendChild(b);});
+    (sj.subjects||[]).forEach(s=>{const b=document.createElement('button');b.className='chip';b.textContent=s.id;b.onclick=()=>{$$('#subjects .chip').forEach(c=>c.classList.remove('on'));b.classList.add('on');state.subject=s.id;$('#subjPick').textContent='— '+s.id;setSubjOpen(false);ready();};sc.appendChild(b);});
     $('#subjHint').textContent='Kies een onderwerp of vul hieronder een naam in.';
   }
   // templates
@@ -73,14 +77,17 @@ async function selectBrand(id,el){state.brand=id;state.subject=null;$$('#brands 
 function buildOpts(){const o=$('#opts');o.innerHTML='';
   const add=(label,html)=>{const r=document.createElement('label');r.className='row';r.innerHTML=label+' '+html;o.appendChild(r);};
   if(BRANDOPTS.includes('palette')) add('Palet','<span class="seg" id="o_pal"><button data-v="modern" class="on">Modern</button><button data-v="warm">Warm</button><button data-v="cool">Koel</button></span>');
+  if(BRANDOPTS.includes('duration')) add('Lengte','<span class="seg" id="o_dur"><button data-v="kort">Kort</button><button data-v="middel" class="on">Middel</button><button data-v="lang">Lang</button></span>');
   if(BRANDOPTS.includes('reveal')) add('Opbouw','<span class="seg" id="o_rev"><button data-v="radial" class="on">Bloei</button><button data-v="diag">Diagonaal</button><button data-v="up">Omhoog</button></span>');
   if(BRANDOPTS.includes('tempo')) add('Tempo','<span class="seg" id="o_tmp"><button data-v="snel">Snel</button><button data-v="normaal" class="on">Normaal</button><button data-v="rustig">Rustig</button></span>');
   if(BRANDOPTS.includes('name')) add('Naam','<input type="text" id="o_name" placeholder="bijv. Café De Hoek" style="flex:1;margin-left:10px">');
   const seg=(id,key)=>{const el=$('#'+id);if(!el)return;$$('#'+id+' button').forEach(b=>b.onclick=()=>{$$('#'+id+' button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.opts[key]=b.dataset.v;});};
-  seg('o_pal','palette');seg('o_rev','reveal');seg('o_tmp','tempo');
+  seg('o_pal','palette');seg('o_dur','duration');seg('o_rev','reveal');seg('o_tmp','tempo');
   const nm=$('#o_name');if(nm)nm.oninput=e=>{state.opts.name=e.target.value;if(state.brand==='unclerank'&&e.target.value)ready();};
 }
 function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}
+function setSubjOpen(o){$('#subjWrap').style.display=o?'':'none';$('#subjToggle').classList.toggle('open',o);}
+$('#subjToggle').onclick=()=>setSubjOpen($('#subjWrap').style.display==='none');
 
 $$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.format=b.dataset.fmt;});
 fetch('/api/music').then(r=>r.json()).then(j=>(j.files||[]).forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;$('#music').appendChild(o);}));
