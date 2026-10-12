@@ -13,6 +13,33 @@ function _mix(a, b, t) { const A = _hexRgb(a), B = _hexRgb(b); const r = Math.ro
 function _lum(h) { const r = _hexRgb(h); return 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2]; }
 // 8-puntige zellige-ster (khatim) als sier bij het woordmerk
 function star8(cx, cy, R, r) { const p = []; for (let i = 0; i < 16; i++) { const a = Math.PI / 8 * i - Math.PI / 2, rad = i % 2 ? r : R; p.push((cx + rad * Math.cos(a)).toFixed(1) + "," + (cy + rad * Math.sin(a)).toFixed(1)); } return p.join(" "); }
+// Moorse hoefijzer-/spitsboog die het rechthoekige paneel bovenin tot een punt brengt.
+function moorArch(x, y, w, h) {
+  const cx = x + w / 2, sh = h * 0.40, sy = y + sh, bulge = w * 0.055;
+  return `M ${x} ${y + h} L ${x} ${sy} `
+    + `C ${(x - bulge).toFixed(1)} ${(sy - sh * 0.5).toFixed(1)} ${(cx - w * 0.30).toFixed(1)} ${y} ${cx} ${y} `
+    + `C ${(cx + w * 0.30).toFixed(1)} ${y} ${(x + w + bulge).toFixed(1)} ${(sy - sh * 0.5).toFixed(1)} ${x + w} ${sy} `
+    + `L ${x + w} ${y + h} Z`;
+}
+// Slanke pilaar met kapiteel en basis (goud contour op plum) — paleis-gevoel.
+function column(cx, topY, botY, cw, gold, plum) {
+  const x = cx - cw / 2, capH = cw * 0.85, baseH = cw * 0.75, sx = (cw * 0.22).toFixed(1);
+  return `<rect x="${(x - cw * 0.22).toFixed(1)}" y="${topY.toFixed(1)}" width="${(cw * 1.44).toFixed(1)}" height="${capH.toFixed(1)}" rx="2" fill="${plum}" stroke="${gold}" stroke-width="1.6"/>`
+    + `<rect x="${x.toFixed(1)}" y="${(topY + capH).toFixed(1)}" width="${cw}" height="${(botY - topY - capH - baseH).toFixed(1)}" fill="${plum}" stroke="${gold}" stroke-width="1.4"/>`
+    + `<line x1="${(cx - cw * 0.16).toFixed(1)}" y1="${(topY + capH + 3).toFixed(1)}" x2="${(cx - cw * 0.16).toFixed(1)}" y2="${(botY - baseH - 3).toFixed(1)}" stroke="${gold}" stroke-width="0.8" opacity="0.5"/>`
+    + `<line x1="${(cx + cw * 0.16).toFixed(1)}" y1="${(topY + capH + 3).toFixed(1)}" x2="${(cx + cw * 0.16).toFixed(1)}" y2="${(botY - baseH - 3).toFixed(1)}" stroke="${gold}" stroke-width="0.8" opacity="0.5"/>`
+    + `<rect x="${(x - cw * 0.22).toFixed(1)}" y="${(botY - baseH).toFixed(1)}" width="${(cw * 1.44).toFixed(1)}" height="${baseH.toFixed(1)}" rx="2" fill="${plum}" stroke="${gold}" stroke-width="1.6"/>`;
+}
+// Mozaïek-medaillon (khatim-ster + ring) — het merk-symbool dat de video opent/sluit.
+function medallion(cx, cy, R, gold) {
+  const s1 = star8(cx, cy, R, R * 0.42);
+  return `<g>`
+    + `<circle cx="${cx}" cy="${cy}" r="${(R * 1.28).toFixed(1)}" fill="none" stroke="${gold}" stroke-width="2"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="${(R * 1.14).toFixed(1)}" fill="none" stroke="${gold}" stroke-width="1" opacity="0.55"/>`
+    + `<polygon points="${s1}" fill="none" stroke="${gold}" stroke-width="2.6"/>`
+    + `<g transform="rotate(22.5 ${cx} ${cy})"><polygon points="${s1}" fill="none" stroke="${gold}" stroke-width="1.5" opacity="0.7"/></g>`
+    + `<circle cx="${cx}" cy="${cy}" r="${(R * 0.13).toFixed(1)}" fill="${gold}"/></g>`;
+}
 function plateColours(cols) {
   cols = (cols || []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
   if (!cols.length) cols = ["#7d8f6e", "#2f4858", "#e8e5e2"];
@@ -215,7 +242,7 @@ export function makeBrand({ ROOT, config }) {
     else { story = templateId === "colorway" ? storyboardColorway(opts) : storyboardFrom(opts); durSec = film.totalDuration(story); }
     const A = parsed.view[2] / parsed.view[3];
     const bandTop = Math.round(H * 0.155), bandBot = Math.round(H * 0.905);
-    const fit = fitRect(Math.round(W * 0.86), bandBot - bandTop, A);
+    const fit = fitRect(Math.round(W * 0.78), bandBot - bandTop, A);   // smaller -> ruimte voor pilaren
     const panelW = fit.w, panelH = fit.h;
     const pad = Math.max(6 * SS, Math.round(panelW * 0.018));
     const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
@@ -245,23 +272,34 @@ export function makeBrand({ ROOT, config }) {
     // CAMERA-REGIE (alleen met foto-bookend): intro zoomt in op de tegels in de foto,
     // lost op in het kale mozaïek dat inkleurt terwijl de camera terugtrekt; aan het eind
     // zoomt de camera weer in op het patroon, lost op in de foto, die langzaam uitzoomt.
-    const camZoom = 2.15;
-    let Ti = 2.4, Dt = 0.5, Tb = buildSec, To = 2.6;
-    if (bookend) { const want = Ti + Tb + To, f = Math.min(want, durSec * 0.72) / want; Ti *= f; Tb *= f; To *= f; }
-    const buildStart = bookend ? Ti : 0;   // opbouw/inkleuren start ná de intro-inzoom
+    const camZoom = 2.0;
+    // Rustiger pacing: trage intro-inzoom, een HOUD op de kale tegels (zodat je ziet
+    // wat er gebeurt), traag inkleuren, trage outro. Th = rustmoment op de kale tegels.
+    let Ti = 4.0, Dt = 1.0, Th = 1.4, Tb = buildSec, To = 4.0;
+    if (bookend) { const want = Ti + Th + Tb + To, f = Math.min(want, durSec * 0.80) / want; Ti *= f; Th *= f; Tb *= f; To *= f; }
+    const buildStart = bookend ? Ti + Th : 0;   // inkleuren start ná de intro-inzoom én de kale-tegel-houd
     const pw = parsed.view[2], ph = parsed.view[3];
+    // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
+    const archD = moorArch(panelX, panelY, panelW, panelH);
+    const plumCol = "#201734";
+    const decor = `<g opacity="0.07">${medallion(W / 2, panelY + panelH * 0.5, panelW * 0.52, branding.gold)}</g>`;
+    const colW = Math.min(Math.round(panelX * 0.5), Math.round(W * 0.052)), colTop = panelY + panelH * 0.34, colBot = panelY + panelH;
+    const cols = column(Math.round(panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol) + column(Math.round(W - panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol);
+    const archLine = `<path d="${archD}" fill="none" stroke="${branding.gold}" stroke-width="3"/>`;
 
     function sceneAt(frame) {
       const t = frame / FPS, tleft = durSec - t;
       // Camera: photoK = hoeveel de foto zichtbaar is; zMos/zPho = inzoom op mozaïek/foto.
       let photoK = 0, zMos = 1, zPho = 1, tailK = 0;
       if (bookend) {
-        const oStart = durSec - To, oZi = oStart + To * 0.42, oDis = oZi + Math.min(Dt, To * 0.28);
-        if (t < Ti) {                                   // intro: foto zoomt in op de tegels, dan dissolve naar kaal mozaïek
+        const oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
+        if (t < Ti) {                                   // intro: foto zoomt langzaam in op de tegels
           zPho = 1 + (camZoom - 1) * smooth(t / Ti); zMos = camZoom;
-          photoK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);
-        } else if (t < Ti + Tb) {                       // camera trekt terug terwijl het inkleurt
-          zMos = camZoom - (camZoom - 1) * smooth((t - Ti) / Tb);
+          photoK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);   // trage dissolve foto -> kaal mozaïek
+        } else if (t < Ti + Th) {                       // HOUD de kale tegels vast — kijk, zo wordt het gemaakt
+          zMos = camZoom;
+        } else if (t < Ti + Th + Tb) {                  // tegels kleuren rustig in terwijl de camera terugtrekt
+          zMos = camZoom - (camZoom - 1) * smooth((t - (Ti + Th)) / Tb);
         } else if (t < oStart) {                        // vrije flow
           zMos = 1;
         } else if (t < oZi) {                           // outro: inzoomen op het patroon
@@ -276,17 +314,18 @@ export function makeBrand({ ROOT, config }) {
       let colors = isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
-      const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
-        `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid meet">`);
+      const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
+        `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`);
+      // mozaïek + medaillon-watermerk, geclipt in de Moorse boog
+      const inner = `<clipPath id="arch"><path d="${archD}"/></clipPath>${decor}<g clip-path="url(#arch)">${mosaic}</g>`;
       let overlay = "";
-      // sfeerfoto over het paneel, met Ken-Burns inzoom (groter tekenen + clippen)
+      // sfeerfoto in de boog, met Ken-Burns inzoom; + merk-medaillon dat met de foto meekomt
       if (bookend && photoK > 0.002) {
         const k = photoK.toFixed(3), iw = panelW * zPho, ih = panelH * zPho, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
-        overlay += `<clipPath id="heroclip"><rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6"/></clipPath>`
-          + `<image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroclip)" opacity="${k}"/>`
-          + `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="none" stroke="${branding.gold}" stroke-width="2" opacity="${k}"/>`;
+        overlay += `<g clip-path="url(#arch)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`
+          + `<g opacity="${(photoK * 0.8).toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;
       }
-      overlay += badge;
+      overlay += archLine + cols + badge;
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
         const outK = bookend ? photoK : tailK;
@@ -299,7 +338,7 @@ export function makeBrand({ ROOT, config }) {
           overlay += `<g opacity="${op.toFixed(3)}">${pl}</g>`;
         }
       }
-      return composeChrome({ branding, W, H, panel: { x: panelX, y: panelY, w: panelW, h: panelH }, innerField: inner, overlay, logoUri: branding.logoUri });
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic };
   }
