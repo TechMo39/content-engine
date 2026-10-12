@@ -134,7 +134,7 @@ export function makeBrand({ ROOT, config }) {
   // presets of 24s. Alle satisfying-timing (opbouw, flow, bookend, naam) schaalt hiermee.
   function resolveDuration(opts) {
     const n = Number(opts.durationSec ?? opts.duration);
-    if (Number.isFinite(n) && n > 0) return Math.max(6, Math.min(60, n));
+    if (Number.isFinite(n) && n > 0) return Math.max(6, Math.min(600, n));   // tot 10 min, geen kunstmatige cap
     return { kort: 14, middel: 24, lang: 38 }[opts.duration] || 24;
   }
   // SATISFYING (template 1, geperfectioneerd): langer + trager + naadloze loop.
@@ -259,7 +259,8 @@ export function makeBrand({ ROOT, config }) {
           photoK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
         }
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
-      let colors = isFlow ? film.flowColorsAt(parsed, { palette: palArr, durSec, buildSec: Tb, buildStart }, t) : film.colorsAt(parsed, story, t);
+      const tempoMul = { snel: 1.6, normaal: 1.0, rustig: 0.6 }[opts.tempo] || 1.0;   // Tempo stuurt de flow-snelheid
+      let colors = isFlow ? film.flowColorsAt(parsed, { palette: palArr, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,

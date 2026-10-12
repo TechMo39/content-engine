@@ -81,13 +81,13 @@ async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick
 function buildOpts(){const o=$('#opts');o.innerHTML='';
   const add=(label,html)=>{const r=document.createElement('label');r.className='row';r.innerHTML=label+' '+html;o.appendChild(r);};
   if(BRANDOPTS.includes('palette')) add('Palet','<span class="seg" id="o_pal"><button data-v="modern" class="on">Modern</button><button data-v="warm">Warm</button><button data-v="cool">Koel</button></span>');
-  if(BRANDOPTS.includes('duration')) add('Lengte','<input type="range" id="o_dursec" min="8" max="45" step="1" value="'+(state.opts.durationSec||24)+'" style="flex:1;margin:0 10px;accent-color:var(--gold)"><span id="o_durlbl" style="min-width:34px;text-align:right">'+(state.opts.durationSec||24)+'s</span>');
+  if(BRANDOPTS.includes('duration')) add('Lengte','<input type="range" id="o_dursec" min="8" max="300" step="1" value="'+(state.opts.durationSec||24)+'" style="flex:1;margin:0 10px;accent-color:var(--gold)"><span id="o_durlbl" style="min-width:52px;text-align:right">'+durLbl(state.opts.durationSec||24)+'</span>');
   if(BRANDOPTS.includes('reveal')) add('Opbouw','<span class="seg" id="o_rev"><button data-v="radial" class="on">Bloei</button><button data-v="diag">Diagonaal</button><button data-v="up">Omhoog</button></span>');
   if(BRANDOPTS.includes('tempo')) add('Tempo','<span class="seg" id="o_tmp"><button data-v="snel">Snel</button><button data-v="normaal" class="on">Normaal</button><button data-v="rustig">Rustig</button></span>');
   if(BRANDOPTS.includes('name')) add('Naam','<input type="text" id="o_name" placeholder="bijv. Café De Hoek" style="flex:1;margin-left:10px">');
   const seg=(id,key)=>{const el=$('#'+id);if(!el)return;$$('#'+id+' button').forEach(b=>b.onclick=()=>{$$('#'+id+' button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.opts[key]=b.dataset.v;});};
   seg('o_pal','palette');seg('o_rev','reveal');seg('o_tmp','tempo');
-  const ds=$('#o_dursec');if(ds)ds.oninput=e=>{state.opts.durationSec=+e.target.value;$('#o_durlbl').textContent=e.target.value+'s';};
+  const ds=$('#o_dursec');if(ds)ds.oninput=e=>{state.opts.durationSec=+e.target.value;$('#o_durlbl').textContent=durLbl(+e.target.value);};
   const nm=$('#o_name');if(nm)nm.oninput=e=>{state.opts.name=e.target.value;if(state.brand==='unclerank'&&e.target.value)ready();};
   if(BRANDOPTS.includes('image')) buildImagePicker();
 }
@@ -102,6 +102,7 @@ async function buildImagePicker(){
   mk('', '', 'Automatisch (willekeurig per render)');
   j.images.forEach(im=>mk(im.id,im.uri,im.id));
 }
+function durLbl(s){s=+s;return s<60?s+'s':(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'));}
 function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}
 function setSubjOpen(o){$('#subjWrap').style.display=o?'':'none';$('#subjToggle').classList.toggle('open',o);}
 $('#subjToggle').onclick=()=>setSubjOpen($('#subjWrap').style.display==='none');
