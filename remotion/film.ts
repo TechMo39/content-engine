@@ -254,8 +254,8 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
     let col = mix(sorted[i0], sorted[i1], smooth(f - i0));
     // glans: zachte lichtband die diagonaal meebeweegt (wrap-afstand -> continu)
     const proj = (u + v) / 2; let d = Math.abs(proj - sc); d = Math.min(d, 1 - d);
-    const sheen = 0.26 * Math.exp(-(d * d) / (0.10 * 0.10));
-    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.5, sheen));
+    const sheen = 0.19 * Math.exp(-(d * d) / (0.085 * 0.085));   // subtieler + smaller -> minder melkig
+    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.32, sheen));
     // opbouw: tegels kleuren in op volgorde, vanaf bStart (ervoor zijn ze nog kaal/neutraal)
     const tb = t - bStart;
     if (tb < build) { const start = tiles[i].order * (build - 0.6); const q = Math.max(0, Math.min(1, (tb - start) / 0.6)); col = q <= 0 ? BLANK : mix(BLANK, col, smooth(q)); }

@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import esbuild from "esbuild";
-import { composeChrome, fitRect, loadLogo, loadImageFile, FORMATS, escapeXml } from "../core/renderer.mjs";
+import { composeChrome, fitRect, loadLogo, loadImageFile, imagePalette, enrichPalette, FORMATS, escapeXml } from "../core/renderer.mjs";
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
 function _hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -77,8 +77,13 @@ export function makeBrand({ ROOT, config }) {
     let files = [];
     try { files = (await fs.readdir(IMG_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
     for (const f of files) {
-      const uri = await loadImageFile(path.join(IMG_DIR, f));
-      if (uri) imagePool.push({ id: f, uri });
+      const abs = path.join(IMG_DIR, f);
+      const uri = await loadImageFile(abs);
+      if (!uri) continue;
+      // scan de foto op levendige hoofdkleuren -> familie-palet voor de flow (kleur-match)
+      let pal = [];
+      try { pal = enrichPalette(await imagePalette(abs, 7), 8); } catch {}
+      imagePool.push({ id: f, uri, pal });
     }
   }
   const imgById = (id) => imagePool.find((x) => x.id === id);
@@ -169,14 +174,19 @@ export function makeBrand({ ROOT, config }) {
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
-  // alles als er (nog) niks in die categorie staat.
+  // alles als er (nog) niks in die categorie staat. Nooit twee keer achter elkaar
+  // dezelfde (anti-herhaling) zodat je echt variatie hoort.
+  let lastMusic = "";
   async function pickMusic(cats) {
     let files = [];
     try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|wav|m4a|aac|ogg)$/i.test(f)); } catch {}
     if (!files.length) return "";
     const want = files.filter((f) => (cats || []).some((c) => f.toLowerCase().startsWith(c + "-")));
-    const pool = want.length ? want : files;
-    return path.resolve(ROOT, config.audioDir, pool[Math.floor(Math.random() * pool.length)]);
+    let pool = want.length ? want : files;
+    if (pool.length > 1 && lastMusic) { const p2 = pool.filter((f) => f !== lastMusic); if (p2.length) pool = p2; }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    lastMusic = pick;
+    return path.resolve(ROOT, config.audioDir, pick);
   }
 
   async function listSubjects() {
@@ -215,7 +225,10 @@ export function makeBrand({ ROOT, config }) {
     const np = name ? plateColours(palArr) : null;
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
-    const hero = (opts.image && imgById(opts.image)) ? imgById(opts.image).uri : (imagePool.length ? imagePool[Math.floor(Math.random() * imagePool.length)].uri : "");
+    const heroObj = (opts.image && imgById(opts.image)) ? imgById(opts.image) : (imagePool.length ? imagePool[Math.floor(Math.random() * imagePool.length)] : null);
+    const hero = heroObj ? heroObj.uri : "";
+    // Kleur-match: de flow volgt de hoofdkleuren van de gekozen foto; geen foto -> het gekozen palet.
+    const flowPal = heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr;
     const bookend = loop && !!hero;   // naadloze foto-bookend: alleen satisfying + er is een foto
     const bk = 1.5;                   // duur van de in-/uit-dissolve naar de foto
     // klein gekaderd productbeeld bovenin links — zelfde foto als het sfeerbeeld
@@ -260,7 +273,7 @@ export function makeBrand({ ROOT, config }) {
         }
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
       const tempoMul = { snel: 1.6, normaal: 1.0, rustig: 0.6 }[opts.tempo] || 1.0;   // Tempo stuurt de flow-snelheid
-      let colors = isFlow ? film.flowColorsAt(parsed, { palette: palArr, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
+      let colors = isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,

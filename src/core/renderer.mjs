@@ -4,7 +4,7 @@
 // Een merk-module levert een sceneAt(frame) -> SVG; de kern rendert dat.
 import { Resvg } from "@resvg/resvg-js";
 import ffmpegStatic from "ffmpeg-static";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -43,6 +43,58 @@ export async function loadImageFile(absPath) {
     uri = `data:image/${mime};base64,` + buf.toString("base64");
   } catch {}
   _imgCache.set(absPath, uri); return uri;
+}
+
+// Haal de LEVENDIGE hoofdkleuren uit een foto (voor kleur-match met het sfeerbeeld).
+// Schaalt het beeld klein met ffmpeg, leest de pixels, negeert grijs/bruin/muur en
+// bundelt op tint. Geeft ~n hex-kleuren terug (meest voorkomend + verzadigd eerst).
+export function imagePalette(absPath, n = 7) {
+  return new Promise((resolve) => {
+    if (!absPath || !existsSync(absPath)) { resolve([]); return; }
+    const args = ["-v", "error", "-i", absPath, "-vf", "scale=40:40:flags=area", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"];
+    execFile(FFMPEG, args, { encoding: "buffer", maxBuffer: 1 << 20 }, (err, stdout) => {
+      if (err || !stdout || !stdout.length) { resolve([]); return; }
+      const px = stdout, bins = new Map();
+      for (let i = 0; i + 2 < px.length; i += 3) {
+        const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+        const s = mx ? d / mx : 0, v = mx;
+        if (s < 0.22 || v < 0.16 || v > 0.97) continue;   // grijs/muur/te donker/uitgeblazen overslaan
+        let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; }
+        h = ((h * 60) + 360) % 360;
+        const key = Math.round(h / 15) % 24, w = s * v;   // 24 tint-bakken, gewogen op verzadiging×helderheid
+        const e = bins.get(key) || { w: 0, r: 0, g: 0, b: 0 }; e.w += w; e.r += px[i] * w; e.g += px[i + 1] * w; e.b += px[i + 2] * w; bins.set(key, e);
+      }
+      const arr = [...bins.values()].sort((a, b) => b.w - a.w).slice(0, n);
+      const toHex = (e) => { const r = Math.round(e.r / e.w), g = Math.round(e.g / e.w), b = Math.round(e.b / e.w); return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1); };
+      resolve(arr.map(toHex));
+    });
+  });
+}
+
+// --- kleurhulp (HSL) voor het opbouwen van een familie-palet rond de foto-kleuren ---
+function _rgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function _toHsl(hex) { let [r, g, b] = _rgb(hex).map((x) => x / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; } h = ((h * 60) + 360) % 360; const l = (mx + mn) / 2, s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1)); return { h, s, l }; }
+function _toHex({ h, s, l }) { s = Math.max(0, Math.min(1, s)); l = Math.max(0, Math.min(1, l)); const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2; let r = 0, g = 0, b = 0; const k = Math.floor(h / 60) % 6; if (k === 0) [r, g, b] = [c, x, 0]; else if (k === 1) [r, g, b] = [x, c, 0]; else if (k === 2) [r, g, b] = [0, c, x]; else if (k === 3) [r, g, b] = [0, x, c]; else if (k === 4) [r, g, b] = [x, 0, c]; else[r, g, b] = [c, 0, x]; const R = Math.round((r + m) * 255), G = Math.round((g + m) * 255), B = Math.round((b + m) * 255); return "#" + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1); }
+
+// Bouw een vol, levendig flow-palet rond de foto-hoofdkleuren: per kleur wat
+// analoge tinten + licht/donker varianten, met een verzadigings-boost zodat het
+// niet melkig wordt. Weinig kleuren in de foto -> familie rond die ene tint.
+export function enrichPalette(cols, target = 8) {
+  const base = (cols || []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  if (!base.length) return [];
+  const H = base.map(_toHsl);
+  const out = [];
+  for (const b of H) {
+    const s = Math.min(1, Math.max(0.45, b.s * 1.18)), l = Math.min(0.62, Math.max(0.4, b.l));
+    out.push({ h: b.h, s, l });
+    out.push({ h: (b.h + 20) % 360, s: s * 0.95, l: Math.min(0.72, l + 0.12) });
+    out.push({ h: (b.h + 340) % 360, s, l: Math.max(0.28, l - 0.14) });
+    out.push({ h: b.h, s: Math.min(1, s * 1.08), l: Math.max(0.24, l - 0.22) });
+    out.push({ h: b.h, s: s * 0.85, l: Math.min(0.8, l + 0.24) });
+  }
+  const hex = []; for (const c of out) { const h = _toHex(c); if (!hex.includes(h)) hex.push(h); }
+  return hex.slice(0, Math.max(5, target));
 }
 
 // Een rechthoek met verhouding A inpassen in (Wmax x Hmax), zonder vervormen.
