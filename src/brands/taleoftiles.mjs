@@ -56,12 +56,13 @@ export function makeBrand({ ROOT, config }) {
   const branding = {
     name: "Tale of Tiles", footer: "taleoftiles.com",
     bg: "#1a1327", bg2: "#241a3a", gold: "#d6b35a", cream: "#f4ecdc", plate: "#eae4d7",
-    // premium woordmerk (altijd herkenbaar bovenin): zellige-ster + serif-caps + goud lijntje
+    // premium woordmerk + korte regel die zegt WAT we doen (altijd bovenin, herkenbaar)
     markSvg: ({ W, H }) => {
-      const gold = "#d6b35a", midY = Math.round(H * 0.082), fs = Math.round(W * 0.05), ruleW = fs * 4.3;
+      const gold = "#d6b35a", cream = "#f4ecdc", midY = Math.round(H * 0.072), fs = Math.round(W * 0.05), ruleW = fs * 4.3, tag = Math.round(fs * 0.33);
       return `<polygon points="${star8(W / 2, midY - fs * 1.02, fs * 0.52, fs * 0.22)}" fill="${gold}"/>`
         + `<text x="${W / 2}" y="${midY + fs * 0.32}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fs}" letter-spacing="${(fs * 0.16).toFixed(1)}" fill="${gold}">TALE OF TILES</text>`
-        + `<line x1="${W / 2 - ruleW}" y1="${midY + fs * 0.66}" x2="${W / 2 + ruleW}" y2="${midY + fs * 0.66}" stroke="${gold}" stroke-width="1.3" opacity="0.75"/>`;
+        + `<line x1="${W / 2 - ruleW}" y1="${midY + fs * 0.62}" x2="${W / 2 + ruleW}" y2="${midY + fs * 0.62}" stroke="${gold}" stroke-width="1.3" opacity="0.75"/>`
+        + `<text x="${W / 2}" y="${midY + fs * 1.12}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="${tag}" letter-spacing="${(tag * 0.14).toFixed(1)}" fill="${cream}" opacity="0.82">HANDGEMAAKTE ZELLIGE NAAMBORDEN</text>`;
     },
   };
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
@@ -75,6 +76,8 @@ export function makeBrand({ ROOT, config }) {
     try { LOCKS = JSON.parse(await fs.readFile(path.resolve(ROOT, "assets/tile-locks.json"), "utf8")); } catch {}
     try { patternList = JSON.parse(await fs.readFile(path.resolve(ROOT, "fixtures/patterns.json"), "utf8")).patterns; } catch {}
     branding.logoUri = await loadLogo(config.logoUrl);
+    // klein beeld van het échte product (paneel aan de muur) — laat zien wát we maken
+    branding.badgeUri = await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");
   }
   async function getBase(pattern) {
     if (baseCache.has(pattern)) return baseCache.get(pattern);
@@ -167,6 +170,14 @@ export function makeBrand({ ROOT, config }) {
     const name = (opts.name || "").trim();
     const palArr = PALS()[opts.palette] || film.PAL;
     const np = name ? plateColours(palArr) : null;
+    // vast productbeeld (paneel aan de muur), klein gekaderd thumbnail bovenin links
+    let badge = "";
+    if (branding.badgeUri) {
+      const bw = Math.round(W * 0.17), bh = Math.round(bw * 1.2), bx = Math.round(W * 0.045), by = Math.round(H * 0.032);
+      badge = `<rect x="${bx - 2}" y="${by - 2}" width="${bw + 4}" height="${bh + 4}" rx="8" fill="#140f1e" stroke="${branding.gold}" stroke-width="2"/>`
+        + `<clipPath id="bdgclip"><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6"/></clipPath>`
+        + `<image href="${branding.badgeUri}" x="${bx}" y="${by}" width="${bw}" height="${bh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bdgclip)"/>`;
+    }
 
     function sceneAt(frame) {
       const t = frame / FPS;
@@ -175,14 +186,14 @@ export function makeBrand({ ROOT, config }) {
       if (loop) { const tail = 1.3, tleft = durSec - t; if (tleft < tail) tailK = Math.min(1, Math.max(0, 1 - tleft / tail)); if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK)); }
       const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
         `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
-      let overlay = "";
+      let overlay = badge;
       if (name && np) {
         let op = Math.max(0, Math.min(1, (t - (durSec - 2.2)) / 1.0)) * (1 - tailK);
         if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
           const plateX = Math.round(panelX + (panelW - plateW) / 2), plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - op) * 10);
           const pl = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
-          overlay = `<g opacity="${op.toFixed(3)}">${pl}</g>`;
+          overlay += `<g opacity="${op.toFixed(3)}">${pl}</g>`;
         }
       }
       return composeChrome({ branding, W, H, panel: { x: panelX, y: panelY, w: panelW, h: panelH }, innerField: inner, overlay, logoUri: branding.logoUri });
