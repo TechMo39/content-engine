@@ -100,6 +100,50 @@ async function loadLogo() {
 }
 
 function escapeXml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+// ---- Naamplaat, 1-op-1 port uit page.ts (mPlateColours + mNameLayerSvg) ----
+function _hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function _mix(a, b, t) { const A = _hexRgb(a), B = _hexRgb(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
+function _lum(h) { const r = _hexRgb(h); return 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2]; }
+function plateColours(cols) {
+  cols = (cols || []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  if (!cols.length) cols = ["#7d8f6e", "#2f4858", "#e8e5e2"];
+  const sorted = cols.slice().sort((a, b) => _lum(a) - _lum(b));
+  const darkest = sorted[0];
+  let edge = cols[0], best = -1;
+  cols.forEach((c) => { const r = _hexRgb(c); const sat = Math.max(r[0], r[1], r[2]) - Math.min(r[0], r[1], r[2]); if (sat > best) { best = sat; edge = c; } });
+  const plate = _mix(edge, "#f4efe6", 0.70);     // zachte lichte tint met kleurtoon
+  const ink = _mix(darkest, "#1a1512", 0.35);
+  return { plate, ink, edge };
+}
+// Bouw de naam-laag SVG (viewBox 560x200), exact zoals mNameLayerSvg in page.ts.
+function nameLayerSvg(nm, np, scale) {
+  const vw = 560, vh = 200;
+  const stone = np.plate, stoneDark = _mix(stone, "#000000", 0.28), stoneLight = _mix(stone, "#ffffff", 0.55), band = np.edge;
+  const engrave = _mix(np.ink || np.edge || stone, "#000000", 0.15);
+  let fpx = Math.round(vh * 0.30 * (scale || 1));
+  const words = (nm || "").split(" "); let lines = [nm];
+  if (nm.length > 14 && words.length > 1) { const mid = Math.ceil(words.length / 2); lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")]; fpx = Math.round(fpx * 0.82); }
+  const FF = "DejaVu Serif,serif", WT = 700, TR = 4, CW = 0.72;   // 'romeins' (Cinzel) -> serif
+  const innerW = vw - 90;
+  let longestLen = 0; for (const l of lines) longestLen = Math.max(longestLen, l.length);
+  const estW = longestLen * (fpx * CW + TR);
+  if (estW > innerW) fpx = Math.max(14, Math.floor(fpx * innerW / estW));
+  const lh = fpx * 1.2, y0 = vh / 2 - (lines.length - 1) * lh / 2 + fpx * 0.34;
+  const brass = "#b08d57";
+  let out = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+  out += `<rect x="6" y="6" width="${vw - 12}" height="${vh - 12}" rx="18" fill="${band}"/>`;
+  out += `<rect x="12" y="12" width="${vw - 24}" height="${vh - 24}" rx="14" fill="${stoneDark}"/>`;
+  out += `<rect x="15" y="15" width="${vw - 30}" height="${vh - 30}" rx="12" fill="${stone}"/>`;
+  out += `<rect x="26" y="24" width="${vw - 52}" height="${vh - 48}" rx="8" fill="none" stroke="${brass}" stroke-width="2"/>`;
+  out += `<rect x="30" y="28" width="${vw - 60}" height="${vh - 56}" rx="6" fill="none" stroke="${stoneDark}" stroke-width="1" opacity="0.4"/>`;
+  const tline = (x, y, ln, fill) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="${FF}" font-weight="${WT}" font-size="${fpx}" letter-spacing="${TR}" fill="${fill}">${escapeXml(ln).toUpperCase()}</text>`;
+  for (let li = 0; li < lines.length; li++) { const yy = y0 + li * lh; out += tline(vw / 2 + 1, yy + 1, lines[li], stoneDark); out += tline(vw / 2 - 1, yy - 1, lines[li], stoneLight); out += tline(vw / 2, yy, lines[li], engrave); }
+  const sy = y0 + (lines.length - 1) * lh + fpx * 0.62, sw = vw * 0.14;
+  out += `<line x1="${vw / 2 - sw}" y1="${sy}" x2="${vw / 2 + sw}" y2="${sy}" stroke="${stoneDark}" stroke-width="1.5"/>`;
+  out += `<polygon points="${vw / 2},${sy - 4} ${vw / 2 + 6},${sy} ${vw / 2},${sy + 4} ${vw / 2 - 6},${sy}" fill="${stoneDark}"/>`;
+  out += `</svg>`;
+  return out;
+}
 function json(res, o, c = 200) { res.writeHead(c, { "content-type": "application/json" }); res.end(JSON.stringify(o)); }
 function readBody(req) { return new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { r(JSON.parse(b || "{}")); } catch { r({}); } }); }); }
 
@@ -146,29 +190,29 @@ async function renderVideo({ pattern, template, opts, format, music, name }) {
   const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
   const panelX = Math.round((W - panelW) / 2), panelY = Math.round(bandTop + (bandBot - bandTop - panelH) / 2);
   const logo = await loadLogo();
+  // naamplaat-kleuren uit het gekozen palet (zoals mPlateColours in de configurator)
+  const palArr = ({ modern: film.PAL, warm: film.WARM, cool: film.COOL })[opts.palette] || film.PAL;
+  const np = name ? plateColours(palArr) : null;
 
   function scene(frame) {
     const inner = film.buildSvg(parsed, film.colorsAt(parsed, activeStory, frame / FPS)).replace(/<svg\b[^>]*>/i,
       `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
     const logoTag = logo ? `<image href="${logo}" x="${W / 2 - 90}" y="${H * 0.05}" width="180" height="${H * 0.07}" preserveAspectRatio="xMidYMid meet"/>`
       : `<text x="${W / 2}" y="${H * 0.1}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="20" letter-spacing="4" fill="${C.gold}">TALE OF TILES</text>`;
-    // Naamplaat (verschijnt aan het eind, zet het ontwerp neer als product): naam op
-    // een stenen plaat, "romeins" serif, inkt #4a3a2a — zoals de configurator.
+    // Naamplaat (port van mNameLayerSvg): verdiepte steenplaat in palet-kleur, messing keylijn,
+    // gegraveerde letters + sierstreep, GECENTREERD in het paneel. Verschijnt aan het eind.
     let plate = "";
-    if (name) {
+    if (name && np) {
       const t = frame / FPS, fadeStart = DUR - 2.2;
       const op = Math.max(0, Math.min(1, (t - fadeStart) / 1.0));
       if (op > 0) {
-        const plateW = Math.round(panelW * 0.80), plateH = Math.max(40, Math.round(panelH * 0.14));
-        const plateX = Math.round((W - plateW) / 2);
-        const plateY = panelY + panelH - plateH - Math.round(panelH * 0.06) + Math.round((1 - op) * 14);
-        const fs = Math.min(Math.round(plateH * 0.44), Math.round(plateW * 1.5 / Math.max(3, name.length)));
-        plate = `<g opacity="${op.toFixed(3)}">`
-          + `<rect x="${plateX + 4}" y="${plateY + 6}" width="${plateW}" height="${plateH}" rx="9" fill="#000000" opacity="0.20"/>`
-          + `<rect x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" rx="9" fill="#efe9dd" stroke="#c9bfa6" stroke-width="1.5"/>`
-          + `<rect x="${plateX + 5}" y="${plateY + 5}" width="${plateW - 10}" height="${plateH - 10}" rx="6" fill="none" stroke="#d8cdb4" stroke-width="1"/>`
-          + `<text x="${W / 2}" y="${plateY + plateH / 2}" text-anchor="middle" dominant-baseline="central" font-family="DejaVu Serif,serif" font-size="${fs}" letter-spacing="1.5" fill="#4a3a2a">${escapeXml(name)}</text>`
-          + `</g>`;
+        const plateW = Math.round(panelW * 0.56);
+        const plateH = Math.round(plateW * 200 / 560);
+        const plateX = Math.round(panelX + (panelW - plateW) / 2);
+        const plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - op) * 10);
+        const inner = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i,
+          `<svg x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
+        plate = `<g opacity="${op.toFixed(3)}">${inner}</g>`;
       }
     }
     return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">

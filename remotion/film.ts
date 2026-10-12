@@ -8,10 +8,11 @@ export const WARM = ["#c75a4e","#f79f45","#e4ce8c","#f6ae91","#e7c077","#c67765"
 export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084","#a1c981","#663959"];
 export const BLANK = "#e8e5e2";
 export const PLUM = "#2a2335";
-// Voeg (zoals de live configurator): cementgrijze naad #9a9488 tussen ingekleurde
-// tegels, dun contour op de nog-neutrale (raw) tegels.
-export const VOEG = "#9a9488";
+// Voeg (exact uit page.ts, var VOEG): gips-crème #eae4d7 breedte 5 tussen ingekleurde
+// tegels; donker contour #b9a98c breedte 2 op de nog-neutrale (raw) tegels; neutraal #e8e5e2.
+export const VOEG = "#eae4d7";
 export const VOEG_RAW = "#b9a98c";
+export const VOEG_PX = 5, VOEG_RAW_PX = 2;
 
 export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };
 export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] } };
@@ -31,15 +32,47 @@ export type Storyboard = { buildSec: number; popSec: number; segments: Segment[]
 // elke tegel data-idx -> samen de sleutel c{i}_{j}_i{idx} (zoals de site).
 export type Lock = { n?: number; gx?: number; gy?: number };
 
+// Transform toepassen op een punt (port van mApplyTf, page.ts): eerst rotate, dan translate.
+function applyTf(x: number, y: number, tf: string | null): [number, number] {
+  if (!tf) return [x, y];
+  const rot = tf.match(/rotate\(\s*(-?[0-9.]+)(?:[ ,]+(-?[0-9.]+)[ ,]+(-?[0-9.]+))?/);
+  if (rot) { const a = +rot[1] * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); let rx = 0, ry = 0; if (rot[2] !== undefined) { rx = +rot[2]; ry = +rot[3]; } const dx = x - rx, dy = y - ry; x = rx + dx * c - dy * s; y = ry + dx * s + dy * c; }
+  const tr = tf.match(/translate\(\s*(-?[0-9.]+)(?:[ ,]+(-?[0-9.]+))?/);
+  if (tr) { x += +tr[1]; if (tr[2] !== undefined) y += +tr[2]; }
+  return [x, y];
+}
+// Punten uit een path-d (port van mPathPts, page.ts).
+function pathPts(d: string): [number, number][] {
+  const pts: [number, number][] = []; let x = 0, y = 0, sx = 0, sy = 0, m: RegExpExecArray | null;
+  const re = /([MmLlHhVvCcSsQqTtAaZz])([^MmLlHhVvCcSsQqTtAaZz]*)/g;
+  while ((m = re.exec(d))) {
+    const nums = (m[2].match(/-?[0-9.]+(?:e-?[0-9]+)?/g) || []).map(Number);
+    const rel = m[1] === m[1].toLowerCase(), c = m[1].toUpperCase(); let i = 0;
+    if (c === "M") { x = rel ? x + nums[0] : nums[0]; y = rel ? y + nums[1] : nums[1]; sx = x; sy = y; pts.push([x, y]); i = 2; for (; i + 1 < nums.length; i += 2) { x = rel ? x + nums[i] : nums[i]; y = rel ? y + nums[i + 1] : nums[i + 1]; pts.push([x, y]); } }
+    else if (c === "L") { for (; i + 1 < nums.length; i += 2) { x = rel ? x + nums[i] : nums[i]; y = rel ? y + nums[i + 1] : nums[i + 1]; pts.push([x, y]); } }
+    else if (c === "H") { for (; i < nums.length; i++) { x = rel ? x + nums[i] : nums[i]; pts.push([x, y]); } }
+    else if (c === "V") { for (; i < nums.length; i++) { y = rel ? y + nums[i] : nums[i]; pts.push([x, y]); } }
+    else if (c === "C") { for (; i + 5 < nums.length; i += 6) { x = rel ? x + nums[i + 4] : nums[i + 4]; y = rel ? y + nums[i + 5] : nums[i + 5]; pts.push([x, y]); } }
+    else if (c === "S" || c === "Q") { for (; i + 3 < nums.length; i += 4) { x = rel ? x + nums[i + 2] : nums[i + 2]; y = rel ? y + nums[i + 3] : nums[i + 3]; pts.push([x, y]); } }
+    else if (c === "T") { for (; i + 1 < nums.length; i += 2) { x = rel ? x + nums[i] : nums[i]; y = rel ? y + nums[i + 1] : nums[i + 1]; pts.push([x, y]); } }
+    else if (c === "Z") { x = sx; y = sy; }
+  }
+  return pts;
+}
+// Transform-bewuste bounding box van de patroon-inhoud (port van mContentBBox, page.ts).
+// DIT is de echte herhaal-eenheid; zonder transforms klopte mijn eenheid niet -> "los van elkaar".
 function contentBBox(inner: string) {
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  const push = (x: number, y: number) => { if (x < minx) minx = x; if (y < miny) miny = y; if (x > maxx) maxx = x; if (y > maxy) maxy = y; };
-  let m: RegExpExecArray | null;
-  const rp = /points="([^"]*)"/g; while ((m = rp.exec(inner))) { const n = (m[1].match(/-?[0-9.]+/g) || []).map(Number); for (let i = 0; i + 1 < n.length; i += 2) push(n[i], n[i + 1]); }
-  const rr = /<rect\b([^>]*)>/gi; while ((m = rr.exec(inner))) { const a = m[1]; const g = (k: string) => parseFloat((a.match(new RegExp('(?:^|\\s)' + k + '="([^"]*)"')) || [])[1] || "NaN"); const x = g("x"), y = g("y"), w = g("width"), h = g("height"); if (isFinite(x) && isFinite(y) && isFinite(w) && isFinite(h)) { push(x, y); push(x + w, y + h); } }
-  const rd = /<path\b[^>]*\bd="([^"]*)"/gi; while ((m = rd.exec(inner))) { const n = (m[1].match(/-?[0-9.]+/g) || []).map(Number); for (let i = 0; i + 1 < n.length; i += 2) push(n[i], n[i + 1]); }
-  if (!isFinite(minx)) { minx = 0; miny = 0; maxx = 700; maxy = 700; }
-  return { minx, miny, w: maxx - minx, h: maxy - miny };
+  const xs: number[] = [], ys: number[] = []; let e: RegExpExecArray | null;
+  const add = (x: number, y: number, tf: string | null) => { const p = applyTf(x, y, tf); xs.push(p[0]); ys.push(p[1]); };
+  const rp = /<polygon([^>]*)>/g;
+  while ((e = rp.exec(inner))) { const a = " " + e[1]; const pm = a.match(/points="([^"]*)"/); if (!pm) continue; const tf = (a.match(/transform="([^"]*)"/) || [])[1] || null; const n = (pm[1].match(/-?[0-9.]+/g) || []).map(Number); for (let i = 0; i + 1 < n.length; i += 2) add(n[i], n[i + 1], tf); }
+  const rr = /<rect([^>]*)>/g;
+  while ((e = rr.exec(inner))) { const a = " " + e[1]; const xm = a.match(/ x="([^"]*)"/), ym = a.match(/ y="([^"]*)"/), wm = a.match(/ width="([^"]*)"/), hm = a.match(/ height="([^"]*)"/); const tf = (a.match(/transform="([^"]*)"/) || [])[1] || null; if (xm && ym && wm && hm) { const x = +xm[1], y = +ym[1], w = +wm[1], h = +hm[1]; add(x, y, tf); add(x + w, y, tf); add(x + w, y + h, tf); add(x, y + h, tf); } }
+  const rd = /<path([^>]*)>/g;
+  while ((e = rd.exec(inner))) { const a = " " + e[1]; const dm = a.match(/ d="([^"]*)"/); if (!dm) continue; const tf = (a.match(/transform="([^"]*)"/) || [])[1] || null; const pts = pathPts(dm[1]); for (let k = 0; k < pts.length; k++) add(pts[k][0], pts[k][1], tf); }
+  if (xs.length < 2) return { minx: 0, miny: 0, w: 700, h: 700 };
+  const mnx = Math.min(...xs), mny = Math.min(...ys);
+  return { minx: mnx, miny: mny, w: Math.max(...xs) - mnx, h: Math.max(...ys) - mny };
 }
 // nummer elke vorm (polygon/rect/path) met data-idx, zodat elke tegel een adres heeft
 function numberShapes(inner: string): string {
@@ -53,16 +86,18 @@ export function tilePattern(baseSvg: string, lock: Lock, nX: number, nY: number)
   let inner = gt >= 0 && end > gt ? baseSvg.slice(gt + 1, end) : baseSvg;
   inner = numberShapes(inner);
   const bb = contentBBox(inner);
+  const cw = bb.w || 700, ch = bb.h || 700, minx = bb.minx || 0, miny = bb.miny || 0;
   const gx = lock && lock.gx ? lock.gx : 0, gy = lock && lock.gy ? lock.gy : 0;
-  const stepX = bb.w + gx, stepY = bb.h + gy;
-  const offX = -gx / 2, offY = -gy / 2;
+  const stepX = cw + gx, stepY = ch + gy;
   const canvasW = stepX * nX, canvasH = stepY * nY;
+  const offX = -gx / 2, offY = -gy / 2;
+  // bleed-cellen (-1..n+1) vullen de randen na de centrering -> geen gaten aan de rand (zoals mTileField)
   let cells = "";
-  for (let j = 0; j < nY; j++) for (let i = 0; i < nX; i++) {
-    const tx = (i * stepX - bb.minx - offX).toFixed(1), ty = (j * stepY - bb.miny - offY).toFixed(1);
+  for (let j = -1; j <= nY + 1; j++) for (let i = -1; i <= nX + 1; i++) {
+    const tx = (i * stepX - minx - offX).toFixed(1), ty = (j * stepY - miny - offY).toFixed(1);
     cells += `<g data-cell="${i}_${j}" transform="translate(${tx},${ty})">${inner}</g>`;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvasW.toFixed(0)} ${canvasH.toFixed(0)}">${cells}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvasW.toFixed(0)} ${canvasH.toFixed(0)}" preserveAspectRatio="none">${cells}</svg>`;
 }
 
 export function parseTiles(svg: string, reveal: string = "diag"): Parsed {
@@ -195,16 +230,14 @@ function paintTile(tag: string, fill: string, stroke: string, sw: number): strin
 }
 
 export function buildSvg(parsed: Parsed, colors: string[]): string {
-  const { svg, tiles, view } = parsed; let out = ""; let cur = 0;
-  // voeg-breedte schaalt met de tegelgrootte van dit patroon
-  const tileSize = Math.sqrt((view[2] * view[3]) / (tiles.length || 1));
-  const groutW = Math.max(1.5, tileSize * 0.07), rawW = Math.max(0.8, tileSize * 0.028);
+  const { svg, tiles } = parsed; let out = ""; let cur = 0;
+  // voeg-breedte constant in patroon-coordinaten (exact zoals page.ts: VOEG.px=5, rawPx=2)
   for (let i = 0; i < tiles.length; i++) {
     out += svg.slice(cur, tiles[i].start);
     let tag = svg.slice(tiles[i].start, tiles[i].end);
     const col = colors[i] || BLANK;
     const raw = col === BLANK;
-    tag = paintTile(tag, col, raw ? VOEG_RAW : VOEG, raw ? rawW : groutW);
+    tag = paintTile(tag, col, raw ? VOEG_RAW : VOEG, raw ? VOEG_RAW_PX : VOEG_PX);
     out += tag; cur = tiles[i].end;
   }
   out += svg.slice(cur);
