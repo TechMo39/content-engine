@@ -150,6 +150,9 @@ export function setReveal(parsed: Parsed, reveal: string = "diag"): void {
 }
 
 function hx(c: string): [number, number, number] { if (typeof c !== "string" || c.charCodeAt(0) !== 35) c = "#140f1e"; const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+// Tint (0..360) van een kleur — om een palet op kleur te sorteren zodat naburige
+// kleuren op elkaar lijken en het stromen vloeiend wordt i.p.v. springerig.
+function hue(c: string): number { const r = hx(c).map((x) => x / 255), mx = Math.max(r[0], r[1], r[2]), mn = Math.min(r[0], r[1], r[2]), d = mx - mn; if (!d) return 0; let h = 0; if (mx === r[0]) h = ((r[1] - r[2]) / d) % 6; else if (mx === r[1]) h = (r[2] - r[0]) / d + 2; else h = (r[0] - r[1]) / d + 4; return (h * 60 + 360) % 360; }
 function mix(a: string, b: string, t: number): string { t = t < 0 ? 0 : t > 1 ? 1 : t; const A = hx(a), B = hx(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
 function seeded(i: number): number { let s = (i * 2654435761) >>> 0; s ^= s >>> 15; return (s >>> 0) / 4294967295; }
 const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.length) % arr.length];
@@ -215,6 +218,47 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
   const local = tt - acc; const tr = story.segments[k].trans;
   if (local < tr) { const e = smooth(tr > 0 ? local / tr : 1); for (let i = 0; i < tiles.length; i++) out[i] = mix(segColors[k - 1][i], segColors[k][i], e); }
   else { for (let i = 0; i < tiles.length; i++) out[i] = segColors[k][i]; }
+  return out;
+}
+
+// SATISFYING-MOTOR: één doorlopend stromend kleurveld dat NOOIT stilstaat en
+// naadloos loopt (einde == begin). Vervangt de losse kleur-stappen-met-stilstand.
+// - organisch: een reizend plasma (golven die over het paneel kruipen), kleuren
+//   morphen vloeiend door het (op tint gesorteerde) palet.
+// - glans: een bewegende lichtband trekt diagonaal over de tegels.
+// - opbouw: aan het begin kleuren de tegels in op volgorde (tile.order).
+// opts = { palette, durSec, buildSec, reveal? }  — alle timing schaalt met durSec.
+export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number };
+export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[] {
+  const { tiles } = parsed;
+  const base = opts.palette && opts.palette.length ? opts.palette : PAL;
+  const sorted = base.slice().sort((a, b) => hue(a) - hue(b));
+  const L = sorted.length;
+  const dur = opts.durSec > 0 ? opts.durSec : 24;
+  const build = Math.max(0, opts.buildSec ?? Math.min(6, dur * 0.22));
+  const bStart = Math.max(0, opts.buildStart ?? 0);   // opbouw mag later starten (na de intro-inzoom)
+  const TWO = Math.PI * 2;
+  const B = Math.max(2, Math.round(dur / 6));       // heel-getal -> fase keert terug op t=dur (naadloze loop)
+  const p = TWO * B * (t / dur);
+  const sweeps = Math.max(2, Math.round(dur / 5));   // aantal glans-vegen over de clip (heel getal -> loopt)
+  const sc = ((t / dur) * sweeps) % 1;
+  const out = new Array<string>(tiles.length);
+  for (let i = 0; i < tiles.length; i++) {
+    const u = tiles[i].nx, v = tiles[i].ny;
+    // reizend plasma — alle fase-termen zijn heel-getal × p, dus op t=dur staat alles weer gelijk
+    const n = Math.sin(u * 5.0 + p) + Math.sin(v * 4.0 - p) + Math.sin((u + v) * 3.0 + p * 2) + Math.sin((u - v) * 6.0 - p * 2);
+    let f = ((n + 4) / 8) * L; f = ((f % L) + L) % L;
+    const i0 = Math.floor(f), i1 = (i0 + 1) % L;
+    let col = mix(sorted[i0], sorted[i1], smooth(f - i0));
+    // glans: zachte lichtband die diagonaal meebeweegt (wrap-afstand -> continu)
+    const proj = (u + v) / 2; let d = Math.abs(proj - sc); d = Math.min(d, 1 - d);
+    const sheen = 0.26 * Math.exp(-(d * d) / (0.10 * 0.10));
+    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.5, sheen));
+    // opbouw: tegels kleuren in op volgorde, vanaf bStart (ervoor zijn ze nog kaal/neutraal)
+    const tb = t - bStart;
+    if (tb < build) { const start = tiles[i].order * (build - 0.6); const q = Math.max(0, Math.min(1, (tb - start) / 0.6)); col = q <= 0 ? BLANK : mix(BLANK, col, smooth(q)); }
+    out[i] = col;
+  }
   return out;
 }
 
