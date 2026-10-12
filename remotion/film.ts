@@ -228,7 +228,7 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
 // - glans: een bewegende lichtband trekt diagonaal over de tegels.
 // - opbouw: aan het begin kleuren de tegels in op volgorde (tile.order).
 // opts = { palette, durSec, buildSec, reveal? }  — alle timing schaalt met durSec.
-export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number };
+export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number; speed?: number };
 export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[] {
   const { tiles } = parsed;
   const base = opts.palette && opts.palette.length ? opts.palette : PAL;
@@ -237,10 +237,12 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
   const dur = opts.durSec > 0 ? opts.durSec : 24;
   const build = Math.max(0, opts.buildSec ?? Math.min(6, dur * 0.22));
   const bStart = Math.max(0, opts.buildStart ?? 0);   // opbouw mag later starten (na de intro-inzoom)
+  const spd = opts.speed && opts.speed > 0 ? opts.speed : 1;   // tempo: snel>1, rustig<1
   const TWO = Math.PI * 2;
-  const B = Math.max(2, Math.round(dur / 6));       // heel-getal -> fase keert terug op t=dur (naadloze loop)
+  // heel-getal cycli -> fase keert terug op t=dur (naadloze loop); tempo schaalt het aantal cycli
+  const B = Math.max(1, Math.round((dur / 6) * spd));
   const p = TWO * B * (t / dur);
-  const sweeps = Math.max(2, Math.round(dur / 5));   // aantal glans-vegen over de clip (heel getal -> loopt)
+  const sweeps = Math.max(1, Math.round((dur / 5) * spd));   // aantal glans-vegen over de clip (heel getal -> loopt)
   const sc = ((t / dur) * sweeps) % 1;
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
