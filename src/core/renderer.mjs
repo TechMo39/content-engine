@@ -29,6 +29,22 @@ export async function loadLogo(url) {
   _logoCache.set(url, uri); return uri;
 }
 
+// Lokaal beeldbestand (jpg/png/webp) als data-URI inladen zodat resvg het kan
+// tekenen. Voor foto's die als INPUT in de video komen (sfeerbeeld/bookend/badge).
+const _imgCache = new Map();
+export async function loadImageFile(absPath) {
+  if (!absPath || !existsSync(absPath)) return "";
+  if (_imgCache.has(absPath)) return _imgCache.get(absPath);
+  let uri = "";
+  try {
+    const buf = await fs.readFile(absPath);
+    const ext = (absPath.split(".").pop() || "png").toLowerCase();
+    const mime = ext === "jpg" || ext === "jpeg" ? "jpeg" : ext === "svg" ? "svg+xml" : ext;
+    uri = `data:image/${mime};base64,` + buf.toString("base64");
+  } catch {}
+  _imgCache.set(absPath, uri); return uri;
+}
+
 // Een rechthoek met verhouding A inpassen in (Wmax x Hmax), zonder vervormen.
 export function fitRect(Wmax, Hmax, A) {
   let w = Wmax, h = Math.round(w / A);

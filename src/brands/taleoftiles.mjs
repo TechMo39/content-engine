@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import esbuild from "esbuild";
-import { composeChrome, fitRect, loadLogo, FORMATS, escapeXml } from "../core/renderer.mjs";
+import { composeChrome, fitRect, loadLogo, loadImageFile, FORMATS, escapeXml } from "../core/renderer.mjs";
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
 function _hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -66,8 +66,22 @@ export function makeBrand({ ROOT, config }) {
     },
   };
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
-  let film = null, LOCKS = {}, patternList = [];
+  const IMG_DIR = path.resolve(ROOT, "assets/images/taleoftiles");
+  let film = null, LOCKS = {}, patternList = [], imagePool = [];
   const baseCache = new Map(), svgCache = new Map();
+
+  // Foto-pool: Mo legt zijn (Gemini-)foto's in assets/images/taleoftiles/.
+  // Die worden sfeerbeeld (hero-bookend aan begin+eind) en de badge.
+  async function loadImages() {
+    imagePool = [];
+    let files = [];
+    try { files = (await fs.readdir(IMG_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
+    for (const f of files) {
+      const uri = await loadImageFile(path.join(IMG_DIR, f));
+      if (uri) imagePool.push({ id: f, uri });
+    }
+  }
+  const imgById = (id) => imagePool.find((x) => x.id === id);
 
   async function init(log) {
     const libOut = path.resolve(ROOT, config.outDir, ".totlib.mjs");
@@ -76,9 +90,12 @@ export function makeBrand({ ROOT, config }) {
     try { LOCKS = JSON.parse(await fs.readFile(path.resolve(ROOT, "assets/tile-locks.json"), "utf8")); } catch {}
     try { patternList = JSON.parse(await fs.readFile(path.resolve(ROOT, "fixtures/patterns.json"), "utf8")).patterns; } catch {}
     branding.logoUri = await loadLogo(config.logoUrl);
-    // klein beeld van het échte product (paneel aan de muur) — laat zien wát we maken
-    branding.badgeUri = await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");
+    await loadImages();
+    // badge-fallback: als er nog geen foto's in de map staan, pak het paneel-aan-de-muur van de site
+    branding.badgeUri = imagePool[0] ? imagePool[0].uri : await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");
+    if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en)`);
   }
+  async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function getBase(pattern) {
     if (baseCache.has(pattern)) return baseCache.get(pattern);
     const file = path.resolve(ROOT, "assets/patterns", pattern + ".svg");
@@ -170,28 +187,52 @@ export function makeBrand({ ROOT, config }) {
     const name = (opts.name || "").trim();
     const palArr = PALS()[opts.palette] || film.PAL;
     const np = name ? plateColours(palArr) : null;
-    // vast productbeeld (paneel aan de muur), klein gekaderd thumbnail bovenin links
+    // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
+    const hero = (opts.image && imgById(opts.image)) ? imgById(opts.image).uri : (imagePool[0] ? imagePool[0].uri : "");
+    const bookend = loop && !!hero;   // naadloze foto-bookend: alleen satisfying + er is een foto
+    const bk = 1.5;                   // duur van de in-/uit-dissolve naar de foto
+    // klein gekaderd productbeeld bovenin links — zelfde foto als het sfeerbeeld
+    const badgeUri = hero || branding.badgeUri;
     let badge = "";
-    if (branding.badgeUri) {
+    if (badgeUri) {
       const bw = Math.round(W * 0.17), bh = Math.round(bw * 1.2), bx = Math.round(W * 0.045), by = Math.round(H * 0.032);
       badge = `<rect x="${bx - 2}" y="${by - 2}" width="${bw + 4}" height="${bh + 4}" rx="8" fill="#140f1e" stroke="${branding.gold}" stroke-width="2"/>`
         + `<clipPath id="bdgclip"><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6"/></clipPath>`
-        + `<image href="${branding.badgeUri}" x="${bx}" y="${by}" width="${bw}" height="${bh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bdgclip)"/>`;
+        + `<image href="${badgeUri}" x="${bx}" y="${by}" width="${bw}" height="${bh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bdgclip)"/>`;
     }
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
     function sceneAt(frame) {
-      const t = frame / FPS;
+      const t = frame / FPS, tleft = durSec - t;
+      // Begin en eind op de sfeerfoto (bookend) => naadloze loop + merk-context.
+      // Geen foto: val terug op het oude "vervaag naar neutraal" voor de loop.
+      let heroK = 0, tailK = 0;
+      if (bookend) {
+        if (t < bk) heroK = Math.max(heroK, 1 - smooth(t / bk));
+        if (tleft < bk) heroK = Math.max(heroK, 1 - smooth(tleft / bk));
+      } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
       let colors = film.colorsAt(parsed, story, t);
-      let tailK = 0;
-      if (loop) { const tail = 1.3, tleft = durSec - t; if (tleft < tail) tailK = Math.min(1, Math.max(0, 1 - tleft / tail)); if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK)); }
+      if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const inner = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
         `<svg x="${panelX + pad}" y="${panelY + pad}" width="${innerW}" height="${innerH}" viewBox="0 0 ${parsed.view[2]} ${parsed.view[3]}" preserveAspectRatio="xMidYMid meet">`);
-      let overlay = badge;
+      let overlay = "";
+      // sfeerfoto over het paneel (cross-dissolve met het mozaïek)
+      if (bookend && heroK > 0.002) {
+        const k = heroK.toFixed(3);
+        overlay += `<clipPath id="heroclip"><rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6"/></clipPath>`
+          + `<image href="${hero}" x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroclip)" opacity="${k}"/>`
+          + `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="6" fill="none" stroke="${branding.gold}" stroke-width="2" opacity="${k}"/>`;
+      }
+      overlay += badge;
+      // De NAAM is de payoff: graveert ~5.5s voor het eind van de opbouw, blijft staan,
+      // verdwijnt pas met de bookend/blank. Zo flitst 'ie niet meer kort voorbij.
       if (name && np) {
-        let op = Math.max(0, Math.min(1, (t - (durSec - 2.2)) / 1.0)) * (1 - tailK);
+        const outK = bookend ? heroK : tailK;
+        const nameStart = Math.max(story.buildSec + 1, durSec - (bookend ? bk : 1.3) - 5.5);
+        const op = Math.max(0, Math.min(1, (t - nameStart) / 1.1)) * (1 - outK);
         if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
-          const plateX = Math.round(panelX + (panelW - plateW) / 2), plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - op) * 10);
+          const plateX = Math.round(panelX + (panelW - plateW) / 2), plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - Math.min(1, op)) * 10);
           const pl = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plateX}" y="${plateY}" width="${plateW}" height="${plateH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
           overlay += `<g opacity="${op.toFixed(3)}">${pl}</g>`;
         }
@@ -210,7 +251,7 @@ export function makeBrand({ ROOT, config }) {
 
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
-    init, listSubjects, templates, makeRender, thumbSvg,
-    options: ["palette", "duration", "reveal", "tempo", "name"],
+    init, listSubjects, listImages, templates, makeRender, thumbSvg,
+    options: ["palette", "duration", "reveal", "tempo", "name", "image"],
   };
 }

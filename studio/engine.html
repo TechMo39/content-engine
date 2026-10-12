@@ -29,6 +29,10 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .logbox{background:#120d1f;border:1px solid #3a2f52;border-radius:10px;padding:10px;height:72vh;overflow:auto;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5}
 .logbox .ok{color:#7fd8a0}.logbox .err{color:#e88}.logbox .run{color:var(--gold)}
 .hint{color:#8a7fae;font-size:12px}
+.imgstrip{display:flex;flex-wrap:wrap;gap:8px}
+.ithumb{width:52px;height:62px;border-radius:8px;overflow:hidden;cursor:pointer;border:1px solid #3a2f52;background:#120d1f;display:flex;align-items:center;justify-content:center;color:#6a5f85;font-size:10px}
+.ithumb.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+.ithumb img{width:100%;height:100%;object-fit:cover;display:block}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub">merk → onderwerp → template → render</span></div>
 <div class="wrap">
@@ -48,7 +52,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 </div>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",duration:"middel",reveal:"radial",tempo:"normaal",name:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",duration:"middel",reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
 let BRANDOPTS=[];
 
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
@@ -84,6 +88,18 @@ function buildOpts(){const o=$('#opts');o.innerHTML='';
   const seg=(id,key)=>{const el=$('#'+id);if(!el)return;$$('#'+id+' button').forEach(b=>b.onclick=()=>{$$('#'+id+' button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.opts[key]=b.dataset.v;});};
   seg('o_pal','palette');seg('o_dur','duration');seg('o_rev','reveal');seg('o_tmp','tempo');
   const nm=$('#o_name');if(nm)nm.oninput=e=>{state.opts.name=e.target.value;if(state.brand==='unclerank'&&e.target.value)ready();};
+  if(BRANDOPTS.includes('image')) buildImagePicker();
+}
+async function buildImagePicker(){
+  const o=$('#opts');const wrap=document.createElement('div');wrap.className='sec';
+  wrap.innerHTML='<div style="font-size:12px;color:#9b8fc0;margin:6px 0">Sfeerbeeld <span class="hint" style="margin-left:4px">(begin + eind van de video)</span></div><div id="imgStrip" class="imgstrip"></div>';
+  o.appendChild(wrap);
+  let j={images:[]};try{j=await (await fetch('/api/images?brand='+state.brand)).json();}catch{}
+  const strip=$('#imgStrip');
+  if(!j.images.length){strip.innerHTML='<div class="hint">Nog geen foto\'s. Leg ze in <code>assets/images/taleoftiles/</code>.</div>';return;}
+  const mk=(id,uri,label)=>{const d=document.createElement('div');d.className='ithumb'+(state.opts.image===id?' on':'');d.title=label||id;d.innerHTML=uri?`<img src="${uri}">`:`<span>auto</span>`;d.onclick=()=>{$$('.ithumb').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.opts.image=id;};strip.appendChild(d);};
+  mk('', '', 'Automatisch (eerste foto)');
+  j.images.forEach(im=>mk(im.id,im.uri,im.id));
 }
 function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}
 function setSubjOpen(o){$('#subjWrap').style.display=o?'':'none';$('#subjToggle').classList.toggle('open',o);}
