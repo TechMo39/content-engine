@@ -5,7 +5,57 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import esbuild from "esbuild";
-import { composeChrome, fitRect, loadLogo, loadImageFile, imagePalette, enrichPalette, FORMATS, escapeXml } from "../core/renderer.mjs";
+import { composeChrome, fitRect, loadLogo, loadImageFile, imagePalette, enrichPalette, imageGridRGB, FORMATS, escapeXml } from "../core/renderer.mjs";
+
+// AUTOMATISCHE MUUR-DETECTIE: lees een mockup-foto en bepaal zélf waar het paneel op de
+// muur komt (midden-x, midden-y, hoogte — genormaliseerd 0..1 van het 9:16-beeld). Zoekt
+// het grootste rustige, egale muurvlak op ooghoogte en vermijdt meubels/vloer/plafond.
+// Geen handwerk: dit draait bij het laden van elke mockup. null = geen duidelijk vlak.
+async function detectWallRect(absPath) {
+  const GW = 64, GH = 114, AR = 0.66;   // AR = paneel breedte/hoogte (portret)
+  const px = await imageGridRGB(absPath, GW, GH);
+  if (!px) return null;
+  const n = GW * GH, at = (x, y) => y * GW + x;
+  const lum = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const r = px[i * 3] / 255, g = px[i * 3 + 1] / 255, b = px[i * 3 + 2] / 255; lum[i] = (Math.max(r, g, b) + Math.min(r, g, b)) / 2; }
+  // gradient (textuur): laag = glad vlak (muur); hoog = rand/meubel
+  const grad = new Float32Array(n);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const i = at(x, y); let gx = 0, gy = 0; if (x + 1 < GW) gx = Math.abs(lum[i] - lum[at(x + 1, y)]); if (y + 1 < GH) gy = Math.abs(lum[i] - lum[at(x, y + 1)]); grad[i] = gx + gy; }
+  // muurkleur = gemiddelde van gladde cellen in de boven-centrale band
+  let wr = 0, wg = 0, wb = 0, wc = 0;
+  for (let y = Math.floor(GH * 0.10); y < GH * 0.55; y++) for (let x = Math.floor(GW * 0.20); x < GW * 0.80; x++) { const i = at(x, y); if (grad[i] < 0.045) { wr += px[i * 3]; wg += px[i * 3 + 1]; wb += px[i * 3 + 2]; wc++; } }
+  if (wc < 24) return null;
+  wr /= wc; wg /= wc; wb /= wc;
+  const wLum = (Math.max(wr, wg, wb) + Math.min(wr, wg, wb)) / 2 / 255;
+  // muur-masker: glad EN kleur dicht bij de muurkleur EN niet veel feller dan de muur
+  // (ramen/lampen/spiegels zijn feller -> die willen we niet als muur, paneel moet er niet op).
+  const wall = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.055 && d < 48 && lum[i] < wLum + 0.10) ? 1 : 0; }
+  // integraalbeeld voor snelle rechthoek-sommen
+  const I = new Int32Array((GW + 1) * (GH + 1));
+  for (let y = 1; y <= GH; y++) for (let x = 1; x <= GW; x++) I[y * (GW + 1) + x] = wall[at(x - 1, y - 1)] + I[(y - 1) * (GW + 1) + x] + I[y * (GW + 1) + x - 1] - I[(y - 1) * (GW + 1) + x - 1];
+  const sum = (x0, y0, x1, y1) => I[y1 * (GW + 1) + x1] - I[y0 * (GW + 1) + x1] - I[y1 * (GW + 1) + x0] + I[y0 * (GW + 1) + x0];
+  // schuif kandidaat-rechthoeken (portret) en kies het grootste, netjes gecentreerde,
+  // op ooghoogte, dat vrijwel volledig op muur ligt.
+  let best = null;
+  for (let hC = Math.round(GH * 0.52); hC >= Math.round(GH * 0.26); hC -= 2) {
+    const wC = Math.max(4, Math.round(hC * AR));
+    if (wC >= GW - 2) continue;
+    for (let y0 = Math.round(GH * 0.05); y0 + hC <= Math.round(GH * 0.84); y0 += 2) {
+      for (let x0 = 2; x0 + wC <= GW - 2; x0 += 2) {
+        const frac = sum(x0, y0, x0 + wC, y0 + hC) / (wC * hC);
+        if (frac < 0.92) continue;                         // moet bijna volledig muur zijn
+        const cx = (x0 + wC / 2) / GW, cy = (y0 + hC / 2) / GH, size = (wC * hC) / n;
+        const pen = Math.abs(cx - 0.5) * 0.45 + Math.abs(cy - 0.44) * 0.35;   // centreren + ooghoogte
+        const score = size - pen;
+        if (!best || score > best.score) best = { score, cx, cy, h: hC / GH };
+      }
+    }
+  }
+  // iets ademruimte: paneel net wat kleiner dan het gevonden vlak
+  if (best) return { cx: best.cx, cy: best.cy, h: Math.max(0.24, best.h * 0.9) };
+  return null;
+}
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
 function _hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -145,19 +195,13 @@ export function makeBrand({ ROOT, config }) {
     let mfiles = [];
     try { mfiles = (await fs.readdir(MOCKUP_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
     for (const f of mfiles) {
-      const uri = await loadImageFile(path.join(MOCKUP_DIR, f));
+      const abs = path.join(MOCKUP_DIR, f);
+      const uri = await loadImageFile(abs);
       if (!uri) continue;
-      // Placement per mockup: optioneel sidecar-bestand "<zelfde-naam>.json" dat zegt
-      // wáár op de muur het paneel komt. Vorm: { "cx":0.5, "cy":0.46, "h":0.4 }
-      //   cx,cy = midden van het paneel (0..1 van breedte/hoogte van het 9:16-beeld)
-      //   h     = hoogte van het paneel als fractie van de beeldhoogte (breedte volgt
-      //           automatisch uit de patroon-verhouding). Geen json = terugval op midden.
+      // AUTOMATISCH: lees de foto uit en bepaal zelf waar het paneel op de muur komt.
+      // Geen handwerk, geen sidecar. Lukt detectie niet -> null -> terugval op midden.
       let place = null;
-      try {
-        const j = JSON.parse(await fs.readFile(path.join(MOCKUP_DIR, f.replace(/\.[^.]+$/, ".json")), "utf8"));
-        const cx = Number(j.cx), cy = Number(j.cy), hh = Number(j.h);
-        if (Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(hh) && hh > 0) place = { cx, cy, h: hh };
-      } catch {}
+      try { place = await detectWallRect(abs); } catch {}
       mockupPool.push({ id: f, uri, place });
     }
   }
