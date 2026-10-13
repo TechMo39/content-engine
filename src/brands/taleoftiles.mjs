@@ -271,14 +271,23 @@ export function makeBrand({ ROOT, config }) {
     const flowPal = insitu ? palArr : (heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr);
     const bookend = loop && (!!hero || insitu);   // bookend: in-situ of foto
     const bk = 1.5;
-    // klein gekaderd productbeeld bovenin links
-    const badgeUri = hero || mockup || branding.badgeUri;
+    // klein gekaderd beeld bovenin links: ECHTE productfoto als die er is; anders het
+    // AFGEMAAKTE paneel (nooit een lege mockup-muur — dat oogt leeg/kapot).
     let badge = "";
-    if (badgeUri) {
+    {
       const bw = Math.round(W * 0.17), bh = Math.round(bw * 1.2), bx = Math.round(W * 0.045), by = Math.round(H * 0.032);
-      badge = `<rect x="${bx - 2}" y="${by - 2}" width="${bw + 4}" height="${bh + 4}" rx="8" fill="#140f1e" stroke="${branding.gold}" stroke-width="2"/>`
-        + `<clipPath id="bdgclip"><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6"/></clipPath>`
-        + `<image href="${badgeUri}" x="${bx}" y="${by}" width="${bw}" height="${bh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bdgclip)"/>`;
+      const bvw = parsed.view[2], bvh = parsed.view[3];
+      const frame = `<rect x="${bx - 2}" y="${by - 2}" width="${bw + 4}" height="${bh + 4}" rx="8" fill="#140f1e" stroke="${branding.gold}" stroke-width="2"/>`
+        + `<clipPath id="bdgclip"><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6"/></clipPath>`;
+      if (hero) {
+        badge = frame + `<image href="${hero}" x="${bx}" y="${by}" width="${bw}" height="${bh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bdgclip)"/>`;
+      } else {
+        // afgemaakt paneel (alle tegels op eindkleur) als mini-preview
+        const bcols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: 1, buildStart: 0 }, durSec + 100);
+        const bmos = film.buildSvg(parsed, bcols).replace(/<svg\b[^>]*>/i,
+          `<svg x="${bx}" y="${by}" width="${bw}" height="${bh}" viewBox="0 0 ${bvw} ${bvh}" preserveAspectRatio="xMidYMid slice">`);
+        badge = frame + `<g clip-path="url(#bdgclip)">${bmos}</g>`;
+      }
     }
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
@@ -302,15 +311,28 @@ export function makeBrand({ ROOT, config }) {
     if (insitu) {
       const finishedT = buildStart + Tb + 0.5;
       const finalCols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart }, finishedT);
-      const A2 = pw / ph, wH = Math.round(H * 0.34), wW = Math.round(Math.min(W * 0.46, wH * A2));
-      const wx = Math.round((W - wW) / 2), wy = Math.round(H * 0.295), cxp = wx + wW / 2, cyp = wy + wH / 2;
+      // Net ingelijst stuk aan de muur (ruimte blijft zichtbaar), gecentreerd op HETZELFDE
+      // midden als het opbouw-paneel. Maat = panelH/camZoom, zodat bij de inzoom (×camZoom)
+      // het paneel precies op het opbouw-mozaïek valt -> naadloze dissolve, geen sprong.
+      const A2 = pw / ph, wH = Math.round(panelH / camZoom), wW = Math.round(wH * A2);
+      const cxp = Math.round(W / 2), cyp = Math.round(panelY + panelH / 2);
+      const wx = Math.round(cxp - wW / 2), wy = Math.round(cyp - wH / 2);
       const panelInner = film.buildSvg(parsed, finalCols).replace(/<svg\b[^>]*>/i,
         `<svg x="${wx}" y="${wy}" width="${wW}" height="${wH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`);
+      // De NAAM óók op het paneel aan de muur (gebakken in het in-situ-beeld), gecentreerd en
+      // op dezelfde plek/schaal als op het opbouw-paneel -> blijft staan door de dissolve heen.
+      let nmPlate = "";
+      if (name && np) {
+        const plW = Math.round(wW * 0.62), plH = Math.round(plW * 200 / 560);
+        const plX = Math.round(cxp - plW / 2), plY = Math.round(cyp - plH / 2);
+        nmPlate = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i,
+          `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
+      }
       const deco = `<rect x="${wx + 5}" y="${wy + 13}" width="${wW + 10}" height="${wH + 10}" rx="5" fill="#000" opacity="0.30"/>`   // schaduw
         + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`                       // lijst
         + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       insituFrame = (scale) => `<g transform="translate(${cxp} ${cyp}) scale(${scale.toFixed(3)}) translate(${-cxp} ${-cyp})">`
-        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}</g>`;
+        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}${nmPlate}</g>`;
     }
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
@@ -389,7 +411,10 @@ export function makeBrand({ ROOT, config }) {
           overlay += `<g clip-path="url(#pan)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
         }
       }
-      overlay += rectBorder;
+      // Paneel-rand: bij in-situ NIET over de muurfoto tekenen (de echte lijst zit al in de
+      // mockup) -> vervaagt mee met de foto; tijdens de opbouw juist vol in beeld.
+      if (insitu) { const bOp = 1 - photoK; if (bOp > 0.003) overlay += `<g opacity="${bOp.toFixed(3)}">${rectBorder}</g>`; }
+      else overlay += rectBorder;
       // boog + pilaren ALLEEN aan begin/eind (corner-mask dekt de hoeken met de achtergrond af)
       if (frameK > 0.003) {
         const fk = frameK.toFixed(3);
