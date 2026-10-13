@@ -272,7 +272,7 @@ export function makeBrand({ ROOT, config }) {
     // CAMERA-REGIE (alleen met foto-bookend): intro zoomt in op de tegels in de foto,
     // lost op in het kale mozaïek dat inkleurt terwijl de camera terugtrekt; aan het eind
     // zoomt de camera weer in op het patroon, lost op in de foto, die langzaam uitzoomt.
-    const camZoom = 2.0;
+    const camZoom = 1.7;   // getemperd: rustigere zoom (was 2.0)
     // OPBOUW is het grote middenstuk: tegel voor tegel inkleuren terwijl de camera
     // héél langzaam terugtrekt. Daarna een korte HOLD op het afgemaakte paneel.
     let Ti = 3.5, Dt = 1.0, To = 3.5, Tb, Thold;
@@ -296,7 +296,7 @@ export function makeBrand({ ROOT, config }) {
     const rectBorder = `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="10" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
     const maskRectD = `M ${panelX - 3} ${panelY - 3} H ${panelX + panelW + 3} V ${panelY + panelH + 3} H ${panelX - 3} Z`;
     const cornerMaskD = `${maskRectD} ${archD}`;
-    const breath = (tt) => 1 + 0.22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * 2 * (tt / durSec)));   // zachte zoom in/uit op het patroon (loopt)
+    const breath = (tt) => 1 + 0.10 * (0.5 - 0.5 * Math.cos(2 * Math.PI * 2 * (tt / durSec)));   // heel zachte zoom-adem (getemperd)
     // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
     // — patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
     function revealK(tt) {
@@ -366,7 +366,9 @@ export function makeBrand({ ROOT, config }) {
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
         const outK = bookend ? photoK : tailK;
-        const nameStart = Math.max(buildStart + Tb + 0.8, durSec - (bookend ? To : 1.3) - 5.0);
+        // naam = vaste afsluiter: verschijnt op het afgemaakte paneel en blijft staan tot de outro
+        const oStartN = durSec - (bookend ? To : 1.3);
+        const nameStart = Math.min(buildStart + Tb + 0.5, oStartN - 2.6);
         const op = Math.max(0, Math.min(1, (t - nameStart) / 1.1)) * (1 - outK);
         if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
