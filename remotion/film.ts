@@ -15,7 +15,7 @@ export const VOEG_RAW = "#b9a98c";
 export const VOEG_PX = 5, VOEG_RAW_PX = 2;
 
 export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };
-export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] } };
+export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] }; _flow?: { key: string; fin: string[] } };
 
 // Scene-beschrijving = pure data (serialiseerbaar):
 export type Scene =
@@ -229,44 +229,38 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
 // - opbouw: aan het begin kleuren de tegels in op volgorde (tile.order).
 // opts = { palette, durSec, buildSec, reveal? }  — alle timing schaalt met durSec.
 export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number; speed?: number };
+// Eén vaste, samenhangende inkleuring per tegel (zoals een echt paneel): egale
+// kleur-regio's, geen willekeur. 1× berekend en gecachet.
+function finalColors(parsed: Parsed, base: string[]): string[] {
+  const key = base.join(",");
+  if (parsed._flow && parsed._flow.key === key) return parsed._flow.fin;
+  const pal = base.length ? base : PAL;
+  const fin = parsed.tiles.map((tile) => {
+    const x = tile.nx * 6, y = tile.ny * 6;
+    const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
+    let idx = Math.floor(((n + 4) / 8) * pal.length);
+    idx = Math.max(0, Math.min(pal.length - 1, idx));
+    return pal[idx];
+  });
+  parsed._flow = { key, fin };
+  return fin;
+}
+// SATISFYING = tegel voor tegel inkleuren naar de VASTE eindkleur, en dan blijven
+// staan. Geen dansende/wisselende kleuren meer — de beweging komt van de camera.
 export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[] {
   const { tiles } = parsed;
   const base = opts.palette && opts.palette.length ? opts.palette : PAL;
-  const sorted = base.slice().sort((a, b) => hue(a) - hue(b));
-  const L = sorted.length;
   const dur = opts.durSec > 0 ? opts.durSec : 24;
-  const build = Math.max(0, opts.buildSec ?? Math.min(6, dur * 0.22));
-  const bStart = Math.max(0, opts.buildStart ?? 0);   // opbouw mag later starten (na de intro-inzoom)
-  const spd = opts.speed && opts.speed > 0 ? opts.speed : 1;   // tempo: snel>1, rustig<1
-  const TWO = Math.PI * 2;
-  // heel-getal cycli -> fase keert terug op t=dur (naadloze loop); tempo schaalt het aantal cycli.
-  // Rustiger basis: minder cycli per seconde dan voorheen.
-  const B = Math.max(1, Math.round((dur / 8) * spd));
-  const p = TWO * B * (t / dur);
-  const sweeps = Math.max(1, Math.round((dur / 6.5) * spd));   // aantal glans-vegen over de clip (heel getal -> loopt)
-  const sc = ((t / dur) * sweeps) % 1;
+  const build = Math.max(0.5, opts.buildSec ?? dur * 0.5);   // tegels vullen over deze (lange) periode
+  const bStart = Math.max(0, opts.buildStart ?? 0);
+  const fin = finalColors(parsed, base);
+  const pop = Math.min(0.7, build * 0.35);                   // hoe lang één tegel doet over inkleuren
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
-    const u = tiles[i].nx, v = tiles[i].ny;
-    // ELKE TEGEL EEN EIGEN, EGALE KLEUR (geen verloop tussen tegels):
-    // - zachte bewegende golf (patches van kleur die over het paneel schuiven)
-    // - per-tegel eigen offset -> buren verschillen -> je ziet lósse tegels, niet een wolk
-    // Alle termen lopen op t=dur terug naar het begin (naadloze loop).
-    const wave = 0.5 + 0.24 * (Math.sin(u * 6.0 + p) + Math.sin(v * 5.0 - p));
-    let g = seeded(i) * 0.30 + wave * 0.5 + B * (t / dur);
-    g = g - Math.floor(g);
-    const fg = g * L, idx = Math.floor(fg) % L, frac = fg - Math.floor(fg);
-    // solide tegelkleur; alleen een korte overgang wanneer een tegel echt omklapt
-    let col = sorted[idx];
-    if (frac > 0.88) col = mix(sorted[idx], sorted[(idx + 1) % L], smooth((frac - 0.88) / 0.12));
-    // glans: zachte lichtband die diagonaal meebeweegt (wrap-afstand -> continu)
-    const proj = (u + v) / 2; let d = Math.abs(proj - sc); d = Math.min(d, 1 - d);
-    const sheen = 0.16 * Math.exp(-(d * d) / (0.08 * 0.08));
-    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.28, sheen));
-    // opbouw: tegels kleuren in op volgorde, vanaf bStart (ervoor zijn ze nog kaal/neutraal)
-    const tb = t - bStart;
-    if (tb < build) { const start = tiles[i].order * (build - 0.6); const q = Math.max(0, Math.min(1, (tb - start) / 0.6)); col = q <= 0 ? BLANK : mix(BLANK, col, smooth(q)); }
-    out[i] = col;
+    const revealT = bStart + tiles[i].order * build;         // elke tegel heeft z'n eigen moment (op volgorde)
+    if (t < revealT) { out[i] = BLANK; continue; }           // nog kaal
+    const q = Math.min(1, (t - revealT) / pop);
+    out[i] = q >= 1 ? fin[i] : mix(BLANK, fin[i], smooth(q)); // kleurt in en blijft dan staan
   }
   return out;
 }

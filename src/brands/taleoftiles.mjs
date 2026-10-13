@@ -273,11 +273,12 @@ export function makeBrand({ ROOT, config }) {
     // lost op in het kale mozaïek dat inkleurt terwijl de camera terugtrekt; aan het eind
     // zoomt de camera weer in op het patroon, lost op in de foto, die langzaam uitzoomt.
     const camZoom = 2.0;
-    // Rustiger pacing: trage intro-inzoom, een HOUD op de kale tegels (zodat je ziet
-    // wat er gebeurt), traag inkleuren, trage outro. Th = rustmoment op de kale tegels.
-    let Ti = 4.0, Dt = 1.0, Th = 1.4, Tb = buildSec, To = 4.0;
-    if (bookend) { const want = Ti + Th + Tb + To, f = Math.min(want, durSec * 0.80) / want; Ti *= f; Th *= f; Tb *= f; To *= f; }
-    const buildStart = bookend ? Ti + Th : 0;   // inkleuren start ná de intro-inzoom én de kale-tegel-houd
+    // OPBOUW is het grote middenstuk: tegel voor tegel inkleuren terwijl de camera
+    // héél langzaam terugtrekt. Daarna een korte HOLD op het afgemaakte paneel.
+    let Ti = 3.5, Dt = 1.0, To = 3.5, Tb, Thold;
+    if (bookend) { const mid = Math.max(2, durSec - Ti - To); Tb = mid * 0.66; Thold = mid - Tb; }
+    else { Ti = 0; Tb = Math.max(1, durSec * 0.6); Thold = 0; }
+    const buildStart = bookend ? Ti : 0;   // inkleuren start ná de intro-inzoom
     const pw = parsed.view[2], ph = parsed.view[3];
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
@@ -296,7 +297,7 @@ export function makeBrand({ ROOT, config }) {
     // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
     // — patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
     function revealK(tt) {
-      const fS = Ti + Th + Tb, fE = durSec - To, span = fE - fS;
+      const fS = Ti + Tb, fE = durSec - To, span = fE - fS;
       if (span < 7) return 0;
       const n = Math.max(1, Math.round(span / 11)), rl = 2.8;
       for (let i = 1; i <= n; i++) { const c = fS + span * (i / (n + 1)), d = Math.abs(tt - c); if (d < rl / 2) return smooth(Math.min(1, (1 - d / (rl / 2)) * 1.7)); }
@@ -309,26 +310,25 @@ export function makeBrand({ ROOT, config }) {
       // (zónder medaillon). zMos/zPho = inzoom op mozaïek/foto.
       let bookendK = 0, zMos = 1, zPho = 1, tailK = 0, frameK = 0;
       if (bookend) {
-        const oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
-        if (t < Ti) {                                   // intro: foto zoomt langzaam in op de tegels
+        const bEnd = Ti + Tb, oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
+        if (t < Ti) {                                   // intro: foto zoomt langzaam in -> kale tegels
           zPho = 1 + (camZoom - 1) * smooth(t / Ti); zMos = camZoom;
           bookendK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);   // trage dissolve foto -> kaal mozaïek
-        } else if (t < Ti + Th) {                       // HOUD de kale tegels vast — kijk, zo wordt het gemaakt
-          zMos = camZoom;
-        } else if (t < Ti + Th + Tb) {                  // tegels kleuren rustig in terwijl de camera terugtrekt
-          zMos = camZoom - (camZoom - 1) * smooth((t - (Ti + Th)) / Tb);
-        } else if (t < oStart) {                        // vrije flow — volle rechthoek, zacht in/uit zoomen
+        } else if (t < bEnd) {                          // OPBOUW: tegel voor tegel, camera trekt héél langzaam terug
+          zMos = camZoom - (camZoom - 1) * smooth((t - Ti) / Tb);
+        } else if (t < oStart) {                        // HOLD: afgemaakt paneel, zachte zoom-adem
           zMos = breath(t);
         } else if (t < oZi) {                           // outro: inzoomen op het patroon
           zMos = 1 + (camZoom - 1) * smooth((t - oStart) / (oZi - oStart));
-        } else if (t < oDis) {                          // dissolve mozaïek -> foto (beide ingezoomd)
+        } else if (t < oDis) {                          // dissolve paneel -> foto (beide ingezoomd)
           zMos = camZoom; zPho = camZoom; bookendK = smooth((t - oZi) / (oDis - oZi));
         } else {                                        // foto zoomt langzaam uit -> naadloos terug naar begin
           bookendK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
         }
-        // boog + pilaren ALLEEN aan begin/eind; in het midden gewoon de volle rechthoek
-        if (t < Ti + Th) frameK = 1;
-        else if (t < Ti + Th + Tb) frameK = 1 - smooth((t - (Ti + Th)) / Tb);
+        // boog + pilaren ALLEEN aan begin/eind; vervaagt vroeg in de opbouw, komt terug bij de outro-foto
+        const fFade = Math.min(Tb, 3);
+        if (t < Ti) frameK = 1;
+        else if (t < Ti + fFade) frameK = 1 - smooth((t - Ti) / fFade);
         else if (t < oZi) frameK = 0;
         else if (t < oDis) frameK = smooth((t - oZi) / (oDis - oZi));
         else frameK = 1;
