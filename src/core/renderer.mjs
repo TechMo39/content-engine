@@ -74,6 +74,22 @@ export function imagePalette(absPath, n = 7) {
   });
 }
 
+// Lees een mockup-foto als klein RGB-raster (gw x gh), op dezelfde manier bijgesneden
+// als hij in beeld komt (cover/slice naar 9:16). Geeft een Buffer (rgb24) of null.
+// Hiermee bepaalt de engine AUTOMATISCH waar op de muur het paneel komt — geen handwerk.
+export function imageGridRGB(absPath, gw, gh) {
+  return new Promise((resolve) => {
+    if (!absPath || !existsSync(absPath)) { resolve(null); return; }
+    const args = ["-v", "error", "-i", absPath, "-vf",
+      `scale=${gw}:${gh}:force_original_aspect_ratio=increase,crop=${gw}:${gh}`,
+      "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"];
+    execFile(FFMPEG, args, { encoding: "buffer", maxBuffer: 1 << 22 }, (err, stdout) => {
+      if (err || !stdout || stdout.length < gw * gh * 3) { resolve(null); return; }
+      resolve(stdout);
+    });
+  });
+}
+
 // --- kleurhulp (HSL) voor het opbouwen van een familie-palet rond de foto-kleuren ---
 function _rgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function _toHsl(hex) { let [r, g, b] = _rgb(hex).map((x) => x / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; } h = ((h * 60) + 360) % 360; const l = (mx + mn) / 2, s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1)); return { h, s, l }; }
