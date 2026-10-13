@@ -239,10 +239,11 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
   const bStart = Math.max(0, opts.buildStart ?? 0);   // opbouw mag later starten (na de intro-inzoom)
   const spd = opts.speed && opts.speed > 0 ? opts.speed : 1;   // tempo: snel>1, rustig<1
   const TWO = Math.PI * 2;
-  // heel-getal cycli -> fase keert terug op t=dur (naadloze loop); tempo schaalt het aantal cycli
-  const B = Math.max(1, Math.round((dur / 6) * spd));
+  // heel-getal cycli -> fase keert terug op t=dur (naadloze loop); tempo schaalt het aantal cycli.
+  // Rustiger basis: minder cycli per seconde dan voorheen.
+  const B = Math.max(1, Math.round((dur / 8) * spd));
   const p = TWO * B * (t / dur);
-  const sweeps = Math.max(1, Math.round((dur / 5) * spd));   // aantal glans-vegen over de clip (heel getal -> loopt)
+  const sweeps = Math.max(1, Math.round((dur / 6.5) * spd));   // aantal glans-vegen over de clip (heel getal -> loopt)
   const sc = ((t / dur) * sweeps) % 1;
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
