@@ -282,10 +282,17 @@ export function makeBrand({ ROOT, config }) {
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
     const plumCol = "#201734";
-    const decor = `<g opacity="0.07">${medallion(W / 2, panelY + panelH * 0.5, panelW * 0.52, branding.gold)}</g>`;
     const colW = Math.min(Math.round(panelX * 0.5), Math.round(W * 0.052)), colTop = panelY + panelH * 0.34, colBot = panelY + panelH;
     const cols = column(Math.round(panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol) + column(Math.round(W - panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol);
     const archLine = `<path d="${archD}" fill="none" stroke="${branding.gold}" stroke-width="3"/>`;
+    // Het paneel is in het MIDDEN een gewone (afgeronde) rechthoek; de boog + pilaren
+    // komen alleen aan begin/eind. De "corner-mask" dekt met de achtergrond de hoeken
+    // boven de boog af -> boog-silhouet; op 0 opacity zie je de volle rechthoek.
+    const rectClip = `<clipPath id="pan"><rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="10"/></clipPath>`;
+    const rectBorder = `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="10" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+    const maskRectD = `M ${panelX - 3} ${panelY - 3} H ${panelX + panelW + 3} V ${panelY + panelH + 3} H ${panelX - 3} Z`;
+    const cornerMaskD = `${maskRectD} ${archD}`;
+    const breath = (tt) => 1 + 0.22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * 2 * (tt / durSec)));   // zachte zoom in/uit op het patroon (loopt)
     // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
     // — patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
     function revealK(tt) {
@@ -300,7 +307,7 @@ export function makeBrand({ ROOT, config }) {
       const t = frame / FPS, tleft = durSec - t;
       // Camera: bookendK = foto aan begin/eind (mét medaillon); rK = foto-reveal tussendoor
       // (zónder medaillon). zMos/zPho = inzoom op mozaïek/foto.
-      let bookendK = 0, zMos = 1, zPho = 1, tailK = 0;
+      let bookendK = 0, zMos = 1, zPho = 1, tailK = 0, frameK = 0;
       if (bookend) {
         const oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
         if (t < Ti) {                                   // intro: foto zoomt langzaam in op de tegels
@@ -310,8 +317,8 @@ export function makeBrand({ ROOT, config }) {
           zMos = camZoom;
         } else if (t < Ti + Th + Tb) {                  // tegels kleuren rustig in terwijl de camera terugtrekt
           zMos = camZoom - (camZoom - 1) * smooth((t - (Ti + Th)) / Tb);
-        } else if (t < oStart) {                        // vrije flow
-          zMos = 1;
+        } else if (t < oStart) {                        // vrije flow — volle rechthoek, zacht in/uit zoomen
+          zMos = breath(t);
         } else if (t < oZi) {                           // outro: inzoomen op het patroon
           zMos = 1 + (camZoom - 1) * smooth((t - oStart) / (oZi - oStart));
         } else if (t < oDis) {                          // dissolve mozaïek -> foto (beide ingezoomd)
@@ -319,6 +326,12 @@ export function makeBrand({ ROOT, config }) {
         } else {                                        // foto zoomt langzaam uit -> naadloos terug naar begin
           bookendK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
         }
+        // boog + pilaren ALLEEN aan begin/eind; in het midden gewoon de volle rechthoek
+        if (t < Ti + Th) frameK = 1;
+        else if (t < Ti + Th + Tb) frameK = 1 - smooth((t - (Ti + Th)) / Tb);
+        else if (t < oZi) frameK = 0;
+        else if (t < oDis) frameK = smooth((t - oZi) / (oDis - oZi));
+        else frameK = 1;
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
       const rK = bookend ? revealK(t) : 0;              // het échte paneel tussendoor tonen
       const photoK = Math.max(bookendK, rK);            // totale foto-zichtbaarheid
@@ -330,16 +343,23 @@ export function makeBrand({ ROOT, config }) {
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
         `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`);
-      // mozaïek + medaillon-watermerk, geclipt in de Moorse boog
-      const inner = `<clipPath id="arch"><path d="${archD}"/></clipPath>${decor}<g clip-path="url(#arch)">${mosaic}</g>`;
+      // mozaïek in de volle (afgeronde) rechthoek
+      const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}</g>`;
       let overlay = "";
-      // sfeerfoto in de boog (begin/eind + reveals tussendoor), met lichte inzoom
+      // sfeerfoto in de rechthoek (begin/eind + reveals tussendoor), met lichte inzoom
       if (bookend && photoK > 0.002) {
         const k = photoK.toFixed(3), iw = panelW * zPhoto, ih = panelH * zPhoto, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
-        overlay += `<g clip-path="url(#arch)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
-        if (medOp > 0.004) overlay += `<g opacity="${medOp.toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;   // medaillon alleen begin/eind
+        overlay += `<g clip-path="url(#pan)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
       }
-      overlay += archLine + cols + badge;
+      overlay += rectBorder;
+      // boog + pilaren ALLEEN aan begin/eind (corner-mask dekt de hoeken met de achtergrond af)
+      if (frameK > 0.003) {
+        const fk = frameK.toFixed(3);
+        overlay += `<path d="${cornerMaskD}" fill-rule="evenodd" fill="url(#bg)" opacity="${fk}"/><g opacity="${fk}">${archLine}${cols}</g>`;
+      }
+      // medaillon alleen aan begin/eind (met de foto)
+      if (medOp > 0.004) overlay += `<g opacity="${medOp.toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;
+      overlay += badge;
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
         const outK = bookend ? photoK : tailK;
