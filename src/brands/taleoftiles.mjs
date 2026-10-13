@@ -132,6 +132,7 @@ export function makeBrand({ ROOT, config }) {
     if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en), ${mockupPool.length} mockup(s)`);
   }
   async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
+  async function listMockups() { return mockupPool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function getBase(pattern) {
     if (baseCache.has(pattern)) return baseCache.get(pattern);
     const file = path.resolve(ROOT, "assets/patterns", pattern + ".svg");
@@ -256,13 +257,16 @@ export function makeBrand({ ROOT, config }) {
     const np = name ? plateColours(palArr) : null;
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
-    const heroObj = (opts.image && imgById(opts.image)) ? imgById(opts.image) : (imagePool.length ? imagePool[Math.floor(Math.random() * imagePool.length)] : null);
+    // Keuze (opts.image): een MOCKUP-id -> in-situ; een FOTO-id -> losse foto als startbeeld;
+    // leeg = auto (in-situ als er mockups zijn, anders een willekeurige foto).
+    const mById = (id) => mockupPool.find((m) => m.id === id);
+    let chosenMockup = null, heroObj = null;
+    if (opts.image) { chosenMockup = mById(opts.image) || null; if (!chosenMockup) heroObj = imgById(opts.image) || null; }
+    else if (mockupPool.length) chosenMockup = mockupPool[Math.floor(Math.random() * mockupPool.length)];
+    else if (imagePool.length) heroObj = imagePool[Math.floor(Math.random() * imagePool.length)];
     const hero = heroObj ? heroObj.uri : "";
-    // IN-SITU heeft voorrang: zijn er lege-muur-mockups, dan plakken we ons ÉCHTE paneel
-    // op de muur (matcht altijd exact het patroon). Anders de oude foto-bookend.
-    const mockupObj = mockupPool.length ? mockupPool[Math.floor(Math.random() * mockupPool.length)] : null;
-    const insitu = loop && !!mockupObj;
-    const mockup = mockupObj ? mockupObj.uri : "";
+    const insitu = loop && !!chosenMockup;       // in-situ = ons paneel op de mockup-muur
+    const mockup = chosenMockup ? chosenMockup.uri : "";
     // Kleur: bij in-situ stuurt het Palet (neutrale muur); anders kleur-match met de foto.
     const flowPal = insitu ? palArr : (heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr);
     const bookend = loop && (!!hero || insitu);   // bookend: in-situ of foto
@@ -422,7 +426,7 @@ export function makeBrand({ ROOT, config }) {
 
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
-    init, listSubjects, listImages, templates, makeRender, thumbSvg,
+    init, listSubjects, listImages, listMockups, templates, makeRender, thumbSvg,
     options: ["palette", "duration", "reveal", "tempo", "name", "image"],
   };
 }
