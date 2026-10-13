@@ -131,6 +131,30 @@ ${panelRect}${innerField || ""}${overlay || ""}
 ${footer}</svg>`;
 }
 
+// Bouw een zachte "tegel-klik" geluidslaag (ASMR): een korte, houten tik op elk
+// opgegeven moment. Schrijft een mono 16-bit WAV van durSec seconden.
+async function writeClickWav(clicks, durSec, outPath) {
+  const sr = 44100, n = Math.ceil(durSec * sr), data = new Float32Array(n);
+  let seed = 777; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (const ct of clicks) {
+    const i0 = Math.floor(ct * sr), len = Math.floor(0.018 * sr);
+    const amp = 0.20 + rnd() * 0.08, freq = 1200 + rnd() * 600;
+    for (let k = 0; k < len && i0 + k < n && i0 + k >= 0; k++) {
+      const tt = k / sr, env = Math.exp(-tt * 150);
+      let s = Math.sin(2 * Math.PI * freq * tt) * env;
+      if (k < 0.003 * sr) s += (rnd() * 2 - 1) * Math.exp(-tt * 700) * 0.5;   // korte aanslag-transiënt
+      data[i0 + k] += s * amp;
+    }
+  }
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write("RIFF", 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write("WAVE", 8);
+  buf.write("fmt ", 12); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(sr, 24); buf.writeUInt32LE(sr * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write("data", 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, data[i])); buf.writeInt16LE(Math.round(v * 32767), 44 + i * 2); }
+  await fs.writeFile(outPath, buf);
+}
+
 // Render een reeks frames (sceneAt(frame)->svg) naar een mp4. Supersampling SS voor scherpte.
 // Rasteren (het dure werk) wordt over alle cores verdeeld; de hoofdthread bouwt de SVG's.
 // render = { W, H, FPS, SS, durSec, sceneAt }  music = absoluut pad of ""
@@ -171,13 +195,21 @@ export async function renderToMp4({ render, music = "", outDir, log = () => {}, 
   }
   const outName = `${namePrefix}-${Date.now()}.mp4`;
   const outPath = path.resolve(outDir, outName);
+  // tegel-klik-laag (ASMR) opbouwen als er klik-momenten zijn
+  const clicks = render.clicks || [];
+  let clickWav = "";
+  if (clicks.length) { clickWav = path.join(tmp, "clicks.wav"); await writeClickWav(clicks, durSec, clickWav); }
+  const hasMusic = music && existsSync(music), hasClicks = !!clickWav;
   const fa = ["-y", "-framerate", String(FPS), "-i", path.join(tmp, "f%05d.png")];
-  const hasMusic = music && existsSync(music);
-  if (hasMusic) fa.push("-i", music, "-shortest");
+  let ai = 1, mi = -1, ci = -1;
+  if (hasMusic) { fa.push("-i", music); mi = ai++; }
+  if (hasClicks) { fa.push("-i", clickWav); ci = ai++; }
   fa.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart");
-  if (hasMusic) fa.push("-c:a", "aac");
+  if (mi >= 0 && ci >= 0) fa.push("-filter_complex", `[${mi}:a]volume=0.75[m];[${ci}:a]volume=1.0[c];[m][c]amix=inputs=2:duration=longest:normalize=0[a]`, "-map", "0:v", "-map", "[a]", "-c:a", "aac", "-shortest");
+  else if (mi >= 0) fa.push("-map", "0:v", "-map", `${mi}:a`, "-c:a", "aac", "-shortest");
+  else if (ci >= 0) fa.push("-map", "0:v", "-map", `${ci}:a`, "-c:a", "aac", "-shortest");
   fa.push(outPath);
-  log(`ffmpeg: frames -> mp4${hasMusic ? " (+ muziek)" : ""}`);
+  log(`ffmpeg: frames -> mp4${hasMusic ? " + muziek" : ""}${hasClicks ? " + tegel-klik" : ""}`);
   await new Promise((resolve, reject) => {
     const p = spawn(FFMPEG, fa, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
