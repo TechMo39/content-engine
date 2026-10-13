@@ -305,3 +305,20 @@ export function buildSvg(parsed: Parsed, colors: string[]): string {
   out += svg.slice(cur);
   return out;
 }
+
+// GLAZUUR-RELIËF-LAAG: zelfde patroon, maar elke INGEKLEURDE tegel gevuld met de lokale
+// glans-gradient (url(#tglz), objectBoundingBox -> per steentje licht linksboven/schaduw
+// rechtsonder) en lege (raw) tegels onzichtbaar. Teken dit bovenop buildSvg (zelfde wrapper)
+// -> de tegels ogen verhoogd/geglazuurd i.p.v. plat. Gradient staat in composeChrome-defs.
+export function buildGlaze(parsed: Parsed, colors: string[]): string {
+  const { svg, tiles } = parsed; let out = ""; let cur = 0;
+  for (let i = 0; i < tiles.length; i++) {
+    out += svg.slice(cur, tiles[i].start);
+    const orig = svg.slice(tiles[i].start, tiles[i].end);
+    const raw = (colors[i] || BLANK) === BLANK;
+    out += raw ? paintTile(orig, "none", "none", 0) : paintTile(orig, "url(#tglz)", "none", 0);
+    cur = tiles[i].end;
+  }
+  out += svg.slice(cur);
+  return out;
+}

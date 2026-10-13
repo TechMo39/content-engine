@@ -141,10 +141,13 @@ export function composeChrome({ branding, W, H, panel, innerField, overlay = "",
       + `<text x="${W / 2}" y="${fy + fSize * 0.3}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fSize}" letter-spacing="${fSize * 0.08}" fill="${b.gold}">${escapeXml(b.footer)}</text></g>`
     : "";
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${b.bg2}"/><stop offset="70%" stop-color="${b.bg}"/></radialGradient></defs>
+<defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${b.bg2}"/><stop offset="70%" stop-color="${b.bg}"/></radialGradient>
+<linearGradient id="tglz" x1="0" y1="0" x2="0.72" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="0.34" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#160c05" stop-opacity="0.28"/></linearGradient>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter></defs>
 <rect width="${W}" height="${H}" fill="url(#bg)"/>${logoTag}
 ${panelRect}${innerField || ""}${overlay || ""}
-${footer}</svg>`;
+${footer}
+<rect width="${W}" height="${H}" filter="url(#grain)" opacity="0.05"/></svg>`;
 }
 
 // Bouw een zachte "tegel-klik" geluidslaag (ASMR): een korte, houten tik op elk
