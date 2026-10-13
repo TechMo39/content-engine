@@ -6,6 +6,19 @@ export const PAL = ["#c75a4e","#f79f45","#e4ce8c","#117573","#32949e","#7e95d7",
   "#efc7c8","#90a084","#45497d","#99bfc5","#f6ae91","#c67765","#e7c077","#663959","#94342f"];
 export const WARM = ["#c75a4e","#f79f45","#e4ce8c","#f6ae91","#e7c077","#c67765","#efc7c8","#94342f"];
 export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084","#a1c981","#663959"];
+// CURATED GLAZUUR-FAMILIES: strakke, bij elkaar passende zellige-glazuurtonen (3-5 per
+// familie) i.p.v. een bonte regenboog. De engine kiest er automatisch één per render.
+// Elke familie: donker -> licht, laatste een crème/neutraal voor rust en contrast.
+export const GLAZE_FAMILIES: Record<string, string[]> = {
+  smaragd:    ["#0f4b40", "#1c7a67", "#2f9b82", "#6fae8e", "#e6e1cf"],
+  kobalt:     ["#17335c", "#245a93", "#3a7cbd", "#6f93b4", "#e2e0d4"],
+  terracotta: ["#8f3f2a", "#b86536", "#d1924a", "#c27a52", "#ebdabf"],
+  aubergine:  ["#3f2440", "#663658", "#9a5570", "#bd8a9a", "#e9dde0"],
+  saffraan:   ["#8a5a1c", "#c08a2e", "#d8b24e", "#7e7a3a", "#ece1c6"],
+  oceaan:     ["#123f4a", "#1f6e78", "#2f98a0", "#6fb2ad", "#e5e6dd"],
+  mono_blauw: ["#14324f", "#1f4e78", "#2f6ea0", "#5a93c0", "#dfe4e8"],
+  mono_groen: ["#1c4a33", "#2b6e49", "#3e9166", "#79b089", "#e4e9da"],
+};
 export const BLANK = "#e8e5e2";
 export const PLUM = "#2a2335";
 // Voeg (exact uit page.ts, var VOEG): gips-crème #eae4d7 breedte 5 tussen ingekleurde

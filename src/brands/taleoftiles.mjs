@@ -244,7 +244,21 @@ export function makeBrand({ ROOT, config }) {
     const panel = film.tilePattern(await getBase(pattern), LOCKS[pattern] || {}, nX, nY);
     svgCache.set(key, panel); return panel;
   }
-  const PALS = () => ({ modern: film.PAL, warm: film.WARM, cool: film.COOL });
+  // Paletten: oude brede sets (back-compat) + de curated glazuur-families.
+  const PALS = () => ({ modern: film.PAL, warm: film.WARM, cool: film.COOL, ...film.GLAZE_FAMILIES });
+  // AUTOMATISCHE paletkeuze: tenzij de UI expliciet een familie/warm/cool kiest, pakt de
+  // engine zélf een curated glazuur-familie (anti-herhaling), zodat elk paneel een strak,
+  // diep kleurenverhaal heeft i.p.v. bont. "modern"/leeg/"auto" => automatisch.
+  let lastFamily = "";
+  function resolvePalette(opts) {
+    const fams = Object.keys(film.GLAZE_FAMILIES);
+    const k = opts.palette;
+    if (k === "warm" || k === "cool" || fams.includes(k)) return { key: k, arr: PALS()[k] };
+    let pool = fams.filter((f) => f !== lastFamily); if (!pool.length) pool = fams;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    lastFamily = pick;
+    return { key: pick, arr: PALS()[pick] };
+  }
   function storyboardFrom(opts) {
     const pal = PALS()[opts.palette] || film.PAL;
     const tempo = { snel: 1.2, normaal: 1.8, rustig: 2.6 }[opts.tempo] || 1.8;
@@ -340,7 +354,7 @@ export function makeBrand({ ROOT, config }) {
     const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
     const panelX = Math.round((W - panelW) / 2), panelY = Math.round(bandTop + (bandBot - bandTop - panelH) / 2);
     const name = (opts.name || "").trim();
-    const palArr = PALS()[opts.palette] || film.PAL;
+    const palArr = resolvePalette(opts).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
