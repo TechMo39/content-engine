@@ -437,7 +437,7 @@ export function makeBrand({ ROOT, config }) {
     // CAMERA-REGIE (alleen met foto-bookend): intro zoomt in op de tegels in de foto,
     // lost op in het kale mozaïek dat inkleurt terwijl de camera terugtrekt; aan het eind
     // zoomt de camera weer in op het patroon, lost op in de foto, die langzaam uitzoomt.
-    const camZoom = 1.7;   // getemperd: rustigere zoom (was 2.0)
+    const camZoom = 1.22;   // RUSTIGE zoom: te veel zoom op 24fps strobet/schokt (was 1.7/2.0)
     // OPBOUW is het grote middenstuk: tegel voor tegel inkleuren terwijl de camera
     // héél langzaam terugtrekt. Daarna een korte HOLD op het afgemaakte paneel.
     let Ti = 3.5, Dt = 1.0, To = 3.5, Tb, Thold;
