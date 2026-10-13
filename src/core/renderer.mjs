@@ -8,6 +8,8 @@ import { spawn, execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { Worker } from "node:worker_threads";
 
 export const FFMPEG = ffmpegStatic || "ffmpeg";
 export const FORMATS = { "9:16": [540, 960], "1:1": [720, 720], "16:9": [960, 540] };
@@ -130,22 +132,46 @@ ${footer}</svg>`;
 }
 
 // Render een reeks frames (sceneAt(frame)->svg) naar een mp4. Supersampling SS voor scherpte.
+// Rasteren (het dure werk) wordt over alle cores verdeeld; de hoofdthread bouwt de SVG's.
 // render = { W, H, FPS, SS, durSec, sceneAt }  music = absoluut pad of ""
-export async function renderToMp4({ render, music = "", outDir, log = () => {}, namePrefix = "video" }) {
+export async function renderToMp4({ render, music = "", outDir, log = () => {}, namePrefix = "video", workers = 0 }) {
   const { W, H, FPS, SS = 2, durSec, sceneAt } = render;
   await fs.mkdir(outDir, { recursive: true });
   const tmp = path.resolve(outDir, ".frames-" + Date.now());
   await fs.mkdir(tmp, { recursive: true });
   const total = Math.round(durSec * FPS);
-  log(`frames renderen: ${total} (${W}x${H} @${FPS}, ${SS}x)`);
-  for (let f = 0; f < total; f++) {
-    const r = new Resvg(sceneAt(f), { fitTo: { mode: "width", value: W * SS }, font: { loadSystemFonts: true } });
-    await fs.writeFile(path.join(tmp, `f${String(f).padStart(4, "0")}.png`), r.render().asPng());
-    if (f % 24 === 0 || f === total - 1) { log(`  frame ${f + 1}/${total}`); await new Promise((r2) => setImmediate(r2)); }
+  const nWorkers = Math.max(1, workers || Math.max(1, (os.cpus().length || 2) - 1));
+  log(`frames renderen: ${total} (${W * SS}x${H * SS} @${FPS}) — ${nWorkers} core(s)`);
+  const wp = new URL("./raster-worker.mjs", import.meta.url);
+  const pool = Array.from({ length: nWorkers }, () => new Worker(wp));
+  try {
+    await new Promise((resolve, reject) => {
+      if (total === 0) { resolve(); return; }
+      let next = 0, done = 0, failed = false;
+      const assign = (w) => {
+        if (next >= total) return;
+        const f = next++;
+        let svg; try { svg = sceneAt(f); } catch (e) { failed = true; reject(e); return; }
+        w.postMessage({ svg, out: path.join(tmp, `f${String(f).padStart(5, "0")}.png`), width: W * SS, frame: f });
+      };
+      for (const w of pool) {
+        w.on("message", (m) => {
+          if (failed) return;
+          if (m.err) { failed = true; reject(new Error("rasterfout frame " + m.frame + ": " + m.err)); return; }
+          done++;
+          if (done % 48 === 0 || done === total) log(`  frame ${done}/${total}`);
+          if (next < total) assign(w); else if (done === total) resolve();
+        });
+        w.on("error", (e) => { if (!failed) { failed = true; reject(e); } });
+      }
+      for (const w of pool) assign(w);
+    });
+  } finally {
+    for (const w of pool) w.terminate();
   }
   const outName = `${namePrefix}-${Date.now()}.mp4`;
   const outPath = path.resolve(outDir, outName);
-  const fa = ["-y", "-framerate", String(FPS), "-i", path.join(tmp, "f%04d.png")];
+  const fa = ["-y", "-framerate", String(FPS), "-i", path.join(tmp, "f%05d.png")];
   const hasMusic = music && existsSync(music);
   if (hasMusic) fa.push("-i", music, "-shortest");
   fa.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart");
