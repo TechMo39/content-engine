@@ -125,7 +125,7 @@ export function fitRect(Wmax, Hmax, A) {
 // Merk-chrome: achtergrond-gloed, logo/merknaam boven, een paneel in het midden
 // waar het merk z'n "veld" (inner) in zet, optioneel een plaat/overlay, footer onder.
 // branding = { bg, bg2, gold, cream, name, footer, logoUri, panel:true/false }
-export function composeChrome({ branding, W, H, panel, innerField, overlay = "", logoUri = "" }) {
+export function composeChrome({ branding, W, H, panel, innerField, overlay = "", logoUri = "", seed = 0 }) {
   const b = branding;
   // merk-mark boven: merk levert eigen premium woordmerk (markSvg), anders logo-afbeelding, anders tekst
   const logoTag = b.markSvg ? b.markSvg({ W, H })
@@ -143,11 +143,11 @@ export function composeChrome({ branding, W, H, panel, innerField, overlay = "",
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${b.bg2}"/><stop offset="70%" stop-color="${b.bg}"/></radialGradient>
 <linearGradient id="tglz" x1="0" y1="0" x2="0.72" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="0.34" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#160c05" stop-opacity="0.28"/></linearGradient>
-<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter></defs>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${seed}" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter></defs>
 <rect width="${W}" height="${H}" fill="url(#bg)"/>${logoTag}
 ${panelRect}${innerField || ""}${overlay || ""}
 ${footer}
-<rect width="${W}" height="${H}" filter="url(#grain)" opacity="0.05"/></svg>`;
+<rect width="${W}" height="${H}" filter="url(#grain)" opacity="0.04"/></svg>`;
 }
 
 // Bouw een zachte "tegel-klik" geluidslaag (ASMR): een korte, houten tik op elk
