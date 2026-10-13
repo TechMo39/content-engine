@@ -286,16 +286,26 @@ export function makeBrand({ ROOT, config }) {
     const colW = Math.min(Math.round(panelX * 0.5), Math.round(W * 0.052)), colTop = panelY + panelH * 0.34, colBot = panelY + panelH;
     const cols = column(Math.round(panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol) + column(Math.round(W - panelX * 0.5), colTop, colBot, colW, branding.gold, plumCol);
     const archLine = `<path d="${archD}" fill="none" stroke="${branding.gold}" stroke-width="3"/>`;
+    // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
+    // — patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
+    function revealK(tt) {
+      const fS = Ti + Th + Tb, fE = durSec - To, span = fE - fS;
+      if (span < 7) return 0;
+      const n = Math.max(1, Math.round(span / 11)), rl = 2.8;
+      for (let i = 1; i <= n; i++) { const c = fS + span * (i / (n + 1)), d = Math.abs(tt - c); if (d < rl / 2) return smooth(Math.min(1, (1 - d / (rl / 2)) * 1.7)); }
+      return 0;
+    }
 
     function sceneAt(frame) {
       const t = frame / FPS, tleft = durSec - t;
-      // Camera: photoK = hoeveel de foto zichtbaar is; zMos/zPho = inzoom op mozaïek/foto.
-      let photoK = 0, zMos = 1, zPho = 1, tailK = 0;
+      // Camera: bookendK = foto aan begin/eind (mét medaillon); rK = foto-reveal tussendoor
+      // (zónder medaillon). zMos/zPho = inzoom op mozaïek/foto.
+      let bookendK = 0, zMos = 1, zPho = 1, tailK = 0;
       if (bookend) {
         const oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
         if (t < Ti) {                                   // intro: foto zoomt langzaam in op de tegels
           zPho = 1 + (camZoom - 1) * smooth(t / Ti); zMos = camZoom;
-          photoK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);   // trage dissolve foto -> kaal mozaïek
+          bookendK = t < Ti - Dt ? 1 : 1 - smooth((t - (Ti - Dt)) / Dt);   // trage dissolve foto -> kaal mozaïek
         } else if (t < Ti + Th) {                       // HOUD de kale tegels vast — kijk, zo wordt het gemaakt
           zMos = camZoom;
         } else if (t < Ti + Th + Tb) {                  // tegels kleuren rustig in terwijl de camera terugtrekt
@@ -305,11 +315,15 @@ export function makeBrand({ ROOT, config }) {
         } else if (t < oZi) {                           // outro: inzoomen op het patroon
           zMos = 1 + (camZoom - 1) * smooth((t - oStart) / (oZi - oStart));
         } else if (t < oDis) {                          // dissolve mozaïek -> foto (beide ingezoomd)
-          zMos = camZoom; zPho = camZoom; photoK = smooth((t - oZi) / (oDis - oZi));
+          zMos = camZoom; zPho = camZoom; bookendK = smooth((t - oZi) / (oDis - oZi));
         } else {                                        // foto zoomt langzaam uit -> naadloos terug naar begin
-          photoK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
+          bookendK = 1; zMos = camZoom; zPho = camZoom - (camZoom - 1) * smooth((t - oDis) / (durSec - oDis));
         }
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
+      const rK = bookend ? revealK(t) : 0;              // het échte paneel tussendoor tonen
+      const photoK = Math.max(bookendK, rK);            // totale foto-zichtbaarheid
+      const zPhoto = bookendK >= rK ? zPho : 1.05;      // reveal: héél lichte zoom
+      const medOp = bookendK * 0.8;                     // medaillon ALLEEN aan begin/eind
       const tempoMul = { snel: 1.6, normaal: 1.0, rustig: 0.6 }[opts.tempo] || 1.0;   // Tempo stuurt de flow-snelheid
       let colors = isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
@@ -319,11 +333,11 @@ export function makeBrand({ ROOT, config }) {
       // mozaïek + medaillon-watermerk, geclipt in de Moorse boog
       const inner = `<clipPath id="arch"><path d="${archD}"/></clipPath>${decor}<g clip-path="url(#arch)">${mosaic}</g>`;
       let overlay = "";
-      // sfeerfoto in de boog, met Ken-Burns inzoom; + merk-medaillon dat met de foto meekomt
+      // sfeerfoto in de boog (begin/eind + reveals tussendoor), met lichte inzoom
       if (bookend && photoK > 0.002) {
-        const k = photoK.toFixed(3), iw = panelW * zPho, ih = panelH * zPho, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
-        overlay += `<g clip-path="url(#arch)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`
-          + `<g opacity="${(photoK * 0.8).toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;
+        const k = photoK.toFixed(3), iw = panelW * zPhoto, ih = panelH * zPhoto, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
+        overlay += `<g clip-path="url(#arch)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
+        if (medOp > 0.004) overlay += `<g opacity="${medOp.toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;   // medaillon alleen begin/eind
       }
       overlay += archLine + cols + badge;
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
