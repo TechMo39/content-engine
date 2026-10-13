@@ -56,8 +56,9 @@ bijzonder is, en precies de content die we kunnen tonen):
 - **Payoff-first kan winnen.** Eindresultaat/transformatie vroeg tonen scoort het hoogst.
 - **Satisfying = voltooiing + orde + geluid.** Kijkers belonen chaos→orde, afgemaakte
   taken, en tactiel geluid (ASMR). Naadloze **loops** → herbekijken = meer bereik.
-- **Geluid is de helft.** Tegel-klik/ASMR + muziek. "Werkt op mute" is een eigenschap,
-  geen excuus om geluid te negeren.
+- **Geluid is de helft.** "Werkt op mute" is een eigenschap, geen excuus om geluid te
+  negeren. (Let op: het constante tegel-getik was juist irritant → uit; later eventueel
+  een échte, zachte ASMR-sample.)
 - **Consistentie > perfectie.** Casevoorbeeld (Grumpy Kid Studio): dagelijks posten,
   proces tonen, **verhaal** eromheen, **doorlopende series** ("part 2", kleur nog kiezen),
   en één herkenbaar visueel handschrift → verkoopt structureel uit, zonder ads.
@@ -70,64 +71,73 @@ machine rolt 10–20 varianten. Status: ✅ af · 🟡 stub · ⬜ nieuw/bouwen.
 Format = het bewezen short-form-format waarop het leunt.
 
 1. **Satisfying Build** ✅ (kern klopt) · _format: how-it's-made / satisfying loop_
-   Tegel voor tegel inkleuren → eindigt met de naam. Doel: subliminaal merkgevoel +
-   retentie (B2C/top-funnel). Audio: lo-fi + **tegel-klik ASMR**. _Open: tegel-klik-geluid,
-   naam als vast slot, camera temperen._
+   Tegel voor tegel inkleuren → afgemaakt paneel → eindigt met de naam. Rust; beweging
+   uit de camera. Nu met **in-situ** (ons echte paneel op een lege-muur-mockup → matcht
+   altijd het patroon). Doel: subliminaal merkgevoel + retentie (B2C/top-funnel).
 
 2. **"Zet jouw naam erin"** ⬜ **(nieuw — groei-motor)** · _format: interactief/UGC + personalized video_
-   "Comment je naam of je bedrijfsnaam → ik leg 'm in zellige." We renderen de naam van
-   de reageerder. Jaagt comments (algoritme) én is gepersonaliseerde video (bewezen
-   conversie). Dit is tegelijk de **outreach-haak** (naam → DM). De engine doet namen al.
+   "Comment je naam of je bedrijfsnaam → ik leg 'm in zellige." Jaagt comments én is
+   gepersonaliseerde video (bewezen conversie). Dit is een **post-tactiek** die op élk
+   type past, geen apart template.
 
-3. **Lege muur → jouw paneel (in situ)** ⬜ **(nieuw/scherper)** · _format: before/after + transformation (hoogste share)_
-   Echte muur-/gevelfoto → paneel met naam verschijnt erop. Sterk voor B2C én B2B
-   ("jouw café-gevel"). Gebruikt de foto-input die we al hebben.
+3. **Lege muur → jouw paneel (in situ)** ⬜ **(volgende type 2)** · _format: before/after (hoogste share)_
+   Echte muur-/gevelfoto → paneel met naam verschijnt erop. De in-situ-composite die we
+   nu in satisfying bouwden is hiervoor de basis.
 
 4. **Colorway A/B/C** 🟡 · _format: serialized poll / engagement_
-   Zelfde paneel, kleuren wisselen op de beat. "Welke past bij jouw huis? A/B/C" →
-   comments → bereik. Audio: beat met drop op elke wissel.
+   Zelfde paneel, kleuren wisselen op de beat. "Welke past bij jouw huis? A/B/C."
 
 5. **"Geen twee gelijk"** ⬜ **(nieuw — USP-video)** · _format: variatie/satisfying_
-   Eén naam, razendsnel langs tientallen patronen/kleurwegen. Tekst: "1 naam, oneindig
-   uniek." Verkoopt direct de kern-USP (uniciteit).
+   Eén naam, razendsnel langs tientallen patronen/kleurwegen. "1 naam, oneindig uniek."
 
 6. **Macro-glans loop** ⬜ **(nieuw — Pinterest/premium)** · _format: aesthetic loop_
-   Extreme close-up van het glanzende, golvende glazuur dat licht vangt — precies waar
-   ontwerpers op vallen. Korte naadloze loop, mute-proof, zeer premium. Evergreen op Pinterest.
+   Close-up van het glanzende, golvende glazuur dat licht vangt. Mute-proof, evergreen.
 
 7. **Patronen-showcase** 🟡 · _format: carousel / discovery_
-   Door de patronen bladeren/loopen. "Welk patroon ben jij?" → engagement + Pinterest-zoekverkeer.
+   Door de patronen bladeren/loopen. "Welk patroon ben jij?"
 
 8. **Cadeau-moment** ⬜ **(nieuw — koopintentie)** · _format: occasion / gifting_
-   Gepersonaliseerd paneel rond housewarming / huwelijk / "Est. [jaar]" — exact de
-   momenten waarop deze markt koopt. Seizoens- en advertentie-vriendelijk.
+   Paneel rond housewarming / huwelijk / "Est. [jaar]" — waar deze markt koopt.
 
 9. **B2B / bedrijfstype** ⬜ · _format: before/after + outreach/ad_
-   Toont bedrijfstype (koffiehuis, bureau, hotel) met de naam in het paneel. Voor
-   e-mailoutreach (later: namen uit UncleRank) + Meta Ads.
+   Bedrijfstype (koffiehuis, bureau, hotel) met de naam in het paneel. Outreach + ads.
 
 10. **Ambacht / atelier-verhaal** ⬜ (geblokkeerd) · _format: storytime / behind-the-scenes_
-    De maâlem die met de menqach hakt, de olijfpit-oven, "geen twee gelijk". Hoogste
-    authenticiteit, niet te faken. **Vereist échte Tetouan-footage** (zie gaten).
+    De maâlem die met de menqach hakt. **Vereist échte Tetouan-footage** (zie gaten).
 
 ## 6. Prioriteit (voorstel)
-1. **Satisfying afmaken**: tegel-klik-geluid + naam-slot + camera temperen (kern staat).
-2. **"Zet jouw naam erin"** (groei + outreach-haak, laag te bouwen, hoge ROI).
-3. **Lege muur → paneel in situ** (before/after = hoogste share; hergebruikt foto-input).
-4. **Colorway A/B/C** (engagement) → **Geen twee gelijk** + **Macro-glans** (volume/Pinterest).
+1. **Satisfying afmaken** (kern staat; in-situ-composite erin).
+2. **Lege muur → paneel in situ** (type 2, bouwt op de in-situ-composite).
+3. **Colorway A/B/C** → **Geen twee gelijk** + **Macro-glans** (volume/Pinterest).
+4. **Planlaag + publicatie** (zie §9) om de types heen.
 Daarna pas UncleRank als apart merk.
 
 ## 7. Gaten (te dichten)
-- **Tegel-klik/ASMR audiolaag + beat-sync** — grootste satisfying-winst.
 - **Tekst/hook-overlay in de engine** (caption per type & doelgroep, NL/EN) — hook in 1,5s.
 - **Echte atelier-footage uit Tetouan** — blokkeert het verhaal/ambacht-type.
-- **In-situ mockups + eerste klantbewijs** (social proof).
-- **Naam als vast, centraal slot** in satisfying.
+- **In-situ mockups + eerste klantbewijs** (social proof). _(Mockups: in gang gezet.)_
+- **Naam als vast, centraal slot** in satisfying — gedaan.
+- **ASMR-geluid** — nog openstaand (eerste poging was te irritant, uit gezet).
 
 ## 8. Wat NIET klopt / eruit
 - Abstract "dansend kleurveld" / plasma → fout, eruit. Satisfying = echte tegels, rust.
+- Constant tegel-getik → irritant, eruit.
 - UncleRank/outreach door elkaar halen met ToT-content → apart houden.
 - Blind bouwen zonder tegen dit doc te checken → stopt hier.
+
+## 9. Publicatie & planning — TikTok / Instagram / Facebook (NIET LinkedIn)
+Nog te bouwen als skills/commando's om de engine heen. **Niet vergeten.**
+- **Planlaag (platform-onafhankelijk):** weekplan, per post een **hook + caption +
+  hashtags**, en welk type/patroon/kleur/mockup. Commando-idee: `/tot-plan` (weekplan),
+  `/tot-caption` (hook + caption per render).
+- **Posten:**
+  - **Instagram + Facebook:** volledig automatisch mogelijk via Meta's officiële API
+    (zakelijk/creator-account + gekoppelde FB-pagina + eenmalige app-setup).
+  - **TikTok:** via posting-API met goedkeuringsdrempel; start semi-automatisch
+    ("staat klaar, jij tikt op posten") of via een planner; volautomatisch na app-review.
+- **Tussenstap die dag 1 werkt:** engine levert video + caption + hashtags kant-en-klaar;
+  jij of een planner zet live.
+- **Pinterest** apart meenemen als evergreen kanaal (macro-glans, patronen-showcase).
 
 ## Bronnen (research 2026-10-13)
 - [How Moroccan Zellige Tiles Are Made — House of Anouar](https://www.houseofanouar.com/blogs/news/how-moroccan-zellige-tiles-are-made-learn-about-ancient-handmade-artisan-process)
