@@ -156,6 +156,30 @@ function glazeSvg(x, y, w, h, sfx) {
     + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${sid})"/>`;
 }
 
+// HOOK-OVERLAY: korte, pakkende tekst bovenin de eerste ~1,5s (short-form wint of verliest
+// in de eerste seconden). Leesbaar op elke achtergrond via een zachte donkere pill + goud
+// randje. Wrapt naar max 2 regels en schaalt mee. op = zichtbaarheid 0..1.
+function hookOverlay(txt, W, H, op) {
+  if (!txt || op <= 0.01) return "";
+  const words = String(txt).split(/\s+/);
+  let lines = [""];
+  for (const w of words) { const cand = (lines[lines.length - 1] ? lines[lines.length - 1] + " " : "") + w; if (cand.length > 16 && lines[lines.length - 1]) lines.push(w); else lines[lines.length - 1] = cand; }
+  if (lines.length > 2) { const mid = Math.ceil(words.length / 2); lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")]; }
+  const longest = Math.max(...lines.map((l) => l.length));
+  let fs = Math.round(W * 0.082);
+  if (longest * fs * 0.56 > W * 0.86) fs = Math.floor(W * 0.86 / (longest * 0.56));
+  const lh = fs * 1.18, blockH = lh * lines.length, cy = Math.round(H * 0.205);
+  const y0 = cy - blockH / 2 + fs * 0.78;
+  const pillW = Math.min(W * 0.92, longest * fs * 0.58 + fs * 1.3), pillH = blockH + fs * 0.7;
+  const px = ((W - pillW) / 2).toFixed(0), py = (cy - pillH / 2).toFixed(0), rx = (pillH * 0.3).toFixed(0);
+  let out = `<g opacity="${op.toFixed(3)}">`;
+  out += `<rect x="${px}" y="${py}" width="${pillW.toFixed(0)}" height="${pillH.toFixed(0)}" rx="${rx}" fill="#160f22" opacity="0.52"/>`;
+  out += `<rect x="${px}" y="${py}" width="${pillW.toFixed(0)}" height="${pillH.toFixed(0)}" rx="${rx}" fill="none" stroke="#d6b35a" stroke-width="1.5" opacity="0.7"/>`;
+  lines.forEach((l, i) => { const yy = (y0 + i * lh).toFixed(0); out += `<text x="${W / 2}" y="${yy}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fs}" letter-spacing="${(fs * 0.02).toFixed(1)}" fill="#f4ecdc">${escapeXml(l)}</text>`; });
+  out += `</g>`;
+  return out;
+}
+
 // ---- de merk-module zelf ----
 export function makeBrand({ ROOT, config }) {
   const branding = {
@@ -249,6 +273,22 @@ export function makeBrand({ ROOT, config }) {
   // AUTOMATISCHE paletkeuze: tenzij de UI expliciet een familie/warm/cool kiest, pakt de
   // engine zélf een curated glazuur-familie (anti-herhaling), zodat elk paneel een strak,
   // diep kleurenverhaal heeft i.p.v. bont. "modern"/leeg/"auto" => automatisch.
+  // HOOK-tekst: automatisch gekozen (anti-herhaling), NL/EN, met de naam erin. opts.hook
+  // overschrijft met eigen tekst; opts.hook="none"/false zet 'm uit. opts.lang = "nl"/"en".
+  let lastHook = "";
+  function resolveHook(opts, name) {
+    if (opts.hook === false || opts.hook === "none" || opts.hook === null) return "";
+    if (typeof opts.hook === "string" && opts.hook.trim()) return opts.hook.trim();
+    const lang = opts.lang === "en" ? "en" : "nl";
+    const nm = (name || "").trim();
+    const NL = ["Met de hand gelegd, steen voor steen.", "1000 jaar ambacht — jouw naam erin.", "Geen twee gelijk.", "Jouw naam, voor altijd in tegel.", "Handgemaakte zellige, op maat."];
+    const EN = ["Laid by hand, tile by tile.", "1000 years of craft — your name in it.", "No two alike.", "Your name, forever in tile.", "Handmade zellige, made to order."];
+    let pool = (lang === "en" ? EN : NL).slice();
+    if (nm) pool.push(lang === "en" ? `${nm}. In zellige.` : `${nm}, in zellige.`);
+    let p2 = pool.filter((h) => h !== lastHook); if (p2.length) pool = p2;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    lastHook = pick; return pick;
+  }
   let lastFamily = "";
   function resolvePalette(opts) {
     const fams = Object.keys(film.GLAZE_FAMILIES);
@@ -356,6 +396,7 @@ export function makeBrand({ ROOT, config }) {
     const name = (opts.name || "").trim();
     const palArr = resolvePalette(opts).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
+    const hookStr = resolveHook(opts, name);   // hook-tekst voor de eerste ~1,5s
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
     // Keuze (opts.image): een MOCKUP-id -> in-situ; een FOTO-id -> losse foto als startbeeld;
@@ -564,6 +605,10 @@ export function makeBrand({ ROOT, config }) {
           overlay += `<g opacity="${op.toFixed(3)}">${pl}</g>`;
         }
       }
+      // HOOK vooraan: vol tot ~1,6s, fadet weg tegen ~2,6s (vóór de opbouw losbarst).
+      let hookOp = 0;
+      { const full = 1.6, fade = 2.6; if (t < full) hookOp = Math.min(1, t / 0.3); else if (t < fade) hookOp = 1 - smooth((t - full) / (fade - full)); }
+      if (hookOp > 0.01) overlay += hookOverlay(hookStr, W, H, hookOp);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks };
