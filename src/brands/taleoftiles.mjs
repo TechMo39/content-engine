@@ -78,6 +78,35 @@ function nameLayerSvg(nm, np, scale) {
   return out;
 }
 
+// GLAZUUR-GLANS: echte zellige glimt en vangt licht. Deze laag legt over een paneel-
+// rechthoek een lichtval van linksboven (sheen), een diagonale glans en een zachte
+// vignet voor diepte, zodat de tegels niet plat/digitaal ogen maar geglazuurd. sfx =
+// uniek achtervoegsel zodat gradient-id's niet botsen (build/in-situ/badge in 1 frame).
+function glazeSvg(x, y, w, h, sfx) {
+  const gid = "glz" + sfx, sid = "shn" + sfx, vid = "vig" + sfx;
+  return `<defs>`
+    // zachte, matte glans (geen felle digitale highlight): licht van linksboven
+    + `<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">`
+    + `<stop offset="0" stop-color="#fff4e0" stop-opacity="0.10"/>`
+    + `<stop offset="0.28" stop-color="#fff4e0" stop-opacity="0.03"/>`
+    + `<stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>`
+    + `<stop offset="0.8" stop-color="#120a04" stop-opacity="0.10"/>`
+    + `<stop offset="1" stop-color="#120a04" stop-opacity="0.26"/></linearGradient>`
+    + `<radialGradient id="${sid}" cx="31%" cy="21%" r="60%">`
+    + `<stop offset="0" stop-color="#fff6e8" stop-opacity="0.13"/>`
+    + `<stop offset="42%" stop-color="#fff6e8" stop-opacity="0.03"/>`
+    + `<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient>`
+    + `<radialGradient id="${vid}" cx="50%" cy="45%" r="74%">`
+    + `<stop offset="48%" stop-color="#000000" stop-opacity="0"/>`
+    + `<stop offset="100%" stop-color="#1c0f06" stop-opacity="0.34"/></radialGradient></defs>`
+    // FILTER: warme, dempende "oven-glazuur"-tint over het hele paneel -> doffer/dieper,
+    // minder digitaal-licht; daarna de diepte (vignet), dan de zachte glans.
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#3a2414" opacity="0.16"/>`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${vid})"/>`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${gid})"/>`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${sid})"/>`;
+}
+
 // ---- de merk-module zelf ----
 export function makeBrand({ ROOT, config }) {
   const branding = {
@@ -115,7 +144,22 @@ export function makeBrand({ ROOT, config }) {
     }
     let mfiles = [];
     try { mfiles = (await fs.readdir(MOCKUP_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
-    for (const f of mfiles) { const uri = await loadImageFile(path.join(MOCKUP_DIR, f)); if (uri) mockupPool.push({ id: f, uri }); }
+    for (const f of mfiles) {
+      const uri = await loadImageFile(path.join(MOCKUP_DIR, f));
+      if (!uri) continue;
+      // Placement per mockup: optioneel sidecar-bestand "<zelfde-naam>.json" dat zegt
+      // wáár op de muur het paneel komt. Vorm: { "cx":0.5, "cy":0.46, "h":0.4 }
+      //   cx,cy = midden van het paneel (0..1 van breedte/hoogte van het 9:16-beeld)
+      //   h     = hoogte van het paneel als fractie van de beeldhoogte (breedte volgt
+      //           automatisch uit de patroon-verhouding). Geen json = terugval op midden.
+      let place = null;
+      try {
+        const j = JSON.parse(await fs.readFile(path.join(MOCKUP_DIR, f.replace(/\.[^.]+$/, ".json")), "utf8"));
+        const cx = Number(j.cx), cy = Number(j.cy), hh = Number(j.h);
+        if (Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(hh) && hh > 0) place = { cx, cy, h: hh };
+      } catch {}
+      mockupPool.push({ id: f, uri, place });
+    }
   }
   const imgById = (id) => imagePool.find((x) => x.id === id);
 
@@ -286,7 +330,7 @@ export function makeBrand({ ROOT, config }) {
         const bcols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: 1, buildStart: 0 }, durSec + 100);
         const bmos = film.buildSvg(parsed, bcols).replace(/<svg\b[^>]*>/i,
           `<svg x="${bx}" y="${by}" width="${bw}" height="${bh}" viewBox="0 0 ${bvw} ${bvh}" preserveAspectRatio="xMidYMid slice">`);
-        badge = frame + `<g clip-path="url(#bdgclip)">${bmos}</g>`;
+        badge = frame + `<g clip-path="url(#bdgclip)">${bmos}${glazeSvg(bx, by, bw, bh, "g")}</g>`;
       }
     }
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
@@ -311,11 +355,13 @@ export function makeBrand({ ROOT, config }) {
     if (insitu) {
       const finishedT = buildStart + Tb + 0.5;
       const finalCols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart }, finishedT);
-      // Net ingelijst stuk aan de muur (ruimte blijft zichtbaar), gecentreerd op HETZELFDE
-      // midden als het opbouw-paneel. Maat = panelH/camZoom, zodat bij de inzoom (×camZoom)
-      // het paneel precies op het opbouw-mozaïek valt -> naadloze dissolve, geen sprong.
-      const A2 = pw / ph, wH = Math.round(panelH / camZoom), wW = Math.round(wH * A2);
-      const cxp = Math.round(W / 2), cyp = Math.round(panelY + panelH / 2);
+      // Plek op de muur: heeft de mockup een sidecar (place), dan daar; anders gecentreerd
+      // op HETZELFDE midden als het opbouw-paneel met maat panelH/camZoom, zodat bij de
+      // inzoom (×camZoom) het paneel precies op het opbouw-mozaïek valt (naadloze dissolve).
+      const A2 = pw / ph;
+      const pl = chosenMockup && chosenMockup.place;
+      const wH = Math.round(pl ? pl.h * H : panelH / camZoom), wW = Math.round(wH * A2);
+      const cxp = Math.round(pl ? pl.cx * W : W / 2), cyp = Math.round(pl ? pl.cy * H : panelY + panelH / 2);
       const wx = Math.round(cxp - wW / 2), wy = Math.round(cyp - wH / 2);
       const panelInner = film.buildSvg(parsed, finalCols).replace(/<svg\b[^>]*>/i,
         `<svg x="${wx}" y="${wy}" width="${wW}" height="${wH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`);
@@ -332,7 +378,7 @@ export function makeBrand({ ROOT, config }) {
         + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`                       // lijst
         + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       insituFrame = (scale) => `<g transform="translate(${cxp} ${cyp}) scale(${scale.toFixed(3)}) translate(${-cxp} ${-cyp})">`
-        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}${nmPlate}</g>`;
+        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}${glazeSvg(wx, wy, wW, wH, "i")}${nmPlate}</g>`;
     }
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
@@ -398,8 +444,9 @@ export function makeBrand({ ROOT, config }) {
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
         `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`);
-      // mozaïek in de volle (afgeronde) rechthoek
-      const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}</g>`;
+      // mozaïek in de volle (afgeronde) rechthoek + glazuur-glans erover (vast op het
+      // paneel, zodat de lichtval blijft staan terwijl de tegels inkleuren)
+      const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}${glazeSvg(panelX, panelY, panelW, panelH, "b")}</g>`;
       let overlay = "";
       // begin/eind + reveals: in-situ (paneel op de muur) of de oude foto-bookend
       if (bookend && photoK > 0.002) {

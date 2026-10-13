@@ -155,6 +155,21 @@ function hx(c: string): [number, number, number] { if (typeof c !== "string" || 
 function hue(c: string): number { const r = hx(c).map((x) => x / 255), mx = Math.max(r[0], r[1], r[2]), mn = Math.min(r[0], r[1], r[2]), d = mx - mn; if (!d) return 0; let h = 0; if (mx === r[0]) h = ((r[1] - r[2]) / d) % 6; else if (mx === r[1]) h = (r[2] - r[0]) / d + 2; else h = (r[0] - r[1]) / d + 4; return (h * 60 + 360) % 360; }
 function mix(a: string, b: string, t: number): string { t = t < 0 ? 0 : t > 1 ? 1 : t; const A = hx(a), B = hx(b); const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t); return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1); }
 function seeded(i: number): number { let s = (i * 2654435761) >>> 0; s ^= s >>> 15; return (s >>> 0) / 4294967295; }
+// HSL-hulp voor natuurlijke tegel-variatie (handgeglazuurd: geen twee gelijk).
+function _toHsl(hex: string): [number, number, number] { let [r, g, b] = hx(hex).map((x) => x / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; } h = ((h * 60) + 360) % 360; const l = (mx + mn) / 2, s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1)); return [h, s, l]; }
+function _fromHsl(h: number, s: number, l: number): string { s = Math.max(0, Math.min(1, s)); l = Math.max(0, Math.min(1, l)); const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2; let r = 0, g = 0, b = 0; const k = ((Math.floor(h / 60) % 6) + 6) % 6; if (k === 0) [r, g, b] = [c, x, 0]; else if (k === 1) [r, g, b] = [x, c, 0]; else if (k === 2) [r, g, b] = [0, c, x]; else if (k === 3) [r, g, b] = [0, x, c]; else if (k === 4) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x]; const R = Math.round((r + m) * 255), G = Math.round((g + m) * 255), B = Math.round((b + m) * 255); return "#" + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1); }
+// Elke tegel krijgt een piepklein eigen afwijkinkje in tint/verzadiging/helderheid,
+// zoals handgeglazuurde zellige die per stuk net iets anders uit de oven komt.
+function tileVary(hex: string, i: number): string {
+  if (typeof hex !== "string" || hex[0] !== "#") return hex;
+  const r1 = seeded(i * 7 + 1), r2 = seeded(i * 13 + 5), r3 = seeded(i * 17 + 9);
+  const [h, s, l] = _toHsl(hex);
+  // Dieper/voller glazuur i.p.v. licht-pastel: helderheid omlaag, verzadiging iets op,
+  // plus een piepkleine per-tegel afwijking (handgeglazuurd -> geen twee gelijk).
+  const dl = Math.max(0.2, Math.min(0.6, l * 0.82)) + (r3 - 0.5) * 0.08;
+  const ds = Math.min(1, s * 1.12 * (1 + (r2 - 0.5) * 0.12));
+  return _fromHsl(h + (r1 - 0.5) * 9, ds, dl);
+}
 const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.length) % arr.length];
 const smooth = (p: number) => p * p * (3 - 2 * p);
 
@@ -240,7 +255,7 @@ function finalColors(parsed: Parsed, base: string[]): string[] {
     const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
     let idx = Math.floor(((n + 4) / 8) * pal.length);
     idx = Math.max(0, Math.min(pal.length - 1, idx));
-    return pal[idx];
+    return tileVary(pal[idx], tile.order ? Math.round(tile.order * 99991) : 0);
   });
   parsed._flow = { key, fin };
   return fin;
