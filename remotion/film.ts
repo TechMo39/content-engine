@@ -248,15 +248,21 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
     const u = tiles[i].nx, v = tiles[i].ny;
-    // reizend plasma — alle fase-termen zijn heel-getal × p, dus op t=dur staat alles weer gelijk
-    const n = Math.sin(u * 5.0 + p) + Math.sin(v * 4.0 - p) + Math.sin((u + v) * 3.0 + p * 2) + Math.sin((u - v) * 6.0 - p * 2);
-    let f = ((n + 4) / 8) * L; f = ((f % L) + L) % L;
-    const i0 = Math.floor(f), i1 = (i0 + 1) % L;
-    let col = mix(sorted[i0], sorted[i1], smooth(f - i0));
+    // ELKE TEGEL EEN EIGEN, EGALE KLEUR (geen verloop tussen tegels):
+    // - zachte bewegende golf (patches van kleur die over het paneel schuiven)
+    // - per-tegel eigen offset -> buren verschillen -> je ziet lósse tegels, niet een wolk
+    // Alle termen lopen op t=dur terug naar het begin (naadloze loop).
+    const wave = 0.5 + 0.24 * (Math.sin(u * 6.0 + p) + Math.sin(v * 5.0 - p));
+    let g = seeded(i) * 0.30 + wave * 0.5 + B * (t / dur);
+    g = g - Math.floor(g);
+    const fg = g * L, idx = Math.floor(fg) % L, frac = fg - Math.floor(fg);
+    // solide tegelkleur; alleen een korte overgang wanneer een tegel echt omklapt
+    let col = sorted[idx];
+    if (frac > 0.88) col = mix(sorted[idx], sorted[(idx + 1) % L], smooth((frac - 0.88) / 0.12));
     // glans: zachte lichtband die diagonaal meebeweegt (wrap-afstand -> continu)
     const proj = (u + v) / 2; let d = Math.abs(proj - sc); d = Math.min(d, 1 - d);
-    const sheen = 0.19 * Math.exp(-(d * d) / (0.085 * 0.085));   // subtieler + smaller -> minder melkig
-    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.32, sheen));
+    const sheen = 0.16 * Math.exp(-(d * d) / (0.08 * 0.08));
+    if (sheen > 0.004) col = mix(col, "#fff4e0", Math.min(0.28, sheen));
     // opbouw: tegels kleuren in op volgorde, vanaf bStart (ervoor zijn ze nog kaal/neutraal)
     const tb = t - bStart;
     if (tb < build) { const start = tiles[i].order * (build - 0.6); const q = Math.max(0, Math.min(1, (tb - start) / 0.6)); col = q <= 0 ? BLANK : mix(BLANK, col, smooth(q)); }
