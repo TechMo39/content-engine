@@ -280,9 +280,9 @@ export function makeBrand({ ROOT, config }) {
     else { Ti = 0; Tb = Math.max(1, durSec * 0.6); Thold = 0; }
     const buildStart = bookend ? Ti : 0;   // inkleuren start ná de intro-inzoom
     const pw = parsed.view[2], ph = parsed.view[3];
-    // tegel-klik (ASMR): zachte tik terwijl de tegels inkleuren, over het opbouw-venster
+    // tegel-klik UIT — het constante getik was irritant, niet satisfying. Alleen muziek
+    // eronder. (Mechaniek blijft in de kern; later eventueel met een échte ASMR-sample.)
     const clicks = [];
-    if (isFlow) { let s = 999; const r2 = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; for (let tck = buildStart + 0.1; tck < buildStart + Tb; tck += 0.1 + r2() * 0.06) clicks.push(+tck.toFixed(3)); }
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
     const plumCol = "#201734";
