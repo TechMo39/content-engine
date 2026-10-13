@@ -94,24 +94,28 @@ export function makeBrand({ ROOT, config }) {
   };
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
   const IMG_DIR = path.resolve(ROOT, "assets/images/taleoftiles");
-  let film = null, LOCKS = {}, patternList = [], imagePool = [];
+  const MOCKUP_DIR = path.resolve(IMG_DIR, "mockups");
+  let film = null, LOCKS = {}, patternList = [], imagePool = [], mockupPool = [];
   const baseCache = new Map(), svgCache = new Map();
 
   // Foto-pool: Mo legt zijn (Gemini-)foto's in assets/images/taleoftiles/.
-  // Die worden sfeerbeeld (hero-bookend aan begin+eind) en de badge.
+  // Mockup-pool: lege-muur/ruimte-foto's in assets/images/taleoftiles/mockups/ —
+  // daarop plakken we ons ÉCHTE paneel (in-situ), zodat de foto altijd het patroon matcht.
   async function loadImages() {
-    imagePool = [];
+    imagePool = []; mockupPool = [];
     let files = [];
     try { files = (await fs.readdir(IMG_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
     for (const f of files) {
       const abs = path.join(IMG_DIR, f);
       const uri = await loadImageFile(abs);
       if (!uri) continue;
-      // scan de foto op levendige hoofdkleuren -> familie-palet voor de flow (kleur-match)
       let pal = [];
       try { pal = enrichPalette(await imagePalette(abs, 7), 8); } catch {}
       imagePool.push({ id: f, uri, pal });
     }
+    let mfiles = [];
+    try { mfiles = (await fs.readdir(MOCKUP_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
+    for (const f of mfiles) { const uri = await loadImageFile(path.join(MOCKUP_DIR, f)); if (uri) mockupPool.push({ id: f, uri }); }
   }
   const imgById = (id) => imagePool.find((x) => x.id === id);
 
@@ -125,7 +129,7 @@ export function makeBrand({ ROOT, config }) {
     await loadImages();
     // badge-fallback: als er nog geen foto's in de map staan, pak het paneel-aan-de-muur van de site
     branding.badgeUri = imagePool[0] ? imagePool[0].uri : await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");
-    if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en)`);
+    if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en), ${mockupPool.length} mockup(s)`);
   }
   async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function getBase(pattern) {
@@ -254,12 +258,17 @@ export function makeBrand({ ROOT, config }) {
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
     const heroObj = (opts.image && imgById(opts.image)) ? imgById(opts.image) : (imagePool.length ? imagePool[Math.floor(Math.random() * imagePool.length)] : null);
     const hero = heroObj ? heroObj.uri : "";
-    // Kleur-match: de flow volgt de hoofdkleuren van de gekozen foto; geen foto -> het gekozen palet.
-    const flowPal = heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr;
-    const bookend = loop && !!hero;   // naadloze foto-bookend: alleen satisfying + er is een foto
-    const bk = 1.5;                   // duur van de in-/uit-dissolve naar de foto
-    // klein gekaderd productbeeld bovenin links — zelfde foto als het sfeerbeeld
-    const badgeUri = hero || branding.badgeUri;
+    // IN-SITU heeft voorrang: zijn er lege-muur-mockups, dan plakken we ons ÉCHTE paneel
+    // op de muur (matcht altijd exact het patroon). Anders de oude foto-bookend.
+    const mockupObj = mockupPool.length ? mockupPool[Math.floor(Math.random() * mockupPool.length)] : null;
+    const insitu = loop && !!mockupObj;
+    const mockup = mockupObj ? mockupObj.uri : "";
+    // Kleur: bij in-situ stuurt het Palet (neutrale muur); anders kleur-match met de foto.
+    const flowPal = insitu ? palArr : (heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr);
+    const bookend = loop && (!!hero || insitu);   // bookend: in-situ of foto
+    const bk = 1.5;
+    // klein gekaderd productbeeld bovenin links
+    const badgeUri = hero || mockup || branding.badgeUri;
     let badge = "";
     if (badgeUri) {
       const bw = Math.round(W * 0.17), bh = Math.round(bw * 1.2), bx = Math.round(W * 0.045), by = Math.round(H * 0.032);
@@ -283,6 +292,22 @@ export function makeBrand({ ROOT, config }) {
     // tegel-klik UIT — het constante getik was irritant, niet satisfying. Alleen muziek
     // eronder. (Mechaniek blijft in de kern; later eventueel met een échte ASMR-sample.)
     const clicks = [];
+    // IN-SITU: ons AFGEMAAKTE paneel op de mockup-muur geplakt. De camera kan er als één
+    // geheel op inzoomen; bij max zoom lost het op in de opbouw-animatie (zelfde patroon).
+    let insituFrame = null;
+    if (insitu) {
+      const finishedT = buildStart + Tb + 0.5;
+      const finalCols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart }, finishedT);
+      const A2 = pw / ph, wH = Math.round(H * 0.34), wW = Math.round(Math.min(W * 0.46, wH * A2));
+      const wx = Math.round((W - wW) / 2), wy = Math.round(H * 0.295), cxp = wx + wW / 2, cyp = wy + wH / 2;
+      const panelInner = film.buildSvg(parsed, finalCols).replace(/<svg\b[^>]*>/i,
+        `<svg x="${wx}" y="${wy}" width="${wW}" height="${wH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`);
+      const deco = `<rect x="${wx + 5}" y="${wy + 13}" width="${wW + 10}" height="${wH + 10}" rx="5" fill="#000" opacity="0.30"/>`   // schaduw
+        + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`                       // lijst
+        + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      insituFrame = (scale) => `<g transform="translate(${cxp} ${cyp}) scale(${scale.toFixed(3)}) translate(${-cxp} ${-cyp})">`
+        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}</g>`;
+    }
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
     const plumCol = "#201734";
@@ -335,6 +360,7 @@ export function makeBrand({ ROOT, config }) {
         else if (t < oZi) frameK = 0;
         else if (t < oDis) frameK = smooth((t - oZi) / (oDis - oZi));
         else frameK = 1;
+        if (insitu) frameK = 0;   // in-situ: de ruimte is het kader, geen boog/pilaren
       } else if (loop && tleft < 1.3) tailK = Math.min(1, Math.max(0, 1 - tleft / 1.3));
       const rK = bookend ? revealK(t) : 0;              // het échte paneel tussendoor tonen
       const photoK = Math.max(bookendK, rK);            // totale foto-zichtbaarheid
@@ -349,10 +375,15 @@ export function makeBrand({ ROOT, config }) {
       // mozaïek in de volle (afgeronde) rechthoek
       const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}</g>`;
       let overlay = "";
-      // sfeerfoto in de rechthoek (begin/eind + reveals tussendoor), met lichte inzoom
+      // begin/eind + reveals: in-situ (paneel op de muur) of de oude foto-bookend
       if (bookend && photoK > 0.002) {
-        const k = photoK.toFixed(3), iw = panelW * zPhoto, ih = panelH * zPhoto, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
-        overlay += `<g clip-path="url(#pan)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
+        const k = photoK.toFixed(3);
+        if (insitu) {
+          overlay += `<g opacity="${k}">${insituFrame(zPhoto)}</g>`;
+        } else {
+          const iw = panelW * zPhoto, ih = panelH * zPhoto, ix = panelX - (iw - panelW) / 2, iy = panelY - (ih - panelH) / 2;
+          overlay += `<g clip-path="url(#pan)"><image href="${hero}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice" opacity="${k}"/></g>`;
+        }
       }
       overlay += rectBorder;
       // boog + pilaren ALLEEN aan begin/eind (corner-mask dekt de hoeken met de achtergrond af)
@@ -360,8 +391,8 @@ export function makeBrand({ ROOT, config }) {
         const fk = frameK.toFixed(3);
         overlay += `<path d="${cornerMaskD}" fill-rule="evenodd" fill="url(#bg)" opacity="${fk}"/><g opacity="${fk}">${archLine}${cols}</g>`;
       }
-      // medaillon alleen aan begin/eind (met de foto)
-      if (medOp > 0.004) overlay += `<g opacity="${medOp.toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;
+      // medaillon alleen aan begin/eind, en niet in-situ (de ruimte spreekt voor zich)
+      if (!insitu && medOp > 0.004) overlay += `<g opacity="${medOp.toFixed(3)}">${medallion(W / 2, panelY + panelH * 0.42, panelW * 0.24, branding.gold)}</g>`;
       overlay += badge;
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
