@@ -2,7 +2,7 @@
 // Weet zelf niks van tegels; dat zit in de merk-modules. Start: npm run engine
 import http from "node:http";
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync, createReadStream } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -30,7 +30,26 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
-    if (u.pathname.startsWith("/out/")) { const f = path.resolve(OUT, u.pathname.slice(5)); if (existsSync(f)) { res.writeHead(200, { "content-type": "video/mp4" }); res.end(await fs.readFile(f)); return; } res.writeHead(404); res.end("nope"); return; }
+    if (u.pathname.startsWith("/out/")) {
+      const f = path.resolve(OUT, u.pathname.slice(5));
+      if (!existsSync(f)) { res.writeHead(404); res.end("nope"); return; }
+      const size = statSync(f).size;
+      const range = req.headers.range;
+      if (range) {
+        const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+        let start = m[1] ? parseInt(m[1], 10) : 0;
+        let end = m[2] ? parseInt(m[2], 10) : size - 1;
+        if (isNaN(start) || start < 0) start = 0;
+        if (isNaN(end) || end >= size) end = size - 1;
+        if (start > end) { res.writeHead(416, { "content-range": `bytes */${size}` }); res.end(); return; }
+        res.writeHead(206, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-range": `bytes ${start}-${end}/${size}`, "content-length": end - start + 1 });
+        createReadStream(f, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-length": size });
+        createReadStream(f).pipe(res);
+      }
+      return;
+    }
     if (u.pathname === "/api/log") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); res.write(`data: ${JSON.stringify("— verbonden —")}\n\n`); logClients.add(res); req.on("close", () => logClients.delete(res)); return; }
     if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) }); return; }
     if (u.pathname === "/api/subjects") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { subjects: [] }); return; } json(res, { subjects: await b.listSubjects() }); return; }
