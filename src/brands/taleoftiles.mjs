@@ -12,48 +12,47 @@ import { composeChrome, fitRect, loadLogo, loadImageFile, imagePalette, enrichPa
 // het grootste rustige, egale muurvlak op ooghoogte en vermijdt meubels/vloer/plafond.
 // Geen handwerk: dit draait bij het laden van elke mockup. null = geen duidelijk vlak.
 async function detectWallRect(absPath) {
-  const GW = 64, GH = 114, AR = 0.66;   // AR = paneel breedte/hoogte (portret)
+  const GW = 80, GH = 142, AR = 0.66;   // fijner raster (kleine objecten als een mok ook zien)
   const px = await imageGridRGB(absPath, GW, GH);
   if (!px) return null;
   const n = GW * GH, at = (x, y) => y * GW + x;
   const lum = new Float32Array(n);
   for (let i = 0; i < n; i++) { const r = px[i * 3] / 255, g = px[i * 3 + 1] / 255, b = px[i * 3 + 2] / 255; lum[i] = (Math.max(r, g, b) + Math.min(r, g, b)) / 2; }
-  // gradient (textuur): laag = glad vlak (muur); hoog = rand/meubel
+  // gradient (textuur): laag = glad vlak (muur); hoog = rand/object/meubel
   const grad = new Float32Array(n);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const i = at(x, y); let gx = 0, gy = 0; if (x + 1 < GW) gx = Math.abs(lum[i] - lum[at(x + 1, y)]); if (y + 1 < GH) gy = Math.abs(lum[i] - lum[at(x, y + 1)]); grad[i] = gx + gy; }
   // muurkleur = gemiddelde van gladde cellen in de boven-centrale band
   let wr = 0, wg = 0, wb = 0, wc = 0;
-  for (let y = Math.floor(GH * 0.10); y < GH * 0.55; y++) for (let x = Math.floor(GW * 0.20); x < GW * 0.80; x++) { const i = at(x, y); if (grad[i] < 0.045) { wr += px[i * 3]; wg += px[i * 3 + 1]; wb += px[i * 3 + 2]; wc++; } }
-  if (wc < 24) return null;
+  for (let y = Math.floor(GH * 0.08); y < GH * 0.50; y++) for (let x = Math.floor(GW * 0.22); x < GW * 0.78; x++) { const i = at(x, y); if (grad[i] < 0.04) { wr += px[i * 3]; wg += px[i * 3 + 1]; wb += px[i * 3 + 2]; wc++; } }
+  if (wc < 30) return null;
   wr /= wc; wg /= wc; wb /= wc;
   const wLum = (Math.max(wr, wg, wb) + Math.min(wr, wg, wb)) / 2 / 255;
-  // muur-masker: glad EN kleur dicht bij de muurkleur EN niet veel feller dan de muur
-  // (ramen/lampen/spiegels zijn feller -> die willen we niet als muur, paneel moet er niet op).
+  // muur-masker: glad EN kleur dicht bij de muurkleur EN niet veel feller/donkerder dan de muur
+  // (objecten, planken, mokken, ramen, schaduwen -> GEEN muur; daar mag het paneel niet op/overheen).
   const wall = new Uint8Array(n);
-  for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.055 && d < 48 && lum[i] < wLum + 0.10) ? 1 : 0; }
-  // integraalbeeld voor snelle rechthoek-sommen
+  for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.05 && d < 40 && lum[i] < wLum + 0.09 && lum[i] > wLum - 0.14) ? 1 : 0; }
   const I = new Int32Array((GW + 1) * (GH + 1));
   for (let y = 1; y <= GH; y++) for (let x = 1; x <= GW; x++) I[y * (GW + 1) + x] = wall[at(x - 1, y - 1)] + I[(y - 1) * (GW + 1) + x] + I[y * (GW + 1) + x - 1] - I[(y - 1) * (GW + 1) + x - 1];
-  const sum = (x0, y0, x1, y1) => I[y1 * (GW + 1) + x1] - I[y0 * (GW + 1) + x1] - I[y1 * (GW + 1) + x0] + I[y0 * (GW + 1) + x0];
-  // schuif kandidaat-rechthoeken (portret) en kies het grootste, netjes gecentreerde,
-  // op ooghoogte, dat vrijwel volledig op muur ligt.
+  const frac = (x0, y0, x1, y1) => (I[y1 * (GW + 1) + x1] - I[y0 * (GW + 1) + x1] - I[y1 * (GW + 1) + x0] + I[y0 * (GW + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+  // zoek het paneel-vlak: VOLLEDIG op muur, PLUS een vrije marge eromheen (niet tegen een
+  // object aan), en bij voorkeur hoog en gecentreerd. Lege muur = lege muur.
   let best = null;
-  for (let hC = Math.round(GH * 0.52); hC >= Math.round(GH * 0.26); hC -= 2) {
+  for (let hC = Math.round(GH * 0.46); hC >= Math.round(GH * 0.22); hC -= 2) {
     const wC = Math.max(4, Math.round(hC * AR));
-    if (wC >= GW - 2) continue;
-    for (let y0 = Math.round(GH * 0.05); y0 + hC <= Math.round(GH * 0.84); y0 += 2) {
-      for (let x0 = 2; x0 + wC <= GW - 2; x0 += 2) {
-        const frac = sum(x0, y0, x0 + wC, y0 + hC) / (wC * hC);
-        if (frac < 0.92) continue;                         // moet bijna volledig muur zijn
+    if (wC >= GW - 4) continue;
+    const mx = Math.max(2, Math.round(wC * 0.12)), my = Math.max(2, Math.round(hC * 0.08));
+    for (let y0 = Math.round(GH * 0.05); y0 + hC <= Math.round(GH * 0.78); y0 += 2) {
+      for (let x0 = 3; x0 + wC <= GW - 3; x0 += 2) {
+        if (frac(x0, y0, x0 + wC, y0 + hC) < 0.985) continue;         // paneel zelf helemaal muur
+        const ex0 = Math.max(0, x0 - mx), ey0 = Math.max(0, y0 - my), ex1 = Math.min(GW, x0 + wC + mx), ey1 = Math.min(GH, y0 + hC + my);
+        if (frac(ex0, ey0, ex1, ey1) < 0.93) continue;                // marge eromheen ook vrij
         const cx = (x0 + wC / 2) / GW, cy = (y0 + hC / 2) / GH, size = (wC * hC) / n;
-        const pen = Math.abs(cx - 0.5) * 0.45 + Math.abs(cy - 0.44) * 0.35;   // centreren + ooghoogte
-        const score = size - pen;
+        const score = size * 0.55 - Math.abs(cx - 0.5) * 0.5 - Math.abs(cy - 0.40) * 0.6;   // groot + gecentreerd + hoog
         if (!best || score > best.score) best = { score, cx, cy, h: hC / GH };
       }
     }
   }
-  // iets ademruimte: paneel net wat kleiner dan het gevonden vlak
-  if (best) return { cx: best.cx, cy: best.cy, h: Math.max(0.24, best.h * 0.9) };
+  if (best) return { cx: best.cx, cy: best.cy, h: Math.max(0.22, best.h * 0.88) };
   return null;
 }
 
@@ -372,8 +371,9 @@ export function makeBrand({ ROOT, config }) {
       } else {
         // afgemaakt paneel (alle tegels op eindkleur) als mini-preview
         const bcols = film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: 1, buildStart: 0 }, durSec + 100);
-        const bmos = film.buildSvg(parsed, bcols).replace(/<svg\b[^>]*>/i,
-          `<svg x="${bx}" y="${by}" width="${bw}" height="${bh}" viewBox="0 0 ${bvw} ${bvh}" preserveAspectRatio="xMidYMid slice">`);
+        const wrapBdg = `<svg x="${bx}" y="${by}" width="${bw}" height="${bh}" viewBox="0 0 ${bvw} ${bvh}" preserveAspectRatio="xMidYMid slice">`;
+        const bmos = film.buildSvg(parsed, bcols).replace(/<svg\b[^>]*>/i, wrapBdg)
+          + film.buildGlaze(parsed, bcols).replace(/<svg\b[^>]*>/i, wrapBdg);
         badge = frame + `<g clip-path="url(#bdgclip)">${bmos}${glazeSvg(bx, by, bw, bh, "g")}</g>`;
       }
     }
@@ -407,8 +407,9 @@ export function makeBrand({ ROOT, config }) {
       const wH = Math.round(pl ? pl.h * H : panelH / camZoom), wW = Math.round(wH * A2);
       const cxp = Math.round(pl ? pl.cx * W : W / 2), cyp = Math.round(pl ? pl.cy * H : panelY + panelH / 2);
       const wx = Math.round(cxp - wW / 2), wy = Math.round(cyp - wH / 2);
-      const panelInner = film.buildSvg(parsed, finalCols).replace(/<svg\b[^>]*>/i,
-        `<svg x="${wx}" y="${wy}" width="${wW}" height="${wH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`);
+      const wrapI = `<svg x="${wx}" y="${wy}" width="${wW}" height="${wH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const panelInner = film.buildSvg(parsed, finalCols).replace(/<svg\b[^>]*>/i, wrapI)
+        + film.buildGlaze(parsed, finalCols).replace(/<svg\b[^>]*>/i, wrapI);   // + per-tegel glazuur-reliëf
       // De NAAM óók op het paneel aan de muur (gebakken in het in-situ-beeld), gecentreerd en
       // op dezelfde plek/schaal als op het opbouw-paneel -> blijft staan door de dissolve heen.
       let nmPlate = "";
@@ -418,11 +419,19 @@ export function makeBrand({ ROOT, config }) {
         nmPlate = nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i,
           `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`);
       }
-      const deco = `<rect x="${wx + 5}" y="${wy + 13}" width="${wW + 10}" height="${wH + 10}" rx="5" fill="#000" opacity="0.30"/>`   // schaduw
-        + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`                       // lijst
+      // SCHERPTEDIEPTE + CONTACTSCHADUW: de kamer licht blurren zodat het paneel scherp
+      // vooruit springt (filmische diepte), en een zachte, verlopende slagschaduw zodat het
+      // paneel écht aan de muur hangt i.p.v. erop geplakt.
+      const fxDefs = `<defs>`
+        + `<filter id="roomblur" x="-3%" y="-3%" width="106%" height="106%"><feGaussianBlur stdDeviation="2.6"/></filter>`
+        + `<filter id="panshadow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter></defs>`;
+      const shadow = `<g filter="url(#panshadow)"><rect x="${wx + 2}" y="${wy + 18}" width="${wW + 10}" height="${wH + 8}" rx="10" fill="#1a1109" opacity="0.46"/></g>`;
+      const deco = `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`                       // lijst
         + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       insituFrame = (scale) => `<g transform="translate(${cxp} ${cyp}) scale(${scale.toFixed(3)}) translate(${-cxp} ${-cyp})">`
-        + `<image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>${deco}${panelInner}${glazeSvg(wx, wy, wW, wH, "i")}${nmPlate}</g>`;
+        + fxDefs
+        + `<g filter="url(#roomblur)"><image href="${mockup}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/></g>`
+        + `${shadow}${deco}${panelInner}${glazeSvg(wx, wy, wW, wH, "i")}${nmPlate}</g>`;
     }
     // Paleis-frame: Moorse boog om het paneel + twee pilaren + mozaïek-medaillon-watermerk.
     const archD = moorArch(panelX, panelY, panelW, panelH);
@@ -486,11 +495,24 @@ export function makeBrand({ ROOT, config }) {
       let colors = isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
-      const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i,
-        `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`);
-      // mozaïek in de volle (afgeronde) rechthoek + glazuur-glans erover (vast op het
-      // paneel, zodat de lichtval blijft staan terwijl de tegels inkleuren)
-      const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}${glazeSvg(panelX, panelY, panelW, panelH, "b")}</g>`;
+      const wrapB = `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`;
+      const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB)
+        + film.buildGlaze(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB);   // + per-tegel glazuur-reliëf
+      // LICHTVEEG: één zachte glans trekt diagonaal over het afgemaakte paneel (glazuur
+      // vangt licht) — loopt ná de opbouw, tijdens de hold.
+      let sweep = "";
+      {
+        const hs = buildStart + Tb + 0.2, he = (bookend ? durSec - To : durSec) - 0.3;
+        if (t > hs && t < he) {
+          const p = (t - hs) / Math.max(0.1, he - hs);
+          const bw2 = panelW * 0.24, cxs = panelX - panelW * 0.35 + p * (panelW * 1.7), cy2 = panelY + panelH / 2;
+          sweep = `<defs><linearGradient id="swp" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff6e6" stop-opacity="0"/><stop offset="0.5" stop-color="#fff6e6" stop-opacity="0.20"/><stop offset="1" stop-color="#fff6e6" stop-opacity="0"/></linearGradient></defs>`
+            + `<rect x="${(cxs - bw2 / 2).toFixed(1)}" y="${(panelY - panelH * 0.3).toFixed(1)}" width="${bw2.toFixed(1)}" height="${(panelH * 1.6).toFixed(1)}" fill="url(#swp)" transform="rotate(14 ${cxs.toFixed(1)} ${cy2.toFixed(1)})"/>`;
+        }
+      }
+      // mozaïek in de volle (afgeronde) rechthoek + glazuur-glans + lichtveeg erover (vast op
+      // het paneel, zodat de lichtval blijft staan terwijl de tegels inkleuren)
+      const inner = `${rectClip}<g clip-path="url(#pan)">${mosaic}${glazeSvg(panelX, panelY, panelW, panelH, "b")}${sweep}</g>`;
       let overlay = "";
       // begin/eind + reveals: in-situ (paneel op de muur) of de oude foto-bookend
       if (bookend && photoK > 0.002) {
