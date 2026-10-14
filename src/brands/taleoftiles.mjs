@@ -303,8 +303,8 @@ export function makeBrand({ ROOT, config }) {
   // Hooks PER TYPE + publiek + funnel-rol (geen cliché, gevarieerd, 2026-toon).
   const HOOKS = {
     satisfying: {   // B2C, scroll-stopper: nieuwsgierig/visueel
-      nl: ["Wacht tot 'ie af is.", "Dit wordt jouw naam.", "Geen twee hetzelfde.", "Zeg maar — welke naam?", "Kijk wat eruit komt.", "1 naam, oneindig uniek.", "Dit heeft niemand anders.", "Steen voor steen, met de hand."],
-      en: ["Wait for it.", "This becomes your name.", "No two the same.", "Tell me your name.", "Watch it come together.", "One name, endlessly unique.", "Nobody else has this.", "Tile by tile, by hand."],
+      nl: ["Wacht tot 'ie af is.", "Dit wordt jouw naam.", "Geen twee hetzelfde.", "Zeg maar — welke naam?", "Kijk wat eruit komt.", "1 naam, oneindig uniek.", "Blijf kijken.", "Steen voor steen, met de hand."],
+      en: ["Wait for it.", "This becomes your name.", "No two the same.", "Tell me your name.", "Watch it come together.", "One name, endlessly unique.", "Keep watching.", "Tile by tile, by hand."],
     },
     insitu: {       // B2B + particulier: plaatsing/aspiratie
       nl: ["Geen plastic bordje meer.", "Zo hangt 'ie straks bij jou.", "Jouw zaak verdient dit.", "Van lege muur naar statement.", "Dit maakt je entree af.", "Klanten onthouden dít.", "Stel je voor: hier, jouw naam."],
@@ -427,6 +427,7 @@ export function makeBrand({ ROOT, config }) {
     const tpl = templates.find((t) => t.id === templateId) || templates[0];
     const autoMusic = await pickMusic(tpl.music || ["calm"]);   // engine kiest zelf de muziek per type
     const isFlow = templateId === "satisfying" || templateId === "insitu" || templateId === "sfeer";
+    const isSatis = templateId === "satisfying";
     const loop = isFlow;   // naadloze loop
     // SATISFYING = doorlopend stromend kleurveld met vrij instelbare duur.
     // Andere templates = de storyboard-weg (losse scènes).
@@ -443,6 +444,17 @@ export function makeBrand({ ROOT, config }) {
     const name = (opts.name || "").trim();
     const palArr = resolvePalette(opts, templateId).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
+    // SATISFYING-CYCLUS: een rij GEVARIEERDE paletten — elke ronde vult 'ie opnieuw in
+    // een ander kleurenverhaal. Eerste ronde = het gekozen palet (sluit aan op badge/naam),
+    // daarna geschud door de andere levendige paletten/families.
+    const cyclePals = (() => {
+      const all = PALS(); const seen = new Set(); const list = [];
+      const add = (arr) => { if (arr && arr.length) { const k = arr.join(","); if (!seen.has(k)) { seen.add(k); list.push(arr); } } };
+      add(palArr);
+      const order = ["modern", "warm", "cool", "saffraan", "smaragd", "kobalt", "terracotta", "aubergine"].sort(() => Math.random() - 0.5);
+      for (const key of order) add(all[key]);
+      return list;
+    })();
     const hookStr = resolveHook(opts, name, templateId);   // hook-tekst voor de eerste ~1,5s (per type)
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
@@ -606,7 +618,10 @@ export function makeBrand({ ROOT, config }) {
       const zPhoto = bookendK >= rK ? zPho : 1.05;      // reveal: héél lichte zoom
       const medOp = bookendK * 0.8;                     // medaillon ALLEEN aan begin/eind
       const tempoMul = { snel: 1.6, normaal: 1.0, rustig: 0.6 }[opts.tempo] || 1.0;   // Tempo stuurt de flow-snelheid
-      let colors = isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t);
+      const isCycle = isSatis && !bookend;   // pure satisfying = eindeloze vul/leeg/hervul-cyclus
+      let colors = isCycle
+        ? film.cycleColorsAt(parsed, { palettes: cyclePals, durSec, speed: tempoMul }, t)
+        : (isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t));
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
       const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const wrapB = `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`;
@@ -617,7 +632,7 @@ export function makeBrand({ ROOT, config }) {
       let sweep = "";
       {
         const hs = buildStart + Tb + 0.2, he = (bookend ? durSec - To : durSec) - 0.3;
-        if (t > hs && t < he) {
+        if (!isCycle && t > hs && t < he) {
           const p = (t - hs) / Math.max(0.1, he - hs);
           const bw2 = panelW * 0.24, cxs = panelX - panelW * 0.35 + p * (panelW * 1.7), cy2 = panelY + panelH / 2;
           sweep = `<defs><linearGradient id="swp" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff6e6" stop-opacity="0"/><stop offset="0.5" stop-color="#fff6e6" stop-opacity="0.20"/><stop offset="1" stop-color="#fff6e6" stop-opacity="0"/></linearGradient></defs>`
@@ -653,10 +668,25 @@ export function makeBrand({ ROOT, config }) {
       // De NAAM is de payoff: graveert tijdens de vrije flow, verdwijnt met de outro-foto.
       if (name && np) {
         const outK = bookend ? photoK : tailK;
-        // naam = vaste afsluiter: verschijnt op het afgemaakte paneel en blijft staan tot de outro
-        const oStartN = durSec - (bookend ? To : 1.3);
-        const nameStart = Math.min(buildStart + Tb + 0.5, oStartN - 2.6);
-        const op = Math.max(0, Math.min(1, (t - nameStart) / 1.1)) * (1 - outK);
+        let op;
+        if (isCycle) {
+          // SATISFYING: de naam pulseert mee met elke ronde — graveert zodra het paneel vol is
+          // (de payoff) en vervaagt als 't weer leegloopt, zodat je de hele cyclus blijft zien.
+          const cycN = Math.max(1, Math.round((durSec * tempoMul) / 7));
+          const Tc = durSec / cycN, Tf = Tc * 0.46, Th = Tc * 0.12, Td = Tc * 0.40;
+          const tl = t - Math.min(cycN - 1, Math.floor(t / Tc)) * Tc;
+          const up = Tf * 0.72, down = Tf + Th + Td * 0.22;
+          if (tl < up) op = 0;
+          else if (tl < Tf) op = smooth((tl - up) / Math.max(0.1, Tf - up));
+          else if (tl < down) op = 1;
+          else op = Math.max(0, 1 - smooth((tl - down) / Math.max(0.1, Tc - down)));
+          op *= (1 - outK);
+        } else {
+          // naam = vaste afsluiter: verschijnt op het afgemaakte paneel en blijft staan tot de outro
+          const oStartN = durSec - (bookend ? To : 1.3);
+          const nameStart = Math.min(buildStart + Tb + 0.5, oStartN - 2.6);
+          op = Math.max(0, Math.min(1, (t - nameStart) / 1.1)) * (1 - outK);
+        }
         if (op > 0.01) {
           const plateW = Math.round(panelW * 0.56), plateH = Math.round(plateW * 200 / 560);
           const plateX = Math.round(panelX + (panelW - plateW) / 2), plateY = Math.round(panelY + (panelH - plateH) / 2 + (1 - Math.min(1, op)) * 10);
