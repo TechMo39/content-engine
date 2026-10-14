@@ -90,6 +90,24 @@ export function imageGridRGB(absPath, gw, gh) {
   });
 }
 
+// Pre-blur (+ licht donkerder) een foto ÉÉN keer met ffmpeg, bijgesneden tot cover 9:16,
+// als data-URI. Zo hoeft resvg niet elk frame de hele muur te blurren (dat is loodzwaar) —
+// de scherptediepte is statisch, dus bakken we 'm vooraf. Geeft "" bij een fout.
+const _blurCache = new Map();
+export function blurImageFile(absPath, { w = 616, h = 1096, sigma = 16, bright = -0.04 } = {}) {
+  const key = `${absPath}|${w}x${h}|${sigma}|${bright}`;
+  if (_blurCache.has(key)) return Promise.resolve(_blurCache.get(key));
+  return new Promise((resolve) => {
+    if (!absPath || !existsSync(absPath)) { resolve(""); return; }
+    const vf = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},gblur=sigma=${sigma},eq=brightness=${bright}`;
+    const args = ["-v", "error", "-i", absPath, "-vf", vf, "-frames:v", "1", "-f", "mjpeg", "-q:v", "4", "-"];
+    execFile(FFMPEG, args, { encoding: "buffer", maxBuffer: 1 << 24 }, (err, stdout) => {
+      const uri = (err || !stdout || !stdout.length) ? "" : "data:image/jpeg;base64," + stdout.toString("base64");
+      _blurCache.set(key, uri); resolve(uri);
+    });
+  });
+}
+
 // --- kleurhulp (HSL) voor het opbouwen van een familie-palet rond de foto-kleuren ---
 function _rgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function _toHsl(hex) { let [r, g, b] = _rgb(hex).map((x) => x / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; } h = ((h * 60) + 360) % 360; const l = (mx + mn) / 2, s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1)); return { h, s, l }; }
