@@ -300,28 +300,49 @@ export function makeBrand({ ROOT, config }) {
   // HOOK-tekst: automatisch gekozen (anti-herhaling), NL/EN, met de naam erin. opts.hook
   // overschrijft met eigen tekst; opts.hook="none"/false zet 'm uit. opts.lang = "nl"/"en".
   let lastHook = "";
-  function resolveHook(opts, name) {
+  // Hooks PER TYPE + publiek + funnel-rol (geen cliché, gevarieerd, 2026-toon).
+  const HOOKS = {
+    satisfying: {   // B2C, scroll-stopper: nieuwsgierig/visueel
+      nl: ["Wacht tot 'ie af is.", "Dit wordt jouw naam.", "Geen twee hetzelfde.", "Zeg maar — welke naam?", "Kijk wat eruit komt.", "1 naam, oneindig uniek.", "Dit heeft niemand anders.", "Steen voor steen, met de hand."],
+      en: ["Wait for it.", "This becomes your name.", "No two the same.", "Tell me your name.", "Watch it come together.", "One name, endlessly unique.", "Nobody else has this.", "Tile by tile, by hand."],
+    },
+    insitu: {       // B2B + particulier: plaatsing/aspiratie
+      nl: ["Geen plastic bordje meer.", "Zo hangt 'ie straks bij jou.", "Jouw zaak verdient dit.", "Van lege muur naar statement.", "Dit maakt je entree af.", "Klanten onthouden dít.", "Stel je voor: hier, jouw naam."],
+      en: ["No more plastic sign.", "Imagine it on your wall.", "Your business deserves this.", "From blank wall to statement.", "This completes your entrance.", "Customers remember this.", "Picture it: here, your name."],
+    },
+    sfeer: {        // ambacht/emotie/erfgoed
+      nl: ["Met de hand, tegel voor tegel.", "Echte zellige, jouw naam.", "Zó wordt het gemaakt.", "Handwerk dat je voelt.", "Een naam om te bewaren.", "Uit Tetouan, voor jou."],
+      en: ["By hand, tile by tile.", "Real zellige, your name.", "This is how it's made.", "Craft you can feel.", "A name to keep.", "From Tetouan, for you."],
+    },
+  };
+  function resolveHook(opts, name, templateId) {
     if (opts.hook === false || opts.hook === "none" || opts.hook === null) return "";
     if (typeof opts.hook === "string" && opts.hook.trim()) return opts.hook.trim();
     const lang = opts.lang === "en" ? "en" : "nl";
     const nm = (name || "").trim();
-    const NL = ["Met de hand gelegd, steen voor steen.", "1000 jaar ambacht — jouw naam erin.", "Geen twee gelijk.", "Jouw naam, voor altijd in tegel.", "Handgemaakte zellige, op maat."];
-    const EN = ["Laid by hand, tile by tile.", "1000 years of craft — your name in it.", "No two alike.", "Your name, forever in tile.", "Handmade zellige, made to order."];
-    let pool = (lang === "en" ? EN : NL).slice();
+    const t = HOOKS[templateId] ? templateId : "satisfying";
+    let pool = (HOOKS[t][lang] || HOOKS[t].nl).slice();
     if (nm) pool.push(lang === "en" ? `${nm}. In zellige.` : `${nm}, in zellige.`);
     let p2 = pool.filter((h) => h !== lastHook); if (p2.length) pool = p2;
     const pick = pool[Math.floor(Math.random() * pool.length)];
     lastHook = pick; return pick;
   }
   let lastFamily = "";
-  function resolvePalette(opts) {
+  function resolvePalette(opts, templateId) {
     const fams = Object.keys(film.GLAZE_FAMILIES);
     const k = opts.palette;
-    if (k === "warm" || k === "cool" || fams.includes(k)) return { key: k, arr: PALS()[k] };
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    if (k === "warm" || k === "cool" || fams.includes(k)) return { key: k, arr: PALS()[k] };   // handmatige keuze wint
+    // SATISFYING (type 1): juist levendig/gevarieerd (breed palet door elkaar), geen strakke familie.
+    if (templateId === "satisfying") {
+      const vivid = ["modern", "warm", "cool"];
+      let pool = vivid.filter((v) => v !== lastFamily); if (!pool.length) pool = vivid;
+      const key = pick(pool); lastFamily = key; return { key, arr: PALS()[key] };
+    }
+    // LEGE MUUR / SFEERBEELD: strakke, samenhangende glazuur-familie (premium). Sfeer matcht
+    // daarnaast nog extra met de foto-kleuren via flowPal.
     let pool = fams.filter((f) => f !== lastFamily); if (!pool.length) pool = fams;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    lastFamily = pick;
-    return { key: pick, arr: PALS()[pick] };
+    const key = pick(pool); lastFamily = key; return { key, arr: PALS()[key] };
   }
   function storyboardFrom(opts) {
     const pal = PALS()[opts.palette] || film.PAL;
@@ -420,9 +441,9 @@ export function makeBrand({ ROOT, config }) {
     const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
     const panelX = Math.round((W - panelW) / 2), panelY = Math.round(bandTop + (bandBot - bandTop - panelH) / 2);
     const name = (opts.name || "").trim();
-    const palArr = resolvePalette(opts).arr || film.PAL;
+    const palArr = resolvePalette(opts, templateId).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
-    const hookStr = resolveHook(opts, name);   // hook-tekst voor de eerste ~1,5s
+    const hookStr = resolveHook(opts, name, templateId);   // hook-tekst voor de eerste ~1,5s (per type)
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
     // Keuze (opts.image): een MOCKUP-id -> in-situ; een FOTO-id -> losse foto als startbeeld;
