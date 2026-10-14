@@ -31,29 +31,40 @@ async function detectWallRect(absPath) {
   // (objecten, planken, mokken, ramen, schaduwen -> GEEN muur; daar mag het paneel niet op/overheen).
   const wall = new Uint8Array(n);
   for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.05 && d < 40 && lum[i] < wLum + 0.09 && lum[i] > wLum - 0.14) ? 1 : 0; }
-  const I = new Int32Array((GW + 1) * (GH + 1));
-  for (let y = 1; y <= GH; y++) for (let x = 1; x <= GW; x++) I[y * (GW + 1) + x] = wall[at(x - 1, y - 1)] + I[(y - 1) * (GW + 1) + x] + I[y * (GW + 1) + x - 1] - I[(y - 1) * (GW + 1) + x - 1];
-  const frac = (x0, y0, x1, y1) => (I[y1 * (GW + 1) + x1] - I[y0 * (GW + 1) + x1] - I[y1 * (GW + 1) + x0] + I[y0 * (GW + 1) + x0]) / ((x1 - x0) * (y1 - y0));
-  // zoek het paneel-vlak: VOLLEDIG op muur, PLUS een vrije marge eromheen (niet tegen een
-  // object aan), en bij voorkeur hoog en gecentreerd. Lege muur = lege muur.
-  let best = null;
-  for (let hC = Math.round(GH * 0.46); hC >= Math.round(GH * 0.22); hC -= 2) {
-    const wC = Math.max(4, Math.round(hC * AR));
-    if (wC >= GW - 4) continue;
-    const mx = Math.max(2, Math.round(wC * 0.12)), my = Math.max(2, Math.round(hC * 0.08));
-    for (let y0 = Math.round(GH * 0.05); y0 + hC <= Math.round(GH * 0.78); y0 += 2) {
-      for (let x0 = 3; x0 + wC <= GW - 3; x0 += 2) {
-        if (frac(x0, y0, x0 + wC, y0 + hC) < 0.985) continue;         // paneel zelf helemaal muur
-        const ex0 = Math.max(0, x0 - mx), ey0 = Math.max(0, y0 - my), ex1 = Math.min(GW, x0 + wC + mx), ey1 = Math.min(GH, y0 + hC + my);
-        if (frac(ex0, ey0, ex1, ey1) < 0.93) continue;                // marge eromheen ook vrij
-        const cx = (x0 + wC / 2) / GW, cy = (y0 + hC / 2) / GH, size = (wC * hC) / n;
-        const score = size * 0.55 - Math.abs(cx - 0.5) * 0.5 - Math.abs(cy - 0.40) * 0.6;   // groot + gecentreerd + hoog
-        if (!best || score > best.score) best = { score, cx, cy, h: hC / GH };
-      }
-    }
+  // DISTANCE TRANSFORM: afstand van elke muur-cel tot het dichtstbijzijnde niet-muur (object
+  // of beeldrand). Het paneel komt in het punt met de MEESTE vrije ruimte -> altijd zo ver
+  // mogelijk van kapstok/jas/meubel/plant/mok/raam, met marge rondom (lege muur = lege muur).
+  const INF = 1e6, dist = new Float32Array(n);
+  for (let i = 0; i < n; i++) dist[i] = wall[i] ? INF : 0;
+  const rel = (i, j, d) => { if (dist[j] + d < dist[i]) dist[i] = dist[j] + d; };
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const i = at(x, y);
+    if (x === 0 || y === 0 || x === GW - 1 || y === GH - 1) dist[i] = Math.min(dist[i], 1);   // beeldrand telt als object
+    if (x > 0) rel(i, at(x - 1, y), 1);
+    if (y > 0) rel(i, at(x, y - 1), 1);
+    if (x > 0 && y > 0) rel(i, at(x - 1, y - 1), 1.414);
+    if (x < GW - 1 && y > 0) rel(i, at(x + 1, y - 1), 1.414);
   }
-  if (best) return { cx: best.cx, cy: best.cy, h: Math.max(0.22, best.h * 0.88) };
-  return null;
+  for (let y = GH - 1; y >= 0; y--) for (let x = GW - 1; x >= 0; x--) {
+    const i = at(x, y);
+    if (x < GW - 1) rel(i, at(x + 1, y), 1);
+    if (y < GH - 1) rel(i, at(x, y + 1), 1);
+    if (x < GW - 1 && y < GH - 1) rel(i, at(x + 1, y + 1), 1.414);
+    if (x > 0 && y < GH - 1) rel(i, at(x - 1, y + 1), 1.414);
+  }
+  // beste centrum: max vrije ruimte, met lichte voorkeur voor horizontaal midden en niet te
+  // laag (ooghoogte / boven de meubels).
+  let best = null;
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const d = dist[at(x, y)]; if (d < 4) continue;
+    const cx = x / GW, cy = y / GH;
+    const score = d - Math.abs(cx - 0.5) * 6 - Math.max(0, cy - 0.5) * 10;
+    if (!best || score > best.score) best = { score, d, cx, cy };
+  }
+  if (!best) return null;
+  // paneelhoogte volgt de vrije ruimte (2×afstand) met marge; begrensd op redelijk formaat.
+  const hC = Math.min(GH * 0.5, Math.max(GH * 0.22, best.d * 2 * 0.78));
+  return { cx: best.cx, cy: best.cy, h: hC / GH };
 }
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
