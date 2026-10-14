@@ -325,9 +325,23 @@ export function cycleColorsAt(parsed: Parsed, opts: CycleOpts, t: number): strin
   const tl = t - cyc * Tc;                       // lokale tijd binnen de ronde
   const fin = finalColorsFor(parsed, pals[cyc % pals.length]);
   const pop = Math.max(0.28, Tfill * 0.28);      // per-tegel duur: rustig, niet gehaast
+  // ELKE RONDE EEN ANDERE VULRICHTING -> niet steeds dezelfde beweging (anti-herhaling):
+  // radiaal, van-buiten, boven->onder, onder->boven, links->rechts, diagonaal.
+  const ROT = [0, 2, 4, 1, 5, 3];
+  const mode = ROT[cyc % ROT.length];
+  const revAt = (tile: Tile): number => {
+    switch (mode) {
+      case 1: return 1 - tile.order;
+      case 2: return tile.ny;
+      case 3: return 1 - tile.ny;
+      case 4: return tile.nx;
+      case 5: return (tile.nx + (1 - tile.ny)) / 2;
+      default: return tile.order;
+    }
+  };
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
-    const o = tiles[i].order;
+    const o = revAt(tiles[i]);
     const fillAt = o * (Tfill - pop);                            // vullen op volgorde
     const drainAt = Tfill + Thold + (1 - o) * (Tdrain - pop);    // leeg in OMGEKEERDE volgorde
     let c: string;

@@ -113,10 +113,11 @@ function nameLayerSvg(nm, np, scale) {
   const vw = 560, vh = 200;
   const stone = np.plate, stoneDark = _mix(stone, "#000000", 0.28), stoneLight = _mix(stone, "#ffffff", 0.55), band = np.edge;
   const engrave = _mix(np.ink || np.edge || stone, "#000000", 0.15);
-  let fpx = Math.round(vh * 0.30 * (scale || 1));
+  let fpx = Math.round(vh * 0.36 * (scale || 1));
   const words = (nm || "").split(" "); let lines = [nm];
   if (nm.length > 14 && words.length > 1) { const mid = Math.ceil(words.length / 2); lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")]; fpx = Math.round(fpx * 0.82); }
-  const FF = "DejaVu Serif,serif", WT = 700, TR = 4, CW = 0.72;
+  // Premium editorial serif op de naamplaat (Cormorant) i.p.v. de logge DejaVu.
+  const FF = SERIF, WT = 600, TR = 6, CW = 0.52;
   const innerW = vw - 90;
   let L = 0; for (const l of lines) L = Math.max(L, l.length);
   const estW = L * (fpx * CW + TR);
