@@ -4,3 +4,8 @@ remotion/public/
 *.log
 .DS_Store
 .env
+
+assets/images/
+*.zip
+out/
+node_modules/

@@ -208,14 +208,15 @@ export function makeBrand({ ROOT, config }) {
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
   const IMG_DIR = path.resolve(ROOT, "assets/images/taleoftiles");
   const MOCKUP_DIR = path.resolve(IMG_DIR, "mockups");
-  let film = null, LOCKS = {}, patternList = [], imagePool = [], mockupPool = [];
+  const SFEER_DIR = path.resolve(IMG_DIR, "sfeer");   // sfeerbeelden = mood/B-roll (begin/eind i.p.v. in-situ)
+  let film = null, LOCKS = {}, patternList = [], imagePool = [], mockupPool = [], sfeerPool = [];
   const baseCache = new Map(), svgCache = new Map();
 
   // Foto-pool: Mo legt zijn (Gemini-)foto's in assets/images/taleoftiles/.
   // Mockup-pool: lege-muur/ruimte-foto's in assets/images/taleoftiles/mockups/ —
   // daarop plakken we ons ÉCHTE paneel (in-situ), zodat de foto altijd het patroon matcht.
   async function loadImages() {
-    imagePool = []; mockupPool = [];
+    imagePool = []; mockupPool = []; sfeerPool = [];
     let files = [];
     try { files = (await fs.readdir(IMG_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
     for (const f of files) {
@@ -238,6 +239,18 @@ export function makeBrand({ ROOT, config }) {
       try { place = await detectWallRect(abs); } catch {}
       mockupPool.push({ id: f, uri, place });
     }
+    // SFEERBEELDEN: mood/B-roll (zellige-closeups, gestylde scènes, atelier). Worden als
+    // echt begin/eind-beeld gebruikt (foto-bookend) i.p.v. ons paneel op een mockup-muur.
+    let sfiles = [];
+    try { sfiles = (await fs.readdir(SFEER_DIR)).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch {}
+    for (const f of sfiles) {
+      const abs = path.join(SFEER_DIR, f);
+      const uri = await loadImageFile(abs);
+      if (!uri) continue;
+      let pal = [];
+      try { pal = enrichPalette(await imagePalette(abs, 7), 8); } catch {}
+      sfeerPool.push({ id: f, uri, pal });
+    }
   }
   const imgById = (id) => imagePool.find((x) => x.id === id);
 
@@ -251,7 +264,7 @@ export function makeBrand({ ROOT, config }) {
     await loadImages();
     // badge-fallback: als er nog geen foto's in de map staan, pak het paneel-aan-de-muur van de site
     branding.badgeUri = imagePool[0] ? imagePool[0].uri : await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");
-    if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en), ${mockupPool.length} mockup(s)`);
+    if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en), ${mockupPool.length} mockup(s), ${sfeerPool.length} sfeerbeeld(en)`);
   }
   async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function listMockups() { return mockupPool.map((x) => ({ id: x.id, uri: x.uri })); }
@@ -352,7 +365,9 @@ export function makeBrand({ ROOT, config }) {
   // Elk template zegt welke muziek-categorieën erbij passen. De engine kiest er
   // automatisch een track uit (op prefix in assets/audio, bv. "oriental-03.mp3").
   const templates = [
-    { id: "satisfying", name: "Satisfying Build", music: ["calm", "oriental", "spanish"], defaults: { base: "confetti", endColorway: true, shapes: [] } },
+    { id: "satisfying", name: "Satisfying Build", music: ["calm", "oriental", "spanish"], defaults: { bookend: "none" } },   // type 1: puur de opbouw, geen muur
+    { id: "insitu", name: "Lege muur (in-situ)", music: ["calm", "oriental", "spanish"], defaults: { bookend: "auto" } },   // type 2: paneel op een mockup-muur
+    { id: "sfeer", name: "Sfeerbeeld", music: ["calm", "oriental", "spanish"], defaults: { bookend: "sfeer" } },
     { id: "colorway", name: "Colorway A/B/C", music: ["upbeat", "lofi", "boombap"], defaults: {} },
     { id: "shapes", name: "Vormen", music: ["lofi", "calm"], defaults: { base: "fields", shapes: ["heart", "star"], endColorway: true } },
   ];
@@ -390,7 +405,7 @@ export function makeBrand({ ROOT, config }) {
     if (!parsed.tiles.length) throw new Error(`patroon ${subjectId} heeft 0 tegels`);
     const tpl = templates.find((t) => t.id === templateId) || templates[0];
     const autoMusic = await pickMusic(tpl.music || ["calm"]);   // engine kiest zelf de muziek per type
-    const isFlow = templateId === "satisfying";
+    const isFlow = templateId === "satisfying" || templateId === "insitu" || templateId === "sfeer";
     const loop = isFlow;   // naadloze loop
     // SATISFYING = doorlopend stromend kleurveld met vrij instelbare duur.
     // Andere templates = de storyboard-weg (losse scènes).
@@ -412,11 +427,23 @@ export function makeBrand({ ROOT, config }) {
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
     // Keuze (opts.image): een MOCKUP-id -> in-situ; een FOTO-id -> losse foto als startbeeld;
     // leeg = auto (in-situ als er mockups zijn, anders een willekeurige foto).
+    // Begin/eind-beeld: "insitu" = ons paneel op een mockup-muur; "sfeer" = een echt
+    // sfeerbeeld (mood/B-roll) dat in de tegels oplost en terug; "auto" = in-situ als er
+    // mockups zijn, anders sfeer, anders losse foto. Het template "Sfeerbeeld" zet 'm op sfeer.
+    const want = opts.bookend || (tpl.defaults && tpl.defaults.bookend) || "auto";
+    const rnd = (a) => a[Math.floor(Math.random() * a.length)];
     const mById = (id) => mockupPool.find((m) => m.id === id);
+    const sById = (id) => sfeerPool.find((s) => s.id === id);
     let chosenMockup = null, heroObj = null;
-    if (opts.image) { chosenMockup = mById(opts.image) || null; if (!chosenMockup) heroObj = imgById(opts.image) || null; }
-    else if (mockupPool.length) chosenMockup = mockupPool[Math.floor(Math.random() * mockupPool.length)];
-    else if (imagePool.length) heroObj = imagePool[Math.floor(Math.random() * imagePool.length)];
+    if (opts.image) { chosenMockup = mById(opts.image) || null; if (!chosenMockup) heroObj = sById(opts.image) || imgById(opts.image) || null; }
+    else if (want === "none") { /* puur de opbouw, geen begin/eind-beeld (type 1) */ }
+    else if (want === "sfeer") { heroObj = sfeerPool.length ? rnd(sfeerPool) : (imagePool.length ? rnd(imagePool) : null); }
+    else if (want === "insitu") { chosenMockup = mockupPool.length ? rnd(mockupPool) : null; }
+    else { // auto
+      if (mockupPool.length) chosenMockup = rnd(mockupPool);
+      else if (sfeerPool.length) heroObj = rnd(sfeerPool);
+      else if (imagePool.length) heroObj = rnd(imagePool);
+    }
     const hero = heroObj ? heroObj.uri : "";
     const insitu = loop && !!chosenMockup;       // in-situ = ons paneel op de mockup-muur
     const mockup = chosenMockup ? chosenMockup.uri : "";
@@ -635,6 +662,6 @@ export function makeBrand({ ROOT, config }) {
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
     init, listSubjects, listImages, listMockups, templates, makeRender, thumbSvg,
-    options: ["palette", "duration", "reveal", "tempo", "name", "image"],
+    options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }
