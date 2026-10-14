@@ -293,6 +293,54 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
   return out;
 }
 
+// SATISFYING-CYCLUS (type 1): vult tegel voor tegel vol -> houdt kort vast -> kleurt
+// langzaam weer leeg (in omgekeerde volgorde) -> vult opnieuw vol in een ANDER palet.
+// Eindeloze, bevredigende loop; langere video = meer rondes. Nooit dood stilstaan.
+export type CycleOpts = { palettes?: string[][]; durSec: number; speed?: number };
+function finalColorsFor(parsed: Parsed, base: string[]): string[] {
+  const cache = ((parsed as any)._cyc || ((parsed as any)._cyc = new Map<string, string[]>()));
+  const key = (base && base.length ? base : PAL).join(",");
+  if (cache.has(key)) return cache.get(key);
+  const pal = base && base.length ? base : PAL;
+  const fin = parsed.tiles.map((tile) => {
+    const x = tile.nx * 6, y = tile.ny * 6;
+    const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
+    let idx = Math.floor(((n + 4) / 8) * pal.length);
+    idx = Math.max(0, Math.min(pal.length - 1, idx));
+    return tileVary(pal[idx], tile.order ? Math.round(tile.order * 99991) : 0);
+  });
+  cache.set(key, fin);
+  return fin;
+}
+export function cycleColorsAt(parsed: Parsed, opts: CycleOpts, t: number): string[] {
+  const { tiles } = parsed;
+  const pals = opts.palettes && opts.palettes.length ? opts.palettes : [PAL];
+  const dur = opts.durSec > 0 ? opts.durSec : 24;
+  const sp = opts.speed && opts.speed > 0 ? opts.speed : 1;
+  // elke ronde ~7s (/speed); hele video = heel aantal rondes zodat de loop sluit
+  const nCycles = Math.max(1, Math.round((dur * sp) / 7));
+  const Tc = dur / nCycles;
+  const Tfill = Tc * 0.46, Thold = Tc * 0.12, Tdrain = Tc * 0.40;
+  const cyc = Math.min(nCycles - 1, Math.floor(t / Tc));
+  const tl = t - cyc * Tc;                       // lokale tijd binnen de ronde
+  const fin = finalColorsFor(parsed, pals[cyc % pals.length]);
+  const pop = Math.max(0.28, Tfill * 0.28);      // per-tegel duur: rustig, niet gehaast
+  const out = new Array<string>(tiles.length);
+  for (let i = 0; i < tiles.length; i++) {
+    const o = tiles[i].order;
+    const fillAt = o * (Tfill - pop);                            // vullen op volgorde
+    const drainAt = Tfill + Thold + (1 - o) * (Tdrain - pop);    // leeg in OMGEKEERDE volgorde
+    let c: string;
+    if (tl < fillAt) c = BLANK;
+    else if (tl < fillAt + pop) c = mix(BLANK, fin[i], smooth((tl - fillAt) / pop));
+    else if (tl < drainAt) c = fin[i];
+    else if (tl < drainAt + pop) c = mix(fin[i], BLANK, smooth((tl - drainAt) / pop));
+    else c = BLANK;
+    out[i] = c;
+  }
+  return out;
+}
+
 // Zet fill + voeg-rand + randbreedte op één tegel-tag (werkt of 'style' bestaat of niet)
 function paintTile(tag: string, fill: string, stroke: string, sw: number): string {
   const set = (t: string, prop: string, val: string, re: RegExp) => re.test(t) ? t.replace(re, `${prop}:${val}`) : (/style="/i.test(t) ? t.replace(/style="/i, `style="${prop}:${val};`) : t);
