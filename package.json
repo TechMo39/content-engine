@@ -30,7 +30,7 @@
     "@types/react": "^18.3.12",
     "electron": "^32.2.0",
     "esbuild": "^0.24.0",
-    "playwright": "^1.48.0",
+    "playwright": "^1.64.1",
     "typescript": "^5.6.3"
   }
 }
