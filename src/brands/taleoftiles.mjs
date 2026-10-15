@@ -514,8 +514,8 @@ export function makeBrand({ ROOT, config }) {
     { id: "insitu", name: "Lege muur (in-situ)", music: ["calm", "oriental", "spanish"], defaults: { bookend: "auto" } },   // type 2: paneel op een mockup-muur
     { id: "sfeer", name: "Sfeerbeeld", music: ["calm", "oriental", "spanish"], defaults: { bookend: "sfeer" } },
     { id: "trio", name: "Trio (3 patronen)", music: ["calm", "oriental", "spanish"], defaults: {} },   // type 4: 3 patronen -> inzoomen -> inkleuren -> muur
-    { id: "colorway", name: "Colorway A/B/C", music: ["upbeat", "lofi", "boombap"], defaults: {} },
-    { id: "shapes", name: "Vormen", music: ["lofi", "calm"], defaults: { base: "fields", shapes: ["heart", "star"], endColorway: true } },
+    { id: "colorway", name: "Colorway A/B/C", music: ["calm", "oriental", "spanish"], defaults: {} },     // poll: zelfde paneel, 3 kleurwegen
+    { id: "geentwee", name: "Geen twee gelijk", music: ["upbeat", "lofi", "calm"], defaults: {} },        // outreach/USP: naam vast, patronen flitsen
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -584,8 +584,8 @@ export function makeBrand({ ROOT, config }) {
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const storyBeats = resolveStory(opts, "", "satisfying");
-    const REVEALS = ["radial", "down", "up", "diag"];
-    const nSeg = Math.max(1, Math.round(durSec / 6.5));   // elk ~6,5s een ander patroon
+    const REVEALS = ["spiral", "down", "spiralout", "up", "radial", "diag"];   // spiraal/richting = "gaat ergens naartoe"
+    const nSeg = Math.max(1, Math.round(durSec / 26));    // ZEER RUSTIG: ~26s per patroon
     const pats = pickPatterns(nSeg); while (pats.length && pats.length < nSeg) pats.push(pats[pats.length - 1]);
     const prep = [];
     for (let i = 0; i < pats.length; i++) {
@@ -601,14 +601,16 @@ export function makeBrand({ ROOT, config }) {
     if (!prep.length) throw new Error("satisfying: geen patronen");
     const bandTop = Math.round(H * 0.175), bandBot = Math.round(H * 0.90);
     const rectFor = (aspect) => { let h = bandBot - bandTop, w = Math.round(h * aspect); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
-    const Tseg = durSec / nSeg, Tx = Math.min(0.5, Tseg * 0.12);
+    const Tseg = durSec / nSeg, Tx = Math.min(0.6, Tseg * 0.06);
+    const Tfill = Tseg * 0.82;   // bijna de hele ronde rustig opbouwen, dan payoff-hold
     function fillColors(P, tl) {
-      const Tfill = Tseg * 0.72;
-      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.05 }, tl);   // krisp tegel-voor-tegel (bijna instant per tegel)
+      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.05 }, tl);   // krisp per tegel, maar traag genoeg om te volgen
     }
-    function drawPanel(P, cols, id, op) {
+    function drawPanel(P, cols, id, op, z = 1) {
       const r = rectFor(P.aspect), pw = P.parsed.view[2], ph = P.parsed.view[3];
-      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      // CAMERA: lichte inzoom die langzaam terugtrekt -> beweging uit de camera, "onthult" het paneel
+      const vw = pw / z, vh = ph / z, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
+      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}" preserveAspectRatio="xMidYMid slice">`;
       const mos = film.buildSvg(P.parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
       const rr = Math.max(6, r.w * 0.03);
       return `<g opacity="${op.toFixed(3)}"><clipPath id="${id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath>`
@@ -622,7 +624,17 @@ export function makeBrand({ ROOT, config }) {
       if (seg > 0 && tl < Tx) { const P0 = prep[seg - 1]; inner += drawPanel(P0, P0.finalCols, "sp" + (seg - 1), 1 - smooth(tl / Tx)); }   // vorige uit-faden
       const P = prep[seg];
       const inOp = (seg > 0 && tl < Tx) ? smooth(tl / Tx) : 1;
-      inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp);
+      // camera trekt langzaam terug tijdens het vullen (1.12 -> 1.0), rust tijdens de payoff-hold
+      const z = 1 + 0.12 * (1 - smooth(Math.min(1, tl / Tfill)));
+      inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp, z);
+      // PAYOFF: zodra het patroon vol is trekt een lichtveeg over het glazuur -> het "landt"
+      if (tl > Tfill) {
+        const r = rectFor(P.aspect), rr = Math.max(6, r.w * 0.03);
+        const p = Math.min(1, (tl - Tfill) / Math.max(0.4, (Tseg - Tfill) * 0.7));
+        const bw = r.w * 0.5, cxs = r.x - bw + p * (r.w + bw * 1.5), cy = r.y + r.h / 2;
+        inner += `<defs><linearGradient id="sfsw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff7ea" stop-opacity="0"/><stop offset="0.5" stop-color="#fff7ea" stop-opacity="0.32"/><stop offset="1" stop-color="#fff7ea" stop-opacity="0"/></linearGradient><clipPath id="sfswc"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath></defs>`
+          + `<g clip-path="url(#sfswc)"><rect x="${cxs.toFixed(0)}" y="${(r.y - r.h * 0.2).toFixed(0)}" width="${bw.toFixed(0)}" height="${(r.h * 1.4).toFixed(0)}" fill="url(#sfsw)" transform="rotate(14 ${(cxs + bw / 2).toFixed(0)} ${cy.toFixed(0)})"/></g>`;
+      }
       let overlay = "";
       if (storyBeats.length) {
         const tA = 0.4, tB = durSec * 0.5, n = storyBeats.length, slot = (tB - tA) / n, fade = Math.min(0.6, slot * 0.3);
@@ -632,6 +644,152 @@ export function makeBrand({ ROOT, config }) {
           if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower");
         }
       }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
+  // COLORWAY A/B/C (poll/engagement): bouwt één paneel tegel-voor-tegel in kleurweg A,
+  // morpht dan op de beat naar B en C. Bijschrift: "Welke past bij jou? A/B/C."
+  async function makeColorwayRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const name = (opts.name || "").trim() || pickName();
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
+    const pid = pickPatterns(1)[0];
+    const b = await getBase(pid), lock = LOCKS[pid] || {};
+    const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
+    const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+    const fams = Object.keys(film.GLAZE_FAMILIES).sort(() => Math.random() - 0.5).slice(0, 3);
+    const pals3 = fams.map((f) => film.GLAZE_FAMILIES[f]);
+    const finals = pals3.map((p) => film.flowColorsAt(parsed, { palette: p, durSec: 1, buildSec: 1, buildStart: 0 }, 1000));
+    const nps = pals3.map((p) => plateColours(p));
+    const pw = parsed.view[2], ph = parsed.view[3], A = pw / ph;
+    let h = Math.round(H * 0.70), w = Math.round(h * A); if (w > W * 0.80) { w = Math.round(W * 0.80); h = Math.round(w / A); }
+    const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2);
+    const rr = Math.max(8, w * 0.03);
+    const poll = { nl: "Welke past bij jou? A · B · C", en: "Which fits you? A · B · C", fr: "Lequel pour vous ? A · B · C" }[lang];
+    const Tb = durSec * 0.34, Tc = durSec * 0.72;   // bouw A -> beat-snap A/B/C -> vergelijk A|B|C
+    const hold = 1.3;                                // snap-interval (op de beat)
+    const drawCW = (cols, r, id) => {
+      const wrp = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const m = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrp) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrp);
+      const rc = Math.max(6, r.w * 0.03);
+      return `<clipPath id="${id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rc}"/></clipPath><g clip-path="url(#${id})">${m}${glazeSvg(r.x, r.y, r.w, r.h, id)}</g><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rc}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+    };
+    const badge = (letter, cx, cy, rad, op) => `<g opacity="${op.toFixed(3)}"><circle cx="${cx}" cy="${cy}" r="${rad}" fill="#1a1327" opacity="0.74"/><circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/><text x="${cx}" y="${(cy + rad * 0.36).toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="600" font-size="${(rad * 1.15).toFixed(0)}" fill="#f6efe0">${letter}</text></g>`;
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      let inner = "", overlay = "";
+      if (t < Tc) {
+        let idx, cols;
+        if (t < Tb) { idx = 0; cols = film.flowColorsAt(parsed, { palette: pals3[0], durSec: Tb * 0.78, buildSec: Tb * 0.78, buildStart: 0, popSec: 0.05 }, t); }
+        else { idx = Math.floor((t - Tb) / hold) % 3; cols = finals[idx]; }   // SNAP op de beat
+        inner += drawCW(cols, { x: px, y: py, w, h }, "cwbig");
+        const rad = Math.round(w * 0.085), bx = px + w - rad * 1.15, by = py + rad * 1.15;
+        const bOp = t < Tb ? Math.max(0, Math.min(1, (t - Tb * 0.78) / 0.4)) : 1;
+        overlay += badge(["A", "B", "C"][idx], bx, by, rad, bOp);
+        if (name) { const plW = Math.round(w * 0.56), plH = Math.round(plW * 200 / 560), plX = Math.round(px + (w - plW) / 2), plY = Math.round(py + (h - plH) / 2); const op = t < Tb ? Math.max(0, Math.min(1, (t - Tb * 0.78) / 0.5)) : 1; if (op > 0.01) overlay += `<g opacity="${op.toFixed(3)}">${nameLayerSvg(name, nps[idx], 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`)}</g>`; }
+      } else {
+        // VERGELIJK: A | B | C naast elkaar (kies maar)
+        const k = Math.min(1, (t - Tc) / 0.5);
+        let mh = Math.round(H * 0.42), mw = Math.round(mh * A); if (mw > W * 0.30) { mw = Math.round(W * 0.30); mh = Math.round(mw / A); }
+        const cxs = [W * 0.19, W * 0.5, W * 0.81], cy = Math.round(H * 0.5);
+        for (let j = 0; j < 3; j++) { const r = { x: Math.round(cxs[j] - mw / 2), y: Math.round(cy - mh / 2), w: mw, h: mh }; inner += `<g opacity="${k.toFixed(3)}">${drawCW(finals[j], r, "cwm" + j)}</g>`; const rad = Math.round(mw * 0.17); overlay += badge(["A", "B", "C"][j], r.x + r.w - rad * 1.05, r.y + rad * 1.05, rad, k); }
+      }
+      const pollOp = t > Tb ? Math.min(1, (t - Tb) / 0.5) : 0;
+      if (pollOp > 0.01) overlay += captionOverlay(poll, "Zeg het in de comments", W, H, pollOp, "lower");
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
+  // MACRO-GLANS LOOP (premium/Pinterest): close-up van het glanzende glazuur dat licht vangt;
+  // trage drift + lichtveeg, naadloze loop. Mute-proof, evergreen. Geen naam.
+  async function makeMacroRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
+    const pid = pickPatterns(1)[0];
+    const b = await getBase(pid), lock = LOCKS[pid] || {};
+    const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
+    const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+    const palArr = (film.VIVID || film.PAL).slice().sort(() => Math.random() - 0.5);
+    const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+    const pw = parsed.view[2], ph = parsed.view[3];
+    const line = { nl: "Echt glazuur. Echte zellige.", en: "Real glaze. Real zellige.", fr: "Véritable émail. Vrai zellige." }[lang];
+    function sceneAt(frame) {
+      const t = frame / FPS, ph2 = t / durSec * 2 * Math.PI;   // volle periode = durSec -> loopt naadloos
+      const zoom = 2.3;                                        // macro inzoom
+      const vw = pw / zoom, vh = ph / zoom;
+      const cx = 0.5 + 0.17 * Math.sin(ph2), cy = 0.5 + 0.12 * Math.cos(ph2);   // trage cirkel-drift
+      const vx = Math.max(0, Math.min(pw - vw, pw * cx - vw / 2)), vy = Math.max(0, Math.min(ph - vh, ph * cy - vh / 2));
+      const wrap = `<svg x="0" y="0" width="${W}" height="${H}" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      // lichtveeg: bright diagonale band die herhaalt (2 keer per loop) -> glazuur vangt licht
+      const sp = (t / durSec * 2) % 1, bw = W * 0.5, cxs = -bw + sp * (W + bw * 2);
+      const sweep = `<defs><linearGradient id="msw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff7ea" stop-opacity="0"/><stop offset="0.5" stop-color="#fff7ea" stop-opacity="0.26"/><stop offset="1" stop-color="#fff7ea" stop-opacity="0"/></linearGradient></defs>`
+        + `<rect x="${cxs.toFixed(0)}" y="${(-H * 0.2).toFixed(0)}" width="${bw.toFixed(0)}" height="${(H * 1.4).toFixed(0)}" fill="url(#msw)" transform="rotate(16 ${(cxs + bw / 2).toFixed(0)} ${(H / 2).toFixed(0)})"/>`;
+      const inner = mos + sweep;
+      let overlay = "";
+      // subtiele vignette voor diepte
+      overlay += `<defs><radialGradient id="mvig" cx="50%" cy="48%" r="72%"><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="0.5"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#mvig)"/>`;
+      // één rustige regel in het begin, dan vrij beeld
+      if (t < 3.2) { const op = t < 2.2 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.2) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
+  // GEEN TWEE GELIJK (outreach/USP): ÉÉN (bedrijfs)naam blijft vast op de plaat, terwijl de
+  // patronen + kleuren er razendsnel achter langs flitsen. "1 naam, oneindig uniek."
+  async function makeGeenRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const name = (opts.name || "").trim() || pickName();   // dynamisch: outreach vult bedrijfsnaam
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
+    const fams = Object.keys(film.GLAZE_FAMILIES);
+    const N = Math.min((patternList || []).length || 1, 16);
+    const pats = pickPatterns(N);
+    const prep = [];
+    for (let i = 0; i < pats.length; i++) {
+      const pid = pats[i], b = await getBase(pid), lock = LOCKS[pid] || {};
+      const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
+      const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+      const palArr = (i % 2 === 0) ? (film.VIVID || film.PAL).slice().sort(() => Math.random() - 0.5) : film.GLAZE_FAMILIES[fams[i % fams.length]];
+      const finalCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      prep.push({ parsed, finalCols, aspect: parsed.view[2] / parsed.view[3] });
+    }
+    const np = name ? plateColours(film.VIVID || film.PAL) : null;   // VASTE plaatkleur (stabiel leesbaar)
+    const bandTop = Math.round(H * 0.175), bandBot = Math.round(H * 0.90);
+    const rectFor = (aspect) => { let h = bandBot - bandTop, w = Math.round(h * aspect); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
+    const line = { nl: "1 naam. Oneindig uniek.", en: "One name. Endlessly unique.", fr: "Un nom. Infiniment unique." }[lang];
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const flash = Math.max(0.28, 0.6 - t * 0.012);   // versnelt licht -> opbouwende energie
+      // tel hoeveel flitsen al voorbij zijn (met versnelling) voor een stabiele index
+      let acc = 0, k = 0, idx = 0; while (acc < t && k < 10000) { acc += Math.max(0.28, 0.6 - acc * 0.012); if (acc <= t) idx++; k++; }
+      const P = prep[idx % prep.length];
+      const r = rectFor(P.aspect);
+      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${P.parsed.view[2]} ${P.parsed.view[3]}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap);
+      const rr = Math.max(6, r.w * 0.03);
+      let inner = `<clipPath id="gtc"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath><g clip-path="url(#gtc)">${mos}${glazeSvg(r.x, r.y, r.w, r.h, "gtc")}</g><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      let overlay = "";
+      if (name) { const plW = Math.round(r.w * 0.6), plH = Math.round(plW * 200 / 560), plX = Math.round(r.x + (r.w - plW) / 2), plY = Math.round(r.y + (r.h - plH) / 2); overlay += nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`); }
+      overlay += captionOverlay(line, null, W, H, 1, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -736,6 +894,8 @@ export function makeBrand({ ROOT, config }) {
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16" }) {
     if (templateId === "trio") return await makeTrioRender({ opts, format });
     if (templateId === "satisfying") return await makeSatisfyingRender({ opts, format });
+    if (templateId === "colorway") return await makeColorwayRender({ opts, format });
+    if (templateId === "geentwee") return await makeGeenRender({ opts, format });
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
