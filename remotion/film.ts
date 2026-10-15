@@ -6,6 +6,8 @@ export const PAL = ["#c75a4e","#f79f45","#e4ce8c","#117573","#32949e","#7e95d7",
   "#efc7c8","#90a084","#45497d","#99bfc5","#f6ae91","#c67765","#e7c077","#663959","#94342f"];
 export const WARM = ["#c75a4e","#f79f45","#e4ce8c","#f6ae91","#e7c077","#c67765","#efc7c8","#94342f"];
 export const COOL = ["#117573","#32949e","#7e95d7","#45497d","#99bfc5","#90a084","#a1c981","#663959"];
+// VIVID: verzadigde, glanzende juweel-glazuurtonen (modern, niet dof/oudbollig). Voor satisfying.
+export const VIVID = ["#1e5fb0","#159c9c","#1a8f4e","#43b183","#e8a51c","#e07b1a","#c5512e","#c0392b","#7a3b70","#136b6e","#4a93d6","#efe7d4"];
 // CURATED GLAZUUR-FAMILIES: strakke, bij elkaar passende zellige-glazuurtonen (3-5 per
 // familie) i.p.v. een bonte regenboog. De engine kiest er automatisch één per render.
 // Elke familie: donker -> licht, laatste een crème/neutraal voor rust en contrast.
@@ -23,9 +25,9 @@ export const BLANK = "#ffffff";   // kaal = wit (niet bruin); 3D-reliëf komt va
 export const PLUM = "#2a2335";
 // Voeg (exact uit page.ts, var VOEG): gips-crème #eae4d7 breedte 5 tussen ingekleurde
 // tegels; donker contour #b9a98c breedte 2 op de nog-neutrale (raw) tegels; neutraal #e8e5e2.
-export const VOEG = "#eae4d7";
-export const VOEG_RAW = "#b9a98c";
-export const VOEG_PX = 5, VOEG_RAW_PX = 2;
+export const VOEG = "#d7d0c2";        // dunne neutrale voeg tussen ingekleurde tegels (schaduw-gleuf)
+export const VOEG_RAW = "#e7e3db";    // lichte neutrale voeg op witte (kale) tegels — NIET bruin
+export const VOEG_PX = 5, VOEG_RAW_PX = 4;
 
 export type Tile = { start: number; end: number; gx: number; gy: number; nx: number; ny: number; order: number; key: string };
 export type Parsed = { svg: string; view: number[]; tiles: Tile[]; _cache?: { story: Storyboard; seg: string[][] }; _flow?: { key: string; fin: string[] } };
@@ -391,7 +393,9 @@ export function buildGlaze(parsed: Parsed, colors: string[]): string {
     out += svg.slice(cur, tiles[i].start);
     const orig = svg.slice(tiles[i].start, tiles[i].end);
     const raw = (colors[i] || BLANK) === BLANK;
-    out += raw ? paintTile(orig, "none", "none", 0) : paintTile(orig, "url(#tglz)", "none", 0);
+    // ALLE tegels krijgen reliëf: ingekleurd = volle glans (#tglz), kaal/wit = subtiel (#tglzraw),
+    // zodat ook de witte tegels verhoogd/3D ogen i.p.v. kaal plat.
+    out += paintTile(orig, raw ? "url(#tglzraw)" : "url(#tglz)", "none", 0);
     cur = tiles[i].end;
   }
   out += svg.slice(cur);

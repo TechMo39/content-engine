@@ -593,7 +593,8 @@ export function makeBrand({ ROOT, config }) {
       const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
       const svg = await getPatternSvg(pid, nX, nY);
       const parsed = film.parseTiles(svg, REVEALS[i % REVEALS.length]);   // elke ronde andere vulrichting
-      const palArr = resolvePalette({}, "satisfying").arr || film.PAL;
+      const palArr = (film.VIVID || film.PAL).slice().sort(() => Math.random() - 0.5);   // verzadigd + per patroon ander
+
       const finalCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
       prep.push({ pid, parsed, palArr, finalCols, aspect: parsed.view[2] / parsed.view[3] });
     }
@@ -603,7 +604,7 @@ export function makeBrand({ ROOT, config }) {
     const Tseg = durSec / nSeg, Tx = Math.min(0.5, Tseg * 0.12);
     function fillColors(P, tl) {
       const Tfill = Tseg * 0.72;
-      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.12 }, tl);   // krisp tegel-voor-tegel
+      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.05 }, tl);   // krisp tegel-voor-tegel (bijna instant per tegel)
     }
     function drawPanel(P, cols, id, op) {
       const r = rectFor(P.aspect), pw = P.parsed.view[2], ph = P.parsed.view[3];
