@@ -162,8 +162,9 @@ export function composeChrome({ branding, W, H, panel, innerField, overlay = "",
 <defs><radialGradient id="bg" cx="50%" cy="26%" r="90%"><stop offset="0%" stop-color="${b.bg2}"/><stop offset="70%" stop-color="${b.bg}"/></radialGradient>
 <linearGradient id="tglz" x1="0" y1="0" x2="0.72" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="0.34" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#160c05" stop-opacity="0.28"/></linearGradient>
 <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${seed}" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter></defs>
-<rect width="${W}" height="${H}" fill="url(#bg)"/>${logoTag}
+<rect width="${W}" height="${H}" fill="url(#bg)"/>
 ${panelRect}${innerField || ""}${overlay || ""}
+${logoTag}
 ${footer}
 <rect width="${W}" height="${H}" filter="url(#grain)" opacity="0.04"/></svg>`;
 }

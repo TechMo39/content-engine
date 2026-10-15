@@ -253,13 +253,31 @@ export function makeBrand({ ROOT, config }) {
   const branding = {
     name: "Tale of Tiles", footer: "taleoftiles.com",
     bg: "#1a1327", bg2: "#241a3a", gold: "#d6b35a", cream: "#f4ecdc", plate: "#eae4d7",
-    // premium woordmerk + korte regel die zegt WAT we doen (altijd bovenin, herkenbaar)
+    // ECHTE logo (van taleoftiles.com) op een strak crème plaatje (donker script leest niet op
+    // de donkere kop), met de tagline eronder. Valt terug op het getekende woordmerk als het
+    // logobestand ontbreekt.
     markSvg: ({ W, H }) => {
-      const gold = "#d6b35a", cream = "#f4ecdc", midY = Math.round(H * 0.072), fs = Math.round(W * 0.05), ruleW = fs * 4.3, tag = Math.round(fs * 0.33);
+      const gold = "#d6b35a", cream = "#f4ecdc", tag = Math.round(W * 0.0165);
+      if (branding.markLogo) {
+        const ar = 389 / 96;
+        const lw = Math.round(W * 0.44), lh = Math.round(lw / ar);
+        const px = Math.round(lw * 0.055), py = Math.round(lh * 0.34);
+        const pw = lw + px * 2, ph = lh + py * 2;
+        const plateX = Math.round((W - pw) / 2), plateY = Math.round(H * 0.032), rx = Math.round(ph * 0.24);
+        const lx = plateX + px, ly = plateY + py;
+        const tagY = plateY + ph + tag * 1.7;
+        return `<defs><radialGradient id="lgsh" cx="50%" cy="46%" r="52%"><stop offset="0.58" stop-color="#0a0712" stop-opacity="0.38"/><stop offset="1" stop-color="#0a0712" stop-opacity="0"/></radialGradient></defs>`
+          + `<ellipse cx="${plateX + pw / 2}" cy="${plateY + ph + 6}" rx="${pw / 2 + 10}" ry="${ph * 0.5}" fill="url(#lgsh)"/>`
+          + `<rect x="${plateX}" y="${plateY}" width="${pw}" height="${ph}" rx="${rx}" fill="#f6f1e8"/>`
+          + `<rect x="${plateX}" y="${plateY}" width="${pw}" height="${ph}" rx="${rx}" fill="none" stroke="${gold}" stroke-width="1.6" opacity="0.55"/>`
+          + `<image href="${branding.markLogo}" x="${lx}" y="${ly}" width="${lw}" height="${lh}" preserveAspectRatio="xMidYMid meet"/>`
+          + `<text x="${W / 2}" y="${tagY}" text-anchor="middle" font-family="${SERIF}" font-weight="500" font-size="${tag}" letter-spacing="${(tag * 0.26).toFixed(1)}" fill="${cream}" opacity="0.8">HANDGEMAAKTE ZELLIGE NAAMBORDEN</text>`;
+      }
+      const midY = Math.round(H * 0.072), fs = Math.round(W * 0.05), ruleW = fs * 4.3, tag2 = Math.round(fs * 0.33);
       return `<polygon points="${star8(W / 2, midY - fs * 1.02, fs * 0.52, fs * 0.22)}" fill="${gold}"/>`
         + `<text x="${W / 2}" y="${midY + fs * 0.32}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fs}" letter-spacing="${(fs * 0.16).toFixed(1)}" fill="${gold}">TALE OF TILES</text>`
         + `<line x1="${W / 2 - ruleW}" y1="${midY + fs * 0.62}" x2="${W / 2 + ruleW}" y2="${midY + fs * 0.62}" stroke="${gold}" stroke-width="1.3" opacity="0.75"/>`
-        + `<text x="${W / 2}" y="${midY + fs * 1.12}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="${tag}" letter-spacing="${(tag * 0.14).toFixed(1)}" fill="${cream}" opacity="0.82">HANDGEMAAKTE ZELLIGE NAAMBORDEN</text>`;
+        + `<text x="${W / 2}" y="${midY + fs * 1.12}" text-anchor="middle" font-family="DejaVu Serif,serif" font-size="${tag2}" letter-spacing="${(tag2 * 0.14).toFixed(1)}" fill="${cream}" opacity="0.82">HANDGEMAAKTE ZELLIGE NAAMBORDEN</text>`;
     },
   };
   const SITE = (/^https?:\/\//.test(config.site) ? config.site : "https://" + config.site).replace(/\/$/, "");
@@ -321,6 +339,7 @@ export function makeBrand({ ROOT, config }) {
     try { LOCKS = JSON.parse(await fs.readFile(path.resolve(ROOT, "assets/tile-locks.json"), "utf8")); } catch {}
     try { patternList = JSON.parse(await fs.readFile(path.resolve(ROOT, "fixtures/patterns.json"), "utf8")).patterns; } catch {}
     branding.logoUri = await loadLogo(config.logoUrl);
+    try { branding.markLogo = await loadImageFile(path.resolve(ROOT, "assets/brand/logo.png")); } catch { branding.markLogo = ""; }
     await loadImages();
     // badge-fallback: als er nog geen foto's in de map staan, pak het paneel-aan-de-muur van de site
     branding.badgeUri = imagePool[0] ? imagePool[0].uri : await loadLogo(config.productUrl || "https://taleoftiles.com/img/site/panel-on-wall.jpg");

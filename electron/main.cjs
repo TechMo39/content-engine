@@ -25,16 +25,26 @@ function waitForServer(cb, tries = 50) {
 }
 
 function createWindow() {
+  // App-icoon = de zellige-rozet uit het Tale of Tiles-logo (.ico op Windows, .png elders).
+  const iconFile = process.platform === "win32" ? "icon.ico" : "icon.png";
+  const iconPath = path.join(ROOT, "assets", "brand", iconFile);
   win = new BrowserWindow({
     width: 1240, height: 860, minWidth: 980, minHeight: 700,
     title: "Tale of Tiles Studio", backgroundColor: "#1a1327",
+    icon: iconPath,
     autoHideMenuBar: true,
   });
   win.loadURL(URL);
+  // de pagina-<title> niet het venster laten overschrijven -> blijft "Tale of Tiles Studio"
+  win.on("page-title-updated", (e) => e.preventDefault());
   // externe links in de standaardbrowser openen, niet in het app-venster
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
 }
 
-app.whenReady().then(() => { startServer(); waitForServer(createWindow); });
+app.whenReady().then(() => {
+  // zorgt dat Windows het venster-icoon ook in de taakbalk toont (en apart groepeert)
+  if (process.platform === "win32" && app.setAppUserModelId) app.setAppUserModelId("com.taleoftiles.studio");
+  startServer(); waitForServer(createWindow);
+});
 app.on("window-all-closed", () => { if (server) server.kill(); app.quit(); });
 app.on("before-quit", () => { if (server) server.kill(); });
