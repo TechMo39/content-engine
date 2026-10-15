@@ -383,46 +383,67 @@ export function makeBrand({ ROOT, config }) {
   // VERHAAL per type: een reeks korte beats (kicker + regel) die mét de ambiance meelopen —
   // geen losse hook, maar een boog (spanning -> ambacht -> payoff). Premium toon, geen cliché.
   // B2B + particulier bij in-situ; ambacht/erfgoed bij sfeer; kort/visueel bij satisfying.
+  // Rode draad: EEUWENOUD -> NIEUWE TOEPASSING. Echte zellige komt uit Fès (bakermat).
+  // Social = de schoonheid & het verhaal (ambacht, eyecatcher, erfgoed) + zachte comment-CTA;
+  // niet "bestel je naambord" (dat staat op de site). Doelgroep: particulier én zakelijk.
   const STORIES = {
-    insitu: {
+    insitu: {   // muur / gevel — eyecatcher, weerbestendig, eerste indruk
       nl: [
-        [{ k: "De muur", t: "Een lege muur zegt niets." }, { k: "Het ambacht", t: "Tegel voor tegel, met de hand gezet." }, { k: "Jouw naam", t: "Tot dit er hangt." }],
-        [{ t: "Hout verkleurt. Plastic breekt." }, { t: "Gebakken klei en glazuur blijven." }, { t: "Een naambord dat een erfstuk wordt." }],
-        [{ k: "Entree", t: "De eerste indruk hangt aan de muur." }, { t: "Echte zellige, gemaakt in Tetouan." }, { t: "Jouw naam — voor wie binnenkomt." }],
+        [{ k: "Fès", t: "Wat eeuwen aan paleismuren hing…" }, { t: "…nu aan die van jou." }, { t: "Jouw naam, in echt glazuur." }],
+        [{ k: "De gevel", t: "De eerste indruk begint buiten." }, { t: "Zon, regen, vorst — het glazuur lacht erom." }, { t: "Jaren later nog net zo diep van kleur." }],
+        [{ t: "Een schilderij hang je óp de muur." }, { t: "Dit wórdt de muur." }, { k: "Comments", t: "Welke naam zou jij kiezen?" }],
+        [{ k: "Ambacht", t: "Tegel voor tegel, met de hand gezet." }, { t: "Geen twee gelijk." }, { t: "Een eyecatcher bij de deur." }],
       ],
       en: [
-        [{ k: "The wall", t: "A blank wall says nothing." }, { k: "The craft", t: "Tile by tile, set by hand." }, { k: "Your name", t: "Until this hangs there." }],
-        [{ t: "Wood fades. Plastic breaks." }, { t: "Fired clay and glaze remain." }, { t: "A nameplate that becomes an heirloom." }],
-        [{ k: "Entrance", t: "The first impression hangs on the wall." }, { t: "Real zellige, made in Tetouan." }, { t: "Your name — for everyone who enters." }],
+        [{ k: "Fès", t: "What once lined palace walls…" }, { t: "…now lines yours." }, { t: "Your name, in real glaze." }],
+        [{ k: "The façade", t: "The first impression starts outside." }, { t: "Sun, rain, frost — the glaze doesn't care." }, { t: "Years on, still this deep." }],
+        [{ t: "A painting hangs on the wall." }, { t: "This becomes it." }, { k: "Comments", t: "Which name would you pick?" }],
+        [{ k: "Craft", t: "Tile by tile, set by hand." }, { t: "No two alike." }, { t: "An eyecatcher at the door." }],
+      ],
+      fr: [
+        [{ k: "Fès", t: "Ce qui ornait les palais…" }, { t: "…orne désormais votre mur." }, { t: "Votre nom, en véritable émail." }],
+        [{ t: "Soleil, pluie, gel — l'émail s'en moque." }, { t: "Des années après, toujours aussi intense." }, { k: "Commentaires", t: "Quel nom choisiriez-vous ?" }],
       ],
     },
-    sfeer: {
+    sfeer: {   // ambacht / erfgoed / Fès — oud -> nieuw
       nl: [
-        [{ k: "Tetouan", t: "Elke tegel met de hand gesneden." }, { t: "Geen twee stukjes zijn gelijk." }, { t: "Zo ontstaat jouw naam." }],
-        [{ t: "Klei, water, vuur — en geduld." }, { k: "Zellige", t: "Een eeuwenoud ambacht." }, { t: "Gemaakt om door te geven." }],
+        [{ k: "Fès", t: "De bakermat van de zellige." }, { t: "Elke tegel met de hand gesneden." }, { t: "Geen twee stukjes gelijk." }],
+        [{ t: "Een ambacht van duizend jaar." }, { k: "Vandaag", t: "Een toepassing van nu." }, { t: "Met jouw naam erin." }],
+        [{ t: "Klei, water, vuur — en geduld." }, { t: "Zo wordt echte zellige gemaakt." }, { t: "Gemaakt om door te geven." }],
       ],
       en: [
-        [{ k: "Tetouan", t: "Every tile cut by hand." }, { t: "No two pieces are the same." }, { t: "This is how your name is made." }],
-        [{ t: "Clay, water, fire — and patience." }, { k: "Zellige", t: "A centuries-old craft." }, { t: "Made to pass on." }],
+        [{ k: "Fès", t: "The birthplace of zellige." }, { t: "Every tile cut by hand." }, { t: "No two pieces alike." }],
+        [{ t: "A thousand-year craft." }, { k: "Today", t: "A use for now." }, { t: "With your name." }],
+        [{ t: "Clay, water, fire — and patience." }, { t: "This is how real zellige is made." }, { t: "Made to pass on." }],
+      ],
+      fr: [
+        [{ k: "Fès", t: "Le berceau du zellige." }, { t: "Chaque carreau taillé à la main." }, { t: "Aucun identique." }],
+        [{ t: "Un art millénaire." }, { k: "Aujourd'hui", t: "Un usage d'aujourd'hui." }, { t: "Avec votre nom." }],
       ],
     },
-    satisfying: {   // kort/licht, bovenin — de animatie is de ster
+    satisfying: {   // kort/visueel — uniek, oud->nieuw, tactiel
       nl: [
         [{ t: "Blijf kijken." }, { t: "Jouw naam, oneindig uniek." }],
-        [{ t: "Geen twee hetzelfde." }, { t: "Steen voor steen, met de hand." }],
-        [{ t: "Dit wordt jouw naam." }],
+        [{ t: "Geen twee hetzelfde." }, { t: "Met de hand gezet." }],
+        [{ t: "Duizend jaar oud." }, { t: "Jouw muur van nu." }],
+        [{ t: "Je wil er je hand overheen halen." }],
       ],
       en: [
         [{ t: "Keep watching." }, { t: "Your name, endlessly unique." }],
-        [{ t: "No two the same." }, { t: "Tile by tile, by hand." }],
-        [{ t: "This becomes your name." }],
+        [{ t: "No two the same." }, { t: "Set by hand." }],
+        [{ t: "A thousand years old." }, { t: "Your wall today." }],
+        [{ t: "You'll want to touch it." }],
+      ],
+      fr: [
+        [{ t: "Regardez jusqu'au bout." }, { t: "Votre nom, unique." }],
+        [{ t: "Fait main." }, { t: "Aucun identique." }],
       ],
     },
   };
   function resolveStory(opts, name, templateId) {
     if (opts.hook === false || opts.hook === "none" || opts.hook === null) return [];
     if (typeof opts.hook === "string" && opts.hook.trim()) return [{ t: opts.hook.trim() }];
-    const lang = opts.lang === "en" ? "en" : "nl";
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
     const t = STORIES[templateId] ? templateId : "satisfying";
     const sets = STORIES[t][lang] || STORIES[t].nl;
     let idx = Math.floor(Math.random() * sets.length);
@@ -513,6 +534,26 @@ export function makeBrand({ ROOT, config }) {
     return path.resolve(ROOT, config.audioDir, pick);
   }
 
+  // AUTO-NAAM: als er geen naam is ingevuld kiest de engine er zelf één (anti-herhaling).
+  // Fictieve namen — mix van zaaknamen (verkoopt het gevelbord), familie/huis en voornamen.
+  // Zwaarder NL + EN, dan FR. Nooit echte personen/merken.
+  const NAMES = [
+    // NL — zaak
+    "Café De Kaai", "Brasserie 't Anker", "Bakkerij Noordhoek", "Salon Nour", "Atelier Vonk",
+    "Koffiehuis Mokka", "Restaurant Olij", "Café De Hoek", "Lunchroom Fleur", "Slagerij Van Dijk",
+    // NL — familie / voornaam
+    "Familie De Vries", "Huize Berg", "Familie El Amrani", "Sofie", "Daan", "Imane", "Youssef", "Lotte", "Noor",
+    // EN
+    "The Copper Spoon", "Harbour & Co.", "Nord Coffee", "The Ivy Table", "The Harpers", "Olivia", "Liam", "Maya", "Leo",
+    // FR
+    "Chez Amélie", "Maison Dorée", "Café du Coin", "L'Atelier Bleu", "Camille", "Léa", "Hugo",
+  ];
+  let lastName = "";
+  function pickName() {
+    let pool = NAMES.filter((n) => n !== lastName); if (!pool.length) pool = NAMES;
+    const pick = pool[Math.floor(Math.random() * pool.length)]; lastName = pick; return pick;
+  }
+
   // AUTO-PATROON: de engine kiest zelf een patroon (anti-herhaling) zodat Mo niks hoeft te
   // kiezen — alleen Render. Geldt voor ALLE types. pickPatterns(n) voor meerdere (trio).
   let lastPattern = "";
@@ -539,7 +580,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    const name = (opts.name || "").trim();
+    const name = (opts.name || "").trim() || pickName();   // geen naam ingevuld -> engine kiest zelf
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
@@ -659,7 +700,7 @@ export function makeBrand({ ROOT, config }) {
     const pad = Math.max(6 * SS, Math.round(panelW * 0.018));
     const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
     let panelX = Math.round((W - panelW) / 2), panelY = Math.round(bandTop + (bandBot - bandTop - panelH) / 2);
-    const name = (opts.name || "").trim();
+    const name = (opts.name || "").trim() || pickName();   // geen naam ingevuld -> engine kiest zelf
     const palArr = resolvePalette(opts, templateId).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
     // SATISFYING-CYCLUS: een rij GEVARIEERDE paletten — elke ronde vult 'ie opnieuw in
