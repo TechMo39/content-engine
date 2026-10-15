@@ -514,8 +514,8 @@ export function makeBrand({ ROOT, config }) {
     { id: "insitu", name: "Lege muur (in-situ)", music: ["calm", "oriental", "spanish"], defaults: { bookend: "auto" } },   // type 2: paneel op een mockup-muur
     { id: "sfeer", name: "Sfeerbeeld", music: ["calm", "oriental", "spanish"], defaults: { bookend: "sfeer" } },
     { id: "trio", name: "Trio (3 patronen)", music: ["calm", "oriental", "spanish"], defaults: {} },   // type 4: 3 patronen -> inzoomen -> inkleuren -> muur
-    { id: "colorway", name: "Colorway A/B/C", music: ["calm", "oriental", "spanish"], defaults: {} },   // poll: zelfde paneel, 3 kleurwegen
-    { id: "macro", name: "Macro-glans", music: ["calm", "oriental", "spanish"], defaults: {} },          // premium close-up loop
+    { id: "colorway", name: "Colorway A/B/C", music: ["calm", "oriental", "spanish"], defaults: {} },     // poll: zelfde paneel, 3 kleurwegen
+    { id: "geentwee", name: "Geen twee gelijk", music: ["upbeat", "lofi", "calm"], defaults: {} },        // outreach/USP: naam vast, patronen flitsen
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -673,25 +673,35 @@ export function makeBrand({ ROOT, config }) {
     const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2);
     const rr = Math.max(8, w * 0.03);
     const poll = { nl: "Welke past bij jou? A · B · C", en: "Which fits you? A · B · C", fr: "Lequel pour vous ? A · B · C" }[lang];
-    const T3 = durSec / 3;
+    const Tb = durSec * 0.34, Tc = durSec * 0.72;   // bouw A -> beat-snap A/B/C -> vergelijk A|B|C
+    const hold = 1.3;                                // snap-interval (op de beat)
+    const drawCW = (cols, r, id) => {
+      const wrp = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const m = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrp) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrp);
+      const rc = Math.max(6, r.w * 0.03);
+      return `<clipPath id="${id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rc}"/></clipPath><g clip-path="url(#${id})">${m}${glazeSvg(r.x, r.y, r.w, r.h, id)}</g><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rc}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+    };
+    const badge = (letter, cx, cy, rad, op) => `<g opacity="${op.toFixed(3)}"><circle cx="${cx}" cy="${cy}" r="${rad}" fill="#1a1327" opacity="0.74"/><circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/><text x="${cx}" y="${(cy + rad * 0.36).toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="600" font-size="${(rad * 1.15).toFixed(0)}" fill="#f6efe0">${letter}</text></g>`;
     function sceneAt(frame) {
       const t = frame / FPS;
-      const seg = Math.min(2, Math.floor(t / T3)), tl = t - seg * T3;
-      let cols, idx = seg;
-      if (seg === 0) cols = film.flowColorsAt(parsed, { palette: pals3[0], durSec: T3 * 0.6, buildSec: T3 * 0.6, buildStart: 0, popSec: 0.05 }, tl);
-      else { const k = smooth(Math.min(1, tl / 0.7)); cols = finals[seg - 1].map((c, i) => _mix(c, finals[seg][i], k)); }
-      const wrap = `<svg x="${px}" y="${py}" width="${w}" height="${h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
-      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
-      let inner = `<clipPath id="cwp"><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}"/></clipPath><g clip-path="url(#cwp)">${mos}${glazeSvg(px, py, w, h, "cwp")}</g><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
-      let overlay = "";
-      // naam op het paneel (zelfde naam, andere kleurweg)
-      if (name) { const plW = Math.round(w * 0.56), plH = Math.round(plW * 200 / 560), plX = Math.round(px + (w - plW) / 2), plY = Math.round(py + (h - plH) / 2); const op = seg === 0 ? Math.max(0, Math.min(1, (tl - T3 * 0.6) / 0.6)) : 1; if (op > 0.01) overlay += `<g opacity="${op.toFixed(3)}">${nameLayerSvg(name, nps[idx], 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`)}</g>`; }
-      // A/B/C-badge rechtsboven op het paneel
-      const letter = ["A", "B", "C"][idx], rad = Math.round(w * 0.085), bx = px + w - rad * 1.15, by = py + rad * 1.15;
-      const bShow = seg === 0 ? Math.max(0, Math.min(1, (tl - T3 * 0.6) / 0.5)) : 1;
-      if (bShow > 0.01) overlay += `<g opacity="${bShow.toFixed(3)}"><circle cx="${bx}" cy="${by}" r="${rad}" fill="#1a1327" opacity="0.74"/><circle cx="${bx}" cy="${by}" r="${rad}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/><text x="${bx}" y="${(by + rad * 0.36).toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="600" font-size="${rad * 1.15}" fill="#f6efe0">${letter}</text></g>`;
-      // poll onderaan (verschijnt na opbouw)
-      const pollOp = t > T3 * 0.6 ? Math.min(1, (t - T3 * 0.6) / 0.6) : 0;
+      let inner = "", overlay = "";
+      if (t < Tc) {
+        let idx, cols;
+        if (t < Tb) { idx = 0; cols = film.flowColorsAt(parsed, { palette: pals3[0], durSec: Tb * 0.78, buildSec: Tb * 0.78, buildStart: 0, popSec: 0.05 }, t); }
+        else { idx = Math.floor((t - Tb) / hold) % 3; cols = finals[idx]; }   // SNAP op de beat
+        inner += drawCW(cols, { x: px, y: py, w, h }, "cwbig");
+        const rad = Math.round(w * 0.085), bx = px + w - rad * 1.15, by = py + rad * 1.15;
+        const bOp = t < Tb ? Math.max(0, Math.min(1, (t - Tb * 0.78) / 0.4)) : 1;
+        overlay += badge(["A", "B", "C"][idx], bx, by, rad, bOp);
+        if (name) { const plW = Math.round(w * 0.56), plH = Math.round(plW * 200 / 560), plX = Math.round(px + (w - plW) / 2), plY = Math.round(py + (h - plH) / 2); const op = t < Tb ? Math.max(0, Math.min(1, (t - Tb * 0.78) / 0.5)) : 1; if (op > 0.01) overlay += `<g opacity="${op.toFixed(3)}">${nameLayerSvg(name, nps[idx], 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`)}</g>`; }
+      } else {
+        // VERGELIJK: A | B | C naast elkaar (kies maar)
+        const k = Math.min(1, (t - Tc) / 0.5);
+        let mh = Math.round(H * 0.42), mw = Math.round(mh * A); if (mw > W * 0.30) { mw = Math.round(W * 0.30); mh = Math.round(mw / A); }
+        const cxs = [W * 0.19, W * 0.5, W * 0.81], cy = Math.round(H * 0.5);
+        for (let j = 0; j < 3; j++) { const r = { x: Math.round(cxs[j] - mw / 2), y: Math.round(cy - mh / 2), w: mw, h: mh }; inner += `<g opacity="${k.toFixed(3)}">${drawCW(finals[j], r, "cwm" + j)}</g>`; const rad = Math.round(mw * 0.17); overlay += badge(["A", "B", "C"][j], r.x + r.w - rad * 1.05, r.y + rad * 1.05, rad, k); }
+      }
+      const pollOp = t > Tb ? Math.min(1, (t - Tb) / 0.5) : 0;
       if (pollOp > 0.01) overlay += captionOverlay(poll, "Zeg het in de comments", W, H, pollOp, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
@@ -734,6 +744,52 @@ export function makeBrand({ ROOT, config }) {
       overlay += `<defs><radialGradient id="mvig" cx="50%" cy="48%" r="72%"><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="0.5"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#mvig)"/>`;
       // één rustige regel in het begin, dan vrij beeld
       if (t < 3.2) { const op = t < 2.2 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.2) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
+  // GEEN TWEE GELIJK (outreach/USP): ÉÉN (bedrijfs)naam blijft vast op de plaat, terwijl de
+  // patronen + kleuren er razendsnel achter langs flitsen. "1 naam, oneindig uniek."
+  async function makeGeenRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const name = (opts.name || "").trim() || pickName();   // dynamisch: outreach vult bedrijfsnaam
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
+    const fams = Object.keys(film.GLAZE_FAMILIES);
+    const N = Math.min((patternList || []).length || 1, 16);
+    const pats = pickPatterns(N);
+    const prep = [];
+    for (let i = 0; i < pats.length; i++) {
+      const pid = pats[i], b = await getBase(pid), lock = LOCKS[pid] || {};
+      const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
+      const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+      const palArr = (i % 2 === 0) ? (film.VIVID || film.PAL).slice().sort(() => Math.random() - 0.5) : film.GLAZE_FAMILIES[fams[i % fams.length]];
+      const finalCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      prep.push({ parsed, finalCols, aspect: parsed.view[2] / parsed.view[3] });
+    }
+    const np = name ? plateColours(film.VIVID || film.PAL) : null;   // VASTE plaatkleur (stabiel leesbaar)
+    const bandTop = Math.round(H * 0.175), bandBot = Math.round(H * 0.90);
+    const rectFor = (aspect) => { let h = bandBot - bandTop, w = Math.round(h * aspect); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
+    const line = { nl: "1 naam. Oneindig uniek.", en: "One name. Endlessly unique.", fr: "Un nom. Infiniment unique." }[lang];
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const flash = Math.max(0.28, 0.6 - t * 0.012);   // versnelt licht -> opbouwende energie
+      // tel hoeveel flitsen al voorbij zijn (met versnelling) voor een stabiele index
+      let acc = 0, k = 0, idx = 0; while (acc < t && k < 10000) { acc += Math.max(0.28, 0.6 - acc * 0.012); if (acc <= t) idx++; k++; }
+      const P = prep[idx % prep.length];
+      const r = rectFor(P.aspect);
+      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${P.parsed.view[2]} ${P.parsed.view[3]}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap);
+      const rr = Math.max(6, r.w * 0.03);
+      let inner = `<clipPath id="gtc"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath><g clip-path="url(#gtc)">${mos}${glazeSvg(r.x, r.y, r.w, r.h, "gtc")}</g><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      let overlay = "";
+      if (name) { const plW = Math.round(r.w * 0.6), plH = Math.round(plW * 200 / 560), plX = Math.round(r.x + (r.w - plW) / 2), plY = Math.round(r.y + (r.h - plH) / 2); overlay += nameLayerSvg(name, np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`); }
+      overlay += captionOverlay(line, null, W, H, 1, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -839,7 +895,7 @@ export function makeBrand({ ROOT, config }) {
     if (templateId === "trio") return await makeTrioRender({ opts, format });
     if (templateId === "satisfying") return await makeSatisfyingRender({ opts, format });
     if (templateId === "colorway") return await makeColorwayRender({ opts, format });
-    if (templateId === "macro") return await makeMacroRender({ opts, format });
+    if (templateId === "geentwee") return await makeGeenRender({ opts, format });
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
