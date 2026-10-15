@@ -493,6 +493,22 @@ export function makeBrand({ ROOT, config }) {
     return path.resolve(ROOT, config.audioDir, pick);
   }
 
+  // AUTO-PATROON: de engine kiest zelf een patroon (anti-herhaling) zodat Mo niks hoeft te
+  // kiezen — alleen Render. Geldt voor ALLE types. pickPatterns(n) voor meerdere (trio).
+  let lastPattern = "";
+  function pickPatterns(n = 1) {
+    const pool = (patternList || []).filter(Boolean);
+    if (!pool.length) return [];
+    if (n <= 1) {
+      let c = pool.filter((p) => p !== lastPattern); if (!c.length) c = pool;
+      const pick = c[Math.floor(Math.random() * c.length)]; lastPattern = pick; return [pick];
+    }
+    // n verschillende patronen
+    const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+    const out = shuffled.slice(0, Math.min(n, shuffled.length));
+    lastPattern = out[out.length - 1];
+    return out;
+  }
   async function listSubjects() {
     return (patternList || []).map((id) => ({ id, thumb: "/api/tot-thumb?p=" + id }));
   }
@@ -502,6 +518,8 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    // GEEN onderwerp gekozen? Engine kiest zelf een patroon (alle types) -> Mo klikt enkel Render.
+    if (!subjectId || !(patternList || []).includes(subjectId)) { const p = pickPatterns(1)[0]; if (p) subjectId = p; }
     const base = await getBase(subjectId);
     const lock = LOCKS[subjectId] || {};
     const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);

@@ -38,7 +38,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 <div class="wrap">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
-    <div class="sec" id="subjSec"><h2 class="acc" id="subjToggle"><span class="arr">▸</span> 2 · Onderwerp <span class="pick" id="subjPick"></span></h2><div id="subjWrap" style="display:none"><div id="subjects"></div><div class="hint" id="subjHint"></div></div></div>
+    <div class="sec" id="subjSec"><h2 class="acc" id="subjToggle"><span class="arr">▸</span> 2 · Patroon <span class="hint" style="font-weight:400">(optioneel — engine kiest zelf)</span> <span class="pick" id="subjPick"></span></h2><div id="subjWrap" style="display:none"><div id="subjects"></div><div class="hint" id="subjHint"></div></div></div>
     <div class="sec" id="tplSec"><h2>3 · Template</h2><div class="seg" id="templates"></div></div>
     <div class="sec" id="optSec"><h2>4 · Opties</h2><div id="opts"></div></div>
     <div class="sec"><h2>5 · Muziek & formaat</h2>
@@ -46,7 +46,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
       <audio id="maud" style="display:none"></audio>
       <label class="row">Formaat <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span></label>
     </div>
-    <button class="render" id="go" disabled>Kies eerst een onderwerp</button>
+    <button class="render" id="go" disabled>Kies merk + type</button>
   </div>
   <div class="col mid"><div id="player"><div>Je video verschijnt hier<br>na het renderen.</div></div><div id="msg" class="hint"></div></div>
   <div class="col"><h2>Operaties</h2><div class="logbox" id="logbox"></div></div>
@@ -111,7 +111,7 @@ async function buildImagePicker(){
   j.images.forEach(im=>mk(im.id,im.uri,im.id));
 }
 function durLbl(s){s=+s;return s<60?s+'s':(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'));}
-function ready(){const ok=state.brand&&state.template&&(state.subject||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':'Kies eerst een onderwerp';}
+function ready(){const ok=state.brand&&state.template&&(state.brand!=='unclerank'||state.opts.name);$('#go').disabled=!ok;$('#go').textContent=ok?'Render video':(state.brand==='unclerank'?'Vul een naam in':'Kies merk + type');}
 function setSubjOpen(o){$('#subjWrap').style.display=o?'':'none';$('#subjToggle').classList.toggle('open',o);}
 $('#subjToggle').onclick=()=>setSubjOpen($('#subjWrap').style.display==='none');
 
