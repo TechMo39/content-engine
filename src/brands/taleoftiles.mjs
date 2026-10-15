@@ -574,6 +574,68 @@ export function makeBrand({ ROOT, config }) {
     return (patternList || []).map((id) => ({ id, thumb: "/api/tot-thumb?p=" + id }));
   }
 
+  // SATISFYING (type 1, herbouwd): toont STEEDS EEN ANDER patroon (auto), elk krisp tegel-voor-
+  // tegel ingekleurd op een WITTE 3D-ondergrond, dan door naar het volgende patroon. Geen naam.
+  async function makeSatisfyingRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const storyBeats = resolveStory(opts, "", "satisfying");
+    const REVEALS = ["radial", "down", "up", "diag"];
+    const nSeg = Math.max(1, Math.round(durSec / 6.5));   // elk ~6,5s een ander patroon
+    const pats = pickPatterns(nSeg); while (pats.length && pats.length < nSeg) pats.push(pats[pats.length - 1]);
+    const prep = [];
+    for (let i = 0; i < pats.length; i++) {
+      const pid = pats[i], b = await getBase(pid), lock = LOCKS[pid] || {};
+      const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
+      const svg = await getPatternSvg(pid, nX, nY);
+      const parsed = film.parseTiles(svg, REVEALS[i % REVEALS.length]);   // elke ronde andere vulrichting
+      const palArr = resolvePalette({}, "satisfying").arr || film.PAL;
+      const finalCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      prep.push({ pid, parsed, palArr, finalCols, aspect: parsed.view[2] / parsed.view[3] });
+    }
+    if (!prep.length) throw new Error("satisfying: geen patronen");
+    const bandTop = Math.round(H * 0.175), bandBot = Math.round(H * 0.90);
+    const rectFor = (aspect) => { let h = bandBot - bandTop, w = Math.round(h * aspect); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
+    const Tseg = durSec / nSeg, Tx = Math.min(0.5, Tseg * 0.12);
+    function fillColors(P, tl) {
+      const Tfill = Tseg * 0.72;
+      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.12 }, tl);   // krisp tegel-voor-tegel
+    }
+    function drawPanel(P, cols, id, op) {
+      const r = rectFor(P.aspect), pw = P.parsed.view[2], ph = P.parsed.view[3];
+      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(P.parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      const rr = Math.max(6, r.w * 0.03);
+      return `<g opacity="${op.toFixed(3)}"><clipPath id="${id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath>`
+        + `<g clip-path="url(#${id})">${mos}${glazeSvg(r.x, r.y, r.w, r.h, id)}</g>`
+        + `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/></g>`;
+    }
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const seg = Math.min(nSeg - 1, Math.floor(t / Tseg)), tl = t - seg * Tseg;
+      let inner = "";
+      if (seg > 0 && tl < Tx) { const P0 = prep[seg - 1]; inner += drawPanel(P0, P0.finalCols, "sp" + (seg - 1), 1 - smooth(tl / Tx)); }   // vorige uit-faden
+      const P = prep[seg];
+      const inOp = (seg > 0 && tl < Tx) ? smooth(tl / Tx) : 1;
+      inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp);
+      let overlay = "";
+      if (storyBeats.length) {
+        const tA = 0.4, tB = durSec * 0.5, n = storyBeats.length, slot = (tB - tA) / n, fade = Math.min(0.6, slot * 0.3);
+        for (let i = 0; i < n; i++) {
+          const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0;
+          if (t >= s0 && t < s1) { if (t < s0 + fade) bo = smooth((t - s0) / fade); else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade); else bo = 1; }
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower");
+        }
+      }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
   // TRIO (type 4): toont 3 auto-gekozen patronen naast elkaar -> zoomt in op #1 -> kleurt in
   // -> hangt aan de muur -> terug naar de 3 -> #2 -> #3. De 3 slots "vullen" zich gaandeweg.
   async function makeTrioRender({ opts = {}, format = "9:16" }) {
@@ -672,6 +734,7 @@ export function makeBrand({ ROOT, config }) {
   // bouw een render-plan voor de kern: { W,H,FPS,SS,durSec, sceneAt(frame) }
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16" }) {
     if (templateId === "trio") return await makeTrioRender({ opts, format });
+    if (templateId === "satisfying") return await makeSatisfyingRender({ opts, format });
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
