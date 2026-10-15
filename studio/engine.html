@@ -90,7 +90,8 @@ function buildOpts(){const o=$('#opts');o.innerHTML='';
   seg('o_pal','palette');seg('o_rev','reveal');seg('o_tmp','tempo');
   const ds=$('#o_dursec');if(ds)ds.oninput=e=>{state.opts.durationSec=+e.target.value;$('#o_durlbl').textContent=durLbl(+e.target.value);};
   const nm=$('#o_name');if(nm)nm.oninput=e=>{state.opts.name=e.target.value;if(state.brand==='unclerank'&&e.target.value)ready();};
-  if(BRANDOPTS.includes('image')) buildImagePicker();
+  // Beeld-picker alleen bij types die een foto/muur gebruiken (niet bij satisfying/colorway/vormen).
+  if(BRANDOPTS.includes('image') && (state.template==='sfeer'||state.template==='insitu')) buildImagePicker();
 }
 async function buildImagePicker(){
   // Picker kijkt naar de JUISTE map per type: sfeer -> sfeer/, in-situ -> mockups/, anders losse foto's.
