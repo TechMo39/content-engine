@@ -19,7 +19,7 @@ export const GLAZE_FAMILIES: Record<string, string[]> = {
   mono_blauw: ["#14324f", "#1f4e78", "#2f6ea0", "#5a93c0", "#dfe4e8"],
   mono_groen: ["#1c4a33", "#2b6e49", "#3e9166", "#79b089", "#e4e9da"],
 };
-export const BLANK = "#e8e5e2";
+export const BLANK = "#ffffff";   // kaal = wit (niet bruin); 3D-reliëf komt van de glazuurlaag
 export const PLUM = "#2a2335";
 // Voeg (exact uit page.ts, var VOEG): gips-crème #eae4d7 breedte 5 tussen ingekleurde
 // tegels; donker contour #b9a98c breedte 2 op de nog-neutrale (raw) tegels; neutraal #e8e5e2.
@@ -256,7 +256,7 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
 // - glans: een bewegende lichtband trekt diagonaal over de tegels.
 // - opbouw: aan het begin kleuren de tegels in op volgorde (tile.order).
 // opts = { palette, durSec, buildSec, reveal? }  — alle timing schaalt met durSec.
-export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number; speed?: number };
+export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number; speed?: number; popSec?: number };
 // Eén vaste, samenhangende inkleuring per tegel (zoals een echt paneel): egale
 // kleur-regio's, geen willekeur. 1× berekend en gecachet.
 function finalColors(parsed: Parsed, base: string[]): string[] {
@@ -282,7 +282,7 @@ export function flowColorsAt(parsed: Parsed, opts: FlowOpts, t: number): string[
   const build = Math.max(0.5, opts.buildSec ?? dur * 0.5);   // tegels vullen over deze (lange) periode
   const bStart = Math.max(0, opts.buildStart ?? 0);
   const fin = finalColors(parsed, base);
-  const pop = Math.min(0.7, build * 0.35);                   // hoe lang één tegel doet over inkleuren
+  const pop = opts.popSec && opts.popSec > 0 ? opts.popSec : Math.min(0.7, build * 0.35);   // per-tegel inkleur-duur (klein = krisp tegel-voor-tegel)
   const out = new Array<string>(tiles.length);
   for (let i = 0; i < tiles.length; i++) {
     const revealT = bStart + tiles[i].order * build;         // elke tegel heeft z'n eigen moment (op volgorde)
