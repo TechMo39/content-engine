@@ -2,7 +2,7 @@
 // Weet zelf niks van tegels; dat zit in de merk-modules. Start: npm run engine
 import http from "node:http";
 import fs from "node:fs/promises";
-import { existsSync, statSync, createReadStream } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -30,32 +30,19 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
-    if (u.pathname.startsWith("/out/")) {
-      const f = path.resolve(OUT, u.pathname.slice(5));
-      if (!existsSync(f)) { res.writeHead(404); res.end("nope"); return; }
-      const size = statSync(f).size;
-      const range = req.headers.range;
-      if (range) {
-        const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
-        let start = m[1] ? parseInt(m[1], 10) : 0;
-        let end = m[2] ? parseInt(m[2], 10) : size - 1;
-        if (isNaN(start) || start < 0) start = 0;
-        if (isNaN(end) || end >= size) end = size - 1;
-        if (start > end) { res.writeHead(416, { "content-range": `bytes */${size}` }); res.end(); return; }
-        res.writeHead(206, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-range": `bytes ${start}-${end}/${size}`, "content-length": end - start + 1 });
-        createReadStream(f, { start, end }).pipe(res);
-      } else {
-        res.writeHead(200, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-length": size });
-        createReadStream(f).pipe(res);
-      }
-      return;
-    }
+    if (u.pathname.startsWith("/out/")) { const f = path.resolve(OUT, u.pathname.slice(5)); if (existsSync(f)) { res.writeHead(200, { "content-type": "video/mp4" }); res.end(await fs.readFile(f)); return; } res.writeHead(404); res.end("nope"); return; }
     if (u.pathname === "/api/log") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); res.write(`data: ${JSON.stringify("— verbonden —")}\n\n`); logClients.add(res); req.on("close", () => logClients.delete(res)); return; }
     if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) }); return; }
     if (u.pathname === "/api/subjects") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { subjects: [] }); return; } json(res, { subjects: await b.listSubjects() }); return; }
     if (u.pathname === "/api/templates") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { templates: [] }); return; } json(res, { templates: b.templates, options: b.options || [] }); return; }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
-    if (u.pathname === "/api/images") { const b = reg.byId[u.searchParams.get("brand")]; if (!b || !b.listImages) { json(res, { images: [], mockups: [] }); return; } json(res, { images: await b.listImages(), mockups: b.listMockups ? await b.listMockups() : [] }); return; }
+    if (u.pathname === "/api/images") {
+      const b = reg.byId[u.searchParams.get("brand")];
+      const pool = u.searchParams.get("pool") || "images";   // images | mockups | sfeer
+      const fn = b && (pool === "sfeer" ? b.listSfeer : pool === "mockups" ? b.listMockups : b.listImages);
+      if (!fn) { json(res, { images: [] }); return; }
+      json(res, { images: await fn() }); return;
+    }
     if (u.pathname === "/api/audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, config.audioDir, f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
     if (u.pathname === "/api/tot-thumb") {
       const b = reg.byId["taleoftiles"]; const p = (u.searchParams.get("p") || "").replace(/\.svg$/i, "");

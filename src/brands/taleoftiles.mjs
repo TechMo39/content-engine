@@ -328,6 +328,7 @@ export function makeBrand({ ROOT, config }) {
   }
   async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function listMockups() { return mockupPool.map((x) => ({ id: x.id, uri: x.uri })); }
+  async function listSfeer() { return sfeerPool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function getBase(pattern) {
     if (baseCache.has(pattern)) return baseCache.get(pattern);
     const file = path.resolve(ROOT, "assets/patterns", pattern + ".svg");
@@ -790,7 +791,7 @@ export function makeBrand({ ROOT, config }) {
 
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
-    init, listSubjects, listImages, listMockups, templates, makeRender, thumbSvg,
+    init, listSubjects, listImages, listMockups, listSfeer, templates, makeRender, thumbSvg,
     options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }

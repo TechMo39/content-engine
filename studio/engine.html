@@ -75,7 +75,7 @@ async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick
   }
   // templates
   const tc=$('#templates');tc.innerHTML='';state.template=null;
-  (tp.templates||[]).forEach((t,i)=>{const b=document.createElement('button');b.textContent=t.name;b.onclick=()=>{$$('#templates button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});ready();};tc.appendChild(b);if(i===0){b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});}});
+  (tp.templates||[]).forEach((t,i)=>{const b=document.createElement('button');b.textContent=t.name;b.onclick=()=>{$$('#templates button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});state.opts.image='';buildOpts();ready();};tc.appendChild(b);if(i===0){b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});}});
   buildOpts();ready();
 }
 
@@ -93,14 +93,20 @@ function buildOpts(){const o=$('#opts');o.innerHTML='';
   if(BRANDOPTS.includes('image')) buildImagePicker();
 }
 async function buildImagePicker(){
+  // Picker kijkt naar de JUISTE map per type: sfeer -> sfeer/, in-situ -> mockups/, anders losse foto's.
+  const cfg = state.template==='sfeer'
+      ? {pool:'sfeer',   title:'Sfeerbeeld',   sub:'(begin + eind van de video)', dir:'assets/images/taleoftiles/sfeer/'}
+    : state.template==='insitu'
+      ? {pool:'mockups', title:'Muur-mockup',  sub:'(lege-muur foto)',            dir:'assets/images/taleoftiles/mockups/'}
+      : {pool:'images',  title:'Foto',         sub:'(begin + eind van de video)', dir:'assets/images/taleoftiles/'};
   const o=$('#opts');const wrap=document.createElement('div');wrap.className='sec';
-  wrap.innerHTML='<div style="font-size:12px;color:#9b8fc0;margin:6px 0">Sfeerbeeld <span class="hint" style="margin-left:4px">(begin + eind van de video)</span></div><div id="imgStrip" class="imgstrip"></div>';
+  wrap.innerHTML='<div style="font-size:12px;color:#9b8fc0;margin:6px 0">'+cfg.title+' <span class="hint" style="margin-left:4px">'+cfg.sub+'</span></div><div id="imgStrip" class="imgstrip"></div>';
   o.appendChild(wrap);
-  let j={images:[]};try{j=await (await fetch('/api/images?brand='+state.brand)).json();}catch{}
+  let j={images:[]};try{j=await (await fetch('/api/images?brand='+state.brand+'&pool='+cfg.pool)).json();}catch{}
   const strip=$('#imgStrip');
-  if(!j.images.length){strip.innerHTML='<div class="hint">Nog geen foto\'s. Leg ze in <code>assets/images/taleoftiles/</code>.</div>';return;}
+  if(!j.images.length){strip.innerHTML='<div class="hint">Nog geen foto\'s. Leg ze in <code>'+cfg.dir+'</code>.</div>';return;}
   const mk=(id,uri,label)=>{const d=document.createElement('div');d.className='ithumb'+(state.opts.image===id?' on':'');d.title=label||id;d.innerHTML=uri?`<img src="${uri}">`:`<span>auto</span>`;d.onclick=()=>{$$('.ithumb').forEach(c=>c.classList.remove('on'));d.classList.add('on');state.opts.image=id;};strip.appendChild(d);};
-  mk('', '', 'Automatisch (willekeurig per render)');
+  mk('', '', 'Automatisch ('+j.images.length+' beschikbaar — willekeurig per render)');
   j.images.forEach(im=>mk(im.id,im.uri,im.id));
 }
 function durLbl(s){s=+s;return s<60?s+'s':(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'));}
