@@ -473,6 +473,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "satisfying", name: "Satisfying Build", music: ["calm", "oriental", "spanish"], defaults: { bookend: "none" } },   // type 1: puur de opbouw, geen muur
     { id: "insitu", name: "Lege muur (in-situ)", music: ["calm", "oriental", "spanish"], defaults: { bookend: "auto" } },   // type 2: paneel op een mockup-muur
     { id: "sfeer", name: "Sfeerbeeld", music: ["calm", "oriental", "spanish"], defaults: { bookend: "sfeer" } },
+    { id: "trio", name: "Trio (3 patronen)", music: ["calm", "oriental", "spanish"], defaults: {} },   // type 4: 3 patronen -> inzoomen -> inkleuren -> muur
     { id: "colorway", name: "Colorway A/B/C", music: ["upbeat", "lofi", "boombap"], defaults: {} },
     { id: "shapes", name: "Vormen", music: ["lofi", "calm"], defaults: { base: "fields", shapes: ["heart", "star"], endColorway: true } },
   ];
@@ -513,8 +514,104 @@ export function makeBrand({ ROOT, config }) {
     return (patternList || []).map((id) => ({ id, thumb: "/api/tot-thumb?p=" + id }));
   }
 
+  // TRIO (type 4): toont 3 auto-gekozen patronen naast elkaar -> zoomt in op #1 -> kleurt in
+  // -> hangt aan de muur -> terug naar de 3 -> #2 -> #3. De 3 slots "vullen" zich gaandeweg.
+  async function makeTrioRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const name = (opts.name || "").trim();
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    // 3 verschillende patronen
+    let pats = pickPatterns(3);
+    while (pats.length && pats.length < 3) pats.push(pats[pats.length - 1]);
+    const prep = [];
+    for (let i = 0; i < pats.length; i++) {
+      const pid = pats[i];
+      const base = await getBase(pid); const lock = LOCKS[pid] || {};
+      const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);
+      const svg = await getPatternSvg(pid, nX, nY);
+      const parsed = film.parseTiles(svg, "radial");
+      const palArr = resolvePalette({}, "insitu").arr || film.PAL;   // levendig/gevarieerd per patroon
+      const np = name ? plateColours(palArr) : null;
+      const finalCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      const blankCols = new Array(parsed.tiles.length).fill(film.BLANK);
+      const mk = mockupPool.length ? mockupPool[Math.floor(Math.random() * mockupPool.length)] : null;
+      const aspect = parsed.view[2] / parsed.view[3];
+      prep.push({ i, pid, parsed, palArr, np, finalCols, blankCols, mk, aspect });
+    }
+    if (!prep.length) throw new Error("trio: geen patronen beschikbaar");
+    while (prep.length < 3) prep.push(prep[prep.length - 1]);
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const centerRect = (aspect) => { let h = Math.round(H * 0.70), w = Math.round(h * aspect); if (w > W * 0.80) { w = Math.round(W * 0.80); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
+    const slotRect = (idx, aspect) => { let h = Math.round(H * 0.26), w = Math.round(h * aspect); if (w > W * 0.29) { w = Math.round(W * 0.29); h = Math.round(w / aspect); } const cx = [W * 0.185, W * 0.5, W * 0.815][idx], cy = H * 0.47; return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h }; };
+    const lerpRect = (A, B, k) => ({ x: lerp(A.x, B.x, k), y: lerp(A.y, B.y, k), w: lerp(A.w, B.w, k), h: lerp(A.h, B.h, k) });
+    function drawPanel(parsed, cols, r, id, withFrame) {
+      const pw = parsed.view[2], ph = parsed.view[3];
+      const wrap = `<svg x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      const rr = Math.max(4, r.w * 0.03);
+      let s = `<clipPath id="${id}"><rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" rx="${rr.toFixed(1)}"/></clipPath>`;
+      s += `<g clip-path="url(#${id})">${mos}${glazeSvg(r.x, r.y, r.w, r.h, id)}</g>`;
+      if (withFrame) s += `<rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" rx="${rr.toFixed(1)}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      return s;
+    }
+    function insituComposite(P) {
+      const pw = P.parsed.view[2], ph = P.parsed.view[3], A2 = pw / ph;
+      const pl = P.mk && P.mk.place;
+      const wH = Math.round(pl ? pl.h * H : H * 0.34), wW = Math.round(wH * A2);
+      const cx = Math.round(pl ? pl.cx * W : W / 2), cy = Math.round(pl ? pl.cy * H : H * 0.46);
+      const wx = cx - Math.round(wW / 2), wy = cy - Math.round(wH / 2);
+      const roomImg = P.mk && P.mk.blur ? P.mk.blur : (P.mk ? P.mk.uri : "");
+      const room = roomImg ? `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>` : `<rect width="${W}" height="${H}" fill="#241a3a"/>`;
+      const sh = `<radialGradient id="tsh${P.i}" cx="50%" cy="48%" r="50%"><stop offset="0.55" stop-color="#120b05" stop-opacity="0.5"/><stop offset="1" stop-color="#120b05" stop-opacity="0"/></radialGradient>`;
+      const shadow = `<defs>${sh}</defs><rect x="${wx - 20}" y="${wy - 4}" width="${wW + 40}" height="${wH + 50}" fill="url(#tsh${P.i})"/>`;
+      const deco = `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/><rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      const panel = drawPanel(P.parsed, P.finalCols, { x: wx, y: wy, w: wW, h: wH }, "tw" + P.i, false);
+      let nm = "";
+      if (name && P.np) { const plW = Math.round(wW * 0.62), plH = Math.round(plW * 200 / 560), plX = cx - Math.round(plW / 2), plY = cy - Math.round(plH / 2); nm = nameLayerSvg(name, P.np, 1).replace(/<svg\b[^>]*>/i, `<svg x="${plX}" y="${plY}" width="${plW}" height="${plH}" viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet">`); }
+      return room + shadow + deco + panel + nm;
+    }
+    const Ta = durSec / 3;
+    function colorsFor(j, t) {
+      const P = prep[j], s = j * Ta, bs = s + Ta * 0.24, be = s + Ta * 0.54;
+      if (t < bs) return P.blankCols;
+      if (t >= be) return P.finalCols;
+      return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: be - bs, buildSec: be - bs, buildStart: 0 }, t - bs);
+    }
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const a = Math.min(2, Math.floor(t / Ta)), f = (t - a * Ta) / Ta;
+      let featureK, wallK;
+      if (f < 0.14) { featureK = 0; wallK = 0; }
+      else if (f < 0.24) { featureK = smooth((f - 0.14) / 0.10); wallK = 0; }
+      else if (f < 0.60) { featureK = 1; wallK = 0; }
+      else if (f < 0.70) { featureK = 1; wallK = smooth((f - 0.60) / 0.10); }
+      else if (f < 0.82) { featureK = 1; wallK = 1; }
+      else if (f < 0.88) { featureK = 1; wallK = 1 - smooth((f - 0.82) / 0.06); }
+      else { featureK = 1 - smooth((f - 0.88) / 0.12); wallK = 0; }
+      const Pa = prep[a];
+      const fRect = lerpRect(slotRect(a, Pa.aspect), centerRect(Pa.aspect), featureK);
+      let inner = "", overlay = "";
+      // de twee niet-actieve patronen op hun slot (vervagen bij inzoom)
+      const slotOp = 1 - featureK;
+      if (slotOp > 0.003) { let g = ""; for (let j = 0; j < 3; j++) { if (j === a) continue; g += drawPanel(prep[j].parsed, colorsFor(j, t), slotRect(j, prep[j].aspect), "ts" + j, true); } inner += `<g opacity="${slotOp.toFixed(3)}">${g}</g>`; }
+      // het actieve patroon: beweegt/groeit van slot naar midden terwijl het inkleurt
+      inner += drawPanel(Pa.parsed, colorsFor(a, t), fRect, "tf", true);
+      // aan de muur (dissolve erover)
+      if (wallK > 0.003) overlay += `<g opacity="${wallK.toFixed(3)}">${insituComposite(Pa)}</g>`;
+      // caption bij de openings-trio
+      if (a === 0 && f < 0.16) { const op = (f < 0.10 ? Math.min(1, f / 0.04) : 1 - smooth((f - 0.10) / 0.06)); if (op > 0.01) overlay += captionOverlay(name ? name + " — in drie stijlen" : "Eén naam, drie stijlen", null, W, H, op, "top"); }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
   // bouw een render-plan voor de kern: { W,H,FPS,SS,durSec, sceneAt(frame) }
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16" }) {
+    if (templateId === "trio") return await makeTrioRender({ opts, format });
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
