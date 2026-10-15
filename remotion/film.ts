@@ -158,6 +158,16 @@ export function setReveal(parsed: Parsed, reveal: string = "diag"): void {
     if (reveal === "radial") return Math.hypot(t.nx - 0.5, (t.ny - 0.5) * 1.2);   // bloei vanuit midden
     if (reveal === "down") return t.ny;                                            // van boven naar beneden
     if (reveal === "up") return 1 - t.ny;                                          // van onder naar boven
+    if (reveal === "spiral") {                                                     // draait naar BINNEN -> climax in het midden
+      const dx = t.nx - 0.5, dy = (t.ny - 0.5) * 1.15, r = Math.hypot(dx, dy);
+      const a = (Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI);                    // 0..1 rond
+      return (0.72 - r) * 2.2 + a;                                                 // buiten eerst, windt naar binnen
+    }
+    if (reveal === "spiralout") {                                                  // draait naar BUITEN
+      const dx = t.nx - 0.5, dy = (t.ny - 0.5) * 1.15, r = Math.hypot(dx, dy);
+      const a = (Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI);
+      return r * 2.2 + a;
+    }
     return t.nx + t.ny;                                                            // diagonaal (standaard)
   };
   const keyed = tiles.map((t, i) => ({ i, k: keyFn(t) + (h() - 0.5) * jit }));
