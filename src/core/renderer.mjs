@@ -94,7 +94,7 @@ export function imageGridRGB(absPath, gw, gh) {
 // als data-URI. Zo hoeft resvg niet elk frame de hele muur te blurren (dat is loodzwaar) —
 // de scherptediepte is statisch, dus bakken we 'm vooraf. Geeft "" bij een fout.
 const _blurCache = new Map();
-export function blurImageFile(absPath, { w = 616, h = 1096, sigma = 16, bright = -0.04 } = {}) {
+export function blurImageFile(absPath, { w = 760, h = 1352, sigma = 4, bright = -0.015 } = {}) {
   const key = `${absPath}|${w}x${h}|${sigma}|${bright}`;
   if (_blurCache.has(key)) return Promise.resolve(_blurCache.get(key));
   return new Promise((resolve) => {
