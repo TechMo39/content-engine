@@ -674,7 +674,7 @@ export function makeBrand({ ROOT, config }) {
       return list;
     })();
     const storyBeats = resolveStory(opts, name, templateId);   // verhaal-beats (per type), lopen mee met de ambiance
-    const storyPos = isSatis ? "top" : "lower";
+    const storyPos = "lower";   // onderregel voor álle types (bovenin zit nu het logo)
     // GEKOZEN SFEERBEELD (input-foto). Valt terug op de eerste in de pool, dan op de badge van de site.
     // Sfeerbeeld: handmatige keuze wint; anders kiest de engine zelf een willekeurige foto uit de pool.
     // Keuze (opts.image): een MOCKUP-id -> in-situ; een FOTO-id -> losse foto als startbeeld;
