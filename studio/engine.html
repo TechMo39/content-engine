@@ -6,12 +6,12 @@
 .top{display:flex;align-items:baseline;gap:14px;padding:18px 26px;background:var(--bg2);border-bottom:1px solid #3a2f52}
 .top h1{font-family:"DejaVu Serif",Georgia,serif;letter-spacing:4px;font-size:20px;margin:0;color:var(--gold)}
 .top .sub{color:var(--ink);font-size:13px}
-.wrap{display:grid;grid-template-columns:320px 1fr 300px;min-height:calc(100vh - 60px)}
-.col{padding:22px;overflow:auto}.mid{border-left:1px solid #3a2f52;border-right:1px solid #3a2f52;display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:28px}
-h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;margin:0 0 10px}
-.sec{margin-bottom:22px}
+.wrap{display:grid;grid-template-columns:350px 1fr 320px;height:calc(100vh - 58px)}
+.col{padding:16px 20px;overflow:auto}.mid{border-left:1px solid #3a2f52;border-right:1px solid #3a2f52;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:18px}
+h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;margin:0 0 8px}
+.sec{margin-bottom:14px}
 .seg{display:inline-flex;gap:8px;flex-wrap:wrap}
-.seg button,.chip{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:8px 14px;font-size:14px;cursor:pointer}
+.seg button,.chip{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:7px 12px;font-size:13px;cursor:pointer}
 .seg button.on,.chip.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -24,18 +24,43 @@ h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;marg
 input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:8px;padding:8px 10px;font-size:14px}
 .render{width:100%;background:var(--gold);color:#241a10;border:0;border-radius:24px;padding:14px;font-weight:700;font-size:16px;cursor:pointer;margin-top:8px}
 .render:disabled{opacity:.5;cursor:default}
-#player{width:300px;aspect-ratio:9/16;background:#120d1f;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#6a5f85;text-align:center;overflow:hidden}
-#player video{width:100%;height:100%}
-.logbox{background:#120d1f;border:1px solid #3a2f52;border-radius:10px;padding:10px;height:72vh;overflow:auto;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5}
+#player{height:min(70vh,600px);max-width:92%;aspect-ratio:9/16;background:#120d1f;border:1px solid #2a2140;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#6a5f85;text-align:center}
+#player video{width:100%;height:100%;border-radius:13px;display:block}
+.logbox{background:#120d1f;border:1px solid #3a2f52;border-radius:10px;padding:10px;height:calc(100vh - 150px);overflow:auto;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5}
 .logbox .ok{color:#7fd8a0}.logbox .err{color:#e88}.logbox .run{color:var(--gold)}
 .hint{color:#8a7fae;font-size:12px}
 .imgstrip{display:flex;flex-wrap:wrap;gap:8px}
 .ithumb{width:52px;height:62px;border-radius:8px;overflow:hidden;cursor:pointer;border:1px solid #3a2f52;background:#120d1f;display:flex;align-items:center;justify-content:center;color:#6a5f85;font-size:10px}
 .ithumb.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
 .ithumb img{width:100%;height:100%;object-fit:cover;display:block}
+.tabs{margin-left:auto;display:flex;gap:8px}
+.tabs button{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:7px 16px;font-size:13px;cursor:pointer}
+.tabs button.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
+#view-lib{height:calc(100vh - 58px);overflow:auto;padding:18px 26px}
+.libbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.libcard{border:1px solid #3a2f52;border-radius:12px;overflow:hidden;background:#1b1430;display:flex;flex-direction:column}
+.libcard .thumb{position:relative;width:100%;aspect-ratio:9/16;background:#120d1f;cursor:pointer;overflow:hidden}
+.libcard .thumb.sq{aspect-ratio:1/1}
+.libcard .thumb img,.libcard .thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.libcard .thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;text-shadow:0 2px 8px #000;opacity:.9;pointer-events:none}
+.libcard .badge{position:absolute;top:8px;left:8px;background:#000a;border:1px solid #ffffff22;color:var(--cream);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+.libcard .meta{padding:9px 11px}
+.libcard .meta .nm{font-size:13px;color:var(--cream);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.libcard .meta .sub{font-size:11px;color:#9b8fc0;margin-top:2px;display:flex;justify-content:space-between;gap:8px}
+.libcard .acts{display:flex;border-top:1px solid #3a2f52}
+.libcard .acts a,.libcard .acts button{flex:1;text-align:center;background:none;border:0;color:var(--gold);font-size:12px;padding:8px;cursor:pointer;text-decoration:none}
+.libcard .acts a:hover,.libcard .acts button:hover{background:#ffffff0c}
+.libcard .acts a+button{border-left:1px solid #3a2f52}
+.libempty{color:#8a7fae;font-size:14px;text-align:center;padding:60px 20px}
+.libmodal{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
+.libmodal-in{position:relative;max-width:min(92vw,520px);max-height:92vh}
+.libmodal-in video,.libmodal-in img{max-width:100%;max-height:88vh;border-radius:12px;display:block}
+.libclose{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#241a10;border:0;font-size:16px;cursor:pointer;font-weight:700}
 </style></head><body>
-<div class="top"><h1>CONTENT ENGINE</h1><span class="sub">merk → onderwerp → template → render</span></div>
-<div class="wrap">
+<div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
+  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-lib">Bibliotheek</button></nav></div>
+<div class="wrap" id="view-studio">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
     <div class="sec" id="subjSec"><h2 class="acc" id="subjToggle"><span class="arr">▸</span> 2 · Patroon <span class="hint" style="font-weight:400">(optioneel — engine kiest zelf)</span> <span class="pick" id="subjPick"></span></h2><div id="subjWrap" style="display:none"><div id="subjects"></div><div class="hint" id="subjHint"></div></div></div>
@@ -47,13 +72,28 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
       <label class="row">Formaat <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span></label>
     </div>
     <button class="render" id="go" disabled>Kies merk + type</button>
+    <button class="render" id="goall" style="background:#1b1430;color:var(--gold);border:1px solid var(--gold);margin-top:6px">Render alle types (wachtrij)</button>
   </div>
   <div class="col mid"><div id="player"><div>Je video verschijnt hier<br>na het renderen.</div></div><div id="msg" class="hint"></div></div>
   <div class="col"><h2>Operaties</h2><div class="logbox" id="logbox"></div></div>
 </div>
+
+<section id="view-lib" style="display:none">
+  <div class="libbar">
+    <div class="seg" id="libBrands"></div>
+    <div class="seg" id="libKinds"><button data-k="" class="on">Alles</button><button data-k="video">Video's</button><button data-k="still">Mail-stills</button></div>
+    <input type="text" id="libSearch" placeholder="Zoek op naam of type…" style="flex:1;min-width:140px">
+    <button id="libRefresh" class="chip" title="Vernieuwen">⟳ Vernieuwen</button>
+  </div>
+  <div id="libGrid" class="libgrid"></div>
+  <div id="libEmpty" class="libempty" style="display:none"></div>
+</section>
+
+<div id="libModal" class="libmodal" style="display:none"><div class="libmodal-in"><button id="libClose" class="libclose">✕</button><div id="libModalBody"></div></div></div>
+
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"modern",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"auto",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
 let BRANDOPTS=[];
 
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
@@ -81,7 +121,7 @@ async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick
 
 function buildOpts(){const o=$('#opts');o.innerHTML='';
   const add=(label,html)=>{const r=document.createElement('label');r.className='row';r.innerHTML=label+' '+html;o.appendChild(r);};
-  if(BRANDOPTS.includes('palette')) add('Palet','<span class="seg" id="o_pal"><button data-v="modern" class="on">Modern</button><button data-v="warm">Warm</button><button data-v="cool">Koel</button></span>');
+  if(BRANDOPTS.includes('palette')) add('Palet','<span class="seg" id="o_pal"><button data-v="auto" class="on">Automatisch</button><button data-v="warm">Warm</button><button data-v="cool">Koel</button></span>');
   if(BRANDOPTS.includes('duration')) add('Lengte','<input type="range" id="o_dursec" min="8" max="300" step="1" value="'+(state.opts.durationSec||24)+'" style="flex:1;margin:0 10px;accent-color:var(--gold)"><span id="o_durlbl" style="min-width:52px;text-align:right">'+durLbl(state.opts.durationSec||24)+'</span>');
   if(BRANDOPTS.includes('reveal')) add('Opbouw','<span class="seg" id="o_rev"><button data-v="radial" class="on">Bloei</button><button data-v="diag">Diagonaal</button><button data-v="up">Omhoog</button></span>');
   if(BRANDOPTS.includes('tempo')) add('Tempo','<span class="seg" id="o_tmp"><button data-v="snel">Snel</button><button data-v="normaal" class="on">Normaal</button><button data-v="rustig">Rustig</button></span>');
@@ -133,5 +173,73 @@ $('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;btn.textContent=
     else $('#msg').textContent='Mislukt: '+(j.error||'onbekend');
   }catch(e){$('#msg').textContent='Fout: '+e.message;}
   btn.disabled=false;btn.textContent='Render video';};
+$('#goall').onclick=async()=>{const btn=$('#goall');btn.disabled=true;$('#msg').textContent='Alle types in de wachtrij zetten…';
+  try{const r=await fetch('/api/render-all',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:state.brand,format:state.format,music:state.music,opts:state.opts})});
+    const j=await r.json();
+    $('#msg').textContent=j.queued?(j.queued+' types in de wachtrij — volg het log; de video\'s komen in /out/.'):'Mislukt: '+(j.error||'onbekend');
+  }catch(e){$('#msg').textContent='Fout: '+e.message;}
+  btn.disabled=false;};
+// ---- BIBLIOTHEEK ----
+const lib={items:[],brand:'',kind:'',q:'',loaded:false};
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function showView(which){
+  const studio=which==='studio';
+  $('#view-studio').style.display=studio?'grid':'none';
+  $('#view-lib').style.display=studio?'none':'block';
+  $('#tab-studio').classList.toggle('on',studio);$('#tab-lib').classList.toggle('on',!studio);
+  $('#topsub').textContent=studio?'merk → onderwerp → template → render':'alle gerenderde output op één plek';
+  if(!studio&&!lib.loaded)loadLibrary();
+}
+$('#tab-studio').onclick=()=>showView('studio');
+$('#tab-lib').onclick=()=>showView('lib');
+$('#libRefresh').onclick=()=>loadLibrary();
+$('#libSearch').oninput=e=>{lib.q=e.target.value.toLowerCase();renderLib();};
+$$('#libKinds button').forEach(b=>b.onclick=()=>{$$('#libKinds button').forEach(x=>x.classList.remove('on'));b.classList.add('on');lib.kind=b.dataset.k;renderLib();});
+
+async function loadLibrary(){
+  $('#libGrid').innerHTML='';$('#libEmpty').style.display='none';$('#libEmpty').textContent='Laden…';$('#libEmpty').style.display='';
+  let j={items:[],brands:[]};try{j=await (await fetch('/api/library')).json();}catch(e){}
+  lib.items=j.items||[];lib.loaded=true;
+  // merk-filter opbouwen (alleen merken die ook echt output hebben)
+  const present=[...new Set(lib.items.map(i=>i.brand).filter(Boolean))];
+  const bc=$('#libBrands');bc.innerHTML='';
+  const mk=(id,label)=>{const b=document.createElement('button');b.className='chip'+((lib.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{lib.brand=id;$$('#libBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderLib();};bc.appendChild(b);};
+  mk('','Alle merken');
+  (j.brands||[]).filter(b=>present.includes(b.id)).forEach(b=>mk(b.id,b.name));
+  renderLib();
+}
+function renderLib(){
+  const g=$('#libGrid');g.innerHTML='';
+  const items=lib.items.filter(i=>(!lib.brand||i.brand===lib.brand)&&(!lib.kind||i.kind===lib.kind)&&(!lib.q||((i.name||'')+' '+(i.typeName||'')+' '+(i.brandName||'')).toLowerCase().includes(lib.q)));
+  if(!items.length){$('#libEmpty').textContent=lib.items.length?'Niets gevonden met deze filters.':'Nog geen output. Render iets in de Studio — het verschijnt hier automatisch.';$('#libEmpty').style.display='';return;}
+  $('#libEmpty').style.display='none';
+  items.forEach(it=>{
+    const card=document.createElement('div');card.className='libcard';
+    const sq=it.kind==='still';
+    const thumb=it.kind==='video'
+      ? `<div class="thumb" data-url="${esc(it.url)}" data-kind="video" data-name="${esc(it.name||it.typeName)}"><video src="${esc(it.url)}#t=0.6" preload="metadata" muted playsinline></video><div class="play">▶</div><span class="badge">${esc(it.typeName)}</span></div>`
+      : `<div class="thumb sq" data-url="${esc(it.url)}" data-kind="still" data-name="${esc(it.name)}"><img src="${esc(it.url)}" loading="lazy"><span class="badge">${esc(it.typeName)}</span></div>`;
+    const title=it.name||it.typeName||it.file;
+    const right=[it.date,(it.kb?it.kb+' KB':'')].filter(Boolean).join(' · ');
+    card.innerHTML=thumb
+      +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub"><span>${esc(it.brandName)}${it.lang==='en'?' · EN':''}</span><span>${esc(right)}</span></div></div>`
+      +`<div class="acts"><a href="${esc(it.url)}" download>Download</a><button>${it.kind==='video'?'Afspelen':'Bekijken'}</button></div>`;
+    card.querySelector('.thumb').onclick=()=>openModal(it);
+    card.querySelector('.acts button').onclick=()=>openModal(it);
+    g.appendChild(card);
+  });
+}
+function openModal(it){
+  const body=$('#libModalBody');
+  body.innerHTML=it.kind==='video'
+    ? `<video src="${esc(it.url)}?t=${Date.now()}" controls autoplay loop playsinline></video>`
+    : `<img src="${esc(it.url)}">`;
+  $('#libModal').style.display='flex';
+}
+function closeModal(){$('#libModal').style.display='none';$('#libModalBody').innerHTML='';}
+$('#libClose').onclick=closeModal;
+$('#libModal').onclick=e=>{if(e.target===$('#libModal'))closeModal();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
 log();loadBrands();
 </script></body></html>
