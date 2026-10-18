@@ -1515,8 +1515,15 @@ export function makeBrand({ ROOT, config }) {
       else if (sfeerPool.length) heroObj = pickFreshObj(sfeerPool, "sfeer");
       else if (imagePool.length) heroObj = rnd(imagePool);
     }
+    // IN-SITU = de muur IS het onderwerp. Wat er ook met opts.image gebeurde (ongeldig id,
+    // een sfeer-id dat blijft hangen bij het wisselen van type): dit type krijgt ALTIJD een
+    // muur. Eerst een mockup-foto; is die er niet, dan een synthetische plaster-muur.
+    // Nooit meer het paneel op de lege achtergrond.
+    if (templateId === "insitu" && !chosenMockup) {
+      chosenMockup = mockupPool.length ? pickFreshObj(mockupPool, "mockups") : null;
+    }
     const hero = heroObj ? heroObj.uri : "";
-    const insitu = loop && !!chosenMockup;       // in-situ = ons paneel op de mockup-muur
+    const insitu = loop && (templateId === "insitu" || !!chosenMockup);   // in-situ = paneel aan de muur
     const mockup = chosenMockup ? chosenMockup.uri : "";
     // Kleur: bij in-situ stuurt het Palet (neutrale muur); anders kleur-match met de foto.
     const flowPal = insitu ? palArr : (heroObj && heroObj.pal && heroObj.pal.length >= 4 ? heroObj.pal : palArr);
@@ -1564,8 +1571,16 @@ export function makeBrand({ ROOT, config }) {
       // het paneel-rechthoek = de muurplek: alles (opbouw, clip, rand, naam) volgt deze plek
       panelX = wx; panelY = wy; panelW = wW; panelH = wH;
       // VOORAF geblurde muur (scherptediepte, 1x gebakken i.p.v. elk frame) -> veel sneller.
-      const roomImg = (chosenMockup && chosenMockup.blur) ? chosenMockup.blur : mockup;
-      const room = `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`;
+      const roomImg = chosenMockup ? (chosenMockup.blur ? chosenMockup.blur : mockup) : "";
+      // Echte muur-mockup als die er is; anders een warme plaster-muur zodat het paneel
+      // ALTIJD aan een muur hangt (de template heet niet voor niets "Lege muur").
+      const room = roomImg
+        ? `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+        : `<defs><linearGradient id="plaster" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#efe7d8"/><stop offset="0.5" stop-color="#e5d9c5"/><stop offset="1" stop-color="#d3c4ab"/></linearGradient>`
+          + `<radialGradient id="plasterV" cx="50%" cy="42%" r="78%"><stop offset="0.5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#3a2d1a" stop-opacity="0.24"/></radialGradient></defs>`
+          + `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#plaster)"/>`
+          + `<rect x="0" y="${Math.round(H * 0.82)}" width="${W}" height="${Math.round(H * 0.18)}" fill="#c4b392" opacity="0.5"/>`
+          + `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#plasterV)"/>`;
       // zachte slagschaduw zónder filter (radiaal verloop) -> het paneel hangt echt aan de muur
       const sh = `<radialGradient id="psh" cx="50%" cy="48%" r="50%"><stop offset="0.55" stop-color="#120b05" stop-opacity="0.52"/><stop offset="1" stop-color="#120b05" stop-opacity="0"/></radialGradient>`;
       const shadow = `<defs>${sh}</defs><rect x="${wx - 22}" y="${wy - 6}" width="${wW + 44}" height="${wH + 54}" fill="url(#psh)"/>`;
@@ -1602,7 +1617,13 @@ export function makeBrand({ ROOT, config }) {
       // Camera: bookendK = foto aan begin/eind (mét medaillon); rK = foto-reveal tussendoor
       // (zónder medaillon). zMos/zPho = inzoom op mozaïek/foto.
       let bookendK = 0, zMos = 1, zPho = 1, tailK = 0, frameK = 0;
-      if (bookend) {
+      if (bookend && insitu) {
+        // IN-SITU: de muur is het kader. GEEN foto-intro/outro-zoom. Het paneel bouwt zich
+        // op de muur op en BLIJFT daarna hangen — de video eindigt op het opgehangen werk
+        // in de ruimte (de payoff die "...tot aan jouw muur" belooft). De lange hold na de
+        // opbouw is bewust: je ziet het kunstwerk rustig aan de muur hangen.
+        zMos = 1; zPho = 1; bookendK = 0; frameK = 0;
+      } else if (bookend) {
         const bEnd = Ti + Tb, oStart = durSec - To, oZi = oStart + To * 0.45, oDis = oZi + To * 0.30;
         if (t < Ti) {                                   // intro: foto zoomt langzaam in -> kale tegels
           zPho = 1 + (camZoom - 1) * smooth(t / Ti); zMos = camZoom;
@@ -1645,7 +1666,7 @@ export function makeBrand({ ROOT, config }) {
       // vangt licht) — loopt ná de opbouw, tijdens de hold.
       let sweep = "";
       {
-        const hs = buildStart + Tb + 0.2, he = (bookend ? durSec - To : durSec) - 0.3;
+        const hs = buildStart + Tb + 0.2, he = (bookend && !insitu ? durSec - To : durSec) - 0.3;
         if (!isCycle && t > hs && t < he) {
           const p = (t - hs) / Math.max(0.1, he - hs);
           const bw2 = panelW * 0.24, cxs = panelX - panelW * 0.35 + p * (panelW * 1.7), cy2 = panelY + panelH / 2;
