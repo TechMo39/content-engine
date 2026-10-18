@@ -17,6 +17,18 @@ const ROOT = path.resolve(fileURLToPath(import.meta.url), "../..");
 const PORT = 4600;
 const OUT = path.resolve(ROOT, config.outDir);
 await fs.mkdir(OUT, { recursive: true });
+// OUT netjes houden: ruim bij het opstarten de tijdelijke werk-/frame-mappen van eerdere of
+// afgebroken renders op. Echte outputs (mp4's, mail-stills, build-bundels .mjs) blijven staan.
+try {
+  for (const e of await fs.readdir(OUT, { withFileTypes: true })) {
+    const nm = e.name;
+    if (e.isDirectory() && (/^\.walk-/.test(nm) || /^\.frames(-|$)/.test(nm) || nm === ".studioframes")) {
+      await fs.rm(path.resolve(OUT, nm), { recursive: true, force: true });
+    } else if (!e.isDirectory() && nm === "dump.svg") {
+      await fs.rm(path.resolve(OUT, nm), { force: true });
+    }
+  }
+} catch {}
 
 const logClients = new Set();
 function log(msg) { const line = String(msg); process.stdout.write("  " + line + "\n"); for (const c of logClients) { try { c.write(`data: ${JSON.stringify(line)}\n\n`); } catch {} } }
@@ -39,6 +51,11 @@ async function withSeed(seed, fn) {
   Math.random = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
   try { return await fn(); } finally { Math.random = orig; }
 }
+// RENDER-SLOT: een video-render en een mail-still-render mogen NOOIT tegelijk de (globale)
+// toevalsgenerator pakken. Deze mutex laat de kritieke secties netjes om de beurt gaan;
+// de lange ffmpeg-encode van een video valt erbuiten, dus die blijft gewoon parallel lopen.
+let _renderGate = Promise.resolve();
+function renderLock(fn) { const run = _renderGate.then(fn, fn); _renderGate = run.then(() => {}, () => {}); return run; }
 // De glazuur-families (vaste set). Door de familie + de mockup op de naam-hash te pinnen,
 // omzeilen we de anti-herhaling (pickFresh) volledig -> zelfde bedrijf = altijd zelfde plaatje.
 const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine"];
@@ -54,11 +71,11 @@ async function renderMailStill(name) {
   const fam = MS_FAMILIES[h % MS_FAMILIES.length];
   const image = mk.length ? mk[Math.floor(h / 97) % mk.length] : "";
   const subjectId = subs.length ? subs[Math.floor(h / 9973) % subs.length] : undefined;
-  const svg = await withSeed(h, async () => {
+  const svg = await renderLock(() => withSeed(h, async () => {
     const r = await brand.makeRender({ subjectId, templateId: "insitu", opts: { name, lang: "nl", palette: fam, image, hook: "none" }, format: "1:1", log: () => {} });
     r.SS = 1;
     return r.sceneAt(Math.round(r.durSec * 0.93 * r.FPS));   // eindbeeld: paneel vol + naam
-  });
+  }));
   const png = new Resvg(svg, { fitTo: { mode: "width", value: 720 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
   const tmp = path.join(os.tmpdir(), "totms-" + Date.now() + ".png");
   await fs.writeFile(tmp, png);
@@ -125,7 +142,12 @@ function outBase(job) {
 async function runOne(job) {
   const brand = reg.byId[job.brand];
   if (!brand) throw new Error("onbekend merk");
-  const render = await brand.makeRender({ subjectId: job.subject, templateId: job.template, opts: job.opts || {}, format: job.format || "9:16", log });
+  // SLOT: niet-walkthrough renders delen de kritieke (random) sectie met de mail-plaatjes ->
+  // via renderLock gaan ze om de beurt, nooit tegelijk. De walkthrough is extern/traag en
+  // botst niet op de generator, dus die lockt niet (anders blokkeert 'ie de plaatjes minuten).
+  const render = (job.template === "walkthrough")
+    ? await brand.makeRender({ subjectId: job.subject, templateId: job.template, opts: job.opts || {}, format: job.format || "9:16", log })
+    : await renderLock(() => brand.makeRender({ subjectId: job.subject, templateId: job.template, opts: job.opts || {}, format: job.format || "9:16", log }));
   // Een render mag de effectieve taal corrigeren (bv. walkthrough valt FR terug op EN) ->
   // dan klopt de taal in de bestandsnaam met wat er echt in de video staat.
   if (render && render.lang) job = { ...job, opts: { ...(job.opts || {}), lang: render.lang } };
@@ -134,6 +156,8 @@ async function runOne(job) {
   if (render && render.prebuilt && existsSync(render.prebuilt)) {
     const outName = base + ".mp4";
     await fs.copyFile(render.prebuilt, path.resolve(OUT, outName));
+    // werkmap van de walkthrough (.walk-*) meteen opruimen -> out blijft netjes
+    if (render.cleanup) { try { await fs.rm(render.cleanup, { recursive: true, force: true }); } catch {} }
     log(`✓ klaar: /out/${outName}`);
     return { url: "/out/" + outName };
   }

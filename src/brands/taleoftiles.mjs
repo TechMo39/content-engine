@@ -1152,7 +1152,7 @@ export function makeBrand({ ROOT, config }) {
     const r2 = await runStreamed(node, [finisher, raw], finEnv, log, "· montage:");
     if (r2.status !== 0) throw new Error("content-ready stap (finish) faalde");
 
-    return { prebuilt: path.join(work, "site-final.mp4"), music: "", lang: siteLang };
+    return { prebuilt: path.join(work, "site-final.mp4"), music: "", lang: siteLang, cleanup: work };
   }
 
   // TYPE 8 — "Stop zodra je 't ziet" (guess/engagement): de camera start extreem ingezoomd op
@@ -1765,13 +1765,16 @@ export function makeBrand({ ROOT, config }) {
       const freeH = Math.round((pl && pl.h ? pl.h : 0.34) * H * 0.90);
       let wW = freeW, wH = Math.round(wW / A2);                   // liggend paneel: start op vrije breedte
       if (wH > freeH) { wH = freeH; wW = Math.round(wH * A2); }   // te hoog -> op vrije hoogte passen
-      const maxW = Math.round(W * 0.74), maxH = Math.round(H * 0.38);
+      // Vierkant (mail-still) heeft een relatief groter logo/slogan bovenin -> paneel kleiner
+      // en lager, zodat de slogan de bovenrand van het paneel niet raakt.
+      const maxW = Math.round(W * 0.74), maxH = Math.round(H * (format === "1:1" ? 0.33 : 0.38));
       if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
       if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
       let cxp = Math.round(pl ? pl.cx * W : W / 2), cyp = Math.round(pl ? pl.cy * H : panelY + panelH / 2);
-      // binnen beeld houden: top onder het logo (H*0.17), onder vrij van de onderrand/meubels.
+      // binnen beeld houden: top onder het logo/slogan (meer marge in 1:1), onder vrij van de rand.
+      const topMargin = (format === "1:1") ? 0.30 : 0.205;
       cxp = Math.max(Math.round(wW / 2 + W * 0.04), Math.min(W - Math.round(wW / 2 + W * 0.04), cxp));
-      cyp = Math.max(Math.round(wH / 2 + H * 0.205), Math.min(H - Math.round(wH / 2 + H * 0.12), cyp));
+      cyp = Math.max(Math.round(wH / 2 + H * topMargin), Math.min(H - Math.round(wH / 2 + H * 0.12), cyp));
       const wx = Math.round(cxp - wW / 2), wy = Math.round(cyp - wH / 2);
       // het paneel-rechthoek = de muurplek: alles (opbouw, clip, rand, naam) volgt deze plek
       panelX = wx; panelY = wy; panelW = wW; panelH = wH;
