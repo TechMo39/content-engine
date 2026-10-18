@@ -65,8 +65,13 @@ async function detectWallRect(absPath) {
   }
   if (!best) return null;
   // paneelhoogte volgt de vrije ruimte (2×afstand) met marge; begrensd op redelijk formaat.
-  const hC = Math.min(GH * 0.5, Math.max(GH * 0.22, best.d * 2 * 0.78));
-  return { cx: best.cx, cy: best.cy, h: hC / GH };
+  // Vrije ruimte = de gegarandeerd-vrije straal (afstandstransform) rond het beste punt.
+  // We geven zowel vrije BREEDTE als HOOGTE terug (als beeldfractie), zodat het paneel
+  // binnen de echte vrije plek past en niet over objecten/randen/bakstenen heen loopt.
+  const freeHalf = Math.max(GH * 0.11, best.d * 0.82);   // veilige half-maat in cellen
+  const wF = Math.min(0.80, (freeHalf * 2) / GW);
+  const hF = Math.min(0.50, (freeHalf * 2) / GH);
+  return { cx: best.cx, cy: best.cy, w: wF, h: hF };
 }
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
@@ -1557,10 +1562,14 @@ export function makeBrand({ ROOT, config }) {
     if (insitu) {
       const A2 = pw / ph;
       const pl = chosenMockup && chosenMockup.place;
-      let wH = Math.round(pl ? pl.h * H : panelH), wW = Math.round(wH * A2);
-      // LIGGEND paneel mag de muur niet overspoelen: begrens op een deel van het beeld,
-      // zodat de ruimte eromheen zichtbaar blijft (een schilderij hángt aan de muur).
-      const maxW = Math.round(W * 0.80), maxH = Math.round(H * 0.40);
+      // Het paneel moet BINNEN de gedetecteerde vrije plek passen — breedte én hoogte, met
+      // marge — zodat het als een opgehangen werk oogt en nooit over bakstenen/planten/rand
+      // heen loopt. Daarna nog harde plafonds zodat het het beeld nooit domineert.
+      const freeW = Math.round((pl && pl.w ? pl.w : 0.52) * W * 0.90);
+      const freeH = Math.round((pl && pl.h ? pl.h : 0.34) * H * 0.90);
+      let wW = freeW, wH = Math.round(wW / A2);                   // liggend paneel: start op vrije breedte
+      if (wH > freeH) { wH = freeH; wW = Math.round(wH * A2); }   // te hoog -> op vrije hoogte passen
+      const maxW = Math.round(W * 0.74), maxH = Math.round(H * 0.38);
       if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
       if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
       let cxp = Math.round(pl ? pl.cx * W : W / 2), cyp = Math.round(pl ? pl.cy * H : panelY + panelH / 2);
