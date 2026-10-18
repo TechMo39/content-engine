@@ -1152,9 +1152,9 @@ export function makeBrand({ ROOT, config }) {
       // subtiel en premium zodra het beeld vol is onthuld.
       if (gimg && level && level !== "makkelijk" && k > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
-        const pretty = word.charAt(0).toUpperCase() + word.slice(1);
+        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `C'est un ${word}` }[lang];
         const op = smooth(Math.min(1, (k - 0.86) / 0.1));
-        overlay += captionOverlay(pretty, { nl: "Het is", en: "It's", fr: "C'est" }[lang], W, H, op, "lower");
+        overlay += captionOverlay(ans, null, W, H, op, "lower");
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
@@ -1182,7 +1182,7 @@ export function makeBrand({ ROOT, config }) {
     const pid = pickPatterns(1)[0];
     const b = await getBase(pid), lock = LOCKS[pid] || {};
     const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
-    const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "spiralout");
+    const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");   // radial: edge-tegels krijgen hoge order
     const palArr = resolvePalette(opts, "satisfying").arr || film.PAL;
     const glaze = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
     const pw = parsed.view[2], ph = parsed.view[3], Ap = pw / ph;
@@ -1200,7 +1200,9 @@ export function makeBrand({ ROOT, config }) {
       const t = frame / FPS;
       const p = t < Tintro ? 0 : smooth(Math.min(1, (t - Tintro) / revWin));   // hold -> onthullen
       const cols = new Array(parsed.tiles.length);
-      for (let i = 0; i < parsed.tiles.length; i++) cols[i] = (parsed.tiles[i].order < p) ? "none" : glaze[i];
+      // VAN BUITEN NAAR BINNEN: edge-tegels (hoge order) verdwijnen eerst, het midden (waar het
+      // object zit) blijft het langst bedekt -> spannend tot het eind.
+      for (let i = 0; i < parsed.tiles.length; i++) cols[i] = (parsed.tiles[i].order > 1 - p) ? "none" : glaze[i];
       const wrap = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
       const mosaic = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
       // de tegel-grid valt aan het eind HELEMAAL weg -> je ziet het beeld scherp (geen ruis)
@@ -1214,8 +1216,8 @@ export function makeBrand({ ROOT, config }) {
       // ANTWOORD vanaf 'gemiddeld' (niet bij makkelijk), zodra het beeld vol onthuld is
       if (gimg && level && level !== "makkelijk" && p > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
-        const pretty = word.charAt(0).toUpperCase() + word.slice(1);
-        overlay += captionOverlay(pretty, { nl: "Het is", en: "It's", fr: "C'est" }[lang], W, H, smooth(Math.min(1, (p - 0.86) / 0.1)), "lower");
+        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `C'est un ${word}` }[lang];
+        overlay += captionOverlay(ans, null, W, H, smooth(Math.min(1, (p - 0.86) / 0.1)), "lower");
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
@@ -1314,21 +1316,85 @@ export function makeBrand({ ROOT, config }) {
     const np = named ? plateColours(palArr) : null;
     const gold = branding.gold;
     const wrapCol = palArr[0];   // "cadeaupapier" = diepste tint van de familie, goud lint erover
+    const fullCols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+    const BLANKS = new Array(parsed.tiles.length).fill(film.BLANK);
     const pw = parsed.view[2], ph = parsed.view[3], A = pw / ph;
     let h = Math.round(H * 0.62), w = Math.round(h * A); if (w > W * 0.80) { w = Math.round(W * 0.80); h = Math.round(w / A); }
     const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2), rr = Math.max(8, w * 0.03);
-    const cxp = px + w / 2, cyp = py + h / 2, bw = Math.round(w * 0.12);
+    const cxp = px + w / 2, cyp = py + h / 2, bw = Math.round(w * 0.085);   // dunner, eleganter lint
+    // TWEE muur-settings voor het slot (zodat men ziet WAT het is: een bord aan de muur).
+    const mk1 = mockupPool.length ? pickFreshObj(mockupPool, "mockups") : null;
+    const mk2 = mockupPool.length ? (pickFreshObj(mockupPool.filter((m) => !mk1 || m.id !== mk1.id), "mockups") || mk1) : null;
+
+    // Het paneel (tegels + glans + rand + eventueel naam) getekend in een willekeurige rechthoek.
+    function panelInRect(X, Y, RW, RH, cols, nameOn, id) {
+      const rr2 = Math.max(6, RW * 0.03);
+      const wrapB = `<svg x="${X}" y="${Y}" width="${RW}" height="${RH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrapB) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrapB);
+      let s = `<clipPath id="cp${id}"><rect x="${X}" y="${Y}" width="${RW}" height="${RH}" rx="${rr2}"/></clipPath>`
+        + `<g clip-path="url(#cp${id})">${mos}${glazeSvg(X, Y, RW, RH, "cg" + id)}</g>`
+        + `<rect x="${X}" y="${Y}" width="${RW}" height="${RH}" rx="${rr2}" fill="none" stroke="${gold}" stroke-width="2.5"/>`;
+      if (nameOn && named && np) s += `<g>${platePlace(named, np, X + RW / 2, Y + RH / 2, Math.round(RH * 0.17), RW * 0.9)}</g>`;
+      return s;
+    }
+    // Het paneel aan een ECHTE muur (mockup + diepte + lijst) — hergebruikt de in-situ-opmaak.
+    function wallScene(mk, cols, id) {
+      const A2 = pw / ph, pl = mk && mk.place;
+      let wH = Math.round(pl ? pl.h * H : H * 0.34), wW = Math.round(wH * A2);
+      const maxW = Math.round(W * 0.78), maxH = Math.round(H * 0.40);
+      if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
+      if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
+      let cx = Math.round(pl ? pl.cx * W : W / 2), cy = Math.round(pl ? pl.cy * H : H * 0.46);
+      cx = Math.max(Math.round(wW / 2 + W * 0.04), Math.min(W - Math.round(wW / 2 + W * 0.04), cx));
+      cy = Math.max(Math.round(wH / 2 + H * 0.205), Math.min(H - Math.round(wH / 2 + H * 0.12), cy));
+      const wx = Math.round(cx - wW / 2), wy = Math.round(cy - wH / 2);
+      const roomImg = (mk && mk.blur) ? mk.blur : (mk ? mk.uri : "");
+      const room = roomImg ? `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>` : `<rect width="${W}" height="${H}" fill="#241a3a"/>`;
+      const sh = `<radialGradient id="csh${id}" cx="50%" cy="48%" r="50%"><stop offset="0.55" stop-color="#120b05" stop-opacity="0.52"/><stop offset="1" stop-color="#120b05" stop-opacity="0"/></radialGradient>`;
+      const shadow = `<defs>${sh}</defs><rect x="${wx - 20}" y="${wy - 6}" width="${wW + 40}" height="${wH + 50}" fill="url(#csh${id})"/>`;
+      const deco = `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`
+        + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${gold}" stroke-width="2.5"/>`;
+      return room + shadow + deco + panelInRect(wx, wy, wW, wH, cols, true, id);
+    }
+    // PREMIUM inpak: papier met verloop + satijnen glans, een dun satijnen lint met highlight,
+    // een nette strik en een zachte slagschaduw. Geen platte vlakken meer.
     const bowSvg = (s, op, sc) => {
-      const g = `<g opacity="${op.toFixed(3)}" transform="translate(${cxp} ${cyp}) scale(${sc.toFixed(3)}) translate(${-cxp} ${-cyp})">`
-        + `<ellipse cx="${cxp - s * 0.62}" cy="${cyp}" rx="${s * 0.62}" ry="${s * 0.44}" fill="${gold}" transform="rotate(-20 ${cxp - s * 0.62} ${cyp})"/>`
-        + `<ellipse cx="${cxp + s * 0.62}" cy="${cyp}" rx="${s * 0.62}" ry="${s * 0.44}" fill="${gold}" transform="rotate(20 ${cxp + s * 0.62} ${cyp})"/>`
-        + `<path d="M ${cxp - s * 0.18} ${cyp} L ${cxp - s * 0.95} ${cyp + s * 1.35} L ${cxp - s * 0.42} ${cyp + s * 1.2} Z" fill="${gold}"/>`
-        + `<path d="M ${cxp + s * 0.18} ${cyp} L ${cxp + s * 0.95} ${cyp + s * 1.35} L ${cxp + s * 0.42} ${cyp + s * 1.2} Z" fill="${gold}"/>`
-        + `<rect x="${cxp - s * 0.24}" y="${cyp - s * 0.34}" width="${s * 0.48}" height="${s * 0.68}" rx="${s * 0.12}" fill="${_mix(gold, "#000000", 0.18)}"/></g>`;
-      return g;
+      const lobe = _mix(gold, "#fff8e6", 0.0), lobeHi = _mix(gold, "#fff8e6", 0.45), knot = _mix(gold, "#000000", 0.22);
+      return `<g opacity="${op.toFixed(3)}" transform="translate(${cxp} ${cyp}) scale(${sc.toFixed(3)}) translate(${-cxp} ${-cyp})">`
+        + `<ellipse cx="${cxp - s * 0.60}" cy="${cyp}" rx="${s * 0.60}" ry="${s * 0.42}" fill="${lobe}" transform="rotate(-20 ${cxp - s * 0.60} ${cyp})"/>`
+        + `<ellipse cx="${cxp + s * 0.60}" cy="${cyp}" rx="${s * 0.60}" ry="${s * 0.42}" fill="${lobe}" transform="rotate(20 ${cxp + s * 0.60} ${cyp})"/>`
+        + `<ellipse cx="${cxp - s * 0.66}" cy="${cyp - s * 0.10}" rx="${s * 0.30}" ry="${s * 0.14}" fill="${lobeHi}" opacity="0.6" transform="rotate(-20 ${cxp - s * 0.66} ${cyp})"/>`
+        + `<ellipse cx="${cxp + s * 0.66}" cy="${cyp - s * 0.10}" rx="${s * 0.30}" ry="${s * 0.14}" fill="${lobeHi}" opacity="0.6" transform="rotate(20 ${cxp + s * 0.66} ${cyp})"/>`
+        + `<path d="M ${cxp - s * 0.16} ${cyp} L ${cxp - s * 0.92} ${cyp + s * 1.35} L ${cxp - s * 0.40} ${cyp + s * 1.18} Z" fill="${lobe}"/>`
+        + `<path d="M ${cxp + s * 0.16} ${cyp} L ${cxp + s * 0.92} ${cyp + s * 1.35} L ${cxp + s * 0.40} ${cyp + s * 1.18} Z" fill="${lobe}"/>`
+        + `<rect x="${cxp - s * 0.22}" y="${cyp - s * 0.32}" width="${s * 0.44}" height="${s * 0.64}" rx="${s * 0.12}" fill="${knot}"/></g>`;
     };
+    const wrapDefs = `<defs>`
+      + `<linearGradient id="cadpaper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${_mix(wrapCol, "#ffffff", 0.16)}"/><stop offset="1" stop-color="${_mix(wrapCol, "#000000", 0.20)}"/></linearGradient>`
+      + `<linearGradient id="cadsheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset="0.5" stop-color="#ffffff" stop-opacity="0.12"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>`
+      + `<linearGradient id="cadribH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${_mix(gold, "#000000", 0.28)}"/><stop offset="0.5" stop-color="${_mix(gold, "#fff6df", 0.38)}"/><stop offset="1" stop-color="${_mix(gold, "#000000", 0.28)}"/></linearGradient>`
+      + `<linearGradient id="cadribV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${_mix(gold, "#000000", 0.28)}"/><stop offset="0.5" stop-color="${_mix(gold, "#fff6df", 0.38)}"/><stop offset="1" stop-color="${_mix(gold, "#000000", 0.28)}"/></linearGradient>`
+      + `<radialGradient id="cadbsh" cx="50%" cy="52%" r="55%"><stop offset="0.5" stop-color="#0a0712" stop-opacity="0.45"/><stop offset="1" stop-color="#0a0712" stop-opacity="0"/></radialGradient></defs>`;
+    function wrapOverlay(wrapK) {
+      const s = Math.round(w * 0.14), sc = 0.45 + 0.55 * wrapK;
+      const shadow = `<ellipse cx="${cxp}" cy="${py + h + 10}" rx="${w * 0.52}" ry="${h * 0.10}" fill="url(#cadbsh)" opacity="${(wrapK * 0.8).toFixed(3)}"/>`;
+      return wrapDefs + shadow
+        + `<g clip-path="url(#cpc)" opacity="${wrapK.toFixed(3)}">`
+        + `<rect x="${px}" y="${py}" width="${w}" height="${h}" fill="url(#cadpaper)"/>`
+        + `<rect x="${px}" y="${py}" width="${w}" height="${h}" fill="url(#cadsheen)"/>`
+        + `<rect x="${Math.round(cxp - bw / 2)}" y="${py}" width="${bw}" height="${h}" fill="url(#cadribV)"/>`
+        + `<rect x="${px}" y="${Math.round(cyp - bw / 2)}" width="${w}" height="${bw}" fill="url(#cadribH)"/>`
+        + `<rect x="${Math.round(cxp - bw / 2)}" y="${py}" width="${Math.max(2, bw * 0.16)}" height="${h}" fill="#fff6df" opacity="0.5"/>`
+        + `<rect x="${px}" y="${Math.round(cyp - bw / 2)}" width="${w}" height="${Math.max(2, bw * 0.16)}" fill="#fff6df" opacity="0.5"/>`
+        + `</g>`
+        + `<rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${gold}" stroke-width="2" opacity="${(wrapK * 0.7).toFixed(3)}"/>`
+        + bowSvg(s, wrapK, sc);
+    }
+
     const Du = Math.min(1.3, durSec * 0.08);
-    const T1 = durSec * 0.26, T2 = durSec * 0.64;   // ingepakt | uitpakken+opbouw | vol + naam/CTA
+    const T1 = durSec * 0.24, Tb = durSec * 0.56, Tswap = durSec * 0.80;   // ingepakt | uitpakken+opbouw | muur #1 | muur #2
+    const Wd = Math.min(1.0, durSec * 0.08);   // overgang paneel -> muur
+    const Sd = Math.min(0.8, durSec * 0.06);   // overgang muur #1 -> muur #2
     const hooks = {
       nl: ["Wat geef je iemand die alles al heeft?", "Op zoek naar een cadeau dat niemand anders geeft?"],
       en: ["What do you give someone who has everything?", "Looking for a gift no one else gives?"],
@@ -1338,34 +1404,34 @@ export function makeBrand({ ROOT, config }) {
       ? { nl: "Een handgemaakt naambord — met hun naam, in echt glazuur.", en: "A handmade nameplate — with their name, in real glaze.", fr: "Une plaque faite main — à leur nom, en véritable émail." }[lang]
       : { nl: "Met de hand gemaakt. Een stuk kunst voor aan de muur.", en: "Made by hand. A piece of art for the wall.", fr: "Fait main. Une œuvre pour le mur." }[lang];
     const cta = { nl: "Geef iets dat blijft.", en: "Give something that lasts.", fr: "Offrez ce qui dure." }[lang];
+
     function sceneAt(frame) {
       const t = frame / FPS;
-      const cols = (t < T1) ? new Array(parsed.tiles.length).fill(film.BLANK)
-        : film.flowColorsAt(parsed, { palette: palArr, durSec: (T2 - T1), buildSec: (T2 - T1) * 0.82, buildStart: 0, popSec: 0.05 }, t - T1);
-      const wrapB = `<svg x="${px}" y="${py}" width="${w}" height="${h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
-      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrapB) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrapB);
-      let inner = `<clipPath id="cad"><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
-        + `<g clip-path="url(#cad)">${mos}${glazeSvg(px, py, w, h, "cad")}</g>`;
-      // het cadeaupapier + lint + strik, dat uitpakt (fade + strik krimpt)
-      const wrapK = t < T1 ? 1 : 1 - smooth((t - T1) / Du);
-      if (wrapK > 0.003) {
-        const s = Math.round(w * 0.15), sc = 0.4 + 0.6 * wrapK;
-        inner += `<g clip-path="url(#cad)" opacity="${wrapK.toFixed(3)}"><rect x="${px}" y="${py}" width="${w}" height="${h}" fill="${wrapCol}"/>`
-          + `<rect x="${Math.round(cxp - bw / 2)}" y="${py}" width="${bw}" height="${h}" fill="${gold}" opacity="0.92"/>`
-          + `<rect x="${px}" y="${Math.round(cyp - bw / 2)}" width="${w}" height="${bw}" fill="${gold}" opacity="0.92"/></g>`
-          + bowSvg(s, wrapK, sc);
+      const cols = (t < T1) ? BLANKS
+        : film.flowColorsAt(parsed, { palette: palArr, durSec: (Tb - T1), buildSec: (Tb - T1) * 0.82, buildStart: 0, popSec: 0.05 }, t - T1);
+      // clip voor de inpak-overlay (zelfde rechthoek als het gecentreerde paneel)
+      let inner = `<clipPath id="cpc"><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`;
+      // kruisfade gecentreerd paneel -> paneel aan de muur
+      const wallK = t < Tb ? 0 : smooth(Math.min(1, (t - Tb) / Wd));
+      // 1) GECENTREERD: het uitpakkende cadeau + opbouwend paneel (vervaagt als de muur komt)
+      if (wallK < 0.999) {
+        const nameOn = t > T1 + Du;
+        let center = panelInRect(px, py, w, h, cols, nameOn, "c");
+        const wrapK = t < T1 ? 1 : 1 - smooth((t - T1) / Du);
+        if (wrapK > 0.003) center += wrapOverlay(wrapK);
+        inner += `<g opacity="${(1 - wallK).toFixed(3)}">${center}</g>`;
       }
-      inner += `<rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${gold}" stroke-width="2.5"/>`;
+      // 2) AAN DE MUUR: eerst setting #1, dan #2 (zodat men ziet wat het is)
+      if (wallK > 0.001) {
+        const swapK = t >= Tswap ? smooth(Math.min(1, (t - Tswap) / Sd)) : 0;
+        if (swapK < 0.999) inner += `<g opacity="${(wallK * (1 - swapK)).toFixed(3)}">${wallScene(mk1, fullCols, "1")}</g>`;
+        if (swapK > 0.001) inner += `<g opacity="${(wallK * swapK).toFixed(3)}">${wallScene(mk2, fullCols, "2")}</g>`;
+      }
       let overlay = "";
-      // naam (als 't een naam-cadeau is): graveert op het onthulde bord
-      if (named && np && t > T1 + Du) {
-        const op = Math.max(0, Math.min(1, (t - (T1 + Du + 0.3)) / 1.0));
-        if (op > 0.01) overlay += `<g opacity="${op.toFixed(3)}">${platePlace(named, np, cxp, cyp, Math.round(h * 0.17), w * 0.9)}</g>`;
-      }
-      // captions: haak -> onthulregel -> CTA
+      // captions: haak -> onthulregel -> CTA (CTA valt op het muurbeeld)
       if (t < T1 + 0.3) { const op = t < 0.6 ? Math.min(1, t / 0.6) : (t > T1 - 0.5 ? 1 - smooth((t - (T1 - 0.5)) / 0.8) : 1); if (op > 0.01) overlay += captionOverlay(hook, { nl: "Het cadeau", en: "The gift", fr: "Le cadeau" }[lang], W, H, op, "lower"); }
-      else if (t < T2) { const op = t < T1 + Du + 0.3 ? smooth((t - (T1 + Du)) / 0.6) : (t > T2 - 0.6 ? 1 - smooth((t - (T2 - 0.6)) / 0.6) : 1); if (op > 0.01) overlay += captionOverlay(revealLine, null, W, H, op, "lower"); }
-      else { const op = t < T2 + 0.6 ? smooth((t - T2) / 0.6) : 1; overlay += captionOverlay(cta, "Tale of Tiles", W, H, op, "lower"); }
+      else if (t < Tb) { const op = t < T1 + Du + 0.3 ? smooth((t - (T1 + Du)) / 0.6) : (t > Tb - 0.6 ? 1 - smooth((t - (Tb - 0.6)) / 0.6) : 1); if (op > 0.01) overlay += captionOverlay(revealLine, null, W, H, op, "lower"); }
+      else { const op = t < Tb + Wd + 0.3 ? smooth((t - (Tb + Wd * 0.3)) / 0.6) : 1; if (op > 0.01) overlay += captionOverlay(cta, "Tale of Tiles", W, H, op, "lower"); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
