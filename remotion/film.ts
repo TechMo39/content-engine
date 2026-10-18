@@ -191,9 +191,9 @@ function tileVary(hex: string, i: number): string {
   const [h, s, l] = _toHsl(hex);
   // Dieper/voller glazuur i.p.v. licht-pastel: helderheid omlaag, verzadiging iets op,
   // plus een piepkleine per-tegel afwijking (handgeglazuurd -> geen twee gelijk).
-  const dl = Math.max(0.2, Math.min(0.6, l * 0.82)) + (r3 - 0.5) * 0.08;
-  const ds = Math.min(1, s * 1.12 * (1 + (r2 - 0.5) * 0.12));
-  return _fromHsl(h + (r1 - 0.5) * 9, ds, dl);
+  const dl = Math.max(0.18, Math.min(0.64, l * 0.82)) + (r3 - 0.5) * 0.20;
+  const ds = Math.min(1, s * 1.12 * (1 + (r2 - 0.5) * 0.26));
+  return _fromHsl(h + (r1 - 0.5) * 16, ds, dl);
 }
 const rndFrom = (arr: string[], seed: number) => arr[Math.floor(seed * arr.length) % arr.length];
 const smooth = (p: number) => p * p * (3 - 2 * p);
