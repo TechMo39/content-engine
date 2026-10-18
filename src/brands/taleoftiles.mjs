@@ -273,7 +273,7 @@ export function makeBrand({ ROOT, config }) {
     markSvg: ({ W, H }) => {
       const gold = "#d6b35a", cream = "#f4ecdc", tag = Math.round(W * 0.0165);
       // SLOGAN onder het logo (merkkeuze #1), taal-afhankelijk. Geen "zellige" meer.
-      const slg = ({ nl: "JOUW NAAM, VERTELD IN TEGELS.", en: "YOUR NAME, TOLD IN TILES.", fr: "VOTRE NOM, RACONTÉ EN CARREAUX." })[branding.lang] || "JOUW NAAM, VERTELD IN TEGELS.";
+      const slg = ({ nl: "HANDGEMAAKTE MOZAÏEKKUNST.", en: "HANDMADE MOSAIC ART.", fr: "MOSAÏQUE FAITE MAIN." })[branding.lang] || "HANDGEMAAKTE MOZAÏEKKUNST.";
       if (branding.markLogo) {
         const ar = 389 / 96;
         const lw = Math.round(W * 0.36), lh = Math.round(lw / ar);   // kleiner (was 0.44) — hing te veel over de panelen
@@ -497,17 +497,17 @@ export function makeBrand({ ROOT, config }) {
     },
     satisfying: {   // OPNIEUW TOT LEVEN: oud ambacht in een nieuw jasje; je ziet het ontstaan.
       nl: [
-        [{ t: "Eeuwenoud ambacht…" }, { k: "Tale of Tiles", t: "…opnieuw tot leven gebracht." }, { t: "Jouw naam, tegel voor tegel." }],
+        [{ t: "Eeuwenoud ambacht…" }, { k: "Tale of Tiles", t: "…opnieuw tot leven gebracht." }, { t: "Met de hand gelegd, tegel voor tegel." }],
         [{ k: "Fès", t: "Van paleismuren…" }, { t: "…naar jouw muur van nu." }, { t: "Met de hand gemaakt." }],
         [{ t: "Tegel voor tegel, met de hand." }, { k: "Tale of Tiles", t: "Een oud ambacht, in een nieuw jasje." }, { t: "Geen twee gelijk." }],
       ],
       en: [
-        [{ t: "Age-old craft…" }, { k: "Tale of Tiles", t: "…brought back to life." }, { t: "Your name, tile by tile." }],
+        [{ t: "Age-old craft…" }, { k: "Tale of Tiles", t: "…brought back to life." }, { t: "Laid by hand, tile by tile." }],
         [{ k: "Fès", t: "From palace walls…" }, { t: "…to your wall today." }, { t: "Made by hand." }],
         [{ t: "Tile by tile, by hand." }, { k: "Tale of Tiles", t: "An old craft, in a new form." }, { t: "No two alike." }],
       ],
       fr: [
-        [{ t: "Un art ancestral…" }, { k: "Tale of Tiles", t: "…ramené à la vie." }, { t: "Votre nom, carreau par carreau." }],
+        [{ t: "Un art ancestral…" }, { k: "Tale of Tiles", t: "…ramené à la vie." }, { t: "Posé à la main, carreau par carreau." }],
         [{ k: "Fès", t: "Un art millénaire." }, { t: "Carreau par carreau, à la main." }],
       ],
     },
