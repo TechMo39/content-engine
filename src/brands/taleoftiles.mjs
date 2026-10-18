@@ -206,6 +206,9 @@ function wrap2(txt, maxLen) {
 // VERHAAL-ONDERSCHRIFT (premium): een elegante regel (Cormorant) met een goud kicker-label
 // en een dun goudlijntje, over een zachte onderste scrim zodat het leesbaar op de muur/foto
 // valt. pos: "lower" = filmische onderregel (in-situ/sfeer), "top" = bovenin (satisfying).
+// Rotatie-helper: kiest willekeurig één variant uit een taal-array, zodat elke render net
+// iets anders zegt. Valt terug op NL als een taal ontbreekt.
+function RVlang(sets, lang) { const a = (sets && sets[lang]) || (sets && sets.nl) || [""]; return a[Math.floor(Math.random() * a.length)]; }
 function captionOverlay(main, kicker, W, H, op, pos = "lower") {
   if (!main || op <= 0.01) return "";
   const O = Math.max(0, Math.min(1, op));
@@ -469,18 +472,31 @@ export function makeBrand({ ROOT, config }) {
     insitu: {   // TOEPASSING + KWALITEIT. GEEN gevel/buiten-only-claims (mockup kan ook binnen zijn).
       nl: [
         [{ k: "Tale of Tiles", t: "Jouw naam, met de hand gemaakt." }, { t: "In echt glazuur — kleur die blijft." }, { t: "Een schilderij aan je muur." }],
-        [{ k: "Echt glazuur", t: "Verbleekt niet, jaren diep van kleur." }, { t: "Binnen én buiten, aan je muur." }, { t: "Met de hand gezet, tegel voor tegel." }],
+        [{ k: "Echt glazuur", t: "Verbleekt niet, jaren diep van kleur." }, { t: "Binnen én buiten, aan je muur." }, { t: "Met de hand gelegd, tegel voor tegel." }],
         [{ k: "Fès", t: "Wat eeuwen aan paleismuren hing…" }, { t: "…nu als kunst aan die van jou." }, { t: "Geen twee gelijk." }],
         [{ t: "Eén naam. Eén kunstwerk." }, { k: "Tale of Tiles", t: "Handgemaakt, voor jouw muur of gevel." }],
+        [{ t: "Geen poster, geen sticker." }, { k: "Tale of Tiles", t: "Handgelegd mozaïek aan je muur." }, { t: "Kleur die jaren blijft." }],
+        [{ t: "Regen, zon of vorst — de kleur blijft." }, { k: "Buiten of binnen", t: "Aan je gevel of in de hal." }, { t: "Gaat generaties mee." }],
+        [{ k: "Jouw muur", t: "Verdient meer dan een kaal bordje." }, { t: "Handgemaakt mozaïek, met jouw naam." }, { t: "In echt glazuur." }],
+        [{ t: "Jij kiest patroon, kleuren en naam." }, { k: "Tale of Tiles", t: "Wij leggen 'm met de hand." }, { t: "En hij hangt als kunst aan je muur." }],
+        [{ t: "Een naambord dat mensen aanraken." }, { t: "Echt reliëf, echt glazuur — geen print." }, { k: "Tale of Tiles", t: "Voor je muur of gevel." }],
+        [{ k: "Tale of Tiles", t: "Kunst met jouw naam erop." }, { t: "Met de hand gelegd in Fès." }, { t: "Een leven lang aan je muur." }],
       ],
       en: [
         [{ k: "Tale of Tiles", t: "Your name, made by hand." }, { t: "In real glaze — colour that stays." }, { t: "A painting for your wall." }],
         [{ k: "Real glaze", t: "Won't fade, deep colour for years." }, { t: "Indoors or out, on your wall." }, { t: "Set by hand, tile by tile." }],
         [{ k: "Fès", t: "What once lined palace walls…" }, { t: "…now art on yours." }, { t: "No two alike." }],
+        [{ t: "One name. One work of art." }, { k: "Tale of Tiles", t: "Handmade, for your wall or facade." }],
+        [{ t: "No poster, no sticker." }, { k: "Tale of Tiles", t: "Hand-laid mosaic on your wall." }, { t: "Colour that lasts for years." }],
+        [{ t: "Rain, sun or frost — the colour stays." }, { k: "Indoors or out", t: "On your facade or in the hall." }, { t: "Lasts for generations." }],
+        [{ t: "You pick the pattern, colours and name." }, { k: "Tale of Tiles", t: "We lay it by hand." }, { t: "And it hangs as art on your wall." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail — une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
         [{ k: "Véritable émail", t: "Ne pâlit pas, des années de couleur." }, { t: "Posé à la main, carreau par carreau." }],
+        [{ k: "Fès", t: "Ce qui ornait les palais…" }, { t: "…désormais sur votre mur." }, { t: "Aucun identique." }],
+        [{ t: "Un nom. Une œuvre d'art." }, { k: "Tale of Tiles", t: "Fait main, pour votre mur ou façade." }],
+        [{ t: "Vous choisissez motif, couleurs et nom." }, { k: "Tale of Tiles", t: "Nous le posons à la main." }],
       ],
     },
     sfeer: {   // ERFGOED + AMBACHT: eeuwenoud ambacht uit Fès -> vandaag, met jouw naam.
@@ -489,15 +505,28 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Klei, water, vuur — en geduld." }, { k: "Tale of Tiles", t: "Zo maken wij jouw naambord." }, { t: "Een schilderij om door te geven." }],
         [{ t: "Eeuwenoud ambacht uit de paleizen van Fès." }, { k: "Vandaag", t: "In een nieuw jasje." }, { t: "Met jouw naam erin." }],
         [{ t: "Het bestaat niet voor niets al eeuwen." }, { k: "Tale of Tiles", t: "Met de hand gemaakt, voor nu." }],
+        [{ t: "Gesneden, geglazuurd, gebakken — met de hand." }, { k: "Fès", t: "Een ambacht dat overleeft." }, { t: "Nu met jouw naam." }],
+        [{ t: "Elke kleur komt uit de oven, niet uit een printer." }, { k: "Echt glazuur", t: "Diep, levend, blijvend." }],
+        [{ t: "Generaties gaven dit ambacht door." }, { k: "Tale of Tiles", t: "Wij brengen het naar jouw muur." }],
+        [{ t: "Geen twee handen leggen hetzelfde." }, { t: "Daarom is geen enkel paneel gelijk." }, { k: "Fès", t: "Met de hand, stuk voor stuk." }],
+        [{ t: "In de medina van Fès, aan een lage tafel…" }, { t: "…wordt jouw naambord stukje voor stukje gelegd." }, { k: "Tale of Tiles", t: "Met de hand." }],
+        [{ k: "Erfgoed", t: "Eeuwen oud, nog altijd levend." }, { t: "Jouw naam, in een eeuwenoud ambacht." }, { t: "Om door te geven." }],
       ],
       en: [
         [{ k: "Fès", t: "A thousand-year craft." }, { t: "Every tile cut and glazed by hand." }, { t: "No two pieces alike." }],
         [{ t: "Clay, water, fire — and patience." }, { k: "Tale of Tiles", t: "This is how we make your nameplate." }, { t: "A painting to pass on." }],
         [{ t: "Age-old craft from the palaces of Fès." }, { k: "Today", t: "In a new form." }, { t: "With your name in it." }],
+        [{ t: "It has lasted centuries for a reason." }, { k: "Tale of Tiles", t: "Made by hand, for now." }],
+        [{ t: "Cut, glazed, fired — all by hand." }, { k: "Fès", t: "A craft that survives." }, { t: "Now with your name." }],
+        [{ t: "Every colour comes from the kiln, not a printer." }, { k: "Real glaze", t: "Deep, alive, lasting." }],
+        [{ t: "No two hands lay it the same." }, { t: "So no panel is ever alike." }, { k: "Fès", t: "By hand, piece by piece." }],
       ],
       fr: [
         [{ k: "Fès", t: "Un art millénaire." }, { t: "Chaque carreau taillé et émaillé à la main." }, { t: "Aucun identique." }],
         [{ t: "Argile, eau, feu — et patience." }, { k: "Tale of Tiles", t: "Voilà comment naît votre plaque." }],
+        [{ t: "Art ancestral des palais de Fès." }, { k: "Aujourd'hui", t: "Sous une nouvelle forme." }, { t: "Avec votre nom." }],
+        [{ t: "Chaque couleur sort du four, pas d'une imprimante." }, { k: "Véritable émail", t: "Profond, vivant, durable." }],
+        [{ t: "Aucune main ne pose pareil." }, { t: "Aucun panneau n'est identique." }, { k: "Fès", t: "À la main, pièce par pièce." }],
       ],
     },
     satisfying: {   // OPNIEUW TOT LEVEN: oud ambacht in een nieuw jasje; je ziet het ontstaan.
@@ -505,29 +534,59 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Eeuwenoud ambacht…" }, { k: "Tale of Tiles", t: "…opnieuw tot leven gebracht." }, { t: "Met de hand gelegd, tegel voor tegel." }],
         [{ k: "Fès", t: "Van paleismuren…" }, { t: "…naar jouw muur van nu." }, { t: "Met de hand gemaakt." }],
         [{ t: "Tegel voor tegel, met de hand." }, { k: "Tale of Tiles", t: "Een oud ambacht, in een nieuw jasje." }, { t: "Geen twee gelijk." }],
+        [{ t: "Zie het ontstaan, stukje voor stukje." }, { k: "Tale of Tiles", t: "Zoals het al eeuwen gaat." }, { t: "Nu met jouw naam." }],
+        [{ t: "Honderden stukjes, één geheel." }, { k: "Met de hand", t: "Zo groeit jouw naambord." }],
+        [{ t: "Elk stukje op z'n plek — met geduld." }, { k: "Tale of Tiles", t: "Handwerk dat je ziet ontstaan." }, { t: "Een kunstwerk voor je muur." }],
+        [{ t: "Geen machine, geen print." }, { t: "Mensenhanden, tegel voor tegel." }, { k: "Tale of Tiles", t: "Dat voel je." }],
+        [{ k: "Oud ambacht", t: "In jouw kleuren." }, { t: "Jij kiest, wij leggen." }, { t: "Stukje voor stukje." }],
+        [{ t: "Zo ontstaat een naambord dat blijft." }, { k: "Tale of Tiles", t: "Met de hand, in echt glazuur." }],
+        [{ t: "Van los stukje tot kunstwerk." }, { k: "Fès", t: "Een ambacht dat leeft." }, { t: "Met jouw naam erin." }],
       ],
       en: [
         [{ t: "Age-old craft…" }, { k: "Tale of Tiles", t: "…brought back to life." }, { t: "Laid by hand, tile by tile." }],
         [{ k: "Fès", t: "From palace walls…" }, { t: "…to your wall today." }, { t: "Made by hand." }],
         [{ t: "Tile by tile, by hand." }, { k: "Tale of Tiles", t: "An old craft, in a new form." }, { t: "No two alike." }],
+        [{ t: "Watch it take shape, piece by piece." }, { k: "Tale of Tiles", t: "As it's been done for centuries." }, { t: "Now with your name." }],
+        [{ t: "Hundreds of pieces, one whole." }, { k: "By hand", t: "This is how your nameplate grows." }],
+        [{ t: "No machine, no print." }, { t: "Human hands, tile by tile." }, { k: "Tale of Tiles", t: "You can feel it." }],
+        [{ t: "From loose piece to work of art." }, { k: "Fès", t: "A living craft." }, { t: "With your name in it." }],
       ],
       fr: [
         [{ t: "Un art ancestral…" }, { k: "Tale of Tiles", t: "…ramené à la vie." }, { t: "Posé à la main, carreau par carreau." }],
-        [{ k: "Fès", t: "Un art millénaire." }, { t: "Carreau par carreau, à la main." }],
+        [{ k: "Fès", t: "Des murs des palais…" }, { t: "…à votre mur d'aujourd'hui." }, { t: "Fait main." }],
+        [{ t: "Carreau par carreau, à la main." }, { k: "Tale of Tiles", t: "Un art ancien, sous une forme nouvelle." }],
+        [{ t: "Des centaines de pièces, un tout." }, { k: "À la main", t: "Ainsi naît votre plaque." }],
+        [{ t: "Ni machine, ni impression." }, { t: "Des mains, carreau par carreau." }, { k: "Tale of Tiles", t: "Ça se ressent." }],
       ],
     },
     geentwee: {   // AMBACHT/UNIEK + keuze: met de hand, nooit twee gelijk — net als jouw naam.
       nl: [
         [{ k: "Tale of Tiles", t: "Eén naam, oneindig veel ontwerpen." }, { t: "Elk met de hand gemaakt — nooit twee gelijk." }, { t: "Welke zou jij kiezen?" }],
-        [{ t: "Elk paneel met de hand gezet." }, { k: "Jouw naam", t: "In echt glazuur." }, { t: "Een kunstwerk voor je muur." }],
-        [{ t: "Zoveel ontwerpen als je wilt." }, { k: "Tale of Tiles", t: "Geen twee dezelfde — net als jouw naam." }],
+        [{ t: "Elk paneel met de hand gelegd." }, { k: "Jouw naam", t: "In echt glazuur." }, { t: "Een kunstwerk voor je muur." }],
+        [{ t: "Zoveel ontwerpen als je wilt." }, { k: "Tale of Tiles", t: "Geen twee dezelfde." }],
+        [{ t: "Ander patroon, andere kleuren, zelfde naam." }, { k: "Tale of Tiles", t: "Jij bepaalt." }, { t: "Welke past bij jou?" }],
+        [{ t: "Honderd namen, honderd kunstwerken." }, { k: "Met de hand", t: "Nooit twee gelijk." }],
+        [{ t: "Kies je patroon. Kies je kleuren." }, { k: "Tale of Tiles", t: "En zet je naam erop." }, { t: "Zo simpel, zo uniek." }],
+        [{ t: "Jouw smaak bestaat maar één keer." }, { k: "Tale of Tiles", t: "Je naambord ook." }],
+        [{ t: "Van ingetogen tot uitbundig." }, { t: "Jij kiest de stijl." }, { k: "Tale of Tiles", t: "Wij maken 'm met de hand." }],
+        [{ t: "Geen twee gelijk — net als jouw naam." }, { k: "Tale of Tiles", t: "Elk met de hand gelegd." }],
+        [{ t: "Welke wordt die van jou?" }, { k: "Tale of Tiles", t: "Oneindig veel ontwerpen, één naam." }],
       ],
       en: [
         [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each made by hand — never two alike." }, { t: "Which would you pick?" }],
         [{ t: "Every panel set by hand." }, { k: "Your name", t: "In real glaze." }, { t: "A piece of art for your wall." }],
+        [{ t: "As many designs as you like." }, { k: "Tale of Tiles", t: "No two the same." }],
+        [{ t: "New pattern, new colours, same name." }, { k: "Tale of Tiles", t: "You decide." }, { t: "Which fits you?" }],
+        [{ t: "A hundred names, a hundred artworks." }, { k: "By hand", t: "Never two alike." }],
+        [{ t: "Pick your pattern. Pick your colours." }, { k: "Tale of Tiles", t: "And add your name." }],
+        [{ t: "No two alike — just like your name." }, { k: "Tale of Tiles", t: "Each laid by hand." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Un nom, une infinité de designs." }, { t: "Fait main — jamais deux pareils." }],
+        [{ t: "Chaque panneau posé à la main." }, { k: "Votre nom", t: "En véritable émail." }, { t: "Une œuvre pour votre mur." }],
+        [{ t: "Autant de designs que vous voulez." }, { k: "Tale of Tiles", t: "Jamais deux identiques." }],
+        [{ t: "Nouveau motif, nouvelles couleurs, même nom." }, { k: "Tale of Tiles", t: "À vous de choisir." }],
+        [{ t: "Aucun pareil — comme votre nom." }, { k: "Tale of Tiles", t: "Chacun posé à la main." }],
       ],
     },
   };
@@ -781,6 +840,7 @@ export function makeBrand({ ROOT, config }) {
     const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2);
     const rr = Math.max(8, w * 0.03);
     const poll = { nl: "Welke past bij jou? A · B · C", en: "Which fits you? A · B · C", fr: "Lequel pour vous ? A · B · C" }[lang];
+    const pollKick = RVlang({ nl: ["Zeg het in de comments", "Laat een A, B of C achter", "Jouw keuze?"], en: ["Tell us in the comments", "Drop an A, B or C", "Your pick?"], fr: ["Dites-le en commentaire", "Un A, B ou C ?", "Votre choix ?"] }, lang);
     const Tb = durSec * 0.34, Tc = durSec * 0.72;   // bouw A -> beat-snap A/B/C -> vergelijk A|B|C
     const hold = 1.3;                                // snap-interval (op de beat)
     const drawCW = (cols, r, id) => {
@@ -810,7 +870,7 @@ export function makeBrand({ ROOT, config }) {
         for (let j = 0; j < 3; j++) { const r = { x: Math.round(cxs[j] - mw / 2), y: Math.round(cy - mh / 2), w: mw, h: mh }; inner += `<g opacity="${k.toFixed(3)}">${drawCW(finals[j], r, "cwm" + j)}</g>`; const rad = Math.round(mw * 0.17); overlay += badge(["A", "B", "C"][j], r.x + r.w - rad * 1.05, r.y + rad * 1.05, rad, k); }
       }
       const pollOp = t > Tb ? Math.min(1, (t - Tb) / 0.5) : 0;
-      if (pollOp > 0.01) overlay += captionOverlay(poll, "Zeg het in de comments", W, H, pollOp, "lower");
+      if (pollOp > 0.01) overlay += captionOverlay(poll, pollKick, W, H, pollOp, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -1011,12 +1071,12 @@ export function makeBrand({ ROOT, config }) {
       // aan de muur (dissolve erover)
       if (wallK > 0.003) overlay += `<g opacity="${wallK.toFixed(3)}">${insituComposite(Pa)}</g>`;
       // OPENING: onderregel (niet "top" -> botste op het logo). Zet de opzet neer.
-      const openTxt = { nl: "Eén naam, drie stijlen", en: "One name, three styles", fr: "Un nom, trois styles" }[lang];
+      const openTxt = RVlang({ nl: ["Eén naam, drie stijlen", "Dezelfde naam, drie keer anders", "Drie ontwerpen, één naam"], en: ["One name, three styles", "Same name, three looks", "Three designs, one name"], fr: ["Un nom, trois styles", "Même nom, trois styles", "Trois designs, un nom"] }, lang);
       const openKick = name || "Tale of Tiles";
       if (a === 0 && f < 0.20) { const op = (f < 0.12 ? Math.min(1, f / 0.05) : 1 - smooth((f - 0.12) / 0.08)); if (op > 0.01) overlay += captionOverlay(openTxt, openKick, W, H, op, "lower"); }
       // SLOT: CTA op het laatste bord -> engagement + "maak 'm zelf (mooier)"
-      const ctaMain = { nl: "Welke vind jij het mooiste?", en: "Which one's your favourite?", fr: "Lequel préférez-vous ?" }[lang];
-      const ctaKick = { nl: "Of ontwerp 'm zelf mooier", en: "Or design yours", fr: "Ou créez le vôtre" }[lang];
+      const ctaMain = RVlang({ nl: ["Welke vind jij het mooiste?", "Welke zou jij ophangen?", "A, B of C?"], en: ["Which one's your favourite?", "Which would you hang?", "A, B or C?"], fr: ["Lequel préférez-vous ?", "Lequel accrocheriez-vous ?", "A, B ou C ?"] }, lang);
+      const ctaKick = RVlang({ nl: ["Of ontwerp 'm zelf mooier", "Of maak je eigen combinatie", "Jij kiest, wij leggen"], en: ["Or design yours", "Or make your own", "You choose, we lay it"], fr: ["Ou créez le vôtre", "Ou composez le vôtre", "À vous de choisir"] }, lang);
       if (a === 2 && f > 0.42) { const op = (f < 0.52 ? smooth((f - 0.42) / 0.10) : (f > 0.86 ? 1 - smooth((f - 0.86) / 0.1) : 1)); if (op > 0.01) overlay += captionOverlay(ctaMain, ctaKick, W, H, op, "lower"); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
@@ -1135,7 +1195,7 @@ export function makeBrand({ ROOT, config }) {
     // het LEVEL als gouden kicker boven de regel (zo zie je: dit is een makkelijke/moeilijke)
     const LVL_LBL = { makkelijk: { nl: "Makkelijk", en: "Easy", fr: "Facile" }, gemiddeld: { nl: "Gemiddeld", en: "Medium", fr: "Moyen" }, moeilijk: { nl: "Moeilijk", en: "Hard", fr: "Difficile" }, expert: { nl: "Expert", en: "Expert", fr: "Expert" } };
     const kick = level ? (LVL_LBL[level][lang] || LVL_LBL[level].nl) : { nl: "Wat is het?", en: "What is it?", fr: "Qu'est-ce que c'est ?" }[lang];
-    const intro = { nl: "Raad wat het is", en: "Guess what it is", fr: "Devinez quoi" }[lang];
+    const intro = RVlang({ nl: ["Raad wat het is", "Wat zie jij ontstaan?", "Herken jij 't?"], en: ["Guess what it is", "What do you see?", "Can you tell?"], fr: ["Devinez quoi", "Que voyez-vous ?", "Reconnais-tu ?"] }, lang);
     // INTRO: eerst even stilstaan (ingezoomd) + het spel uitleggen, dán pas uitzoomen/onthullen.
     const Tintro = Math.min(2.8, durSec * 0.22);
     function sceneAt(frame) {
@@ -1196,7 +1256,7 @@ export function makeBrand({ ROOT, config }) {
     const line = { nl: "Stop zodra je 't herkent", en: "Pause when you recognise it", fr: "Arrête quand tu reconnais" }[lang];
     const LVL_LBL = { makkelijk: { nl: "Makkelijk", en: "Easy", fr: "Facile" }, gemiddeld: { nl: "Gemiddeld", en: "Medium", fr: "Moyen" }, moeilijk: { nl: "Moeilijk", en: "Hard", fr: "Difficile" }, expert: { nl: "Expert", en: "Expert", fr: "Expert" } };
     const kick = level ? (LVL_LBL[level][lang] || LVL_LBL[level].nl) : { nl: "Wat zie jij?", en: "What is it?", fr: "Qu'est-ce ?" }[lang];
-    const intro = { nl: "Raad wat er onder zit", en: "Guess what's underneath", fr: "Devinez ce qui se cache" }[lang];
+    const intro = RVlang({ nl: ["Raad wat er onder zit", "Wat zit eronder?", "Herken jij 't al?"], en: ["Guess what's underneath", "What's underneath?", "Can you tell yet?"], fr: ["Devinez ce qui se cache", "Qu'y a-t-il dessous ?", "Devinez vite"] }, lang);
     // INTRO: eerst even stilstaan op het volle patroon + uitleg, dán pas onthullen.
     const Tintro = Math.min(2.8, durSec * 0.22);
     const revWin = (durSec - Tintro) * 0.72;
@@ -1401,14 +1461,15 @@ export function makeBrand({ ROOT, config }) {
     const Wd = Math.min(1.0, durSec * 0.08);   // overgang paneel -> muur
     const Sd = Math.min(0.8, durSec * 0.06);   // overgang muur #1 -> muur #2
     const hooks = {
-      nl: ["Wat geef je iemand die alles al heeft?", "Op zoek naar een cadeau dat niemand anders geeft?"],
-      en: ["What do you give someone who has everything?", "Looking for a gift no one else gives?"],
+      nl: ["Wat geef je iemand die alles al heeft?", "Op zoek naar een cadeau dat niemand anders geeft?", "Een cadeau dat ze nooit meer weggeven.", "Geen bloemen die verwelken."],
+      en: ["What do you give someone who has everything?", "Looking for a gift no one else gives?", "A gift they'll never give away.", "No flowers that wilt."],
+      fr: ["Que offrir à qui a déjà tout ?", "Un cadeau que personne d'autre n'offre ?", "Un cadeau qu'on ne redonne jamais."],
     };
-    const hook = (hooks[lang] || hooks.nl)[Math.floor(Math.random() * 2)];
+    const hook = RVlang(hooks, lang);
     const revealLine = named
       ? { nl: "Een handgemaakt naambord — met hun naam, in echt glazuur.", en: "A handmade nameplate — with their name, in real glaze.", fr: "Une plaque faite main — à leur nom, en véritable émail." }[lang]
       : { nl: "Met de hand gemaakt. Een stuk kunst voor aan de muur.", en: "Made by hand. A piece of art for the wall.", fr: "Fait main. Une œuvre pour le mur." }[lang];
-    const cta = { nl: "Geef iets dat blijft.", en: "Give something that lasts.", fr: "Offrez ce qui dure." }[lang];
+    const cta = RVlang({ nl: ["Geef iets dat blijft.", "Iets dat generaties meegaat.", "Geef kunst, geen cadeaubon.", "Een cadeau met een naam erop."], en: ["Give something that lasts.", "Something that outlives trends.", "Give art, not a gift card."], fr: ["Offrez ce qui dure.", "Un cadeau qui traverse les générations.", "Offrez de l'art, pas un bon."] }, lang);
 
     function sceneAt(frame) {
       const t = frame / FPS;
