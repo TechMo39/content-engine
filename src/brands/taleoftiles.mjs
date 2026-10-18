@@ -672,6 +672,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "stopzodra", name: "Stop zodra je 't ziet (game)", music: ["upbeat", "lofi", "calm"], defaults: {} },  // type 8: zoom-uit raadspel
     { id: "onthul", name: "Onthul (raad-foto achter patroon)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 9: patroon dooft uit -> foto erachter
     { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU — cadeau-reveal
+    { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -1117,12 +1118,15 @@ export function makeBrand({ ROOT, config }) {
     const ffmpeg = FFMPEG || "ffmpeg";
     const work = path.resolve(ROOT, config.outDir, ".walk-" + Date.now());
     await fs.mkdir(work, { recursive: true });
-    const lang = (opts.lang === "en") ? "en" : "nl"; branding.lang = lang;
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
+    // De live site bestaat alleen in NL en EN — geen FR. Vraag je FR, dan nemen we de
+    // EN-site op met EN-teksten (consistente video) i.p.v. FR-tekst over een niet-FR site.
+    const siteLang = lang === "fr" ? "en" : lang; branding.lang = siteLang;
     const mode = (opts.mode === "simpel" || opts.mode === "detail") ? opts.mode : (Math.random() < 0.5 ? "simpel" : "detail");
     const name = (opts.name || "").trim();
 
     // 1) opnemen -> ruwe mp4 + markers
-    const recEnv = { ...process.env, TOT_OUT: work, TOT_LANG: lang, TOT_MODE: mode, FFMPEG: ffmpeg };
+    const recEnv = { ...process.env, TOT_OUT: work, TOT_LANG: siteLang, TOT_MODE: mode, FFMPEG: ffmpeg };
     if (name) recEnv.TOT_NAME = name;
     if (log) log("● walkthrough — opname van de live site start…");
     const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
@@ -1134,19 +1138,21 @@ export function makeBrand({ ROOT, config }) {
     const caps = ({
       nl: ["Gelukkig heeft iedereen zijn eigen smaak.", "Ontwerp die van jou · Tale of Tiles"],
       en: ["Luckily, everyone has their own taste.", "Design yours · Tale of Tiles"],
-    })[lang];
+      fr: ["Chacun a ses propres goûts.", "Créez la vôtre · Tale of Tiles"],
+    })[siteLang];
     // GUIDE-STAPPEN: neem de kijker mee door de configurator i.p.v. kaal de site tonen.
     const steps = ({
       nl: ["Kies je patroon", "Kleur 'm in — kleurgroepen of per tegel", "Zet je naam erop", "Zie 't op je muur"],
       en: ["Pick your pattern", "Colour it — by group or tile", "Add your name", "See it on your wall"],
-    })[lang];
+      fr: ["Choisissez votre motif", "Colorez — par groupe ou par carreau", "Ajoutez votre nom", "Voyez-le sur votre mur"],
+    })[siteLang];
     const finEnv = { ...process.env, FFMPEG: ffmpeg, TOT_CAPTION: caps[0], TOT_CAPTION2: caps[1], TOT_STEPS: JSON.stringify(steps), TOT_FINAL: path.join(work, "site-final.mp4") };
     if (music) finEnv.TOT_MUSIC = music;
     if (log) log("● walkthrough — content-ready (hook, snelheid, caption, muziek)…");
     const r2 = await runStreamed(node, [finisher, raw], finEnv, log, "· montage:");
     if (r2.status !== 0) throw new Error("content-ready stap (finish) faalde");
 
-    return { prebuilt: path.join(work, "site-final.mp4"), music: "" };
+    return { prebuilt: path.join(work, "site-final.mp4"), music: "", lang: siteLang };
   }
 
   // TYPE 8 — "Stop zodra je 't ziet" (guess/engagement): de camera start extreem ingezoomd op
@@ -1503,7 +1509,136 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
   }
 
+  // INTRO / UITLEG (type 11): WAT -> HOE -> WAAR -> CTA. Combineert de satisfying-opbouw,
+  // een kleurwissel (zelf ontwerpen) en de in-situ muur. Vertelt in ~24-28s wat Tale of Tiles
+  // is, hoe je 'm samenstelt en waar 'ie hangt. Captions roteren (elke render net anders).
+  async function makeIntroRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const durSec = Math.max(18, Math.min(40, resolveDuration(opts)));
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
+    const gold = branding.gold;
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const name = (opts.name || "").trim() || pickName();
+    // één LIGGEND paneel (past straks aan de muur)
+    const PANEL_ASPECT = { "9:16": 1.5, "1:1": 1.2, "16:9": 1.9 }[format] || 1.5;
+    let subjectId = (opts.subject && (patternList || []).includes(opts.subject)) ? opts.subject : pickPatterns(1)[0];
+    const base = await getBase(subjectId);
+    const lock = LOCKS[subjectId] || {};
+    const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);
+    const pSvg = await getPatternSvg(subjectId, nX, nY);
+    const parsed = film.parseTiles(pSvg, "radial");
+    const pw = parsed.view[2], ph = parsed.view[3], A2 = pw / ph;
+    // drie paletten voor de HOE-fase (zelf kleuren kiezen -> kleurwissel)
+    const fam0 = resolvePalette(opts, "intro").key;
+    const others = Object.keys(film.GLAZE_FAMILIES).filter((f) => f !== fam0).sort(() => Math.random() - 0.5).slice(0, 2);
+    const pals = [fam0, ...others].map((k) => PALS()[k] || film.PAL);
+    const finals = pals.map((p) => film.flowColorsAt(parsed, { palette: p, durSec: 1, buildSec: 1, buildStart: 0 }, 1000));
+    const np2 = plateColours(pals[2] || pals[0]);
+    // muur (in-situ) voor de WAAR-fase — paneel past binnen de vrije plek
+    const mk = mockupPool.length ? pickFreshObj(mockupPool, "mockups") : null;
+    const pl = mk && mk.place;
+    let wH = Math.round((pl && pl.h ? pl.h : 0.34) * H * 0.92), wW = Math.round(wH * A2);
+    if (pl && pl.w) { const fw = Math.round(pl.w * W * 0.92); if (wW > fw) { wW = fw; wH = Math.round(wW / A2); } }
+    const maxW = Math.round(W * 0.74), maxH = Math.round(H * 0.40);
+    if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
+    if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
+    let cx = Math.round((pl ? pl.cx : 0.5) * W), cy = Math.round((pl ? pl.cy : 0.46) * H);
+    cx = Math.max(Math.round(wW / 2 + W * 0.05), Math.min(W - Math.round(wW / 2 + W * 0.05), cx));
+    cy = Math.max(Math.round(wH / 2 + H * 0.205), Math.min(H - Math.round(wH / 2 + H * 0.12), cy));
+    const wx = Math.round(cx - wW / 2), wy = Math.round(cy - wH / 2);
+    const roomImg = mk ? (mk.blur ? mk.blur : mk.uri) : "";
+    const roomSVG = (roomImg
+      ? `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+      : `<defs><linearGradient id="iplaster" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#efe7d8"/><stop offset="1" stop-color="#d3c4ab"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#iplaster)"/>`)
+      + `<defs><radialGradient id="ish" cx="50%" cy="48%" r="50%"><stop offset="0.55" stop-color="#120b05" stop-opacity="0.5"/><stop offset="1" stop-color="#120b05" stop-opacity="0"/></radialGradient></defs>`
+      + `<rect x="${wx - 20}" y="${wy - 6}" width="${wW + 40}" height="${wH + 50}" fill="url(#ish)"/>`
+      + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="#16110d"/>`
+      + `<rect x="${wx - 7}" y="${wy - 7}" width="${wW + 14}" height="${wH + 14}" rx="4" fill="none" stroke="${gold}" stroke-width="2.5"/>`;
+    // tijdlijn: WAT (opbouw) -> HOE (kleurwissel + naam) -> WAAR (muur) -> CTA
+    const T1 = durSec * 0.30, T2 = durSec * 0.58, T3 = durSec * 0.86;
+    const nameStart = T1 + (T2 - T1) * 0.55;
+    // ROULERENDE SCRIPTS: elk script legt een ANDER facet uit (basis, ambacht, kwaliteit,
+    // personalisatie, cadeau, paleis->muur) maar komt steeds op dezelfde kern + CTA uit.
+    // Zo is de intro elke render inhoudelijk een andere doorlopende uitleg.
+    const INTRO_SCRIPTS = {
+      nl: [
+        { wat: { t: "Handgemaakte mozaïekkunst met jouw naam.", k: "Dit is Tale of Tiles" }, hoe: { t: "Jij kiest het patroon, de kleuren en je naam.", k: "Zelf ontworpen" }, waar: { t: "En het hangt als kunst aan jouw muur of gevel.", k: "Aan jouw muur" } },
+        { wat: { t: "Met de hand gelegd, tegel voor tegel.", k: "Een eeuwenoud ambacht" }, hoe: { t: "Gesneden, geglazuurd en gebakken — met de hand.", k: "Uit Fès" }, waar: { t: "Nu als een schilderij aan jouw muur.", k: "Vandaag bij jou" } },
+        { wat: { t: "Geen print — mozaïek dat je voelt.", k: "Echt glazuur, echt reliëf" }, hoe: { t: "Verbleekt niet, binnen én buiten.", k: "Kleur die blijft" }, waar: { t: "Aan je gevel of in de hal, generaties lang.", k: "Blijvend" } },
+        { wat: { t: "Eén naam, oneindig veel ontwerpen.", k: "Nooit twee gelijk" }, hoe: { t: "Kies je patroon, je kleuren, je naam.", k: "Jij bepaalt" }, waar: { t: "Klaar om op te hangen — een kunstwerk voor je muur.", k: "Aan jouw muur" } },
+        { wat: { t: "Handgemaakte kunst met hun naam.", k: "Meer dan een bordje" }, hoe: { t: "Stuk voor stuk gemaakt, speciaal voor hen.", k: "Met de hand" }, waar: { t: "Een schilderij om door te geven.", k: "Iets dat blijft" } },
+        { wat: { t: "Wat eeuwen aan paleismuren hing…", k: "Fès" }, hoe: { t: "…nu met de hand gelegd, in jouw kleuren.", k: "Hetzelfde ambacht" }, waar: { t: "Aan jouw muur van nu, binnen of buiten.", k: "Van paleis tot jouw muur" } },
+      ],
+      en: [
+        { wat: { t: "Handmade mosaic art with your name.", k: "This is Tale of Tiles" }, hoe: { t: "You pick the pattern, the colours, your name.", k: "Your design" }, waar: { t: "And it hangs as art on your wall or facade.", k: "On your wall" } },
+        { wat: { t: "Laid by hand, tile by tile.", k: "An age-old craft" }, hoe: { t: "Cut, glazed and fired — all by hand.", k: "From Fès" }, waar: { t: "Now a painting on your wall.", k: "Today, yours" } },
+        { wat: { t: "No print — mosaic you can feel.", k: "Real glaze, real relief" }, hoe: { t: "Won't fade, indoors or out.", k: "Colour that stays" }, waar: { t: "On your facade or in the hall, for generations.", k: "Lasting" } },
+        { wat: { t: "One name, endless designs.", k: "Never two alike" }, hoe: { t: "Pick your pattern, your colours, your name.", k: "You decide" }, waar: { t: "Ready to hang — a piece of art for your wall.", k: "On your wall" } },
+        { wat: { t: "Handmade art with their name.", k: "More than a label" }, hoe: { t: "Made piece by piece, just for them.", k: "By hand" }, waar: { t: "A painting to pass on.", k: "Something that lasts" } },
+        { wat: { t: "What once lined palace walls…", k: "Fès" }, hoe: { t: "…now laid by hand, in your colours.", k: "The same craft" }, waar: { t: "On your wall today, indoors or out.", k: "From palace to your wall" } },
+      ],
+      fr: [
+        { wat: { t: "De l'art mosaïque fait main, à votre nom.", k: "Voici Tale of Tiles" }, hoe: { t: "Vous choisissez le motif, les couleurs et le nom.", k: "Votre création" }, waar: { t: "Et il orne votre mur ou façade.", k: "Sur votre mur" } },
+        { wat: { t: "Posé à la main, carreau par carreau.", k: "Un art ancestral" }, hoe: { t: "Taillé, émaillé et cuit — à la main.", k: "De Fès" }, waar: { t: "Désormais un tableau sur votre mur.", k: "Aujourd'hui, chez vous" } },
+        { wat: { t: "Un nom, une infinité de designs.", k: "Jamais deux pareils" }, hoe: { t: "Choisissez motif, couleurs et nom.", k: "À vous de décider" }, waar: { t: "Prêt à accrocher — une œuvre pour votre mur.", k: "Sur votre mur" } },
+        { wat: { t: "Ce qui ornait les palais…", k: "Fès" }, hoe: { t: "…posé à la main, dans vos couleurs.", k: "Le même art" }, waar: { t: "Sur votre mur d'aujourd'hui.", k: "Du palais à votre mur" } },
+      ],
+    };
+    const scripts = INTRO_SCRIPTS[lang] || INTRO_SCRIPTS.nl;
+    const sc = scripts[Math.floor(Math.random() * scripts.length)];
+    const capWAT = sc.wat.t, kickWAT = sc.wat.k;
+    const capHOE = sc.hoe.t, kickHOE = sc.hoe.k;
+    const capWAAR = sc.waar.t, kickWAAR = sc.waar.k;
+    const capCTA = { nl: "Ontwerp die van jou.", en: "Design yours.", fr: "Créez la vôtre." }[lang];
+    function colAt(t) {
+      if (t < T1) return film.flowColorsAt(parsed, { palette: pals[0], durSec: T1, buildSec: T1 * 0.82, buildStart: T1 * 0.10, popSec: 0.05 }, t);
+      if (t < T2) {
+        const k = (t - T1) / (T2 - T1);
+        if (k < 0.5) { const m = smooth(k / 0.5); return finals[0].map((c, i) => _mix(finals[0][i], finals[1][i], m)); }
+        const m = smooth((k - 0.5) / 0.5); return finals[1].map((c, i) => _mix(finals[1][i], finals[2][i], m));
+      }
+      return finals[2];
+    }
+    function mosaicInRect(x, y, w, h, cols, id) {
+      const wrap = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      const rr = Math.max(6, w * 0.03);
+      return `<clipPath id="imc${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
+        + `<g clip-path="url(#imc${id})">${mos}${glazeSvg(x, y, w, h, "img" + id)}</g>`;
+    }
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const cols = colAt(t);
+      let wallK = 0;
+      if (t >= T2 && t < T3) wallK = smooth((t - T2) / (T3 - T2));
+      else if (t >= T3) wallK = 1;
+      let inner = "";
+      if (wallK > 0.003) inner += `<g opacity="${wallK.toFixed(3)}">${roomSVG}</g>`;
+      inner += mosaicInRect(wx, wy, wW, wH, cols, "0");
+      let overlay = "";
+      if (wallK < 0.997) { const rr = Math.max(6, wW * 0.03); overlay += `<rect x="${wx}" y="${wy}" width="${wW}" height="${wH}" rx="${rr}" fill="none" stroke="${gold}" stroke-width="2.5" opacity="${(1 - wallK).toFixed(3)}"/>`; }
+      if (name) {
+        const op = Math.max(0, Math.min(1, (t - nameStart) / 1.1));
+        if (op > 0.01) { const cyN = wy + wH / 2 + (1 - smooth(op)) * 8; overlay += `<g opacity="${op.toFixed(3)}">${platePlace(name, np2, wx + wW / 2, cyN, Math.round(wH * 0.20), wW * 0.9)}</g>`; }
+      }
+      const cap = (txt, kick, a0, a1) => {
+        const fade = Math.min(0.6, (a1 - a0) * 0.22); let o = 0;
+        if (t >= a0 && t < a1) { if (t < a0 + fade) o = smooth((t - a0) / fade); else if (t > a1 - fade) o = 1 - smooth((t - (a1 - fade)) / fade); else o = 1; }
+        return o > 0.01 ? captionOverlay(txt, kick, W, H, o, "lower") : "";
+      };
+      overlay += cap(capWAT, kickWAT, 0.4, T1 + (T2 - T1) * 0.15);
+      overlay += cap(capHOE, kickHOE, T1 + (T2 - T1) * 0.18, T2 + (T3 - T2) * 0.10);
+      overlay += cap(capWAAR, kickWAAR, T2 + (T3 - T2) * 0.14, T3 + (durSec - T3) * 0.45);
+      overlay += cap(capCTA, "Tale of Tiles", T3 + (durSec - T3) * 0.5, durSec);
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
+    if (templateId === "intro") return await makeIntroRender({ opts, format });
     if (templateId === "walkthrough") return await makeWalkthroughRender({ opts, format, log });
     if (templateId === "cadeau") return await makeCadeauRender({ opts, format });
     if (templateId === "stopzodra") return await makeGuessRender({ opts, format });

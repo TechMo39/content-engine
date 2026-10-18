@@ -36,7 +36,9 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .tabs{margin-left:auto;display:flex;gap:8px}
 .tabs button{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:7px 16px;font-size:13px;cursor:pointer}
 .tabs button.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
-#view-lib{height:calc(100vh - 58px);overflow:auto;padding:18px 26px}
+#view-lib,#view-mail{height:calc(100vh - 58px);overflow:auto;padding:18px 26px}
+.mailbar{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+#mailNames{width:340px;max-width:90vw;height:120px;resize:vertical;background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:10px;padding:10px;font-size:14px;font-family:inherit}
 .libbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
 .libcard{border:1px solid #3a2f52;border-radius:12px;overflow:hidden;background:#1b1430;display:flex;flex-direction:column}
@@ -59,7 +61,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .libclose{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#241a10;border:0;font-size:16px;cursor:pointer;font-weight:700}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
-  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-lib">Bibliotheek</button></nav></div>
+  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button></nav></div>
 <div class="wrap" id="view-studio">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
@@ -70,6 +72,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
       <label class="row">Muziek <span style="display:flex;gap:6px;align-items:center"><select id="music"><option value="">(automatisch — op type)</option></select><button id="mprev" title="Beluister" style="background:#1b1430;border:1px solid #3a2f52;color:var(--gold);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:13px">▶</button></span></label>
       <audio id="maud" style="display:none"></audio>
       <label class="row">Formaat <span class="seg"><button data-fmt="9:16" class="on">9:16</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9">16:9</button></span></label>
+      <label class="row">Taal <span class="seg" id="langSeg"><button data-lang="nl" class="on">NL</button><button data-lang="en">EN</button><button data-lang="fr">FR</button></span></label>
     </div>
     <button class="render" id="go" disabled>Kies merk + type</button>
     <button class="render" id="goall" style="background:#1b1430;color:var(--gold);border:1px solid var(--gold);margin-top:6px">Render alle types (wachtrij)</button>
@@ -89,11 +92,24 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
   <div id="libEmpty" class="libempty" style="display:none"></div>
 </section>
 
+<section id="view-mail" style="display:none">
+  <div class="mailbar">
+    <div>
+      <div style="font-size:12px;color:#9b8fc0;margin-bottom:6px">Bedrijfsnamen — één per regel</div>
+      <textarea id="mailNames" placeholder="Café De Kaai&#10;Bloemist Amira&#10;Garage Yilmaz"></textarea>
+    </div>
+    <button id="mailGo" class="chip" style="align-self:flex-end;font-size:14px;padding:9px 16px">Render plaatjes</button>
+    <span id="mailMsg" class="hint" style="align-self:flex-end"></span>
+  </div>
+  <div id="mailGrid" class="libgrid"></div>
+  <div id="mailEmpty" class="libempty">Tik bedrijfsnamen in en klik “Render plaatjes”. Elk bedrijf krijgt hetzelfde plaatje telkens — klaar voor R2 en de mail.</div>
+</section>
+
 <div id="libModal" class="libmodal" style="display:none"><div class="libmodal-in"><button id="libClose" class="libclose">✕</button><div id="libModalBody"></div></div></div>
 
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{palette:"auto",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{lang:"nl",palette:"auto",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
 let BRANDOPTS=[];
 
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
@@ -156,6 +172,7 @@ function setSubjOpen(o){$('#subjWrap').style.display=o?'':'none';$('#subjToggle'
 $('#subjToggle').onclick=()=>setSubjOpen($('#subjWrap').style.display==='none');
 
 $$('[data-fmt]').forEach(b=>b.onclick=()=>{$$('[data-fmt]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.format=b.dataset.fmt;});
+$$('[data-lang]').forEach(b=>b.onclick=()=>{$$('[data-lang]').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.opts.lang=b.dataset.lang;});
 fetch('/api/music').then(r=>r.json()).then(j=>(j.files||[]).forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;$('#music').appendChild(o);}));
 $('#music').onchange=e=>state.music=e.target.value;
 // Muziek-preview: ▶ speelt de gekozen track (of een willekeurige bij 'automatisch'); nogmaals = stop.
@@ -183,15 +200,37 @@ $('#goall').onclick=async()=>{const btn=$('#goall');btn.disabled=true;$('#msg').
 const lib={items:[],brand:'',kind:'',q:'',loaded:false};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function showView(which){
-  const studio=which==='studio';
-  $('#view-studio').style.display=studio?'grid':'none';
-  $('#view-lib').style.display=studio?'none':'block';
-  $('#tab-studio').classList.toggle('on',studio);$('#tab-lib').classList.toggle('on',!studio);
-  $('#topsub').textContent=studio?'merk → onderwerp → template → render':'alle gerenderde output op één plek';
-  if(!studio&&!lib.loaded)loadLibrary();
+  $('#view-studio').style.display=which==='studio'?'grid':'none';
+  $('#view-mail').style.display=which==='mail'?'block':'none';
+  $('#view-lib').style.display=which==='lib'?'block':'none';
+  $('#tab-studio').classList.toggle('on',which==='studio');
+  $('#tab-mail').classList.toggle('on',which==='mail');
+  $('#tab-lib').classList.toggle('on',which==='lib');
+  $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':'alle gerenderde output op één plek';
+  if(which==='lib'&&!lib.loaded)loadLibrary();
 }
 $('#tab-studio').onclick=()=>showView('studio');
+$('#tab-mail').onclick=()=>showView('mail');
 $('#tab-lib').onclick=()=>showView('lib');
+$('#mailGo').onclick=async()=>{
+  const names=$('#mailNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!names.length){$('#mailMsg').textContent='Vul minstens één bedrijfsnaam in.';return;}
+  const btn=$('#mailGo');btn.disabled=true;$('#mailEmpty').style.display='none';$('#mailMsg').textContent='Renderen… ('+names.length+' bedrijf'+(names.length>1?'ven':'')+')';
+  try{
+    const j=await (await fetch('/api/mailstill',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({names})})).json();
+    const g=$('#mailGrid');g.innerHTML='';
+    (j.items||[]).forEach(it=>{
+      const card=document.createElement('div');card.className='libcard';
+      if(it.error){ card.innerHTML=`<div class="thumb sq" style="display:flex;align-items:center;justify-content:center;color:#e88;font-size:12px;text-align:center;padding:10px">mislukt</div><div class="meta"><div class="nm">${esc(it.name)}</div><div class="sub"><span>${esc(it.error)}</span></div></div>`; }
+      else{ card.innerHTML=`<div class="thumb sq"><img src="${esc(it.url)}?t=${Date.now()}" loading="lazy"></div><div class="meta"><div class="nm" title="${esc(it.name)}">${esc(it.name)}</div><div class="sub"><span>${it.kb} KB</span></div></div><div class="acts"><a href="${esc(it.url)}" download>Download</a></div>`;
+        card.querySelector('.thumb').onclick=()=>openModal({kind:'still',url:it.url}); }
+      g.appendChild(card);
+    });
+    const ok=(j.items||[]).filter(x=>!x.error).length;
+    $('#mailMsg').textContent=ok+' klaar — staan ook in de Bibliotheek.';
+  }catch(e){$('#mailMsg').textContent='Fout: '+e.message;}
+  btn.disabled=false;
+};
 $('#libRefresh').onclick=()=>loadLibrary();
 $('#libSearch').oninput=e=>{lib.q=e.target.value.toLowerCase();renderLib();};
 $$('#libKinds button').forEach(b=>b.onclick=()=>{$$('#libKinds button').forEach(x=>x.classList.remove('on'));b.classList.add('on');lib.kind=b.dataset.k;renderLib();});
@@ -222,7 +261,7 @@ function renderLib(){
     const title=it.name||it.typeName||it.file;
     const right=[it.date,(it.kb?it.kb+' KB':'')].filter(Boolean).join(' · ');
     card.innerHTML=thumb
-      +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub"><span>${esc(it.brandName)}${it.lang==='en'?' · EN':''}</span><span>${esc(right)}</span></div></div>`
+      +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub"><span>${esc(it.brandName)}${it.lang&&it.lang!=='nl'?' · '+it.lang.toUpperCase():''}</span><span>${esc(right)}</span></div></div>`
       +`<div class="acts"><a href="${esc(it.url)}" download>Download</a><button>${it.kind==='video'?'Afspelen':'Bekijken'}</button></div>`;
     card.querySelector('.thumb').onclick=()=>openModal(it);
     card.querySelector('.acts button').onclick=()=>openModal(it);

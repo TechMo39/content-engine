@@ -4,11 +4,14 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.mjs";
 import { buildRegistry } from "./registry.mjs";
 import { renderToMp4 } from "./core/renderer.mjs";
+import { Resvg } from "@resvg/resvg-js";
+import ffmpegPath from "ffmpeg-static";
 
 const ROOT = path.resolve(fileURLToPath(import.meta.url), "../..");
 const PORT = 4600;
@@ -21,6 +24,51 @@ function log(msg) { const line = String(msg); process.stdout.write("  " + line +
 const reg = buildRegistry({ ROOT, config });
 for (const b of reg.brands) { try { await b.init(log); } catch (e) { log(`merk ${b.id} init-fout: ${e.message}`); } }
 log("merken geladen: " + reg.brands.map((b) => b.id).join(", "));
+
+// ---- MAIL-STILL: per bedrijf één mail-afbeelding, LOKAAL gerenderd. Deterministisch per naam
+// (zelfde bedrijf -> altijd hetzelfde plaatje), zodat het op R2 een stabiele URL kan krijgen.
+const MAILSTILL_DIR = path.resolve(OUT, "mail-stills");
+const FONTS_DIR = path.resolve(ROOT, "assets/fonts");
+let FONT_FILES = [];
+try { FONT_FILES = (await fs.readdir(FONTS_DIR)).filter((f) => /\.(ttf|otf)$/i.test(f)).map((f) => path.join(FONTS_DIR, f)); } catch {}
+function slugify(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "naam"; }
+function hashSeed(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+// Math.random tijdelijk vervangen door een vaste reeks (seed uit de naam) -> dezelfde mockup+palet
+async function withSeed(seed, fn) {
+  const orig = Math.random; let x = (seed || 1) >>> 0;
+  Math.random = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  try { return await fn(); } finally { Math.random = orig; }
+}
+// De glazuur-families (vaste set). Door de familie + de mockup op de naam-hash te pinnen,
+// omzeilen we de anti-herhaling (pickFresh) volledig -> zelfde bedrijf = altijd zelfde plaatje.
+const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine"];
+let MS_MOCKUPS = null, MS_SUBJECTS = null;
+async function mockupsOnce() { if (MS_MOCKUPS) return MS_MOCKUPS; try { MS_MOCKUPS = (await reg.byId["taleoftiles"].listMockups()).map((m) => m.id); } catch { MS_MOCKUPS = []; } return MS_MOCKUPS; }
+async function subjectsOnce() { if (MS_SUBJECTS) return MS_SUBJECTS; try { MS_SUBJECTS = (await reg.byId["taleoftiles"].listSubjects()).map((s) => s.id); } catch { MS_SUBJECTS = []; } return MS_SUBJECTS; }
+let mailChain = Promise.resolve();   // renders serialiseren (de seed is globaal, dus niet parallel)
+async function renderMailStill(name) {
+  const brand = reg.byId["taleoftiles"]; if (!brand) throw new Error("merk taleoftiles niet geladen");
+  await fs.mkdir(MAILSTILL_DIR, { recursive: true });
+  const mk = await mockupsOnce(), subs = await subjectsOnce();
+  const h = hashSeed(name);
+  const fam = MS_FAMILIES[h % MS_FAMILIES.length];
+  const image = mk.length ? mk[Math.floor(h / 97) % mk.length] : "";
+  const subjectId = subs.length ? subs[Math.floor(h / 9973) % subs.length] : undefined;
+  const svg = await withSeed(h, async () => {
+    const r = await brand.makeRender({ subjectId, templateId: "insitu", opts: { name, lang: "nl", palette: fam, image, hook: "none" }, format: "1:1", log: () => {} });
+    r.SS = 1;
+    return r.sceneAt(Math.round(r.durSec * 0.93 * r.FPS));   // eindbeeld: paneel vol + naam
+  });
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: 720 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
+  const tmp = path.join(os.tmpdir(), "totms-" + Date.now() + ".png");
+  await fs.writeFile(tmp, png);
+  const file = slugify(name) + ".jpg";
+  spawnSync(ffmpegPath, ["-y", "-v", "error", "-i", tmp, "-vf", "scale=600:-1:flags=lanczos", "-q:v", "4", path.join(MAILSTILL_DIR, file)], { stdio: "ignore" });
+  try { await fs.unlink(tmp); } catch {}
+  const st = await fs.stat(path.join(MAILSTILL_DIR, file));
+  return { name, url: "/out/mail-stills/" + encodeURIComponent(file), kb: Math.round(st.size / 1024) };
+}
+function enqueueMail(name) { const p = mailChain.then(() => renderMailStill(name)); mailChain = p.catch(() => {}); return p; }
 
 // ---- BIBLIOTHEEK-helpers: metadata uit de bestandsnaam halen (<merk>-<type>[-en][-naam]-MMDD-HHMMSS.mp4) ----
 const BRAND_IDS = reg.brands.map((b) => b.id).sort((a, b) => b.length - a.length);   // langste eerst (prefix-match)
@@ -40,7 +88,7 @@ function parseOutName(fileNoExt) {
   let template = null, lang = "nl"; const nameParts = [];
   for (const p of rest.split("-").filter(Boolean)) {
     if (!template && TEMPLATE_IDS.has(p)) { template = p; continue; }
-    if (p === "en") { lang = "en"; continue; }
+    if (p === "en" || p === "fr") { lang = p; continue; }
     nameParts.push(p);
   }
   return { brand, template, lang, name: nameParts.join(" "), date };
@@ -70,7 +118,7 @@ function p2(n) { return String(n).padStart(2, "0"); }
 function stamp() { const d = new Date(); return `${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`; }
 function outBase(job) {
   const p = [job.brand, job.template || "video"];
-  if (job.opts && job.opts.lang === "en") p.push("en");
+  const _lg = job.opts && job.opts.lang; if (_lg === "en" || _lg === "fr") p.push(_lg);
   if (job.opts && job.opts.name) p.push(String(job.opts.name).replace(/\s+/g, ""));
   return (p.join("-").replace(/[^A-Za-z0-9_-]+/g, "").slice(0, 50) || "video") + "-" + stamp();
 }
@@ -78,6 +126,9 @@ async function runOne(job) {
   const brand = reg.byId[job.brand];
   if (!brand) throw new Error("onbekend merk");
   const render = await brand.makeRender({ subjectId: job.subject, templateId: job.template, opts: job.opts || {}, format: job.format || "9:16", log });
+  // Een render mag de effectieve taal corrigeren (bv. walkthrough valt FR terug op EN) ->
+  // dan klopt de taal in de bestandsnaam met wat er echt in de video staat.
+  if (render && render.lang) job = { ...job, opts: { ...(job.opts || {}), lang: render.lang } };
   const base = outBase(job);
   // kant-en-klare mp4 (bv. website-walkthrough) -> direct met nette naam neerzetten
   if (render && render.prebuilt && existsSync(render.prebuilt)) {
@@ -158,6 +209,19 @@ const server = http.createServer(async (req, res) => {
       } catch {}
       items.sort((a, b) => b.mtime - a.mtime);
       json(res, { items, brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) });
+      return;
+    }
+    if (u.pathname === "/api/mailstill" && req.method === "POST") {
+      const bd = await readBody(req);
+      const names = (Array.isArray(bd.names) ? bd.names : String(bd.names || "").split("\n")).map((s) => String(s).trim()).filter(Boolean).slice(0, 50);
+      if (!names.length) { json(res, { error: "geen namen opgegeven" }, 400); return; }
+      log(`▶ mail-plaatjes: ${names.length} bedrijf(ven)`);
+      const items = [];
+      for (const nm of names) {
+        try { items.push(await enqueueMail(nm)); log(`✓ mail-still: ${nm}`); }
+        catch (e) { items.push({ name: nm, error: e.message }); log(`✗ mail-still ${nm}: ${e.message}`); }
+      }
+      json(res, { items });
       return;
     }
     if (u.pathname === "/api/render" && req.method === "POST") {
