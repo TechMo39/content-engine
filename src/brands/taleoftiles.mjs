@@ -295,7 +295,8 @@ export function makeBrand({ ROOT, config }) {
           + `<rect x="${plateX}" y="${plateY}" width="${pw}" height="${ph}" rx="${rx}" fill="#f6f1e8"/>`
           + `<rect x="${plateX}" y="${plateY}" width="${pw}" height="${ph}" rx="${rx}" fill="none" stroke="${gold}" stroke-width="1.6" opacity="0.55"/>`
           + `<image href="${branding.markLogo}" x="${lx}" y="${ly}" width="${lw}" height="${lh}" preserveAspectRatio="xMidYMid meet"/>`
-          + `<text x="${W / 2}" y="${tagY}" text-anchor="middle" font-family="${SERIF}" font-weight="500" font-size="${tag}" letter-spacing="${(tag * 0.26).toFixed(1)}" fill="${cream}" opacity="0.8">${slg}</text>`;
+          + `<text x="${W / 2}" y="${(tagY + 1.3).toFixed(1)}" text-anchor="middle" font-family="${SERIF}" font-weight="500" font-size="${tag}" letter-spacing="${(tag * 0.26).toFixed(1)}" fill="#1c140b" opacity="0.5">${slg}</text>`
+          + `<text x="${W / 2}" y="${tagY}" text-anchor="middle" font-family="${SERIF}" font-weight="500" font-size="${tag}" letter-spacing="${(tag * 0.26).toFixed(1)}" fill="${cream}" opacity="0.96">${slg}</text>`;
       }
       const midY = Math.round(H * 0.072), fs = Math.round(W * 0.05), ruleW = fs * 4.3, tag2 = Math.round(fs * 0.33);
       return `<polygon points="${star8(W / 2, midY - fs * 1.02, fs * 0.52, fs * 0.22)}" fill="${gold}"/>`
@@ -418,7 +419,7 @@ export function makeBrand({ ROOT, config }) {
     if (log) log(`foto-pool taleoftiles: ${imagePool.length} beeld(en), ${mockupPool.length} mockup(s), ${sfeerPool.length} sfeerbeeld(en), ${guessPool.length} raad-beeld(en)`);
   }
   async function listImages() { return imagePool.map((x) => ({ id: x.id, uri: x.uri })); }
-  async function listMockups() { return mockupPool.map((x) => ({ id: x.id, uri: x.uri })); }
+  async function listMockups() { return mockupPool.map((x) => ({ id: x.id, uri: x.uri, place: x.place || null })); }
   async function listSfeer() { return sfeerPool.map((x) => ({ id: x.id, uri: x.uri })); }
   async function getBase(pattern) {
     if (baseCache.has(pattern)) return baseCache.get(pattern);
@@ -1410,7 +1411,7 @@ export function makeBrand({ ROOT, config }) {
     }
     // Het paneel aan een ECHTE muur (mockup + diepte + lijst) — hergebruikt de in-situ-opmaak.
     function wallScene(mk, cols, id) {
-      const A2 = pw / ph, pl = mk && mk.place;
+      const A2 = Math.max(1.2, Math.min(1.65, pw / ph)), pl = mk && mk.place;
       let wH = Math.round(pl ? pl.h * H : H * 0.34), wW = Math.round(wH * A2);
       const maxW = Math.round(W * 0.78), maxH = Math.round(H * 0.40);
       if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
@@ -1756,7 +1757,10 @@ export function makeBrand({ ROOT, config }) {
     // de lijst op de gedetecteerde vrije muurplek. Geen positie-sprong meer bij de overgang.
     let insituWall = "";          // vaste achtergrond: muur (blur/DoF) + contactschaduw + lijst
     if (insitu) {
-      const A2 = pw / ph;
+      // Paneelverhouding vastklemmen op een nette naambord-vorm: sommige patronen hebben een
+      // brede/smalle viewBox; zonder klem wordt het paneel een letterbox. Het mozaïek vult de
+      // vorm (slice), dus de inhoud blijft kloppen.
+      const A2 = Math.max(1.2, Math.min(1.65, pw / ph));
       const pl = chosenMockup && chosenMockup.place;
       // Het paneel moet BINNEN de gedetecteerde vrije plek passen — breedte én hoogte, met
       // marge — zodat het als een opgehangen werk oogt en nooit over bakstenen/planten/rand
@@ -1767,12 +1771,12 @@ export function makeBrand({ ROOT, config }) {
       if (wH > freeH) { wH = freeH; wW = Math.round(wH * A2); }   // te hoog -> op vrije hoogte passen
       // Vierkant (mail-still) heeft een relatief groter logo/slogan bovenin -> paneel kleiner
       // en lager, zodat de slogan de bovenrand van het paneel niet raakt.
-      const maxW = Math.round(W * 0.74), maxH = Math.round(H * (format === "1:1" ? 0.33 : 0.38));
+      const maxW = Math.round(W * 0.74), maxH = Math.round(H * (format === "1:1" ? 0.36 : 0.38));
       if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
       if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
       let cxp = Math.round(pl ? pl.cx * W : W / 2), cyp = Math.round(pl ? pl.cy * H : panelY + panelH / 2);
       // binnen beeld houden: top onder het logo/slogan (meer marge in 1:1), onder vrij van de rand.
-      const topMargin = (format === "1:1") ? 0.30 : 0.205;
+      const topMargin = (format === "1:1") ? 0.275 : 0.205;
       cxp = Math.max(Math.round(wW / 2 + W * 0.04), Math.min(W - Math.round(wW / 2 + W * 0.04), cxp));
       cyp = Math.max(Math.round(wH / 2 + H * topMargin), Math.min(H - Math.round(wH / 2 + H * 0.12), cyp));
       const wx = Math.round(cxp - wW / 2), wy = Math.round(cyp - wH / 2);

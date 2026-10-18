@@ -60,13 +60,17 @@ function renderLock(fn) { const run = _renderGate.then(fn, fn); _renderGate = ru
 // omzeilen we de anti-herhaling (pickFresh) volledig -> zelfde bedrijf = altijd zelfde plaatje.
 const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine"];
 let MS_MOCKUPS = null, MS_SUBJECTS = null;
-async function mockupsOnce() { if (MS_MOCKUPS) return MS_MOCKUPS; try { MS_MOCKUPS = (await reg.byId["taleoftiles"].listMockups()).map((m) => m.id); } catch { MS_MOCKUPS = []; } return MS_MOCKUPS; }
+async function mockupsOnce() { if (MS_MOCKUPS) return MS_MOCKUPS; try { MS_MOCKUPS = await reg.byId["taleoftiles"].listMockups(); } catch { MS_MOCKUPS = []; } return MS_MOCKUPS; }
 async function subjectsOnce() { if (MS_SUBJECTS) return MS_SUBJECTS; try { MS_SUBJECTS = (await reg.byId["taleoftiles"].listSubjects()).map((s) => s.id); } catch { MS_SUBJECTS = []; } return MS_SUBJECTS; }
 let mailChain = Promise.resolve();   // renders serialiseren (de seed is globaal, dus niet parallel)
 async function renderMailStill(name) {
   const brand = reg.byId["taleoftiles"]; if (!brand) throw new Error("merk taleoftiles niet geladen");
   await fs.mkdir(MAILSTILL_DIR, { recursive: true });
-  const mk = await mockupsOnce(), subs = await subjectsOnce();
+  const mkAll = await mockupsOnce(), subs = await subjectsOnce();
+  // MAIL-VEILIGE MOCKUPS: alleen muren waar de auto-detectie een ruime, nette vrije plek vond
+  // (niet te laag/klein/aan de rand) -> nooit een bord op de stoep/straat van een winkelpui.
+  const mkSafe = mkAll.filter((m) => m.place && m.place.w >= 0.34 && m.place.h >= 0.24 && m.place.cy <= 0.58 && m.place.cx >= 0.30 && m.place.cx <= 0.70);
+  const mk = (mkSafe.length ? mkSafe : mkAll).map((m) => m.id);
   const h = hashSeed(name);
   const fam = MS_FAMILIES[h % MS_FAMILIES.length];
   const image = mk.length ? mk[Math.floor(h / 97) % mk.length] : "";
@@ -76,7 +80,7 @@ async function renderMailStill(name) {
     r.SS = 1;
     return r.sceneAt(Math.round(r.durSec * 0.93 * r.FPS));   // eindbeeld: paneel vol + naam
   }));
-  const png = new Resvg(svg, { fitTo: { mode: "width", value: 720 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: 1200 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
   const tmp = path.join(os.tmpdir(), "totms-" + Date.now() + ".png");
   await fs.writeFile(tmp, png);
   const file = slugify(name) + ".jpg";
