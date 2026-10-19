@@ -20,6 +20,10 @@ export const GLAZE_FAMILIES: Record<string, string[]> = {
   oceaan:     ["#123f4a", "#1f6e78", "#2f98a0", "#6fb2ad", "#e5e6dd"],
   mono_blauw: ["#14324f", "#1f4e78", "#2f6ea0", "#5a93c0", "#dfe4e8"],
   mono_groen: ["#1c4a33", "#2b6e49", "#3e9166", "#79b089", "#e4e9da"],
+  // BONT: een echt veelkleurig zellige-palet — blauw naast groen naast oker naast terracotta
+  // naast zwart en crème. Botsende, pakkende kleuren (zoals de meerkleurige configurator-modus).
+  bont:       ["#1e5fb0", "#167e7e", "#1a8f4e", "#6f9f3c", "#e5a81c", "#e07b1a", "#c0452e", "#9c3b63", "#e0928c", "#232528", "#5a93c0", "#ece3cf"],
+  feest:      ["#2b4f9c", "#0f8a86", "#2f9b57", "#d8a51e", "#d96a1c", "#b83a2e", "#7a3b70", "#d98a86", "#1d6f6b", "#20242a", "#8fb0d6", "#efe7d4"],
 };
 export const BLANK = "#ffffff";   // kaal = wit (niet bruin); 3D-reliëf komt van de glazuurlaag
 export const PLUM = "#2a2335";
@@ -269,19 +273,74 @@ export function colorsAt(parsed: Parsed, story: Storyboard, t: number): string[]
 // - opbouw: aan het begin kleuren de tegels in op volgorde (tile.order).
 // opts = { palette, durSec, buildSec, reveal? }  — alle timing schaalt met durSec.
 export type FlowOpts = { palette?: string[]; durSec: number; buildSec?: number; buildStart?: number; speed?: number; popSec?: number };
-// Eén vaste, samenhangende inkleuring per tegel (zoals een echt paneel): egale
-// kleur-regio's, geen willekeur. 1× berekend en gecachet.
+// Kleur-index per tegel. Twee modi:
+//  - SCATTER (veelkleurig palet, 10+): elke tegel een losse kleur, BUURBEWUST ->
+//    geen enkele tegel krijgt dezelfde kleur als een aangrenzende tegel ("om en om").
+//    Op het palet gesorteerd op TINT kiest elke tegel uit een lokaal, harmonieus
+//    kleur-bandje dat langzaam over het paneel schuift. Grote/weinig tegels: het
+//    bandje = het hele palet -> vol & bont (configurator-look). Veel kleine tegels:
+//    een smaller bandje -> aangrenzende tinten ipv wild spectrum -> rustig voor 't
+//    oog, maar nog steeds tegel-voor-tegel anders (geen beeldruis, geen groepjes).
+//  - ZONES (monochroom/klein palet): ruimtelijke ruis = rustige kleur-regio's. Zo
+//    ontstaat vanzelf een mix: sommige borden rustig-tonaal, sommige bont scatter.
+function colorIndices(parsed: Parsed, pal: string[]): number[] {
+  const tiles = parsed.tiles, n = tiles.length;
+  if (pal.length < 10 || n === 0) {
+    // ZONES: vloeiende ruis-regio's
+    return tiles.map((tile) => {
+      const x = tile.nx * 6, y = tile.ny * 6;
+      const nz = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
+      return Math.max(0, Math.min(pal.length - 1, Math.floor(((nz + 4) / 8) * pal.length)));
+    });
+  }
+  const L = pal.length;
+  // Palet op tint sorteren -> rang-ruimte waarin naburige rangen op elkaar lijken.
+  const order = pal.map((_, i) => i).sort((a, b) => hue(pal[a]) - hue(pal[b]));   // rang -> palet-index
+  // Bandbreedte: weinig/grote tegels -> heel palet (bont). Veel/kleine tegels -> smaller
+  // bandje analoge tinten. Minimaal 7 zodat er altijd een vrije kleur is voor ~6 buren.
+  const f = n <= 320 ? 1 : n >= 1000 ? 0.46 : 1 - ((n - 320) / 680) * 0.54;
+  const W = Math.max(7, Math.min(L, Math.round(L * f)));
+  const half = Math.floor(W / 2);
+  // SCATTER buurbewust. Ruimtelijke hash op ECHTE coördinaten (gx,gy) -> isotroop.
+  let miX = Infinity, maX = -Infinity, miY = Infinity, maY = -Infinity;
+  for (const t of tiles) { if (Number.isFinite(t.gx)) { if (t.gx < miX) miX = t.gx; if (t.gx > maX) maX = t.gx; } if (Number.isFinite(t.gy)) { if (t.gy < miY) miY = t.gy; if (t.gy > maY) maY = t.gy; } }
+  const spanX = (maX - miX) || 1, spanY = (maY - miY) || 1;
+  const pitch = Math.sqrt((spanX * spanY) / n) || 1;   // geschatte tegel-afstand
+  const cell = pitch, rad = pitch * 1.45, rad2 = rad * rad;
+  const grid = new Map<string, number[]>();
+  const gkey = (gx: number, gy: number) => `${Math.floor(gx / cell)}_${Math.floor(gy / cell)}`;
+  for (let i = 0; i < n; i++) { const t = tiles[i]; if (!Number.isFinite(t.gx)) continue; const k = gkey(t.gx, t.gy); const a = grid.get(k); if (a) a.push(i); else grid.set(k, [i]); }
+  const outRank = new Array<number>(n).fill(-1);   // gekozen TINT-rang per tegel
+  for (let i = 0; i < n; i++) {
+    const t = tiles[i];
+    const used = new Set<number>();                // tint-rangen van reeds-ingekleurde buren
+    if (Number.isFinite(t.gx)) {
+      const ci = Math.floor(t.gx / cell), cj = Math.floor(t.gy / cell);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const a = grid.get(`${ci + di}_${cj + dj}`); if (!a) continue;
+        for (const j of a) { if (j === i || outRank[j] < 0) continue; const tj = tiles[j]; const dx = tj.gx - t.gx, dy = tj.gy - t.gy; if (dx * dx + dy * dy <= rad2) used.add(outRank[j]); }
+      }
+    }
+    // Basis-tint uit langzame ruimtelijke ruis -> schuift rustig over het paneel.
+    const x = t.nx * 3.1, y = t.ny * 3.1;
+    const nz = Math.sin(x) + Math.sin(y * 1.27) + Math.sin((x + y) * 0.83);   // ~[-3,3]
+    const baseRank = ((Math.floor(((nz + 3) / 6) * L) % L) + L) % L;
+    // Startpunt binnen het bandje [baseRank-half .. +half], deterministisch willekeurig.
+    const start = ((baseRank - half + Math.floor(seeded(i * 2 + 1) * W)) % L + L) % L;
+    let rank = -1;
+    for (let s = 0; s < W; s++) { const r = (start + s) % L; if (!used.has(r)) { rank = r; break; } }   // eerst binnen het harmonieuze bandje
+    if (rank < 0) for (let s = 0; s < L; s++) { const r = (start + s) % L; if (!used.has(r)) { rank = r; break; } }   // bandje vol -> heel palet (garandeert: geen buur gelijk)
+    outRank[i] = rank < 0 ? start : rank;
+  }
+  return outRank.map((r) => order[r]);
+}
+// Eén vaste inkleuring per tegel (zoals een echt paneel). 1× berekend en gecachet.
 function finalColors(parsed: Parsed, base: string[]): string[] {
   const key = base.join(",");
   if (parsed._flow && parsed._flow.key === key) return parsed._flow.fin;
   const pal = base.length ? base : PAL;
-  const fin = parsed.tiles.map((tile) => {
-    const x = tile.nx * 6, y = tile.ny * 6;
-    const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
-    let idx = Math.floor(((n + 4) / 8) * pal.length);
-    idx = Math.max(0, Math.min(pal.length - 1, idx));
-    return tileVary(pal[idx], tile.order ? Math.round(tile.order * 99991) : 0);
-  });
+  const idxs = colorIndices(parsed, pal);
+  const fin = parsed.tiles.map((tile, i) => tileVary(pal[idxs[i]], tile.order ? Math.round(tile.order * 99991) : 0));
   parsed._flow = { key, fin };
   return fin;
 }
@@ -314,13 +373,8 @@ function finalColorsFor(parsed: Parsed, base: string[]): string[] {
   const key = (base && base.length ? base : PAL).join(",");
   if (cache.has(key)) return cache.get(key);
   const pal = base && base.length ? base : PAL;
-  const fin = parsed.tiles.map((tile) => {
-    const x = tile.nx * 6, y = tile.ny * 6;
-    const n = Math.sin(x) + Math.sin(y * 1.3) + Math.sin((x + y) * 0.8) + Math.sin((x - y) * 1.1);
-    let idx = Math.floor(((n + 4) / 8) * pal.length);
-    idx = Math.max(0, Math.min(pal.length - 1, idx));
-    return tileVary(pal[idx], tile.order ? Math.round(tile.order * 99991) : 0);
-  });
+  const idxs = colorIndices(parsed, pal);
+  const fin = parsed.tiles.map((tile, i) => tileVary(pal[idxs[i]], tile.order ? Math.round(tile.order * 99991) : 0));
   cache.set(key, fin);
   return fin;
 }
