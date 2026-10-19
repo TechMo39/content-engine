@@ -59,20 +59,35 @@ function renderLock(fn) { const run = _renderGate.then(fn, fn); _renderGate = ru
 // De glazuur-families (vaste set). Door de familie + de mockup op de naam-hash te pinnen,
 // omzeilen we de anti-herhaling (pickFresh) volledig -> zelfde bedrijf = altijd zelfde plaatje.
 const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine", "bont", "feest", "bont", "feest"];
+// STIJLEN voor de mail (3 per naam, bewust ver uit elkaar). Elke stijl put uit een eigen set
+// families; de naam-hash kiest er deterministisch één uit -> zelfde naam+stijl = zelfde plaatje.
+//  - klassiek : warme aardetinten (terracotta/oker/diepgroen) — de veilige, tijdloze klassieker
+//  - modern   : strak, koel monochroom (inktblauw/antraciet) — premium, veel rust
+//  - kleurrijk: levendig meerkleurig (bont/feest, per-tegel scatter) — blikvanger
+const MS_STYLES = {
+  klassiek:  ["terracotta", "saffraan", "mono_groen"],
+  modern:    ["mono_blauw", "kobalt", "oceaan"],
+  kleurrijk: ["bont", "feest"],
+};
+function normStyle(s) { s = String(s || "").toLowerCase().trim(); return MS_STYLES[s] ? s : "klassiek"; }
 let MS_MOCKUPS = null, MS_SUBJECTS = null;
 async function mockupsOnce() { if (MS_MOCKUPS) return MS_MOCKUPS; try { MS_MOCKUPS = await reg.byId["taleoftiles"].listMockups(); } catch { MS_MOCKUPS = []; } return MS_MOCKUPS; }
 async function subjectsOnce() { if (MS_SUBJECTS) return MS_SUBJECTS; try { MS_SUBJECTS = (await reg.byId["taleoftiles"].listSubjects()).map((s) => s.id); } catch { MS_SUBJECTS = []; } return MS_SUBJECTS; }
 let mailChain = Promise.resolve();   // renders serialiseren (de seed is globaal, dus niet parallel)
-async function renderMailStill(name) {
+async function renderMailStill(name, style) {
   const brand = reg.byId["taleoftiles"]; if (!brand) throw new Error("merk taleoftiles niet geladen");
   await fs.mkdir(MAILSTILL_DIR, { recursive: true });
+  style = normStyle(style);
+  const fams = MS_STYLES[style];
   const mkAll = await mockupsOnce(), subs = await subjectsOnce();
   // MAIL-VEILIGE MOCKUPS: alleen muren waar de auto-detectie een ruime, nette vrije plek vond
   // (niet te laag/klein/aan de rand) -> nooit een bord op de stoep/straat van een winkelpui.
   const mkSafe = mkAll.filter((m) => m.place && m.place.w >= 0.34 && m.place.h >= 0.24 && m.place.cy <= 0.58 && m.place.cx >= 0.30 && m.place.cx <= 0.70);
   const mk = (mkSafe.length ? mkSafe : mkAll).map((m) => m.id);
-  const h = hashSeed(name);
-  const fam = MS_FAMILIES[h % MS_FAMILIES.length];
+  // Seed uit naam ÉN stijl -> de drie stijlen pakken een andere familie/mockup/patroon,
+  // dus visueel duidelijk uit elkaar. Deterministisch: zelfde naam+stijl = zelfde plaatje.
+  const h = hashSeed(name + "|" + style);
+  const fam = fams[h % fams.length];
   const image = mk.length ? mk[Math.floor(h / 97) % mk.length] : "";
   const subjectId = subs.length ? subs[Math.floor(h / 9973) % subs.length] : undefined;
   const svg = await renderLock(() => withSeed(h, async () => {
@@ -83,13 +98,13 @@ async function renderMailStill(name) {
   const png = new Resvg(svg, { fitTo: { mode: "width", value: 1200 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
   const tmp = path.join(os.tmpdir(), "totms-" + Date.now() + ".png");
   await fs.writeFile(tmp, png);
-  const file = slugify(name) + ".jpg";
+  const file = slugify(name) + "-" + style + ".jpg";
   spawnSync(ffmpegPath, ["-y", "-v", "error", "-i", tmp, "-vf", "scale=600:-1:flags=lanczos", "-q:v", "4", path.join(MAILSTILL_DIR, file)], { stdio: "ignore" });
   try { await fs.unlink(tmp); } catch {}
   const st = await fs.stat(path.join(MAILSTILL_DIR, file));
-  return { name, url: "/out/mail-stills/" + encodeURIComponent(file), kb: Math.round(st.size / 1024) };
+  return { name, style, file, url: "/out/mail-stills/" + encodeURIComponent(file), kb: Math.round(st.size / 1024) };
 }
-function enqueueMail(name) { const p = mailChain.then(() => renderMailStill(name)); mailChain = p.catch(() => {}); return p; }
+function enqueueMail(name, style) { const p = mailChain.then(() => renderMailStill(name, style)); mailChain = p.catch(() => {}); return p; }
 
 // ---- BIBLIOTHEEK-helpers: metadata uit de bestandsnaam halen (<merk>-<type>[-en][-naam]-MMDD-HHMMSS.mp4) ----
 const BRAND_IDS = reg.brands.map((b) => b.id).sort((a, b) => b.length - a.length);   // langste eerst (prefix-match)
@@ -248,13 +263,17 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname === "/api/mailstill" && req.method === "POST") {
       const bd = await readBody(req);
-      const names = (Array.isArray(bd.names) ? bd.names : String(bd.names || "").split("\n")).map((s) => String(s).trim()).filter(Boolean).slice(0, 50);
+      // Outreach roept per lead 1 naam + 1 stijl aan ({naam, stijl}); de studio-tab stuurt een
+      // lijst namen ({names}). Beide ondersteund. Stijl ontbreekt -> klassiek (backwards-compat).
+      const style = normStyle(bd.stijl);
+      const src = bd.naam != null ? [bd.naam] : (Array.isArray(bd.names) ? bd.names : String(bd.names || "").split("\n"));
+      const names = src.map((s) => String(s).trim()).filter(Boolean).slice(0, 50);
       if (!names.length) { json(res, { error: "geen namen opgegeven" }, 400); return; }
-      log(`▶ mail-plaatjes: ${names.length} bedrijf(ven)`);
+      log(`▶ mail-plaatjes (${style}): ${names.length} bedrijf(ven)`);
       const items = [];
       for (const nm of names) {
-        try { items.push(await enqueueMail(nm)); log(`✓ mail-still: ${nm}`); }
-        catch (e) { items.push({ name: nm, error: e.message }); log(`✗ mail-still ${nm}: ${e.message}`); }
+        try { items.push(await enqueueMail(nm, style)); log(`✓ mail-still ${style}: ${nm}`); }
+        catch (e) { items.push({ name: nm, style, error: e.message }); log(`✗ mail-still ${nm}: ${e.message}`); }
       }
       json(res, { items });
       return;
