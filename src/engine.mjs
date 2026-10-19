@@ -220,19 +220,26 @@ const server = http.createServer(async (req, res) => {
           });
         }
       } catch {}
-      // 2) mail-stills: jpg/png in out/mail-stills
+      // 2) mail-stills: uit R2 (niet meer de lokale map), via het worker-endpoint.
       try {
-        const sd = path.join(OUT, "mail-stills");
-        for (const f of await fs.readdir(sd)) {
-          if (!/\.(jpe?g|png|webp)$/i.test(f)) continue;
-          let st; try { st = await fs.stat(path.join(sd, f)); } catch { continue; }
-          items.push({
-            kind: "still", url: "/out/mail-stills/" + encodeURIComponent(f), file: f,
-            brand: "taleoftiles", brandName: BRAND_NAME["taleoftiles"] || "Tale of Tiles",
-            type: "mailstill", typeName: "Mail-still",
-            name: titleCase(f.replace(/\.(jpe?g|png|webp)$/i, "").replace(/-/g, " ")), lang: "", date: null,
-            kb: Math.round(st.size / 1024), mtime: st.mtimeMs,
-          });
+        const resp = await fetch("https://taleoftiles.com/api/mail-stills");
+        if (resp.ok) {
+          for (const o of await resp.json()) {
+            const file = String(o.key).replace(/^mail-stills\//, "");
+            if (!/\.(jpe?g|png|webp)$/i.test(file)) continue;
+            const bust = o.uploaded ? "?t=" + Date.parse(o.uploaded) : "";
+            items.push({
+              kind: "still",
+              url: "https://taleoftiles.com/img/" + o.key + bust,
+              file,
+              brand: "taleoftiles", brandName: BRAND_NAME["taleoftiles"] || "Tale of Tiles",
+              type: "mailstill", typeName: "Mail-still",
+              name: titleCase(file.replace(/\.(jpe?g|png|webp)$/i, "").replace(/-/g, " ")),
+              lang: "", date: null,
+              kb: Math.round((o.size || 0) / 1024),
+              mtime: o.uploaded ? Date.parse(o.uploaded) : 0,
+            });
+          }
         }
       } catch {}
       items.sort((a, b) => b.mtime - a.mtime);
