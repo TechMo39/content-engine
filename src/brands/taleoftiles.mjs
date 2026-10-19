@@ -1045,6 +1045,10 @@ export function makeBrand({ ROOT, config }) {
       return room + shadow + deco + panel + nm;
     }
     const Ta = durSec / 3;
+    // Captions ÉÉN keer kiezen (RVlang = Math.random) -> niet per frame, anders flikkert de tekst.
+    const openTxt = RVlang({ nl: ["Eén naam, drie stijlen", "Dezelfde naam, drie keer anders", "Drie ontwerpen, één naam"], en: ["One name, three styles", "Same name, three looks", "Three designs, one name"], fr: ["Un nom, trois styles", "Même nom, trois styles", "Trois designs, un nom"] }, lang);
+    const ctaMain = RVlang({ nl: ["Welke vind jij het mooiste?", "Welke zou jij ophangen?", "A, B of C?"], en: ["Which one's your favourite?", "Which would you hang?", "A, B or C?"], fr: ["Lequel préférez-vous ?", "Lequel accrocheriez-vous ?", "A, B ou C ?"] }, lang);
+    const ctaKick = RVlang({ nl: ["Of ontwerp 'm zelf mooier", "Of maak je eigen combinatie", "Jij kiest, wij leggen"], en: ["Or design yours", "Or make your own", "You choose, we lay it"], fr: ["Ou créez le vôtre", "Ou composez le vôtre", "À vous de choisir"] }, lang);
     function colorsFor(j, t) {
       const P = prep[j], s = j * Ta, bs = s + Ta * 0.24, be = s + Ta * 0.54;
       if (t < bs) return P.blankCols;
@@ -1073,12 +1077,9 @@ export function makeBrand({ ROOT, config }) {
       // aan de muur (dissolve erover)
       if (wallK > 0.003) overlay += `<g opacity="${wallK.toFixed(3)}">${insituComposite(Pa)}</g>`;
       // OPENING: onderregel (niet "top" -> botste op het logo). Zet de opzet neer.
-      const openTxt = RVlang({ nl: ["Eén naam, drie stijlen", "Dezelfde naam, drie keer anders", "Drie ontwerpen, één naam"], en: ["One name, three styles", "Same name, three looks", "Three designs, one name"], fr: ["Un nom, trois styles", "Même nom, trois styles", "Trois designs, un nom"] }, lang);
       const openKick = name || "Tale of Tiles";
       if (a === 0 && f < 0.20) { const op = (f < 0.12 ? Math.min(1, f / 0.05) : 1 - smooth((f - 0.12) / 0.08)); if (op > 0.01) overlay += captionOverlay(openTxt, openKick, W, H, op, "lower"); }
       // SLOT: CTA op het laatste bord -> engagement + "maak 'm zelf (mooier)"
-      const ctaMain = RVlang({ nl: ["Welke vind jij het mooiste?", "Welke zou jij ophangen?", "A, B of C?"], en: ["Which one's your favourite?", "Which would you hang?", "A, B or C?"], fr: ["Lequel préférez-vous ?", "Lequel accrocheriez-vous ?", "A, B ou C ?"] }, lang);
-      const ctaKick = RVlang({ nl: ["Of ontwerp 'm zelf mooier", "Of maak je eigen combinatie", "Jij kiest, wij leggen"], en: ["Or design yours", "Or make your own", "You choose, we lay it"], fr: ["Ou créez le vôtre", "Ou composez le vôtre", "À vous de choisir"] }, lang);
       if (a === 2 && f > 0.42) { const op = (f < 0.52 ? smooth((f - 0.42) / 0.10) : (f > 0.86 ? 1 - smooth((f - 0.86) / 0.1) : 1)); if (op > 0.01) overlay += captionOverlay(ctaMain, ctaKick, W, H, op, "lower"); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
