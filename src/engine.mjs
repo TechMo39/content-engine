@@ -58,7 +58,7 @@ let _renderGate = Promise.resolve();
 function renderLock(fn) { const run = _renderGate.then(fn, fn); _renderGate = run.then(() => {}, () => {}); return run; }
 // De glazuur-families (vaste set). Door de familie + de mockup op de naam-hash te pinnen,
 // omzeilen we de anti-herhaling (pickFresh) volledig -> zelfde bedrijf = altijd zelfde plaatje.
-const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine"];
+const MS_FAMILIES = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine", "bont", "feest", "bont", "feest"];
 let MS_MOCKUPS = null, MS_SUBJECTS = null;
 async function mockupsOnce() { if (MS_MOCKUPS) return MS_MOCKUPS; try { MS_MOCKUPS = await reg.byId["taleoftiles"].listMockups(); } catch { MS_MOCKUPS = []; } return MS_MOCKUPS; }
 async function subjectsOnce() { if (MS_SUBJECTS) return MS_SUBJECTS; try { MS_SUBJECTS = (await reg.byId["taleoftiles"].listSubjects()).map((s) => s.id); } catch { MS_SUBJECTS = []; } return MS_SUBJECTS; }
