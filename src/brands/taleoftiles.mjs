@@ -1095,7 +1095,7 @@ export function makeBrand({ ROOT, config }) {
   // (Vroeger: stdio:"inherit" -> alleen terminal, paneel bleef leeg.)
   function runStreamed(node, args, env, log, tag) {
     return new Promise((resolve) => {
-      const ch = spawn(node, args, { env });
+      const ch = spawn(node, args, { env, windowsHide: true });
       let buf = "";
       const flush = (d) => {
         buf += d.toString();

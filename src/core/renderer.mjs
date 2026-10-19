@@ -195,8 +195,53 @@ async function writeClickWav(clicks, durSec, outPath) {
 }
 
 // Render een reeks frames (sceneAt(frame)->svg) naar een mp4. Supersampling SS voor scherpte.
+// Duur van een mp4 uit ffmpeg zelf (geen ffprobe nodig).
+function probeDur(file) {
+  return new Promise((res) => {
+    execFile(FFMPEG, ["-hide_banner", "-i", file], { encoding: "utf8" }, (err, so, se) => {
+      const m = (se || "").match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+      res(m ? (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]) : 0);
+    });
+  });
+}
+// HOOK-FIRST: plak een korte, licht inzoomende freeze van de PAYOFF (het afgemaakte,
+// ingekleurde paneel) vóór de opbouw. Short-form wint of verliest in de eerste seconde:
+// toon eerst het mooie resultaat, dán "zo wordt het gemaakt". Draait als losse ffmpeg-
+// nastap op het al-gerenderde bestand, zodat elk type het kan krijgen zonder eigen montage.
+// atFrac = waar in de video het paneel vol/op z'n mooist is (per type aangeleverd).
+async function prependHook(file, { atFrac = 0.8, FPS = 24, outW, outH, hasAudio = false, holdSec = 1.25, log = () => {} }) {
+  const dir = path.dirname(file);
+  const tmp = path.resolve(dir, ".hook-" + Date.now());
+  await fs.mkdir(tmp, { recursive: true });
+  const pf = path.join(tmp, "pf.png"), hook = path.join(tmp, "hook.mp4"), out = path.join(tmp, "out.mp4");
+  const run = (args) => new Promise((resolve, reject) => {
+    const p = spawn(FFMPEG, ["-v", "error", "-y", ...args], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    let e = ""; if (p.stderr) p.stderr.on("data", (d) => (e += d.toString()));
+    p.on("error", reject);
+    p.on("close", (c) => (c === 0 ? resolve() : reject(new Error("ffmpeg hook: " + (e.trim().split("\n").pop() || c)))));
+  });
+  try {
+    const dur = await probeDur(file);
+    const pt = Math.max(0, Math.min(dur - 0.05, dur * atFrac));
+    await run(["-ss", String(pt.toFixed(2)), "-i", file, "-frames:v", "1", pf]);
+    const d = Math.max(2, Math.round(holdSec * FPS));
+    const vf = `zoompan=z='min(zoom+0.0016,1.065)':d=${d}:s=${outW}x${outH}:fps=${FPS},format=yuv420p`;
+    const ha = ["-loop", "1", "-i", pf];
+    if (hasAudio) ha.push("-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo");
+    ha.push("-t", String(holdSec), "-r", String(FPS), "-vf", vf, "-c:v", "libx264");
+    if (hasAudio) ha.push("-c:a", "aac", "-shortest");
+    ha.push(hook);
+    await run(ha);
+    if (hasAudio) await run(["-i", hook, "-i", file, "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]", "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", out]);
+    else await run(["-i", hook, "-i", file, "-filter_complex", "[0:v][1:v]concat=n=2:v=1[v]", "-map", "[v]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out]);
+    await fs.rename(out, file);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+}
+
 // Rasteren (het dure werk) wordt over alle cores verdeeld; de hoofdthread bouwt de SVG's.
-// render = { W, H, FPS, SS, durSec, sceneAt }  music = absoluut pad of ""
+// render = { W, H, FPS, SS, durSec, sceneAt, hookAt? }  music = absoluut pad of ""
 export async function renderToMp4({ render, music = "", outDir, log = () => {}, namePrefix = "video", workers = 0 }) {
   const { W, H, FPS, SS = 2, durSec, sceneAt } = render;
   await fs.mkdir(outDir, { recursive: true });
@@ -250,7 +295,7 @@ export async function renderToMp4({ render, music = "", outDir, log = () => {}, 
   fa.push(outPath);
   log(`ffmpeg: frames -> mp4${hasMusic ? " + muziek" : ""}${hasClicks ? " + tegel-klik" : ""}`);
   await new Promise((resolve, reject) => {
-    const p = spawn(FFMPEG, fa, { stdio: ["ignore", "ignore", "pipe"] });
+    const p = spawn(FFMPEG, fa, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let err = "";
     p.on("error", (e) => reject(new Error("ffmpeg kon niet starten: " + e.message)));
     if (p.stderr) p.stderr.on("data", (d) => (err += d.toString()));
@@ -258,5 +303,11 @@ export async function renderToMp4({ render, music = "", outDir, log = () => {}, 
   });
   await fs.rm(tmp, { recursive: true, force: true });
   log("mp4 geschreven: " + outName);
+  // HOOK-FIRST: payoff-freeze vooraan (per type aangestuurd via render.hookAt = fractie 0..1).
+  if (render.hookAt != null && render.hookAt >= 0) {
+    log("hook-first: payoff vooraan");
+    try { await prependHook(outPath, { atFrac: render.hookAt, FPS, outW: W * SS, outH: H * SS, hasAudio: hasMusic || hasClicks, log }); }
+    catch (e) { log("hook-first overgeslagen: " + e.message); }
+  }
   return { outName, outPath };
 }

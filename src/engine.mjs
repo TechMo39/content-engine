@@ -99,7 +99,7 @@ async function renderMailStill(name, style) {
   const tmp = path.join(os.tmpdir(), "totms-" + Date.now() + ".png");
   await fs.writeFile(tmp, png);
   const file = slugify(name) + "-" + style + ".jpg";
-  spawnSync(ffmpegPath, ["-y", "-v", "error", "-i", tmp, "-vf", "scale=600:-1:flags=lanczos", "-q:v", "4", path.join(MAILSTILL_DIR, file)], { stdio: "ignore" });
+  spawnSync(ffmpegPath, ["-y", "-v", "error", "-i", tmp, "-vf", "scale=600:-1:flags=lanczos", "-q:v", "4", path.join(MAILSTILL_DIR, file)], { stdio: "ignore", windowsHide: true });
   try { await fs.unlink(tmp); } catch {}
   const st = await fs.stat(path.join(MAILSTILL_DIR, file));
   return { name, style, file, url: "/out/mail-stills/" + encodeURIComponent(file), kb: Math.round(st.size / 1024) };
