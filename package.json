@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Tale of Tiles content-engine — fase 1: tegel-voor-tegel opbouw-video's uit opgeslagen ontwerpen.",
   "scripts": {
+    "start": "node src/engine.mjs",
+    "dev": "node --watch-path=./src src/engine.mjs",
     "app": "electron electron/main.cjs",
     "studio-app": "node src/studio.mjs",
     "studio": "remotion studio remotion/index.ts",
