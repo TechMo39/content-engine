@@ -1029,10 +1029,17 @@ export function makeBrand({ ROOT, config }) {
       return s;
     }
     function insituComposite(P) {
-      const pw = P.parsed.view[2], ph = P.parsed.view[3], A2 = pw / ph;
+      const pw = P.parsed.view[2], ph = P.parsed.view[3], A2 = Math.max(0.6, Math.min(1.7, pw / ph));
       const pl = P.mk && P.mk.place;
-      const wH = Math.round(pl ? pl.h * H : H * 0.34), wW = Math.round(wH * A2);
-      const cx = Math.round(pl ? pl.cx * W : W / 2), cy = Math.round(pl ? pl.cy * H : H * 0.46);
+      // VEILIGE ZONE: onder het logo+slogan, boven de footer -> paneel botst nooit op het logo
+      // en valt nooit af. Paneel binnen die zone passen (aspect behouden) en centreren.
+      const top = Math.round(H * 0.165), bot = Math.round(H * 0.895);
+      const availH = bot - top, maxW = Math.round(W * 0.86);
+      let wH = Math.round(pl ? pl.h * H : H * 0.52), wW = Math.round(wH * A2);
+      if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
+      if (wH > availH) { wH = availH; wW = Math.round(wH * A2); }
+      const cx = Math.max(Math.round(wW / 2) + 12, Math.min(W - Math.round(wW / 2) - 12, Math.round(pl ? pl.cx * W : W / 2)));
+      const cy = Math.max(top + Math.round(wH / 2) + 8, Math.min(bot - Math.round(wH / 2) - 8, Math.round(pl ? pl.cy * H : (top + bot) / 2)));
       const wx = cx - Math.round(wW / 2), wy = cy - Math.round(wH / 2);
       const roomImg = P.mk && P.mk.blur ? P.mk.blur : (P.mk ? P.mk.uri : "");
       const room = roomImg ? `<image href="${roomImg}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>` : `<rect width="${W}" height="${H}" fill="#241a3a"/>`;
