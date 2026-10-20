@@ -88,6 +88,24 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .socsave button{width:100%;background:#1b1430;border:1px solid #3a2f52;color:#9b8fc0;border-radius:8px;padding:7px;font-size:11px;cursor:pointer}
 .socsave button:hover{border-color:var(--gold);color:var(--gold)}
 .socmsg{font-size:11px;color:#9b8fc0;padding:0 12px 10px;min-height:14px}
+/* kanalen-paneel */
+.socchannels{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:22px}
+.chanbox{border:1px solid #3a2f52;border-radius:12px;background:#1b1430;padding:12px 14px}
+.chanbox.off{opacity:.5}
+.chanbox h3{margin:0 0 10px;font-size:13px;letter-spacing:1px;color:var(--cream);text-transform:none;display:flex;align-items:center;gap:8px}
+.chanbox h3 .soon{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#9b8fc0;border:1px solid #3a2f52;border-radius:10px;padding:1px 6px}
+.chanlang{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #2a2140}
+.chanlang:first-of-type{border-top:0}
+.chanlang .l{font-size:12px;color:var(--ink)}
+.chanlang .who{font-size:11px;color:#7fd8a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.chanlang .dot{width:8px;height:8px;border-radius:50%;background:#5a4f72;display:inline-block;margin-right:6px}
+.chanlang .dot.on{background:#39d98a}
+.chanlang button{background:#241a3a;border:1px solid var(--gold);color:var(--gold);border-radius:14px;padding:4px 12px;font-size:11px;cursor:pointer}
+.chanlang button:disabled{opacity:.4;cursor:default;border-color:#3a2f52;color:#9b8fc0}
+/* video-groepen per type */
+.socgrouphead{font-size:13px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:18px 0 10px;display:flex;align-items:center;gap:10px}
+.socgrouphead .cnt{font-size:11px;color:#9b8fc0;letter-spacing:0;text-transform:none}
+.socgrouphead::after{content:"";flex:1;height:1px;background:#3a2f52}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
   <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button><button id="tab-social">Socials</button></nav></div>
@@ -135,12 +153,14 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 </section>
 
 <section id="view-social" style="display:none">
+  <div id="socChannels" class="socchannels"></div>
   <div class="socbar">
     <div class="seg" id="socBrands"></div>
+    <div class="seg" id="socLangs"></div>
     <input type="text" id="socSearch" placeholder="Zoek op naam of type…" style="flex:1;min-width:140px">
     <button id="socRefresh" class="chip" title="Vernieuwen">⟳ Vernieuwen</button>
   </div>
-  <div id="socGrid" class="socgrid"></div>
+  <div id="socGroups"></div>
   <div id="socEmpty" class="libempty" style="display:none"></div>
 </section>
 
@@ -330,25 +350,57 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 // Elke video draagt z'n TAAL uit de bestandsnaam (-en-/-fr-, NL ongemarkeerd). De engine
 // bepaalt die al en stuurt it.lang mee. Per video tonen we de platform-knoppen in ÉÉN taal:
 // die van de video -> de video valt automatisch in het juiste taal-account (YouTube EN enz.).
-const soc={items:[],platforms:[],brand:'',q:'',loaded:false};
+const soc={items:[],platforms:[],accounts:[],brand:'',lang:'',q:'',loaded:false};
 const TYPE_OF=f=>{const m=String(f).match(/^taleoftiles-([a-z]+)/i);return m?m[1]:'satisfying';};
 const LANG_LBL={nl:'NL',en:'EN',fr:'FR'};
 async function loadSocial(){
-  $('#socGrid').innerHTML='';$('#socEmpty').textContent='Laden…';$('#socEmpty').style.display='';
-  let j={items:[],platforms:[]};try{j=await (await fetch('/api/social/videos')).json();}catch(e){}
-  soc.items=j.items||[];soc.platforms=j.platforms||[];soc.loaded=true;
-  // merk-filter (alleen merken met output)
+  $('#socGroups').innerHTML='';$('#socEmpty').textContent='Laden…';$('#socEmpty').style.display='';
+  // kanalen (met koppel-status) + video's parallel
+  let vids={items:[],platforms:[]},chan={accounts:[]};
+  try{[vids,chan]=await Promise.all([fetch('/api/social/videos').then(r=>r.json()),fetch('/api/social/channels').then(r=>r.json())]);}catch(e){}
+  soc.items=vids.items||[];soc.platforms=vids.platforms||chan.platforms||[];soc.accounts=chan.accounts||[];soc.loaded=true;
+  renderChannels();
+  // merk-filter
   const seen=new Map();soc.items.forEach(i=>{if(i.brand&&!seen.has(i.brand))seen.set(i.brand,i.brandName||i.brand);});
   const bc=$('#socBrands');bc.innerHTML='';
-  const mk=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};bc.appendChild(b);};
-  mk('','Alle merken');
-  for(const [id,label] of seen) mk(id,label);
+  const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};bc.appendChild(b);};
+  mkb('','Alle merken'); for(const [id,label] of seen) mkb(id,label);
+  // taal-filter
+  const lc=$('#socLangs');lc.innerHTML='';
+  const mkl=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.lang===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.lang=id;$$('#socLangs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};lc.appendChild(b);};
+  mkl('','Alle talen'); ['nl','en','fr'].forEach(l=>mkl(l,LANG_LBL[l]));
   renderSoc();
 }
 $('#socRefresh').onclick=()=>{soc.loaded=false;loadSocial();};
 $('#socSearch').oninput=e=>{soc.q=e.target.value.toLowerCase();renderSoc();};
-// Teksten voor één video+platform in de taal van de video. Bewaarde versie (store) wint,
-// anders vraagt de engine een voorstel in die taal.
+
+// KANALEN-PANEEL: per platform een box met de drie taal-accounts + koppel-status/knop.
+function renderChannels(){
+  const wrap=$('#socChannels');wrap.innerHTML='';
+  const byPlat={};soc.accounts.forEach(a=>{(byPlat[a.platform]=byPlat[a.platform]||[]).push(a);});
+  soc.platforms.forEach(p=>{
+    const accs=(byPlat[p.id]||[]).sort((a,b)=>['nl','en','fr'].indexOf(a.lang)-['nl','en','fr'].indexOf(b.lang));
+    const box=document.createElement('div');box.className='chanbox'+(p.enabled?'':' off');
+    box.innerHTML=`<h3>${esc(p.label)}${p.enabled?'':'<span class="soon">binnenkort</span>'}</h3>`;
+    accs.forEach(a=>{
+      const row=document.createElement('div');row.className='chanlang';
+      const connected=a.connected;
+      row.innerHTML=`<span class="l"><span class="dot${connected?' on':''}"></span>${LANG_LBL[a.lang]}</span>`
+        +(connected?`<span class="who" title="${esc(a.who||'gekoppeld')}">${esc(a.who||'gekoppeld')}</span>`
+                   :`<button ${p.enabled?'':'disabled'}>${p.enabled?'Koppel':'—'}</button>`);
+      if(connected||!p.enabled){/* niks */}
+      else row.querySelector('button').onclick=async(ev)=>{
+        ev.target.disabled=true;ev.target.textContent='Koppelen…';
+        try{const r=await (await fetch('/api/social/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({platform:p.id,lang:a.lang})})).json();
+          if(r.ok){soc.loaded=false;loadSocial();}else{ev.target.disabled=false;ev.target.textContent='Koppel';alert(r.error||'koppelen mislukt');}
+        }catch(e){ev.target.disabled=false;ev.target.textContent='Koppel';}
+      };
+      box.appendChild(row);
+    });
+    wrap.appendChild(box);
+  });
+}
+
 async function socText(it,platform){
   const acc=platform+'-'+it.lang;
   const saved=it.posts&&it.posts[acc];
@@ -356,54 +408,68 @@ async function socText(it,platform){
   try{return await (await fetch('/api/social/suggest?platform='+platform+'&type='+encodeURIComponent(it.type||TYPE_OF(it.file))+'&lang='+(it.lang||'nl')+'&name='+encodeURIComponent(it.name||''))).json();}
   catch{return{title:'',description:'',tags:[]};}
 }
-function renderSoc(){
-  const g=$('#socGrid');g.innerHTML='';
-  const items=soc.items.filter(i=>(!soc.brand||i.brand===soc.brand)&&(!soc.q||((i.name||'')+' '+(i.typeName||'')).toLowerCase().includes(soc.q)));
-  if(!items.length){$('#socEmpty').textContent=soc.items.length?'Niets gevonden.':'Nog geen video\'s. Render iets in de Studio.';$('#socEmpty').style.display='';return;}
-  $('#socEmpty').style.display='none';
-  items.forEach(it=>{
-    const card=document.createElement('div');card.className='soccard';
-    const title=it.name||it.typeName||it.file;
-    const vlang=it.lang||'nl';
-    // één knop per platform; elke knop post naar het taal-account van DEZE video.
-    const ch=soc.platforms.map(p=>{
-      const acc=p.id+'-'+vlang;
-      const rec=(it.posts&&it.posts[acc])||null;
-      const cls=!p.enabled?'':rec&&rec.status==='posted'?'posted':rec&&rec.status==='failed'?'failed':rec&&rec.status==='draft'?'draft':'';
-      const st=!p.enabled?'binnenkort':rec&&rec.status==='posted'?'geplaatst':rec&&rec.status==='failed'?'mislukt':rec&&rec.status==='draft'?'concept':'posten';
-      return `<button data-pf="${p.id}" class="${cls}" ${p.enabled?'':'disabled'}>${esc(p.label)} ${LANG_LBL[vlang]}<span class="st">${st}</span></button>`;
-    }).join('');
-    card.innerHTML=
-      `<div class="thumb" data-url="${esc(it.url)}"><video src="${esc(it.url)}#t=0.6" preload="metadata" muted playsinline></video><div class="play">▶</div><span class="badge">${esc(it.typeName)} · ${LANG_LBL[vlang]}</span></div>`
-      +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub">${esc(it.brandName)} · ${LANG_LBL[vlang]}${it.date?' · '+esc(it.date):''}</div></div>`
-      +`<div class="soctext"><div class="lbl">Titel</div><input class="soc-title" maxlength="100" placeholder="laden…"><div class="lbl">Omschrijving + hashtags</div><textarea class="soc-desc" placeholder="laden…"></textarea></div>`
-      +`<div class="socsave"><button class="soc-savebtn">Concept bewaren</button></div>`
-      +`<div class="socchan">${ch}</div>`
-      +`<div class="socmsg"></div>`;
-    g.appendChild(card);
-    card.querySelector('.thumb').onclick=()=>openModal({kind:'video',url:it.url});
-    const tEl=card.querySelector('.soc-title'),dEl=card.querySelector('.soc-desc'),msg=card.querySelector('.socmsg');
-    // teksten laden (bewaard of voorstel) in de taal van de video, voor het eerste echte platform
-    const firstPf=(soc.platforms.find(p=>p.enabled)||soc.platforms[0]||{}).id||'youtube';
-    socText(it,firstPf).then(t=>{tEl.value=t.title||'';dEl.value=t.description||'';});
-    const collect=()=>({file:it.file,lang:vlang,title:tEl.value,description:dEl.value,tags:(dEl.value.match(/#[\p{L}\p{N}]+/gu)||[]).map(s=>s.slice(1))});
-    card.querySelector('.soc-savebtn').onclick=async()=>{
-      msg.textContent='Bewaren…';
-      try{const r=await (await fetch('/api/social/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform:firstPf})})).json();
-        msg.textContent=r.ok?'Concept bewaard.':(r.error||'mislukt');}catch(e){msg.textContent='Fout: '+e.message;}
+
+function videoCard(it){
+  const card=document.createElement('div');card.className='soccard';
+  const title=it.name||it.typeName||it.file;
+  const vlang=it.lang||'nl';
+  const ch=soc.platforms.map(p=>{
+    const acc=p.id+'-'+vlang;
+    const rec=(it.posts&&it.posts[acc])||null;
+    const acct=soc.accounts.find(a=>a.platform===p.id&&a.lang===vlang);
+    const linked=acct&&acct.connected;
+    const cls=!p.enabled?'':rec&&rec.status==='posted'?'posted':rec&&rec.status==='failed'?'failed':rec&&rec.status==='draft'?'draft':'';
+    const st=!p.enabled?'binnenkort':rec&&rec.status==='posted'?'geplaatst':rec&&rec.status==='failed'?'mislukt':!linked?'koppel eerst':rec&&rec.status==='draft'?'concept':'posten';
+    const dis=(!p.enabled||!linked);
+    return `<button data-pf="${p.id}" class="${cls}" ${dis?'disabled':''}>${esc(p.label)} ${LANG_LBL[vlang]}<span class="st">${st}</span></button>`;
+  }).join('');
+  card.innerHTML=
+    `<div class="thumb" data-url="${esc(it.url)}"><video src="${esc(it.url)}#t=0.6" preload="metadata" muted playsinline></video><div class="play">▶</div><span class="badge">${esc(it.typeName)} · ${LANG_LBL[vlang]}</span></div>`
+    +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub">${esc(it.brandName)} · ${LANG_LBL[vlang]}${it.date?' · '+esc(it.date):''}</div></div>`
+    +`<div class="soctext"><div class="lbl">Titel</div><input class="soc-title" maxlength="100" placeholder="laden…"><div class="lbl">Omschrijving + hashtags</div><textarea class="soc-desc" placeholder="laden…"></textarea></div>`
+    +`<div class="socsave"><button class="soc-savebtn">Concept bewaren</button></div>`
+    +`<div class="socchan">${ch}</div>`
+    +`<div class="socmsg"></div>`;
+  card.querySelector('.thumb').onclick=()=>openModal({kind:'video',url:it.url});
+  const tEl=card.querySelector('.soc-title'),dEl=card.querySelector('.soc-desc'),msg=card.querySelector('.socmsg');
+  const firstPf=(soc.platforms.find(p=>p.enabled)||soc.platforms[0]||{}).id||'youtube';
+  socText(it,firstPf).then(t=>{tEl.value=t.title||'';dEl.value=t.description||'';});
+  const collect=()=>({file:it.file,lang:vlang,title:tEl.value,description:dEl.value,tags:(dEl.value.match(/#[\p{L}\p{N}]+/gu)||[]).map(s=>s.slice(1))});
+  card.querySelector('.soc-savebtn').onclick=async()=>{
+    msg.textContent='Bewaren…';
+    try{const r=await (await fetch('/api/social/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform:firstPf})})).json();
+      msg.textContent=r.ok?'Concept bewaard.':(r.error||'mislukt');}catch(e){msg.textContent='Fout: '+e.message;}
+  };
+  card.querySelectorAll('.socchan button[data-pf]').forEach(b=>{
+    if(b.disabled)return;
+    b.onclick=async()=>{
+      const platform=b.dataset.pf,lbl=b.textContent.trim();msg.textContent=lbl+': posten…';b.disabled=true;
+      try{const r=await (await fetch('/api/social/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform})})).json();
+        if(r.ok){msg.textContent=lbl+': geplaatst.';soc.loaded=false;loadSocial();}
+        else msg.textContent=lbl+': '+(r.error||'mislukt');
+      }catch(e){msg.textContent='Fout: '+e.message;}
+      b.disabled=false;
     };
-    card.querySelectorAll('.socchan button[data-pf]').forEach(b=>{
-      if(b.disabled)return;
-      b.onclick=async()=>{
-        const platform=b.dataset.pf,lbl=b.textContent.trim();msg.textContent=lbl+': posten…';b.disabled=true;
-        try{const r=await (await fetch('/api/social/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform})})).json();
-          if(r.ok){msg.textContent=lbl+': geplaatst.';soc.loaded=false;loadSocial();}
-          else msg.textContent=lbl+': '+(r.error||'mislukt');
-        }catch(e){msg.textContent='Fout: '+e.message;}
-        b.disabled=false;
-      };
-    });
   });
+  return card;
+}
+
+// Video's GEGROEPEERD per type (categorie). Binnen filters merk/taal/zoek.
+function renderSoc(){
+  const host=$('#socGroups');host.innerHTML='';
+  const items=soc.items.filter(i=>(!soc.brand||i.brand===soc.brand)&&(!soc.lang||i.lang===soc.lang)&&(!soc.q||((i.name||'')+' '+(i.typeName||'')).toLowerCase().includes(soc.q)));
+  if(!items.length){$('#socEmpty').textContent=soc.items.length?'Niets gevonden met deze filters.':'Nog geen video\'s. Render iets in de Studio.';$('#socEmpty').style.display='';return;}
+  $('#socEmpty').style.display='none';
+  // groeperen op type, in de volgorde waarin ze voorkomen
+  const groups=new Map();
+  items.forEach(it=>{const k=it.type||'video';if(!groups.has(k))groups.set(k,{name:it.typeName||k,items:[]});groups.get(k).items.push(it);});
+  for(const [,g] of groups){
+    const head=document.createElement('div');head.className='socgrouphead';head.innerHTML=`${esc(g.name)}<span class="cnt">${g.items.length} video${g.items.length>1?'\'s':''}</span>`;
+    host.appendChild(head);
+    const grid=document.createElement('div');grid.className='socgrid';
+    g.items.forEach(it=>grid.appendChild(videoCard(it)));
+    host.appendChild(grid);
+  }
 }
 
 log();loadBrands();
