@@ -36,7 +36,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .tabs{margin-left:auto;display:flex;gap:8px}
 .tabs button{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:7px 16px;font-size:13px;cursor:pointer}
 .tabs button.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
-#view-lib,#view-mail{height:calc(100vh - 58px);overflow:auto;padding:18px 26px}
+#view-lib,#view-mail,#view-social{height:calc(100vh - 58px);overflow:auto;padding:18px 26px}
 .mailbar{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
 #mailNames{width:340px;max-width:90vw;height:120px;resize:vertical;background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:10px;padding:10px;font-size:14px;font-family:inherit}
 .libbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
@@ -59,9 +59,38 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .libmodal-in{position:relative;max-width:min(92vw,520px);max-height:92vh}
 .libmodal-in video,.libmodal-in img{max-width:100%;max-height:88vh;border-radius:12px;display:block}
 .libclose{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#241a10;border:0;font-size:16px;cursor:pointer;font-weight:700}
+/* ---- Socials ---- */
+.socbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.socgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.soccard{border:1px solid #3a2f52;border-radius:12px;overflow:hidden;background:#1b1430;display:flex;flex-direction:column}
+.soccard .thumb{position:relative;width:100%;aspect-ratio:9/16;max-height:280px;background:#120d1f;cursor:pointer;overflow:hidden}
+.soccard .thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.soccard .thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff;text-shadow:0 2px 8px #000;opacity:.9;pointer-events:none}
+.soccard .thumb .badge{position:absolute;top:8px;left:8px;background:#000a;border:1px solid #ffffff22;color:var(--cream);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+.soccard .meta{padding:10px 12px}
+.soccard .meta .nm{font-size:13px;color:var(--cream);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.soccard .meta .sub{font-size:11px;color:#9b8fc0;margin-top:2px}
+.soctext{padding:0 12px 10px;display:flex;flex-direction:column;gap:6px}
+.soctext input,.soctext textarea{background:#140f1e;border:1px solid #3a2f52;color:var(--cream);border-radius:8px;padding:7px 9px;font-size:12px;font-family:inherit;width:100%}
+.soctext textarea{height:60px;resize:vertical}
+.soctext .lbl{font-size:10px;color:#9b8fc0;letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.socchan{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.socchan button{flex:1;min-width:84px;background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:8px;padding:8px 6px;font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.socchan button:hover:not(:disabled){border-color:var(--gold)}
+.socchan button:disabled{opacity:.4;cursor:default}
+.socchan button .st{font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.socchan button.posted{border-color:#39d98a;color:#9fe8c2}
+.socchan button.posted .st{color:#39d98a}
+.socchan button.failed{border-color:#e8888a}
+.socchan button.failed .st{color:#e88}
+.socchan button.draft{border-color:#d6b35a88}
+.socsave{padding:0 12px 12px}
+.socsave button{width:100%;background:#1b1430;border:1px solid #3a2f52;color:#9b8fc0;border-radius:8px;padding:7px;font-size:11px;cursor:pointer}
+.socsave button:hover{border-color:var(--gold);color:var(--gold)}
+.socmsg{font-size:11px;color:#9b8fc0;padding:0 12px 10px;min-height:14px}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
-  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button></nav></div>
+  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button><button id="tab-social">Socials</button></nav></div>
 <div class="wrap" id="view-studio">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
@@ -103,6 +132,16 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
   </div>
   <div id="mailGrid" class="libgrid"></div>
   <div id="mailEmpty" class="libempty">Tik bedrijfsnamen in en klik “Render plaatjes”. Elk bedrijf krijgt hetzelfde plaatje telkens — klaar voor R2 en de mail.</div>
+</section>
+
+<section id="view-social" style="display:none">
+  <div class="socbar">
+    <div class="seg" id="socBrands"></div>
+    <input type="text" id="socSearch" placeholder="Zoek op naam of type…" style="flex:1;min-width:140px">
+    <button id="socRefresh" class="chip" title="Vernieuwen">⟳ Vernieuwen</button>
+  </div>
+  <div id="socGrid" class="socgrid"></div>
+  <div id="socEmpty" class="libempty" style="display:none"></div>
 </section>
 
 <div id="libModal" class="libmodal" style="display:none"><div class="libmodal-in"><button id="libClose" class="libclose">✕</button><div id="libModalBody"></div></div></div>
@@ -203,15 +242,19 @@ function showView(which){
   $('#view-studio').style.display=which==='studio'?'grid':'none';
   $('#view-mail').style.display=which==='mail'?'block':'none';
   $('#view-lib').style.display=which==='lib'?'block':'none';
+  $('#view-social').style.display=which==='social'?'block':'none';
   $('#tab-studio').classList.toggle('on',which==='studio');
   $('#tab-mail').classList.toggle('on',which==='mail');
   $('#tab-lib').classList.toggle('on',which==='lib');
-  $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':'alle gerenderde output op één plek';
+  $('#tab-social').classList.toggle('on',which==='social');
+  $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':which==='social'?'video → kanaal → keuren → posten':'alle gerenderde output op één plek';
   if(which==='lib'&&!lib.loaded)loadLibrary();
+  if(which==='social'&&!soc.loaded)loadSocial();
 }
 $('#tab-studio').onclick=()=>showView('studio');
 $('#tab-mail').onclick=()=>showView('mail');
 $('#tab-lib').onclick=()=>showView('lib');
+$('#tab-social').onclick=()=>showView('social');
 $('#mailGo').onclick=async()=>{
   const names=$('#mailNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!names.length){$('#mailMsg').textContent='Vul minstens één bedrijfsnaam in.';return;}
@@ -280,5 +323,81 @@ $('#libClose').onclick=closeModal;
 $('#libModal').onclick=e=>{if(e.target===$('#libModal'))closeModal();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
+// ---- SOCIALS ----
+// De video's uit out/ (zelfde bron als de Bibliotheek), per video een bewerkbaar
+// titel/omschrijving-veld (engine stelt voor) + kanaal-knoppen. Menselijke poort: je keurt
+// en bewerkt, dan tik je op een kanaal om te posten. Status per kanaal wordt onthouden.
+const soc={items:[],channels:[],brand:'',q:'',loaded:false};
+const TYPE_OF=f=>{const m=String(f).match(/^taleoftiles-([a-z]+)/i);return m?m[1]:'satisfying';};
+const LANG_OF=f=>/-(en|fr)-/.test(f)?(f.match(/-(en|fr)-/)[1]):'nl';
+async function loadSocial(){
+  $('#socGrid').innerHTML='';$('#socEmpty').textContent='Laden…';$('#socEmpty').style.display='';
+  let j={items:[],channels:[]};try{j=await (await fetch('/api/social/videos')).json();}catch(e){}
+  soc.items=j.items||[];soc.channels=j.channels||[];soc.loaded=true;
+  const present=[...new Set(soc.items.map(i=>i.brand).filter(Boolean))];
+  const bc=$('#socBrands');bc.innerHTML='';
+  const mk=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};bc.appendChild(b);};
+  mk('','Alle merken');
+  [...new Set(soc.items.map(i=>i.brandName).filter(Boolean))].forEach((nm,i)=>mk(present[i],nm));
+  renderSoc();
+}
+$('#socRefresh').onclick=()=>{soc.loaded=false;loadSocial();};
+$('#socSearch').oninput=e=>{soc.q=e.target.value.toLowerCase();renderSoc();};
+// Voor één video+kanaal de teksten bepalen: bewaarde versie wint, anders vraag de engine om een voorstel.
+async function socText(it,channel){
+  const saved=it.posts&&it.posts[channel];
+  if(saved&&(saved.title||saved.description))return{title:saved.title,description:saved.description,tags:saved.tags||[]};
+  try{return await (await fetch('/api/social/suggest?channel='+channel+'&type='+encodeURIComponent(it.type||TYPE_OF(it.file))+'&lang='+(it.lang||'nl')+'&name='+encodeURIComponent(it.name||''))).json();}
+  catch{return{title:'',description:'',tags:[]};}
+}
+function renderSoc(){
+  const g=$('#socGrid');g.innerHTML='';
+  const items=soc.items.filter(i=>(!soc.brand||i.brand===soc.brand)&&(!soc.q||((i.name||'')+' '+(i.typeName||'')).toLowerCase().includes(soc.q)));
+  if(!items.length){$('#socEmpty').textContent=soc.items.length?'Niets gevonden.':'Nog geen video\'s. Render iets in de Studio.';$('#socEmpty').style.display='';return;}
+  $('#socEmpty').style.display='none';
+  items.forEach(it=>{
+    const card=document.createElement('div');card.className='soccard';
+    const title=it.name||it.typeName||it.file;
+    const ch=soc.channels.map(c=>{
+      const rec=(it.posts&&it.posts[c.id])||null;
+      // Uitgeschakeld kanaal wint altijd: geen status-kleur, tekst "binnenkort".
+      const cls=!c.enabled?'':rec&&rec.status==='posted'?'posted':rec&&rec.status==='failed'?'failed':rec&&rec.status==='draft'?'draft':'';
+      const st=!c.enabled?'binnenkort':rec&&rec.status==='posted'?'geplaatst':rec&&rec.status==='failed'?'mislukt':rec&&rec.status==='draft'?'concept':'posten';
+      return `<button data-ch="${c.id}" class="${cls}" ${c.enabled?'':'disabled'}>${esc(c.label)}<span class="st">${st}</span></button>`;
+    }).join('');
+    card.innerHTML=
+      `<div class="thumb" data-url="${esc(it.url)}"><video src="${esc(it.url)}#t=0.6" preload="metadata" muted playsinline></video><div class="play">▶</div><span class="badge">${esc(it.typeName)}</span></div>`
+      +`<div class="meta"><div class="nm" title="${esc(title)}">${esc(title)}</div><div class="sub">${esc(it.brandName)}${it.lang&&it.lang!=='nl'?' · '+it.lang.toUpperCase():''}${it.date?' · '+esc(it.date):''}</div></div>`
+      +`<div class="soctext"><div class="lbl">Titel</div><input class="soc-title" maxlength="100" placeholder="laden…"><div class="lbl">Omschrijving + hashtags</div><textarea class="soc-desc" placeholder="laden…"></textarea></div>`
+      +`<div class="socsave"><button class="soc-savebtn">Concept bewaren</button></div>`
+      +`<div class="socchan">${ch}</div>`
+      +`<div class="socmsg"></div>`;
+    g.appendChild(card);
+    card.querySelector('.thumb').onclick=()=>openModal({kind:'video',url:it.url});
+    const tEl=card.querySelector('.soc-title'),dEl=card.querySelector('.soc-desc'),msg=card.querySelector('.socmsg');
+    // teksten laden (bewaard of voorstel) voor het eerste echte kanaal (YouTube)
+    const firstCh=(soc.channels.find(c=>c.enabled)||soc.channels[0]||{}).id||'youtube';
+    socText(it,firstCh).then(t=>{tEl.value=t.title||'';dEl.value=t.description||'';});
+    const collect=()=>({file:it.file,title:tEl.value,description:dEl.value,tags:(dEl.value.match(/#[\p{L}\p{N}]+/gu)||[]).map(s=>s.slice(1))});
+    card.querySelector('.soc-savebtn').onclick=async()=>{
+      msg.textContent='Bewaren…';
+      try{const r=await (await fetch('/api/social/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),channel:firstCh})})).json();
+        msg.textContent=r.ok?'Concept bewaard.':(r.error||'mislukt');}catch(e){msg.textContent='Fout: '+e.message;}
+    };
+    card.querySelectorAll('.socchan button[data-ch]').forEach(b=>{
+      if(b.disabled)return;
+      b.onclick=async()=>{
+        const channel=b.dataset.ch;msg.textContent=channel+': posten…';b.disabled=true;
+        try{const r=await (await fetch('/api/social/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),channel})})).json();
+          if(r.ok){msg.textContent=channel+': geplaatst.';soc.loaded=false;loadSocial();}
+          else msg.textContent=channel+': '+(r.error||'mislukt');
+        }catch(e){msg.textContent='Fout: '+e.message;}
+        b.disabled=false;
+      };
+    });
+  });
+}
+
 log();loadBrands();
 </script></body></html>
+
