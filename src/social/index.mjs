@@ -8,10 +8,11 @@ import { makeStub } from "./stub.mjs";
 export const LANGS = ["nl", "en", "fr"];
 export const LANG_LABEL = { nl: "NL", en: "EN", fr: "FR" };
 
-export function buildSocial() {
+export function buildSocial(ctx = {}) {
   // Platform-definities in UI-volgorde. Elk levert de gedeelde kanaal-vorm (suggest/upload/…).
+  // ctx.ROOT geven we door zodat een platform z'n tokens in <root>/secrets/ kan bewaren.
   const platforms = [
-    youtube(),
+    youtube(ctx),
     makeStub({ id: "instagram", label: "Instagram" }),
     makeStub({ id: "facebook", label: "Facebook" }),
     makeStub({ id: "tiktok", label: "TikTok" }),

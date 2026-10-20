@@ -11,11 +11,13 @@ import { config } from "../config.mjs";
 import { buildRegistry } from "./registry.mjs";
 import { buildSocial } from "./social/index.mjs";
 import { makeSocialStore } from "./social/store.mjs";
+import { loadEnv } from "./social/env.mjs";
 import { renderToMp4 } from "./core/renderer.mjs";
 import { Resvg } from "@resvg/resvg-js";
 import ffmpegPath from "ffmpeg-static";
 
 const ROOT = path.resolve(fileURLToPath(import.meta.url), "../..");
+loadEnv(ROOT);   // .env inlezen (YT_CLIENT_ID/SECRET e.d.) zonder bestaande env te overschrijven
 const PORT = 4600;
 const OUT = path.resolve(ROOT, config.outDir);
 await fs.mkdir(OUT, { recursive: true });
@@ -43,7 +45,7 @@ log("merken geladen: " + reg.brands.map((b) => b.id).join(", "));
 // Kanalen (YouTube actief, rest stub) + lokaal logboek out/.social.json. Het casco posten
 // komt in stap 2 (echte API's per kanaal). Nu: de video's uit de Bibliotheek tonen, per video
 // auto-teksten voorstellen (bewerkbaar), en de post-status onthouden.
-const social = buildSocial();
+const social = buildSocial({ ROOT });
 const socialStore = makeSocialStore(OUT);
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
 
@@ -309,8 +311,27 @@ const server = http.createServer(async (req, res) => {
 
     // ---- SOCIAL-ARM endpoints (los van render + mail) ----
     // Elk platform (youtube/…) heeft DRIE taal-accounts (NL/EN/FR), elk eigen token.
+    // Geeft per account de echte koppel-status (connected + kanaalnaam) terug.
     if (u.pathname === "/api/social/channels") {
-      json(res, { platforms: social.listPlatforms(), accounts: social.listAccounts(), langs: social.LANGS });
+      const accounts = [];
+      for (const a of social.listAccounts()) {
+        let connected = false, who = "";
+        const p = social.platById[a.platform];
+        if (p && p.enabled && p.authStatus) { try { const s = await p.authStatus(a.lang); connected = !!s.connected; who = s.who || ""; } catch {} }
+        accounts.push({ ...a, connected, who });
+      }
+      json(res, { platforms: social.listPlatforms(), accounts, langs: social.LANGS });
+      return;
+    }
+    // LOGIN: start de OAuth-koppeling voor één platform+taal. Opent de browser (desktop-flow)
+    // en lost op zodra de gebruiker is ingelogd en het token lokaal is opgeslagen.
+    if (u.pathname === "/api/social/login" && req.method === "POST") {
+      const bd = await readBody(req);
+      const p = social.platById[bd.platform];
+      const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
+      if (!p || !p.enabled || !p.startLogin) { json(res, { error: "kan dit platform niet koppelen" }, 400); return; }
+      try { await p.startLogin(lang, log); json(res, { ok: true }); }
+      catch (e) { log(`✗ koppelen ${bd.platform} ${lang.toUpperCase()}: ${e.message}`); json(res, { error: e.message }, 500); }
       return;
     }
     // Postbare video's = de afgewerkte mp4's in out/ (zelfde bron als de Bibliotheek). Per video
