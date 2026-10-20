@@ -73,15 +73,18 @@ function suggest({ type, lang, name } = {}) {
   return { title: title.slice(0, 100), description, tags };
 }
 
-export function makeChannel() {
+// Platform met drie taal-accounts (NL/EN/FR). De taal komt mee als argument (lang), want
+// elk taal-account heeft een eigen YouTube-kanaal + eigen token. In het casco faalt upload
+// nog met een nette melding; stap 2 vult authStatus/upload/stats per taal met de echte API.
+export function makePlatform() {
   return {
     id: "youtube",
     label: "YouTube",
     enabled: true,          // casco: zichtbaar en actief in de UI; upload faalt nog tot stap 2
     needsAuth: true,
     suggest,
-    async authStatus() { return { connected: false, who: "" }; },   // stap 2 vult dit
-    async upload() { throw new Error("YouTube-koppeling nog niet ingesteld (stap 2: OAuth + upload)"); },
-    async stats() { return null; },
+    async authStatus(lang) { return { connected: false, who: "" }; },   // stap 2 vult dit per taal
+    async upload(video, meta, lang, log) { throw new Error("YouTube " + String(lang || "").toUpperCase() + " nog niet gekoppeld (stap 2: OAuth + upload)"); },
+    async stats(postId, lang) { return null; },
   };
 }
