@@ -1,5 +1,5 @@
 // SOCIAL-PLATFORM: YouTube (Shorts). Drie taal-accounts (NL/EN/FR), elk een eigen kanaal
-// + eigen token. Kaal via fetch — geen googleapis-dependency (Node 22 heeft fetch/FormData).
+// + eigen token. Kaal via fetch, geen googleapis-dependency (Node 22 heeft fetch/FormData).
 //
 // OAuth: "loopback" desktop-flow. De engine opent een tijdelijk servertje op een vrije poort,
 // stuurt de gebruiker naar Google's consent, vangt de ?code op localhost op, wisselt 'm om
@@ -41,14 +41,14 @@ const TITLE = {
   fr: { satisfying: "Mosaïque faite main, carreau par carreau", insitu: "Une plaque faite main sur votre mur", sfeer: "Un art ancestral, à la main", trio: "Un nom, trois styles", colorway: "Quelle couleur vous ressemble ?", geentwee: "Un nom, infiniment unique", walkthrough: "Composez votre plaque en mosaïque", stopzodra: "Arrête quand tu reconnais", onthul: "Devinez ce qui se cache", cadeau: "Un cadeau qui dure toute une vie", intro: "Voici Tale of Tiles" },
 };
 const DESC = {
-  nl: "Handgemaakte mozaïekkunst met jouw naam, in echt glazuur. Tale of Tiles — taleoftiles.com",
-  en: "Handmade mosaic art with your name, in real glaze. Tale of Tiles — taleoftiles.com",
-  fr: "De l'art mosaïque fait main, à votre nom, en véritable émail. Tale of Tiles — taleoftiles.com",
+  nl: "Handgemaakte mozaïekkunst met jouw naam, in echt glazuur. Tale of Tiles · taleoftiles.com",
+  en: "Handmade mosaic art with your name, in real glaze. Tale of Tiles · taleoftiles.com",
+  fr: "De l'art mosaïque fait main, à votre nom, en véritable émail. Tale of Tiles · taleoftiles.com",
 };
 function suggest({ type, lang, name } = {}) {
   const lg = ["en", "fr"].includes(lang) ? lang : "nl";
   let title = (TITLE[lg] && TITLE[lg][type]) || TITLE[lg].satisfying;
-  if (name) title = `${name} — ${title}`;
+  if (name) title = `${name} · ${title}`;
   const tags = TAGS[lg].slice();
   const hashline = tags.map((t) => "#" + t.replace(/[^\p{L}\p{N}]/gu, "")).join(" ");
   // #Shorts helpt YouTube de video als Short te tonen
