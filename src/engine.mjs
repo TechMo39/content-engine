@@ -9,6 +9,8 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.mjs";
 import { buildRegistry } from "./registry.mjs";
+import { buildSocial } from "./social/index.mjs";
+import { makeSocialStore } from "./social/store.mjs";
 import { renderToMp4 } from "./core/renderer.mjs";
 import { Resvg } from "@resvg/resvg-js";
 import ffmpegPath from "ffmpeg-static";
@@ -36,6 +38,14 @@ function log(msg) { const line = String(msg); process.stdout.write("  " + line +
 const reg = buildRegistry({ ROOT, config });
 for (const b of reg.brands) { try { await b.init(log); } catch (e) { log(`merk ${b.id} init-fout: ${e.message}`); } }
 log("merken geladen: " + reg.brands.map((b) => b.id).join(", "));
+
+// ---- SOCIAL-ARM (losse laag, raakt het mail-contract niet) ----
+// Kanalen (YouTube actief, rest stub) + lokaal logboek out/.social.json. Het casco posten
+// komt in stap 2 (echte API's per kanaal). Nu: de video's uit de Bibliotheek tonen, per video
+// auto-teksten voorstellen (bewerkbaar), en de post-status onthouden.
+const social = buildSocial();
+const socialStore = makeSocialStore(OUT);
+log("social-kanalen: " + social.channels.map((c) => c.id + (c.enabled ? "" : "·stub")).join(", "));
 
 // ---- MAIL-STILL: per bedrijf één mail-afbeelding, LOKAAL gerenderd. Deterministisch per naam
 // (zelfde bedrijf -> altijd hetzelfde plaatje), zodat het op R2 een stabiele URL kan krijgen.
@@ -296,6 +306,83 @@ const server = http.createServer(async (req, res) => {
       json(res, { queued: n });
       return;
     }
+
+    // ---- SOCIAL-ARM endpoints (los van render + mail) ----
+    if (u.pathname === "/api/social/channels") {
+      json(res, { channels: social.list() });
+      return;
+    }
+    // Postbare video's = de afgewerkte mp4's in out/ (zelfde bron als de Bibliotheek), met
+    // per video de huidige post-status per kanaal uit de store erbij.
+    if (u.pathname === "/api/social/videos") {
+      const items = [];
+      try {
+        for (const f of await fs.readdir(OUT)) {
+          if (!/\.mp4$/i.test(f)) continue;
+          if (/-\d{12,}\.mp4$/i.test(f)) continue;   // tijdelijke render-output, nog niet hernoemd
+          let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
+          if (st.size < 4096) continue;
+          const meta = parseOutName(f.replace(/\.mp4$/i, ""));
+          items.push({
+            url: "/out/" + encodeURIComponent(f), file: f,
+            brand: meta.brand, brandName: meta.brand ? (BRAND_NAME[meta.brand] || meta.brand) : "—",
+            type: meta.template, typeName: meta.template ? (TEMPLATE_NAME[meta.template] || titleCase(meta.template)) : "Video",
+            name: meta.name || "", lang: meta.lang, date: meta.date,
+            kb: Math.round(st.size / 1024), mtime: st.mtimeMs,
+            posts: await socialStore.forFile(f),
+          });
+        }
+      } catch {}
+      items.sort((a, b) => b.mtime - a.mtime);
+      json(res, { items, channels: social.list() });
+      return;
+    }
+    // Auto-teksten voorstellen voor één video+kanaal (titel/omschrijving/tags). De UI vult
+    // deze in het bewerk-veld; de bewaarde versie (store) wint als die al bestaat.
+    if (u.pathname === "/api/social/suggest") {
+      const ch = social.byId[u.searchParams.get("channel") || "youtube"] || social.byId.youtube;
+      const type = u.searchParams.get("type") || "satisfying";
+      const lang = u.searchParams.get("lang") || "nl";
+      const name = u.searchParams.get("name") || "";
+      json(res, ch.suggest({ type, lang, name }));
+      return;
+    }
+    // Teksten bewaren (concept) zonder te posten — de menselijke poort: eerst keuren/bewerken.
+    if (u.pathname === "/api/social/save" && req.method === "POST") {
+      const bd = await readBody(req);
+      if (!bd.file || !bd.channel) { json(res, { error: "file en channel verplicht" }, 400); return; }
+      const rec = await socialStore.set(bd.file, bd.channel, {
+        title: String(bd.title || "").slice(0, 100),
+        description: String(bd.description || ""),
+        tags: Array.isArray(bd.tags) ? bd.tags.slice(0, 15) : [],
+        status: "draft",
+      });
+      json(res, { ok: true, post: rec });
+      return;
+    }
+    // POSTEN: nu nog het casco. Het echte uploaden per kanaal komt in stap 2; tot dan geeft
+    // het kanaal een nette fout terug en leggen we de status als "failed" vast (met reden).
+    if (u.pathname === "/api/social/post" && req.method === "POST") {
+      const bd = await readBody(req);
+      const ch = social.byId[bd.channel];
+      if (!bd.file || !ch) { json(res, { error: "onbekend kanaal of geen video" }, 400); return; }
+      if (!ch.enabled) { json(res, { error: ch.label + " — binnenkort" }, 400); return; }
+      const meta = { title: bd.title || "", description: bd.description || "", tags: bd.tags || [] };
+      await socialStore.set(bd.file, bd.channel, { ...meta, status: "posting" });
+      log(`▶ social: ${bd.channel} ← ${bd.file}`);
+      try {
+        const r = await ch.upload(path.resolve(OUT, bd.file), meta, log);
+        const rec = await socialStore.set(bd.file, bd.channel, { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() });
+        log(`✓ social: ${bd.channel} geplaatst — ${r.url || r.postId || ""}`);
+        json(res, { ok: true, post: rec });
+      } catch (e) {
+        const rec = await socialStore.set(bd.file, bd.channel, { status: "failed", error: e.message });
+        log(`✗ social: ${bd.channel} — ${e.message}`);
+        json(res, { error: e.message, post: rec }, 500);
+      }
+      return;
+    }
+
     res.writeHead(404); res.end("nope");
   } catch (e) { log("✗ serverfout: " + e.message); json(res, { error: e.message }, 500); }
 });
@@ -306,3 +393,4 @@ server.listen(PORT, () => {
   if (process.env.STUDIO_NO_OPEN) return;
   try { const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]]; spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref(); } catch {}
 });
+
