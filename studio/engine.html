@@ -418,10 +418,12 @@ function videoCard(it){
     const rec=(it.posts&&it.posts[acc])||null;
     const acct=soc.accounts.find(a=>a.platform===p.id&&a.lang===vlang);
     const linked=acct&&acct.connected;
-    const cls=!p.enabled?'':rec&&rec.status==='posted'?'posted':rec&&rec.status==='failed'?'failed':rec&&rec.status==='draft'?'draft':'';
-    const st=!p.enabled?'binnenkort':rec&&rec.status==='posted'?'geplaatst':rec&&rec.status==='failed'?'mislukt':!linked?'koppel eerst':rec&&rec.status==='draft'?'concept':'posten';
+    const posted=rec&&rec.status==='posted';
+    const cls=!p.enabled?'':posted?'posted':rec&&rec.status==='failed'?'failed':rec&&rec.status==='draft'?'draft':'';
+    const st=!p.enabled?'binnenkort':posted?'geplaatst ✓':rec&&rec.status==='failed'?'opnieuw':!linked?'koppel eerst':rec&&rec.status==='draft'?'concept':'posten';
+    // disabled: platform uit, of niet gekoppeld. Al-geplaatst blijft klikbaar (voor bewust herposten na bevestiging).
     const dis=(!p.enabled||!linked);
-    return `<button data-pf="${p.id}" class="${cls}" ${dis?'disabled':''}>${esc(p.label)} ${LANG_LBL[vlang]}<span class="st">${st}</span></button>`;
+    return `<button data-pf="${p.id}" class="${cls}" data-posted="${posted?1:0}" ${dis?'disabled':''}>${esc(p.label)} ${LANG_LBL[vlang]}<span class="st">${st}</span></button>`;
   }).join('');
   card.innerHTML=
     `<div class="thumb" data-url="${esc(it.url)}"><video src="${esc(it.url)}#t=0.6" preload="metadata" muted playsinline></video><div class="play">▶</div><span class="badge">${esc(it.typeName)} · ${LANG_LBL[vlang]}</span></div>`
@@ -443,9 +445,15 @@ function videoCard(it){
   card.querySelectorAll('.socchan button[data-pf]').forEach(b=>{
     if(b.disabled)return;
     b.onclick=async()=>{
-      const platform=b.dataset.pf,lbl=b.textContent.trim();msg.textContent=lbl+': posten…';b.disabled=true;
-      try{const r=await (await fetch('/api/social/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform})})).json();
+      const platform=b.dataset.pf,lbl=(b.childNodes[0]?b.childNodes[0].textContent:b.textContent).trim();
+      // al geplaatst? eerst bevestigen; dan pas nog een keer (force) -> geen stille duplicaten
+      let force=false;
+      if(b.dataset.posted==='1'){ if(!confirm(lbl+' is al geplaatst. Nog een keer posten? Dit maakt een TWEEDE video op het kanaal.')) return; force=true; }
+      msg.textContent=lbl+': posten…';b.disabled=true;
+      try{const resp=await fetch('/api/social/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform,force})});
+        const r=await resp.json();
         if(r.ok){msg.textContent=lbl+': geplaatst.';soc.loaded=false;loadSocial();}
+        else if(r.already){msg.textContent=lbl+': al geplaatst (niet opnieuw gepost).';}
         else msg.textContent=lbl+': '+(r.error||'mislukt');
       }catch(e){msg.textContent='Fout: '+e.message;}
       b.disabled=false;
