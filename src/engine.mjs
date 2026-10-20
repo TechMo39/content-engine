@@ -45,7 +45,7 @@ log("merken geladen: " + reg.brands.map((b) => b.id).join(", "));
 // auto-teksten voorstellen (bewerkbaar), en de post-status onthouden.
 const social = buildSocial();
 const socialStore = makeSocialStore(OUT);
-log("social-kanalen: " + social.channels.map((c) => c.id + (c.enabled ? "" : "·stub")).join(", "));
+log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
 
 // ---- MAIL-STILL: per bedrijf één mail-afbeelding, LOKAAL gerenderd. Deterministisch per naam
 // (zelfde bedrijf -> altijd hetzelfde plaatje), zodat het op R2 een stabiele URL kan krijgen.
@@ -308,12 +308,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- SOCIAL-ARM endpoints (los van render + mail) ----
+    // Elk platform (youtube/…) heeft DRIE taal-accounts (NL/EN/FR), elk eigen token.
     if (u.pathname === "/api/social/channels") {
-      json(res, { channels: social.list() });
+      json(res, { platforms: social.listPlatforms(), accounts: social.listAccounts(), langs: social.LANGS });
       return;
     }
-    // Postbare video's = de afgewerkte mp4's in out/ (zelfde bron als de Bibliotheek), met
-    // per video de huidige post-status per kanaal uit de store erbij.
+    // Postbare video's = de afgewerkte mp4's in out/ (zelfde bron als de Bibliotheek). Per video
+    // alleen het taal-account dat bij de taal van de video past (EN-video -> YouTube EN, enz.),
+    // met de post-status per platform uit de store. posts gesleuteld op "<platform>-<lang>".
     if (u.pathname === "/api/social/videos") {
       const items = [];
       try {
@@ -323,35 +325,37 @@ const server = http.createServer(async (req, res) => {
           let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
           if (st.size < 4096) continue;
           const meta = parseOutName(f.replace(/\.mp4$/i, ""));
+          const lang = ["en", "fr"].includes(meta.lang) ? meta.lang : "nl";
           items.push({
             url: "/out/" + encodeURIComponent(f), file: f,
             brand: meta.brand, brandName: meta.brand ? (BRAND_NAME[meta.brand] || meta.brand) : "—",
             type: meta.template, typeName: meta.template ? (TEMPLATE_NAME[meta.template] || titleCase(meta.template)) : "Video",
-            name: meta.name || "", lang: meta.lang, date: meta.date,
+            name: meta.name || "", lang, date: meta.date,
             kb: Math.round(st.size / 1024), mtime: st.mtimeMs,
             posts: await socialStore.forFile(f),
           });
         }
       } catch {}
       items.sort((a, b) => b.mtime - a.mtime);
-      json(res, { items, channels: social.list() });
+      json(res, { items, platforms: social.listPlatforms() });
       return;
     }
-    // Auto-teksten voorstellen voor één video+kanaal (titel/omschrijving/tags). De UI vult
-    // deze in het bewerk-veld; de bewaarde versie (store) wint als die al bestaat.
+    // Auto-teksten voorstellen voor één video (titel/omschrijving/tags) in de taal van de video.
+    // platform bepaalt de hashtag-stijl; nu identiek per platform maar per-platform aanpasbaar.
     if (u.pathname === "/api/social/suggest") {
-      const ch = social.byId[u.searchParams.get("channel") || "youtube"] || social.byId.youtube;
+      const p = social.platById[u.searchParams.get("platform") || "youtube"] || social.platById.youtube;
       const type = u.searchParams.get("type") || "satisfying";
       const lang = u.searchParams.get("lang") || "nl";
       const name = u.searchParams.get("name") || "";
-      json(res, ch.suggest({ type, lang, name }));
+      json(res, p.suggest({ type, lang, name }));
       return;
     }
     // Teksten bewaren (concept) zonder te posten — de menselijke poort: eerst keuren/bewerken.
     if (u.pathname === "/api/social/save" && req.method === "POST") {
       const bd = await readBody(req);
-      if (!bd.file || !bd.channel) { json(res, { error: "file en channel verplicht" }, 400); return; }
-      const rec = await socialStore.set(bd.file, bd.channel, {
+      const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
+      if (!bd.file || !bd.platform) { json(res, { error: "file en platform verplicht" }, 400); return; }
+      const rec = await socialStore.set(bd.file, bd.platform, lang, {
         title: String(bd.title || "").slice(0, 100),
         description: String(bd.description || ""),
         tags: Array.isArray(bd.tags) ? bd.tags.slice(0, 15) : [],
@@ -360,24 +364,25 @@ const server = http.createServer(async (req, res) => {
       json(res, { ok: true, post: rec });
       return;
     }
-    // POSTEN: nu nog het casco. Het echte uploaden per kanaal komt in stap 2; tot dan geeft
-    // het kanaal een nette fout terug en leggen we de status als "failed" vast (met reden).
+    // POSTEN: nu nog het casco. Het echte uploaden per taal-account komt in stap 2; tot dan geeft
+    // het platform een nette fout terug en leggen we de status als "failed" vast (met reden).
     if (u.pathname === "/api/social/post" && req.method === "POST") {
       const bd = await readBody(req);
-      const ch = social.byId[bd.channel];
-      if (!bd.file || !ch) { json(res, { error: "onbekend kanaal of geen video" }, 400); return; }
-      if (!ch.enabled) { json(res, { error: ch.label + " — binnenkort" }, 400); return; }
+      const p = social.platById[bd.platform];
+      const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
+      if (!bd.file || !p) { json(res, { error: "onbekend platform of geen video" }, 400); return; }
+      if (!p.enabled) { json(res, { error: p.label + " — binnenkort" }, 400); return; }
       const meta = { title: bd.title || "", description: bd.description || "", tags: bd.tags || [] };
-      await socialStore.set(bd.file, bd.channel, { ...meta, status: "posting" });
-      log(`▶ social: ${bd.channel} ← ${bd.file}`);
+      await socialStore.set(bd.file, bd.platform, lang, { ...meta, status: "posting" });
+      log(`▶ social: ${bd.platform} ${lang.toUpperCase()} ← ${bd.file}`);
       try {
-        const r = await ch.upload(path.resolve(OUT, bd.file), meta, log);
-        const rec = await socialStore.set(bd.file, bd.channel, { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() });
-        log(`✓ social: ${bd.channel} geplaatst — ${r.url || r.postId || ""}`);
+        const r = await p.upload(path.resolve(OUT, bd.file), meta, lang, log);
+        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() });
+        log(`✓ social: ${bd.platform} ${lang.toUpperCase()} geplaatst — ${r.url || r.postId || ""}`);
         json(res, { ok: true, post: rec });
       } catch (e) {
-        const rec = await socialStore.set(bd.file, bd.channel, { status: "failed", error: e.message });
-        log(`✗ social: ${bd.channel} — ${e.message}`);
+        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "failed", error: e.message });
+        log(`✗ social: ${bd.platform} ${lang.toUpperCase()} — ${e.message}`);
         json(res, { error: e.message, post: rec }, 500);
       }
       return;
