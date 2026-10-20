@@ -30,30 +30,119 @@ const SCOPES = [
 ].join(" ");
 
 // ---- auto-teksten (titel/omschrijving/tags) per type & taal ----
-const TAGS = {
-  nl: ["zellige", "mozaïek", "handgemaakt", "naambord", "ambacht", "interieur"],
-  en: ["zellige", "mosaic", "handmade", "nameplate", "craft", "interior"],
-  fr: ["zellige", "mosaïque", "faitmain", "artisanat", "deco", "interieur"],
+// Merk-hashtags (altijd) + type-specifieke hashtags (per video-type). Geen # hier; dat zet
+// hashline erop. Alles kleine letters, accenten mogen (YouTube accepteert ze).
+const BASE_TAGS = {
+  nl: ["zellige", "mozaïek", "handgemaakt", "taleoftiles"],
+  en: ["zellige", "mosaic", "handmade", "taleoftiles"],
+  fr: ["zellige", "mosaïque", "faitmain", "taleoftiles"],
 };
-const TITLE = {
-  nl: { satisfying: "Handgemaakt mozaïek, steen voor steen", insitu: "Een handgemaakt naambord op je muur", sfeer: "Een eeuwenoud ambacht, met de hand", trio: "Eén naam, drie stijlen", colorway: "Welke kleur past bij jou?", geentwee: "Eén naam, oneindig uniek", walkthrough: "Ontwerp je eigen mozaïek-naambord", stopzodra: "Stop zodra je het herkent", onthul: "Raad wat eronder zit", cadeau: "Een cadeau dat een leven lang meegaat", intro: "Dit is Tale of Tiles" },
-  en: { satisfying: "Handmade mosaic, tile by tile", insitu: "A handmade nameplate on your wall", sfeer: "An age-old craft, by hand", trio: "One name, three styles", colorway: "Which colour fits you?", geentwee: "One name, endlessly unique", walkthrough: "Design your own mosaic nameplate", stopzodra: "Pause when you recognise it", onthul: "Guess what's underneath", cadeau: "A gift that lasts a lifetime", intro: "This is Tale of Tiles" },
-  fr: { satisfying: "Mosaïque faite main, carreau par carreau", insitu: "Une plaque faite main sur votre mur", sfeer: "Un art ancestral, à la main", trio: "Un nom, trois styles", colorway: "Quelle couleur vous ressemble ?", geentwee: "Un nom, infiniment unique", walkthrough: "Composez votre plaque en mosaïque", stopzodra: "Arrête quand tu reconnais", onthul: "Devinez ce qui se cache", cadeau: "Un cadeau qui dure toute une vie", intro: "Voici Tale of Tiles" },
+const TYPE_TAGS = {
+  satisfying: { nl: ["oddlysatisfying", "satisfying", "ambacht"], en: ["oddlysatisfying", "satisfying", "craft"], fr: ["satisfaisant", "oddlysatisfying", "artisanat"] },
+  insitu:     { nl: ["naambord", "interieur", "wanddecoratie"], en: ["nameplate", "interior", "walldecor"], fr: ["plaque", "interieur", "decomurale"] },
+  sfeer:      { nl: ["ambacht", "erfgoed", "atelier"], en: ["craft", "heritage", "workshop"], fr: ["artisanat", "patrimoine", "atelier"] },
+  trio:       { nl: ["naambord", "ontwerp", "kleuren"], en: ["nameplate", "design", "colours"], fr: ["plaque", "design", "couleurs"] },
+  colorway:   { nl: ["kleuren", "interieur", "ontwerp"], en: ["colours", "interior", "design"], fr: ["couleurs", "interieur", "design"] },
+  geentwee:   { nl: ["uniek", "handwerk", "naambord"], en: ["unique", "handmade", "nameplate"], fr: ["unique", "faitmain", "plaque"] },
+  walkthrough:{ nl: ["ontwerp", "configurator", "naambord"], en: ["design", "custom", "nameplate"], fr: ["design", "surmesure", "plaque"] },
+  stopzodra:  { nl: ["raadspel", "satisfying", "mozaïek"], en: ["guessinggame", "satisfying", "mosaic"], fr: ["devinette", "satisfaisant", "mosaïque"] },
+  onthul:     { nl: ["raadspel", "reveal", "mozaïek"], en: ["reveal", "guessinggame", "mosaic"], fr: ["reveal", "devinette", "mosaïque"] },
+  cadeau:     { nl: ["cadeau", "housewarming", "persoonlijkcadeau"], en: ["gift", "housewarming", "giftidea"], fr: ["cadeau", "cremaillere", "ideecadeau"] },
+  intro:      { nl: ["naambord", "ambacht", "interieur"], en: ["nameplate", "craft", "interior"], fr: ["plaque", "artisanat", "interieur"] },
 };
-const DESC = {
-  nl: "Handgemaakte mozaïekkunst met jouw naam, in echt glazuur. Tale of Tiles · taleoftiles.com",
-  en: "Handmade mosaic art with your name, in real glaze. Tale of Tiles · taleoftiles.com",
-  fr: "De l'art mosaïque fait main, à votre nom, en véritable émail. Tale of Tiles · taleoftiles.com",
+// Titels per type (2 varianten, roulerend). Jouw merkstem; geen plaatsnaam in de titel.
+const TITLES = {
+  satisfying: { nl: ["Handgemaakt, steen voor steen", "Zie het ontstaan, stukje voor stukje"], en: ["Handmade, tile by tile", "Watch it take shape, piece by piece"], fr: ["Fait main, carreau par carreau", "Regardez-le prendre forme"] },
+  insitu:     { nl: ["Jouw naam aan de muur", "Je naam verdient beter dan plastic"], en: ["Your name on the wall", "Your name deserves better than plastic"], fr: ["Votre nom au mur", "Votre nom mérite mieux que du plastique"] },
+  sfeer:      { nl: ["Een eeuwenoud ambacht", "Weken werk in één paneel"], en: ["An age-old craft", "Weeks of work in one panel"], fr: ["Un art ancestral", "Des semaines de travail dans un panneau"] },
+  trio:       { nl: ["Eén naam, drie stijlen", "Welke zou jij ophangen?"], en: ["One name, three styles", "Which would you hang?"], fr: ["Un nom, trois styles", "Lequel accrocheriez-vous ?"] },
+  colorway:   { nl: ["Welke kleur past bij jou?", "Eén paneel, drie kleurwegen"], en: ["Which colour fits you?", "One panel, three colourways"], fr: ["Quelle couleur vous ressemble ?", "Un panneau, trois couleurs"] },
+  geentwee:   { nl: ["Geen twee gelijk", "Eén naam, oneindig uniek"], en: ["No two alike", "One name, endlessly unique"], fr: ["Aucun identique", "Un nom, infiniment unique"] },
+  walkthrough:{ nl: ["Ontwerp jouw paneel", "Zo maak je het zelf"], en: ["Design your panel", "Make it yourself"], fr: ["Composez votre panneau", "Créez le vôtre"] },
+  stopzodra:  { nl: ["Stop zodra je het herkent", "Raad jij wat het is?"], en: ["Pause when you recognise it", "Can you guess what it is?"], fr: ["Arrête quand tu reconnais", "Devinez ce que c'est"] },
+  onthul:     { nl: ["Raad wat eronder zit", "Herken jij het al?"], en: ["Guess what's underneath", "Can you tell yet?"], fr: ["Devinez ce qui se cache", "Reconnaissez-vous ?"] },
+  cadeau:     { nl: ["Een cadeau dat blijft", "Geef iets dat niemand anders geeft"], en: ["A gift that lasts", "Give what no one else gives"], fr: ["Un cadeau qui dure", "Offrez ce que personne n'offre"] },
+  intro:      { nl: ["Dit is Tale of Tiles", "Handgemaakte mozaïekkunst met jouw naam"], en: ["This is Tale of Tiles", "Handmade mosaic art with your name"], fr: ["Voici Tale of Tiles", "L'art mosaïque fait main, à votre nom"] },
 };
-function suggest({ type, lang, name } = {}) {
+// Beschrijvingen per type (2 varianten, roulerend). In jouw site-stem: ambacht laten voelen,
+// "geen twee gelijk", zachte maar duidelijke CTA. Geen em-dash. {naam} wordt ingevuld of weg.
+const DESCS = {
+  satisfying: {
+    nl: ["Honderden stukjes, met de hand gelegd, tot jouw naam er staat. Geen twee komen er identiek uit, en dat is precies de bedoeling.", "Tegel voor tegel, puur op gevoel. Zo groeit een handgemaakt naambord dat jaren meegaat."],
+    en: ["Hundreds of pieces, laid by hand, until your name takes shape. No two come out identical, and that is exactly the point.", "Tile by tile, purely on feel. This is how a handmade nameplate that lasts for years takes shape."],
+    fr: ["Des centaines de pièces posées à la main, jusqu'à ce que votre nom apparaisse. Aucune n'est identique, et c'est exactement le but.", "Carreau par carreau, au ressenti. Ainsi naît une plaque faite main qui dure des années."],
+  },
+  insitu: {
+    nl: ["Geen plastic bordje, maar een handgemaakt paneel in echt glazuur. Aan je gevel, achter de balie of in de hal.", "Overal waar een naam ertoe doet, hoort er een die je met trots laat zien. Met de hand gelegd, in echt glazuur."],
+    en: ["No plastic sign, but a handmade panel in real glaze. On your facade, behind the counter or in the hall.", "Anywhere a name matters, it deserves one you show with pride. Laid by hand, in real glaze."],
+    fr: ["Pas une plaque en plastique, mais un panneau fait main en véritable émail. Sur votre façade, derrière le comptoir ou dans l'entrée.", "Partout où un nom compte, il en mérite un que l'on montre avec fierté. Posé à la main, en véritable émail."],
+  },
+  sfeer: {
+    nl: ["Klei, zon, vuur en geduld. Elke tegel met de hand gesneden en geglazuurd, zoals het al eeuwen gaat. Haast bestaat hier niet.", "Weken werk zitten in één paneel. Dat is precies waarom er nergens een tweede bestaat dat op het jouwe lijkt."],
+    en: ["Clay, sun, fire and patience. Every tile cut and glazed by hand, the way it has been done for ages. Haste does not exist here.", "Weeks of work go into a single panel. That is exactly why no other one like yours exists."],
+    fr: ["Argile, soleil, feu et patience. Chaque carreau taillé et émaillé à la main, comme depuis des siècles. La hâte n'existe pas ici.", "Des semaines de travail dans un seul panneau. C'est pourquoi aucun autre ne ressemble au vôtre."],
+  },
+  trio: {
+    nl: ["Dezelfde naam, drie keer anders. Welke zou jij aan je muur hangen? Zeg het in de comments.", "Eén naam, drie stijlen, met de hand gelegd. Jij kiest, wij maken."],
+    en: ["Same name, three different looks. Which would you hang on your wall? Tell us in the comments.", "One name, three styles, laid by hand. You choose, we make it."],
+    fr: ["Même nom, trois styles. Lequel accrocheriez-vous ? Dites-le en commentaire.", "Un nom, trois styles, posés à la main. Vous choisissez, nous réalisons."],
+  },
+  colorway: {
+    nl: ["Eén paneel, drie kleurwegen. Welke past bij jouw huis? A, B of C?", "Zelfde patroon, andere kleuren. Zeg in de comments welke jij zou kiezen."],
+    en: ["One panel, three colourways. Which fits your home? A, B or C?", "Same pattern, different colours. Tell us in the comments which one you'd pick."],
+    fr: ["Un panneau, trois couleurs. Laquelle pour chez vous ? A, B ou C ?", "Même motif, autres couleurs. Dites en commentaire laquelle vous choisiriez."],
+  },
+  geentwee: {
+    nl: ["Met de hand gemaakt, dus nooit twee gelijk. Net als jouw naam. Oneindig veel ontwerpen, één naam.", "Ander patroon, andere kleuren, dezelfde naam. Welke wordt die van jou?"],
+    en: ["Made by hand, so never two alike. Just like your name. Endless designs, one name.", "New pattern, new colours, same name. Which one becomes yours?"],
+    fr: ["Fait main, donc jamais deux pareils. Comme votre nom. Une infinité de designs, un nom.", "Nouveau motif, nouvelles couleurs, même nom. Lequel sera le vôtre ?"],
+  },
+  walkthrough: {
+    nl: ["Jij doet het leuke deel, wij het handwerk. Kies je patroon, je kleuren en je naam. Ontwerp jouw paneel op taleoftiles.com.", "Typ je naam en zie je ontwerp verschijnen in glanzende tegel. Ontwerp die van jou op taleoftiles.com."],
+    en: ["You do the fun part, we do the craft. Pick your pattern, your colours and your name. Design yours at taleoftiles.com.", "Type your name and watch your design appear in glossy tile. Design yours at taleoftiles.com."],
+    fr: ["Vous faites la partie amusante, nous l'artisanat. Choisissez motif, couleurs et nom. Composez le vôtre sur taleoftiles.com.", "Tapez votre nom et voyez votre design apparaître en carreau brillant. Composez le vôtre sur taleoftiles.com."],
+  },
+  stopzodra: {
+    nl: ["Extreem ingezoomd op het mozaïek. Stop zodra je herkent wat het is. Lukt het jou?", "Raad jij wat er ontstaat voordat het bord vol is? Zeg het in de comments."],
+    en: ["Zoomed right into the mosaic. Pause the moment you recognise it. Can you?", "Can you guess what it is before the panel fills up? Tell us in the comments."],
+    fr: ["Zoom extrême sur la mosaïque. Arrêtez dès que vous reconnaissez. Vous y arrivez ?", "Devinez ce qui apparaît avant que le panneau soit plein. Dites-le en commentaire."],
+  },
+  onthul: {
+    nl: ["Onder het patroon zit een beeld verstopt. Herken jij het voordat het helemaal onthuld is?", "De tegels doven één voor één uit. Raad jij wat eronder zit?"],
+    en: ["An image is hidden under the pattern. Can you recognise it before it is fully revealed?", "The tiles fade one by one. Can you guess what's underneath?"],
+    fr: ["Une image se cache sous le motif. La reconnaissez-vous avant la fin ?", "Les carreaux s'effacent un à un. Devinez ce qui se cache dessous."],
+  },
+  cadeau: {
+    nl: ["Wat geef je iemand die alles al heeft? Een handgemaakt naambord in echt glazuur, met hun naam. Een cadeau dat ze nooit meer weggeven.", "Geen bloemen die verwelken, maar kunst die blijft. Ontwerp een cadeau op taleoftiles.com."],
+    en: ["What do you give someone who has everything? A handmade nameplate in real glaze, with their name. A gift they'll never give away.", "No flowers that wilt, but art that lasts. Design a gift at taleoftiles.com."],
+    fr: ["Que offrir à qui a déjà tout ? Une plaque faite main en véritable émail, à leur nom. Un cadeau qu'on ne redonne jamais.", "Pas des fleurs qui fanent, mais de l'art qui dure. Composez un cadeau sur taleoftiles.com."],
+  },
+  intro: {
+    nl: ["Handgemaakte mozaïekkunst met jouw naam, in echt glazuur. Jij kiest patroon, kleuren en naam, wij leggen het met de hand. Ontwerp jouw paneel op taleoftiles.com.", "Een eeuwenoud ambacht, nu met jouw naam aan de muur. Ontwerp die van jou op taleoftiles.com."],
+    en: ["Handmade mosaic art with your name, in real glaze. You pick pattern, colours and name, we lay it by hand. Design yours at taleoftiles.com.", "An age-old craft, now with your name on the wall. Design yours at taleoftiles.com."],
+    fr: ["De l'art mosaïque fait main, à votre nom, en véritable émail. Vous choisissez motif, couleurs et nom, nous posons à la main. Composez le vôtre sur taleoftiles.com.", "Un art ancestral, désormais avec votre nom au mur. Composez le vôtre sur taleoftiles.com."],
+  },
+};
+// kleine deterministische keuze zodat per video een stabiele (maar verschillende) variant valt
+function pick(arr, seed) { if (!arr || !arr.length) return ""; return arr[Math.abs(seed) % arr.length]; }
+function seedOf(s) { let h = 0; s = String(s || ""); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
+
+function suggest({ type, lang, name, seed } = {}) {
   const lg = ["en", "fr"].includes(lang) ? lang : "nl";
-  let title = (TITLE[lg] && TITLE[lg][type]) || TITLE[lg].satisfying;
+  const t = TITLES[type] ? type : "satisfying";
+  const sd = Number.isFinite(seed) ? seed : seedOf((type || "") + "|" + (name || "") + "|" + lg);
+  // titel
+  let title = pick((TITLES[t] && TITLES[t][lg]) || TITLES[t].nl, sd);
   if (name) title = `${name} · ${title}`;
-  const tags = TAGS[lg].slice();
-  const hashline = tags.map((t) => "#" + t.replace(/[^\p{L}\p{N}]/gu, "")).join(" ");
-  // #Shorts helpt YouTube de video als Short te tonen
-  const description = DESC[lg] + "\n\n#Shorts " + hashline;
-  return { title: title.slice(0, 100), description, tags };
+  // beschrijving
+  const body = pick((DESCS[t] && DESCS[t][lg]) || DESCS[t].nl, sd + 1);
+  // hashtags: #Shorts + merk + type-specifiek (uniek gehouden)
+  const brand = BASE_TAGS[lg] || BASE_TAGS.nl;
+  const typed = (TYPE_TAGS[t] && TYPE_TAGS[t][lg]) || [];
+  const all = [...new Set([...brand, ...typed])];
+  const hashline = "#Shorts " + all.map((x) => "#" + x.replace(/[^\p{L}\p{N}]/gu, "")).join(" ");
+  const description = body + "\n\n" + hashline;
+  return { title: title.slice(0, 100), description, tags: all };
 }
 
 export function makePlatform({ ROOT } = {}) {

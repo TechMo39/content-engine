@@ -393,6 +393,13 @@ const server = http.createServer(async (req, res) => {
       const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
       if (!bd.file || !p) { json(res, { error: "onbekend platform of geen video" }, 400); return; }
       if (!p.enabled) { json(res, { error: p.label + " — binnenkort" }, 400); return; }
+      // DUBBEL POSTEN VOORKOMEN: al geplaatst naar dit kanaal in deze taal? Dan weigeren tenzij
+      // de UI expliciet force meestuurt (gebruiker bevestigde "toch nog een keer").
+      const existing = await socialStore.get(bd.file, bd.platform, lang);
+      if (existing && existing.status === "posted" && !bd.force) {
+        json(res, { error: "al geplaatst", already: true, post: existing }, 409);
+        return;
+      }
       const meta = { title: bd.title || "", description: bd.description || "", tags: bd.tags || [] };
       await socialStore.set(bd.file, bd.platform, lang, { ...meta, status: "posting" });
       log(`▶ social: ${bd.platform} ${lang.toUpperCase()} ← ${bd.file}`);
