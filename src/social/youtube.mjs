@@ -126,14 +126,13 @@ export function makePlatform({ ROOT } = {}) {
         const url = `${AUTH}?${params}`;
         log(`YouTube ${lang.toUpperCase()}: open de browser om te koppelen…`);
         log(`Opent niet vanzelf? Open deze link: ${url}`);
-        // Browser openen met de VOLLEDIGE url. Op Windows NIET `cmd /c start` gebruiken: cmd
-        // ziet de &-tekens in de url als commando-scheiders en kapt 'm af (-> response_type weg).
-        // PowerShell Start-Process neemt de url als één argument, zonder shell-parsing.
+        // Browser openen met de VOLLEDIGE url. `cmd /c start` opent de browser (zoals eerst),
+        // maar cmd ziet de &-tekens als commando-scheiders en kapt de url af (-> response_type
+        // viel weg). Fix: de & voor cmd escapen als ^& zodat de hele url doorkomt.
         try {
           if (process.platform === "win32") {
-            // url single-quoten voor PowerShell ('' = escaped quote); zo blijft de hele url intact
-            const psUrl = "'" + url.replace(/'/g, "''") + "'";
-            spawn("powershell", ["-NoProfile", "-Command", "Start-Process", psUrl], { stdio: "ignore", detached: true, windowsHide: true }).unref();
+            const cmdUrl = url.replace(/&/g, "^&");
+            spawn("cmd", ["/c", "start", "", cmdUrl], { stdio: "ignore", detached: true, windowsHide: true }).unref();
           } else {
             const bin = process.platform === "darwin" ? "open" : "xdg-open";
             spawn(bin, [url], { stdio: "ignore", detached: true }).unref();
