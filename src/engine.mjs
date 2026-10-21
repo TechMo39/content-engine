@@ -12,6 +12,7 @@ import { buildRegistry } from "./registry.mjs";
 import { buildSocial } from "./social/index.mjs";
 import { makeSocialStore } from "./social/store.mjs";
 import { loadEnv } from "./social/env.mjs";
+import { r2Put, r2Delete } from "./social/r2.mjs";
 import { renderToMp4 } from "./core/renderer.mjs";
 import { Resvg } from "@resvg/resvg-js";
 import ffmpegPath from "ffmpeg-static";
@@ -45,7 +46,19 @@ log("merken geladen: " + reg.brands.map((b) => b.id).join(", "));
 // Kanalen (YouTube actief, rest stub) + lokaal logboek out/.social.json. Het casco posten
 // komt in stap 2 (echte API's per kanaal). Nu: de video's uit de Bibliotheek tonen, per video
 // auto-teksten voorstellen (bewerkbaar), en de post-status onthouden.
-const social = buildSocial({ ROOT });
+// publicUrlFor: Instagram eist een PUBLIEKE video-URL. We zetten de mp4 TIJDELIJK rechtstreeks in
+// R2 (eigen S3-route, raakt de worker niet aan) onder social-tmp/. De worker serveert elk object
+// al publiek op /img/<key>, dus die URL geven we door. cleanup() wist 'm na het posten weer.
+const IMG_BASE = (process.env.TOT_IMG_BASE || "https://taleoftiles.com/img").replace(/\/$/, "");
+async function publicUrlFor(videoPath) {
+  const key = "social-tmp/ig-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".mp4";
+  const buf = await fs.readFile(videoPath);
+  await r2Put(key, buf, "video/mp4");
+  const cleanup = async () => { try { await r2Delete(key); } catch {} };
+  return { url: `${IMG_BASE}/${key}`, cleanup };
+}
+
+const social = buildSocial({ ROOT, publicUrlFor });
 const socialStore = makeSocialStore(OUT);
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
 
