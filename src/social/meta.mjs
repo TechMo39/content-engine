@@ -21,12 +21,13 @@ import { spawn } from "node:child_process";
 const GV = "v21.0";
 const GRAPH = `https://graph.facebook.com/${GV}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Rechten voor Instagram posten + de pagina-koppeling lezen. pages_manage_posts (FB-video
-// posten) vraagt aparte/geavanceerde toegang en blokkeert anders de device-login, dus die
-// laten we hier weg; Instagram werkt hiermee. FB-posten voegen we toe zodra die scope rond is.
+// Rechten voor Instagram posten + Facebook-pagina posten + de koppeling lezen.
+// pages_manage_posts moet in de app geactiveerd zijn (use-case "Manage everything on your Page"),
+// anders weigert Meta de scope bij de login.
 const SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
+  "pages_manage_posts",
   "business_management",
   "instagram_basic",
   "instagram_content_publish",
