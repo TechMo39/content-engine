@@ -58,6 +58,17 @@ async function publicUrlFor(videoPath) {
   return { url: `${IMG_BASE}/${key}`, cleanup };
 }
 
+// Per-type maximale duur (seconden) voor "render alles". Alleen een plafond: kies je minder,
+// dan geldt jouw keuze. Types die bij langere duur MEER brengen (satisfying/sfeer/geentwee) en
+// de externe walkthrough staan er bewust NIET in -> die pakken je gekozen duur volledig.
+const TYPE_MAX_SEC = {
+  intro: 40,        // uitlegvideo: kort houden
+  trio: 30, colorway: 30,
+  cadeau: 35,
+  onthul: 24, stopzodra: 24,   // raad-/reveal-clips: kort is spannender
+  insitu: 24,
+};
+
 const social = buildSocial({ ROOT, publicUrlFor });
 const socialStore = makeSocialStore(OUT);
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
@@ -316,7 +327,16 @@ const server = http.createServer(async (req, res) => {
       const brand = reg.byId[bd.brand];
       if (!brand) { json(res, { error: "onbekend merk" }, 400); return; }
       let n = 0;
-      for (const t of brand.templates) { enqueue({ brand: bd.brand, subject: bd.subject || null, template: t.id, format: bd.format || "9:16", music: bd.music || "", opts: bd.opts || {} }); n++; }
+      for (const t of brand.templates) {
+        // Per-type max-duur: kies je bv. 45s voor "render alles", dan worden de types die
+        // alleen REKKEN (en dus sloom worden bij lange duur) automatisch kort gehouden; de
+        // types die juist MEER brengen bij langere duur pakken gewoon je gekozen duur.
+        const opts = { ...(bd.opts || {}) };
+        const cap = TYPE_MAX_SEC[t.id];
+        if (cap && Number.isFinite(Number(opts.durationSec)) && Number(opts.durationSec) > cap) opts.durationSec = cap;
+        enqueue({ brand: bd.brand, subject: bd.subject || null, template: t.id, format: bd.format || "9:16", music: bd.music || "", opts });
+        n++;
+      }
       log(`▶ wachtrij: ${n} types toegevoegd — ze worden één voor één gemaakt`);
       json(res, { queued: n });
       return;
