@@ -21,11 +21,12 @@ import { spawn } from "node:child_process";
 const GV = "v21.0";
 const GRAPH = `https://graph.facebook.com/${GV}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Rechten die we nodig hebben: pagina's zien/beheren/posten + Instagram posten.
+// Rechten voor Instagram posten + de pagina-koppeling lezen. pages_manage_posts (FB-video
+// posten) vraagt aparte/geavanceerde toegang en blokkeert anders de device-login, dus die
+// laten we hier weg; Instagram werkt hiermee. FB-posten voegen we toe zodra die scope rond is.
 const SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
-  "pages_manage_posts",
   "business_management",
   "instagram_basic",
   "instagram_content_publish",
