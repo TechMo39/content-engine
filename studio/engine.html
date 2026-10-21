@@ -392,7 +392,14 @@ function renderChannels(){
       else row.querySelector('button').onclick=async(ev)=>{
         ev.target.disabled=true;ev.target.textContent='Koppelen…';
         try{const r=await (await fetch('/api/social/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({platform:p.id,lang:a.lang})})).json();
-          if(r.ok){soc.loaded=false;loadSocial();}else{ev.target.disabled=false;ev.target.textContent='Koppel';alert(r.error||'koppelen mislukt');}
+          if(r.error){ev.target.disabled=false;ev.target.textContent='Koppel';alert(r.error);return;}
+          // Meta device-login: toon de code die de gebruiker op facebook.com/device invoert.
+          if(r.userCode){
+            ev.target.textContent='Code: '+r.userCode;
+            alert('Koppelen:\n\n1. Er opent een Facebook-pagina (of ga naar '+(r.verifyUrl||'facebook.com/device')+')\n2. Voer deze code in: '+r.userCode+'\n3. Kies de pagina Tale of Tiles NL en geef toestemming\n\nDaarna springt dit vanzelf op groen (klik Vernieuwen).');
+            // na ~15s automatisch verversen om de status te pakken
+            setTimeout(()=>{soc.loaded=false;loadSocial();},15000);
+          } else { soc.loaded=false;loadSocial(); }
         }catch(e){ev.target.disabled=false;ev.target.textContent='Koppel';}
       };
       box.appendChild(row);

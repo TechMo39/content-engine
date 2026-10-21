@@ -16,12 +16,11 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import http from "node:http";
 import { spawn } from "node:child_process";
 
 const GV = "v21.0";
-const OAUTH_DIALOG = `https://www.facebook.com/${GV}/dialog/oauth`;
 const GRAPH = `https://graph.facebook.com/${GV}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Rechten die we nodig hebben: pagina's zien/beheren/posten + Instagram posten.
 const SCOPES = [
   "pages_show_list",
@@ -38,10 +37,11 @@ export function makeMetaAuth({ ROOT } = {}) {
   const tokenPath = (lang) => path.join(SECRETS, `meta-${lang}.json`);
 
   function creds() {
-    const id = process.env.META_APP_ID, secret = process.env.META_APP_SECRET;
+    const id = process.env.META_APP_ID, secret = process.env.META_APP_SECRET, clientToken = process.env.META_CLIENT_TOKEN;
     if (!id || !secret) throw new Error("META_APP_ID/SECRET ontbreken in .env");
-    return { id, secret };
+    return { id, secret, clientToken };
   }
+  const inProgress = {};   // lang -> true, voorkomt dubbel pollen
   async function readToken(lang) { try { return JSON.parse(await fsp.readFile(tokenPath(lang), "utf8")); } catch { return null; } }
   async function writeToken(lang, data) { await fsp.mkdir(SECRETS, { recursive: true }); await fsp.writeFile(tokenPath(lang), JSON.stringify(data, null, 2)); }
 
@@ -54,63 +54,76 @@ export function makeMetaAuth({ ROOT } = {}) {
     return { connected: true, who: t.page_name || "", igId: t.ig_id || "", pageId: t.page_id, daysLeft, expiring };
   }
 
-  // LOGIN: loopback-flow. Opent Facebook-consent, vangt ?code, ruilt om naar long-lived user-token,
-  // haalt de pagina + page-token + IG-id op en bewaart alles. De engine kiest de pagina:
-  // we nemen de pagina die aan de juiste taal hangt. Nu (1 pagina per taal) pakken we de eerste;
-  // als er meer zijn kiest de gebruiker later. targetPage (optioneel) = exacte paginanaam.
-  function startLogin(lang, log = () => {}, targetPage = "") {
+  // Van user-token -> pagina + page-token + IG-id -> opslaan. Gedeeld door device-flow.
+  async function finalizeFromUserToken(lang, userToken, longExpiresMs, log, targetPage = "") {
     const { id, secret } = creds();
-    return new Promise((resolve, reject) => {
-      let settled = false, killer = null;
-      const finish = (err, val) => { if (settled) return; settled = true; clearTimeout(killer); try { server.close(); } catch {} err ? reject(err) : resolve(val); };
-      const server = http.createServer(async (req, res) => {
-        try {
-          const u = new URL(req.url, "http://127.0.0.1");
-          if (!u.searchParams.has("code") && !u.searchParams.has("error")) { res.writeHead(404); res.end(); return; }
-          if (u.searchParams.has("error")) { res.end("Geannuleerd. Sluit dit tabblad."); finish(new Error("login geannuleerd")); return; }
-          const code = u.searchParams.get("code");
-          const port = server.address().port;
-          const redirect = `http://127.0.0.1:${port}/`;
-          // 1) code -> short-lived user token
-          const t1 = await (await fetch(`${GRAPH}/oauth/access_token?client_id=${id}&client_secret=${secret}&redirect_uri=${encodeURIComponent(redirect)}&code=${encodeURIComponent(code)}`)).json();
-          if (!t1.access_token) throw new Error("geen user-token: " + (t1.error?.message || JSON.stringify(t1)).slice(0, 200));
-          // 2) short -> long-lived user token (~60d)
-          const t2 = await (await fetch(`${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${id}&client_secret=${secret}&fb_exchange_token=${t1.access_token}`)).json();
-          const userToken = t2.access_token || t1.access_token;
-          const expiresMs = Date.now() + (t2.expires_in ? t2.expires_in * 1000 : 60 * 86400000);
-          // 3) pagina's + page-token
-          const pages = await (await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${userToken}`)).json();
-          const list = pages.data || [];
-          if (!list.length) throw new Error("geen Facebook-pagina gevonden onder dit account (koppel eerst een pagina)");
-          let page = targetPage ? list.find((p) => (p.name || "").toLowerCase() === targetPage.toLowerCase()) : null;
-          if (!page) page = list[0];   // 1 pagina per taal: de eerste
-          // 4) IG-business-id (kan ontbreken als IG niet aan de pagina hangt)
-          let igId = page.instagram_business_account && page.instagram_business_account.id;
-          if (!igId) {
-            const ig = await (await fetch(`${GRAPH}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`)).json();
-            igId = ig.instagram_business_account && ig.instagram_business_account.id;
-          }
-          await writeToken(lang, { page_id: page.id, page_name: page.name, page_token: page.access_token, ig_id: igId || "", expires: expiresMs, saved: Date.now() });
-          res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-          res.end(`<body style="font-family:system-ui;background:#1a1327;color:#f4ecdc;text-align:center;padding-top:80px"><h2>Meta ${lang.toUpperCase()} gekoppeld ✓</h2><p>${page.name}${igId ? " + Instagram" : " (geen IG gevonden — koppel Instagram aan de pagina)"}</p><p>Je kunt dit tabblad sluiten.</p></body>`);
-          log(`Meta ${lang.toUpperCase()} gekoppeld: ${page.name}${igId ? " + IG" : " (geen IG!)"}`);
-          finish(null, { ok: true });
-        } catch (e) { try { res.writeHead(500); res.end(String(e.message)); } catch {} finish(e); }
-      });
-      server.on("error", (e) => finish(e));
-      server.listen(0, "127.0.0.1", () => {
-        const port = server.address().port;
-        const params = new URLSearchParams({ client_id: id, redirect_uri: `http://127.0.0.1:${port}/`, response_type: "code", scope: SCOPES });
-        const url = `${OAUTH_DIALOG}?${params}`;
-        log(`Meta ${lang.toUpperCase()}: open de browser om te koppelen…`);
-        log(`Opent niet vanzelf? Open deze link: ${url}`);
-        try {
-          if (process.platform === "win32") spawn("cmd", ["/c", "start", "", url.replace(/&/g, "^&")], { stdio: "ignore", detached: true, windowsHide: true }).unref();
-          else spawn(process.platform === "darwin" ? "open" : "xdg-open", [url], { stdio: "ignore", detached: true }).unref();
-        } catch {}
-      });
-      killer = setTimeout(() => finish(new Error("koppelen verlopen (geen login binnen 5 min)")), 5 * 60 * 1000);
-    });
+    // user-token verlengen naar long-lived (~60d) als het nog kort is
+    let token = userToken, expiresMs = longExpiresMs || (Date.now() + 60 * 86400000);
+    try {
+      const t2 = await (await fetch(`${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${id}&client_secret=${secret}&fb_exchange_token=${userToken}`)).json();
+      if (t2.access_token) { token = t2.access_token; if (t2.expires_in) expiresMs = Date.now() + t2.expires_in * 1000; }
+    } catch {}
+    const pages = await (await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${token}`)).json();
+    const list = pages.data || [];
+    if (!list.length) throw new Error("geen Facebook-pagina gevonden onder dit account");
+    let page = targetPage ? list.find((p) => (p.name || "").toLowerCase() === targetPage.toLowerCase()) : null;
+    if (!page) page = list[0];
+    let igId = page.instagram_business_account && page.instagram_business_account.id;
+    if (!igId) {
+      const ig = await (await fetch(`${GRAPH}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`)).json();
+      igId = ig.instagram_business_account && ig.instagram_business_account.id;
+    }
+    await writeToken(lang, { page_id: page.id, page_name: page.name, page_token: page.access_token, ig_id: igId || "", expires: expiresMs, saved: Date.now() });
+    log(`✓ Meta ${lang.toUpperCase()} gekoppeld: ${page.name}${igId ? " + Instagram" : " (geen IG aan de pagina!)"}`);
+    return { page_name: page.name, ig: !!igId };
+  }
+
+  // LOGIN via "Facebook Login for Devices": geen redirect-URL / https nodig (werkt voor een lokale
+  // desktop-app). Vraagt een code, toont die, de gebruiker voert 'm in op facebook.com/device,
+  // en de engine pollt tot het token binnen is. Geeft {user_code, verification_uri} direct terug;
+  // het ophalen van het token gebeurt daarna op de achtergrond (status springt op connected).
+  async function startLogin(lang, log = () => {}) {
+    const { id, clientToken } = creds();
+    if (!clientToken) throw new Error("META_CLIENT_TOKEN ontbreekt in .env (nodig voor device-login)");
+    if (inProgress[lang]) throw new Error(`koppelen ${lang.toUpperCase()} loopt al — voer de code in op facebook.com/device`);
+    const appToken = `${id}|${clientToken}`;
+    const init = await (await fetch(`${GRAPH}/device/login`, {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ access_token: appToken, scope: SCOPES }),
+    })).json();
+    if (!init.code || !init.user_code) throw new Error("device-login faalde: " + (init.error?.message || JSON.stringify(init)).slice(0, 200) + " (staat 'Login from Devices' aan?)");
+    const verifyUrl = init.verification_uri || "https://www.facebook.com/device";
+    const interval = Math.max(5, init.interval || 5);
+    const expiresAt = Date.now() + (init.expires_in || 420) * 1000;
+    log(`Meta ${lang.toUpperCase()}: ga naar ${verifyUrl} en voer de code in: ${init.user_code}`);
+    // browser openen op de device-pagina met de code voorgevuld
+    try {
+      const u = `https://www.facebook.com/device?user_code=${init.user_code}`;
+      if (process.platform === "win32") spawn("cmd", ["/c", "start", "", u.replace(/&/g, "^&")], { stdio: "ignore", detached: true, windowsHide: true }).unref();
+      else spawn(process.platform === "darwin" ? "open" : "xdg-open", [u], { stdio: "ignore", detached: true }).unref();
+    } catch {}
+    // achtergrond-poll
+    inProgress[lang] = true;
+    (async () => {
+      try {
+        while (Date.now() < expiresAt) {
+          await sleep(interval * 1000);
+          const st = await (await fetch(`${GRAPH}/device/login_status`, {
+            method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ access_token: appToken, code: init.code }),
+          })).json();
+          if (st.access_token) { await finalizeFromUserToken(lang, st.access_token, st.expires_in ? Date.now() + st.expires_in * 1000 : 0, log); break; }
+          const sub = st.error && st.error.error_subcode;
+          if (sub === 1349174) continue;              // nog niet bevestigd
+          if (sub === 1349172) { await sleep(interval * 1000); continue; }  // te snel
+          if (sub === 1349152) { log(`✗ Meta ${lang.toUpperCase()}: code verlopen, probeer opnieuw`); break; }
+          // andere fout -> stoppen
+          if (st.error) { log(`✗ Meta ${lang.toUpperCase()}: ${st.error.message || "login mislukt"}`); break; }
+        }
+      } catch (e) { log(`✗ Meta ${lang.toUpperCase()}: ${e.message}`); }
+      finally { delete inProgress[lang]; }
+    })();
+    return { ok: true, pending: true, userCode: init.user_code, verifyUrl };
   }
 
   return { readToken, writeToken, status, startLogin, GRAPH };
