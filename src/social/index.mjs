@@ -6,6 +6,7 @@ import { makePlatform as youtube, suggest } from "./youtube.mjs";
 import { makeMetaAuth } from "./meta.mjs";
 import { makeInstagram } from "./instagram.mjs";
 import { makeFacebook } from "./facebook.mjs";
+import { makeTikTok } from "./tiktok.mjs";
 import { makeStub } from "./stub.mjs";
 
 export const LANGS = ["nl", "en", "fr"];
@@ -24,7 +25,7 @@ export function buildSocial(ctx = {}) {
     youtube(ctx),
     makeInstagram({ auth: metaAuth, suggest, publicUrlFor }),
     makeFacebook({ auth: metaAuth, suggest }),
-    makeStub({ id: "tiktok", label: "TikTok" }),
+    makeTikTok({ ROOT: ctx.ROOT, suggest }),
     makeStub({ id: "whatsapp", label: "WhatsApp" }),
   ];
   const platById = {};

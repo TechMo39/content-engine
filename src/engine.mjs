@@ -367,6 +367,26 @@ const server = http.createServer(async (req, res) => {
       catch (e) { log(`✗ koppelen ${bd.platform} ${lang.toUpperCase()}: ${e.message}`); json(res, { error: e.message }, 500); }
       return;
     }
+    // TIKTOK CALLBACK: de worker (/tiktok/callback op taleoftiles.com) stuurt de ?code&state
+    // hierheen (browser-fetch naar localhost). We wisselen de code -> token via completeLogin.
+    // CORS open op deze route zodat de fetch vanaf taleoftiles.com naar localhost mag.
+    if (u.pathname === "/api/social/tiktok-cb") {
+      res.setHeader("access-control-allow-origin", "*");
+      res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+      res.setHeader("access-control-allow-headers", "content-type");
+      if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+      const code = u.searchParams.get("code") || "";
+      const state = u.searchParams.get("state") || "";
+      const err = u.searchParams.get("error") || "";
+      // taal uit de state (we zetten "<rnd>_<lang>" in startLogin)
+      const lang = (state.split("_").pop() || "nl").toLowerCase();
+      const tt = social.platById["tiktok"];
+      if (err) { log(`✗ TikTok ${lang.toUpperCase()}: ${err}`); json(res, { error: err }); return; }
+      if (!code || !tt || !tt.completeLogin) { json(res, { error: "geen code of TikTok niet beschikbaar" }, 400); return; }
+      try { await tt.completeLogin(lang, code, state, log); json(res, { ok: true }); }
+      catch (e) { log(`✗ TikTok ${lang.toUpperCase()}: ${e.message}`); json(res, { error: e.message }, 500); }
+      return;
+    }
     // Postbare video's = de afgewerkte mp4's in out/ (zelfde bron als de Bibliotheek). Per video
     // alleen het taal-account dat bij de taal van de video past (EN-video -> YouTube EN, enz.),
     // met de post-status per platform uit de store. posts gesleuteld op "<platform>-<lang>".
@@ -459,4 +479,3 @@ server.listen(PORT, () => {
   if (process.env.STUDIO_NO_OPEN) return;
   try { const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]]; spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref(); } catch {}
 });
-
