@@ -330,7 +330,7 @@ const server = http.createServer(async (req, res) => {
       const p = social.platById[bd.platform];
       const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
       if (!p || !p.enabled || !p.startLogin) { json(res, { error: "kan dit platform niet koppelen" }, 400); return; }
-      try { await p.startLogin(lang, log); json(res, { ok: true }); }
+      try { const r = await p.startLogin(lang, log); json(res, { ok: true, ...(r || {}) }); }
       catch (e) { log(`✗ koppelen ${bd.platform} ${lang.toUpperCase()}: ${e.message}`); json(res, { error: e.message }, 500); }
       return;
     }
