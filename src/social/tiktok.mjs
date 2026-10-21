@@ -162,6 +162,9 @@ export function makeTikTok({ ROOT, suggest } = {}) {
 
   // UPLOAD: push_by_file. Probeer DIRECT_POST (sandbox/na audit); mag dat niet, val terug op
   // MEDIA_UPLOAD (concept in de TikTok-inbox). meta = {title, description, tags}.
+  // TikTok eist dat je VÓÓR het posten creator_info ophaalt en de toegestane privacy-optie
+  // daaruit gebruikt (niet zelf verzinnen). Voor een ongeauditeerde app moet het account bovendien
+  // op privé staan; creator_info vertelt ook of posten nu mag.
   async function upload(videoPath, meta, lang, log = () => {}) {
     const at = await accessToken(lang);
     const stat = await fsp.stat(videoPath);
@@ -173,17 +176,39 @@ export function makeTikTok({ ROOT, suggest } = {}) {
     // Welke modus mag deze koppeling? Uit de scope in het token afleiden.
     const tok = await readToken(lang);
     const canDirect = (tok && tok.scope || "").includes("video.publish");
-    const mode = canDirect ? "DIRECT_POST" : "MEDIA_UPLOAD";
-    const initUrl = `${API}/post/publish/${canDirect ? "video/init" : "inbox/video/init"}/`;
 
+    // 1) CREATOR INFO (verplicht vóór direct posten): haalt de toegestane privacy-opties op en
+    //    of de creator nu mag posten. Zonder deze stap weigert TikTok de init ("review guidelines").
+    let privacy = "SELF_ONLY", maxDur = 0;
+    if (canDirect) {
+      const ci = await fetch(`${API}/post/publish/creator_info/query/`, {
+        method: "POST",
+        headers: { authorization: "Bearer " + at, "content-type": "application/json; charset=UTF-8" },
+        body: "{}",
+      });
+      const cj = await ci.json();
+      const d = cj && cj.data;
+      if (!ci.ok || !d) {
+        throw new Error("TikTok creator_info faalde: " + ((cj && cj.error && (cj.error.message || cj.error.code)) || JSON.stringify(cj)).toString().slice(0, 300));
+      }
+      const opts = Array.isArray(d.privacy_level_options) ? d.privacy_level_options : [];
+      // ongeauditeerd -> alleen SELF_ONLY toegestaan; kies die als 'ie mag, anders de eerste optie
+      privacy = opts.includes("SELF_ONLY") ? "SELF_ONLY" : (opts[0] || "SELF_ONLY");
+      maxDur = d.max_video_post_duration_sec || 0;
+      if (d.can_post === false) {
+        throw new Error("TikTok staat posten nu niet toe (dagelijkse limiet bereikt of account niet op privé). Zet je account op privé en probeer later opnieuw.");
+      }
+    }
+
+    const initUrl = `${API}/post/publish/${canDirect ? "video/init" : "inbox/video/init"}/`;
     const postInfo = canDirect
-      ? { title, privacy_level: "SELF_ONLY", disable_duet: false, disable_comment: false, disable_stitch: false, video_cover_timestamp_ms: 1000 }
+      ? { title, privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false, video_cover_timestamp_ms: 1000 }
       : undefined;   // inbox-upload neemt geen post_info (gebruiker vult titel zelf in de app)
     const initBody = {
       ...(postInfo ? { post_info: postInfo } : {}),
       source_info: { source: "FILE_UPLOAD", video_size: size, chunk_size: CHUNK, total_chunk_count: 1 },
     };
-    log(`TikTok ${lang.toUpperCase()}: ${canDirect ? "direct post (SELF_ONLY)" : "concept naar inbox"} — init (${Math.round(size / 1024)} KB)…`);
+    log(`TikTok ${lang.toUpperCase()}: ${canDirect ? "direct post (" + privacy + ")" : "concept naar inbox"} — init (${Math.round(size / 1024)} KB)…`);
     const initRes = await fetch(initUrl, {
       method: "POST",
       headers: { authorization: "Bearer " + at, "content-type": "application/json; charset=UTF-8" },
