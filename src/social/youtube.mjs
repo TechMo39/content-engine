@@ -127,7 +127,7 @@ const DESCS = {
 function pick(arr, seed) { if (!arr || !arr.length) return ""; return arr[Math.abs(seed) % arr.length]; }
 function seedOf(s) { let h = 0; s = String(s || ""); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
-function suggest({ type, lang, name, seed } = {}) {
+export function suggest({ type, lang, name, seed } = {}) {
   const lg = ["en", "fr"].includes(lang) ? lang : "nl";
   const t = TITLES[type] ? type : "satisfying";
   const sd = Number.isFinite(seed) ? seed : seedOf((type || "") + "|" + (name || "") + "|" + lg);
