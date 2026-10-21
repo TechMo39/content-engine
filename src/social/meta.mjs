@@ -83,10 +83,11 @@ export function makeMetaAuth({ ROOT } = {}) {
   // en de engine pollt tot het token binnen is. Geeft {user_code, verification_uri} direct terug;
   // het ophalen van het token gebeurt daarna op de achtergrond (status springt op connected).
   async function startLogin(lang, log = () => {}) {
-    const { id, clientToken } = creds();
-    if (!clientToken) throw new Error("META_CLIENT_TOKEN ontbreekt in .env (nodig voor device-login)");
+    const { id, secret, clientToken } = creds();
     if (inProgress[lang]) throw new Error(`koppelen ${lang.toUpperCase()} loopt al — voer de code in op facebook.com/device`);
-    const appToken = `${id}|${clientToken}`;
+    // App-access-token voor device-login: client token als die er is, anders app_id|app_secret
+    // (beide zijn geldige app-tokens; zo is geen aparte client token nodig).
+    const appToken = clientToken ? `${id}|${clientToken}` : `${id}|${secret}`;
     const init = await (await fetch(`${GRAPH}/device/login`, {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ access_token: appToken, scope: SCOPES }),
