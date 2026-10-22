@@ -88,6 +88,25 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .socsave button{width:100%;background:#1b1430;border:1px solid #3a2f52;color:#9b8fc0;border-radius:8px;padding:7px;font-size:11px;cursor:pointer}
 .socsave button:hover{border-color:var(--gold);color:var(--gold)}
 .socmsg{font-size:11px;color:#9b8fc0;padding:0 12px 10px;min-height:14px}
+/* monitor: wat is er al gezegd (per type) */
+.socmon{border:1px solid #3a2f52;border-radius:12px;background:#17112b;padding:12px 14px;margin-bottom:16px}
+.socmon-head{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}
+.socmon-head h3{margin:0;font-size:13px;letter-spacing:1px;color:var(--gold)}
+.socmon-head .tot{font-size:12px;color:var(--ink)}
+.socmon-head .caret{color:var(--ink);font-size:12px}
+.socmon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+.socmon-grid.hide{display:none}
+.montype{border:1px solid #3a2f52;border-radius:10px;background:#1b1430;padding:10px 12px}
+.montype .mt-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+.montype .mt-name{font-size:13px;color:var(--cream);font-weight:600}
+.montype .mt-count{font-size:11px;color:var(--ink)}
+.montype .mt-hooks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.montype .mt-hooks li{font-size:11px;color:#b9aede;display:flex;justify-content:space-between;gap:8px;line-height:1.35}
+.montype .mt-hooks li .n{color:var(--ink);flex:none}
+.montype .mt-hooks li.rep{color:#e6b36a}
+.montype .mt-empty{font-size:11px;color:#6f6490;font-style:italic}
+.montype.warn{border-color:#7a5a2a}
+.montype .mt-flag{font-size:10px;color:#e6b36a;margin-top:6px}
 /* kanalen-paneel */
 .socchannels{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:22px}
 .chanbox{border:1px solid #3a2f52;border-radius:12px;background:#1b1430;padding:12px 14px}
@@ -153,6 +172,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 </section>
 
 <section id="view-social" style="display:none">
+  <div id="socMonitor" class="socmon" style="display:none"></div>
   <div id="socChannels" class="socchannels"></div>
   <div class="socbar">
     <div class="seg" id="socBrands"></div>
@@ -359,20 +379,68 @@ async function loadSocial(){
   let vids={items:[],platforms:[]},chan={accounts:[]};
   try{[vids,chan]=await Promise.all([fetch('/api/social/videos').then(r=>r.json()),fetch('/api/social/channels').then(r=>r.json())]);}catch(e){}
   soc.items=vids.items||[];soc.platforms=vids.platforms||chan.platforms||[];soc.accounts=chan.accounts||[];soc.loaded=true;
+  renderMonitor();
   renderChannels();
   // merk-filter
   const seen=new Map();soc.items.forEach(i=>{if(i.brand&&!seen.has(i.brand))seen.set(i.brand,i.brandName||i.brand);});
   const bc=$('#socBrands');bc.innerHTML='';
-  const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};bc.appendChild(b);};
+  const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderMonitor();renderSoc();};bc.appendChild(b);};
   mkb('','Alle merken'); for(const [id,label] of seen) mkb(id,label);
   // taal-filter
   const lc=$('#socLangs');lc.innerHTML='';
-  const mkl=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.lang===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.lang=id;$$('#socLangs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderSoc();};lc.appendChild(b);};
+  const mkl=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.lang===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.lang=id;$$('#socLangs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderMonitor();renderSoc();};lc.appendChild(b);};
   mkl('','Alle talen'); ['nl','en','fr'].forEach(l=>mkl(l,LANG_LBL[l]));
   renderSoc();
 }
 $('#socRefresh').onclick=()=>{soc.loaded=false;loadSocial();};
 $('#socSearch').oninput=e=>{soc.q=e.target.value.toLowerCase();renderSoc();};
+
+// MONITOR: "wat is er al gezegd". Aggregeert per video-TYPE wat er daadwerkelijk gepost is
+// (titels/hooks + hoe vaak), zodat je in één oogopslag ziet waar het eentonig wordt. Leest
+// alleen soc.items (die de post-status per video dragen); verandert niets.
+soc.monOpen = (soc.monOpen===undefined) ? true : soc.monOpen;
+function normHook(s){ return String(s||'').toLowerCase().replace(/^.*?·\s*/,'').replace(/\s+/g,' ').trim(); }
+function renderMonitor(){
+  const box=$('#socMonitor'); if(!box) return;
+  // alleen echt geplaatste posts tellen, gefilterd op het actieve merk/taal-filter van de balk
+  const byType={}; let total=0;
+  (soc.items||[]).forEach(it=>{
+    if(soc.brand&&it.brand!==soc.brand) return;
+    if(soc.lang&&it.lang!==soc.lang) return;
+    const ty=it.type||TYPE_OF(it.file); const tn=it.typeName||ty;
+    const posts=it.posts||{};
+    // één video kan op meerdere kanalen staan; tel de hook éénmaal per video, niet per kanaal
+    let title='',posted=false;
+    for(const k in posts){ const r=posts[k]; if(r&&r.status==='posted'&&!r.error){ posted=true; if(r.title&&!title) title=r.title; } }
+    if(!posted) return;
+    total++;
+    const g=byType[ty]||(byType[ty]={name:tn,count:0,hooks:new Map()});
+    g.count++;
+    const h=normHook(title)|| '(geen titel)';
+    g.hooks.set(h,(g.hooks.get(h)||0)+1);
+  });
+  const types=Object.keys(byType).sort((a,b)=>byType[b].count-byType[a].count);
+  if(!total){ box.style.display='none'; return; }
+  box.style.display='';
+  const caret=soc.monOpen?'▾':'▸';
+  let html=`<div class="socmon-head" id="socMonHead"><h3>Wat is er al gezegd</h3><span class="tot">${total} posts · ${types.length} typen <span class="caret">${caret}</span></span></div>`;
+  html+=`<div class="socmon-grid${soc.monOpen?'':' hide'}">`;
+  types.forEach(ty=>{
+    const g=byType[ty];
+    const hooks=[...g.hooks.entries()].sort((a,b)=>b[1]-a[1]);
+    const repeated=hooks.some(([,n])=>n>1);
+    html+=`<div class="montype${repeated?' warn':''}">`;
+    html+=`<div class="mt-top"><span class="mt-name">${esc(g.name)}</span><span class="mt-count">${g.count}x</span></div>`;
+    html+=`<ul class="mt-hooks">`;
+    hooks.forEach(([h,n])=>{ html+=`<li class="${n>1?'rep':''}"><span>${esc(h)}</span><span class="n">${n>1?n+'x':''}</span></li>`; });
+    html+=`</ul>`;
+    if(repeated) html+=`<div class="mt-flag">↻ zelfde hook meermaals gebruikt</div>`;
+    html+=`</div>`;
+  });
+  html+=`</div>`;
+  box.innerHTML=html;
+  const head=$('#socMonHead'); if(head) head.onclick=()=>{ soc.monOpen=!soc.monOpen; renderMonitor(); };
+}
 
 // KANALEN-PANEEL: per platform een box met de drie taal-accounts + koppel-status/knop.
 function renderChannels(){
