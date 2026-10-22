@@ -4,7 +4,28 @@
 //
 // Flow: POST /{ig_id}/media (media_type=REELS, video_url, caption) -> creation_id
 //       status pollen tot FINISHED -> POST /{ig_id}/media_publish (creation_id) -> media id
+import { spawn } from "node:child_process";
+import { FFMPEG } from "../core/renderer.mjs";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// COVER-FRAME: de eerste frame van onze video's is een (bijna) leeg paneel, dus als cover lelijk.
+// We lezen de duur met ffmpeg en laten Instagram een frame op ~90% pakken als cover (daar is het
+// paneel altijd vol/af, ook bij herhalende patronen). Lukt het lezen niet -> geen offset (default).
+function probeDurationMs(videoPath) {
+  return new Promise((resolve) => {
+    try {
+      const ch = spawn(FFMPEG, ["-i", videoPath], { windowsHide: true });
+      let err = "";
+      ch.stderr.on("data", (d) => { err += d.toString(); });
+      ch.on("close", () => {
+        const m = err.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+        if (m) resolve(Math.round(((+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])) * 1000));
+        else resolve(0);
+      });
+      ch.on("error", () => resolve(0));
+    } catch { resolve(0); }
+  });
+}
 
 export function makeInstagram({ auth, suggest, publicUrlFor }) {
   return {
@@ -26,10 +47,14 @@ export function makeInstagram({ auth, suggest, publicUrlFor }) {
       if (!videoUrl) throw new Error("kon geen publieke video-URL maken");
       try {
         const caption = [meta.title, meta.description].filter(Boolean).join("\n\n");
+        // cover-frame op ~90% (niet de lege begin-frame). thumb_offset in ms; 0/onbekend -> weglaten.
+        const durMs = await probeDurationMs(videoPath);
+        const thumbOffset = durMs > 0 ? Math.round(durMs * 0.9) : 0;
+        if (thumbOffset > 0) log(`Instagram ${lang.toUpperCase()}: cover-frame op ${(thumbOffset / 1000).toFixed(1)}s`);
         // 2) media container maken
         const create = await (await fetch(`${auth.GRAPH}/${tok.ig_id}/media`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ media_type: "REELS", video_url: videoUrl, caption, access_token: tok.page_token }),
+          body: JSON.stringify({ media_type: "REELS", video_url: videoUrl, caption, ...(thumbOffset > 0 ? { thumb_offset: thumbOffset } : {}), access_token: tok.page_token }),
         })).json();
         if (!create.id) throw new Error("IG-container faalde: " + (create.error?.message || JSON.stringify(create)).slice(0, 300));
         // 3) status pollen (video verwerken kan even duren)
