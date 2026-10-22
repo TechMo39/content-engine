@@ -73,6 +73,30 @@ const social = buildSocial({ ROOT, publicUrlFor });
 const socialStore = makeSocialStore(OUT);
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
 
+// ---- ANTI-HERHALING: welke titels/omschrijvingen zijn al gepost (of als concept bewaard) voor
+// een bepaald video-TYPE + taal. Leest het sociale logboek, bepaalt het type uit de bestandsnaam
+// (zelfde parser als de Bibliotheek), en geeft de teksten terug met de nieuwste eerst. suggest()
+// kiest daarmee een variant die nog niet gebruikt is. Puur lezen; raakt niets aan de render/mail.
+async function recentTexts(type, lang) {
+  const lg = ["en", "fr"].includes(lang) ? lang : "nl";
+  const rows = [];
+  try {
+    for (const r of await socialStore.all()) {
+      if (!r || (r.lang || "nl") !== lg) continue;
+      const meta = parseOutName(String(r.file || "").replace(/\.mp4$/i, ""));
+      if (meta.template !== type) continue;
+      if (!r.title && !r.description) continue;
+      rows.push(r);
+    }
+  } catch {}
+  rows.sort((a, b) => (b.updated || b.at || 0) - (a.updated || a.at || 0));   // nieuwste eerst
+  return {
+    titles: rows.map((r) => r.title).filter(Boolean),
+    // alleen de eerste regel van de omschrijving vergelijken (zonder de hashtag-staart)
+    descs: rows.map((r) => String(r.description || "").split("\n")[0]).filter(Boolean),
+  };
+}
+
 // ---- MAIL-STILL: per bedrijf één mail-afbeelding, LOKAAL gerenderd. Deterministisch per naam
 // (zelfde bedrijf -> altijd hetzelfde plaatje), zodat het op R2 een stabiele URL kan krijgen.
 const MAILSTILL_DIR = path.resolve(OUT, "mail-stills");
@@ -421,7 +445,10 @@ const server = http.createServer(async (req, res) => {
       const type = u.searchParams.get("type") || "satisfying";
       const lang = u.searchParams.get("lang") || "nl";
       const name = u.searchParams.get("name") || "";
-      json(res, p.suggest({ type, lang, name }));
+      // ANTI-HERHALING: verzamel de titels/omschrijvingen die al voor dit type+taal gepost zijn,
+      // zodat suggest een nog-niet-gebruikte variant kiest (opbouwend i.p.v. telkens hetzelfde).
+      const recent = await recentTexts(type, lang);
+      json(res, p.suggest({ type, lang, name, recent }));
       return;
     }
     // Teksten bewaren (concept) zonder te posten — de menselijke poort: eerst keuren/bewerken.
