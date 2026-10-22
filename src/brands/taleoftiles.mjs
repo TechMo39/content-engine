@@ -709,18 +709,28 @@ export function makeBrand({ ROOT, config }) {
   // AUTO-NAAM: als er geen naam is ingevuld kiest de engine er zelf één (anti-herhaling).
   // Fictieve namen — mix van zaaknamen (verkoopt het gevelbord), familie/huis en voornamen.
   // Zwaarder NL + EN, dan FR. Nooit echte personen/merken.
-  const NAMES = [
-    // NL — zaak
-    "Café De Kaai", "Brasserie 't Anker", "Bakkerij Noordhoek", "Salon Nour", "Atelier Vonk",
-    "Koffiehuis Mokka", "Restaurant Olij", "Café De Hoek", "Lunchroom Fleur", "Slagerij Van Dijk",
-    // NL — familie / voornaam
-    "Familie De Vries", "Huize Berg", "Familie El Amrani", "Sofie", "Daan", "Imane", "Youssef", "Lotte", "Noor",
-    // EN
-    "The Copper Spoon", "Harbour & Co.", "Nord Coffee", "The Ivy Table", "The Harpers", "Olivia", "Liam", "Maya", "Leo",
-    // FR
-    "Chez Amélie", "Maison Dorée", "Café du Coin", "L'Atelier Bleu", "Camille", "Léa", "Hugo",
-  ];
-  function pickName() { return pickFresh(NAMES, "names") || NAMES[0]; }
+  // Namen PER TAAL — een NL-video mag nooit een Franse naam tonen (en omgekeerd). pickName kiest
+  // uit de lijst die bij de taal van de video hoort. Nooit echte personen/merken.
+  const NAMES_BY_LANG = {
+    nl: [
+      // NL — zaak
+      "Café De Kaai", "Brasserie 't Anker", "Bakkerij Noordhoek", "Salon Nour", "Atelier Vonk",
+      "Koffiehuis Mokka", "Restaurant Olij", "Café De Hoek", "Lunchroom Fleur", "Slagerij Van Dijk",
+      // NL — familie / voornaam
+      "Familie De Vries", "Huize Berg", "Familie El Amrani", "Sofie", "Daan", "Imane", "Youssef", "Lotte", "Noor",
+    ],
+    en: [
+      "The Copper Spoon", "Harbour & Co.", "Nord Coffee", "The Ivy Table", "The Harpers", "Olivia", "Liam", "Maya", "Leo",
+    ],
+    fr: [
+      "Chez Amélie", "Maison Dorée", "Café du Coin", "L'Atelier Bleu", "Camille", "Léa", "Hugo",
+    ],
+  };
+  function pickName(rawLang) {
+    const lang = ["en", "fr"].includes(rawLang) ? rawLang : "nl";
+    const pool = NAMES_BY_LANG[lang];
+    return pickFresh(pool, "names") || pool[0];
+  }
 
   // AUTO-PATROON: de engine kiest zelf een patroon (anti-herhaling) zodat Mo niks hoeft te
   // kiezen — alleen Render. Geldt voor ALLE types. pickPatterns(n) voor meerdere (trio).
@@ -743,7 +753,7 @@ export function makeBrand({ ROOT, config }) {
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
-    const name = (opts.name || "").trim() || pickName();   // de naam = waar het naartoe bouwt
+    const name = (opts.name || "").trim() || pickName(opts.lang);   // de naam = waar het naartoe bouwt
     const storyBeats = resolveStory(opts, name, "satisfying");
     // Organische vulrichtingen (geen lineaire sweeps -> geen blokken). Elk patroon een andere.
     const REVEALS = ["spiralout", "radial", "spiral"];
@@ -839,7 +849,7 @@ export function makeBrand({ ROOT, config }) {
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
-    const name = (opts.name || "").trim() || pickName();
+    const name = (opts.name || "").trim() || pickName(opts.lang);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const pid = pickPatterns(1)[0];
     const b = await getBase(pid), lock = LOCKS[pid] || {};
@@ -858,7 +868,7 @@ export function makeBrand({ ROOT, config }) {
     let h = Math.round(H * 0.70), w = Math.round(h * A); if (w > W * 0.80) { w = Math.round(W * 0.80); h = Math.round(w / A); }
     const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2);
     const rr = Math.max(8, w * 0.03);
-    const poll = { nl: "Welke past bij jou? A · B · C", en: "Which fits you? A · B · C", fr: "Lequel pour vous ? A · B · C" }[lang];
+    const poll = { nl: "Welke past bij jou?", en: "Which fits you?", fr: "Lequel pour vous ?" }[lang];
     const pollKick = RVlang({ nl: ["Zeg het in de comments", "Laat een A, B of C achter", "Jouw keuze?"], en: ["Tell us in the comments", "Drop an A, B or C", "Your pick?"], fr: ["Dites-le en commentaire", "Un A, B ou C ?", "Votre choix ?"] }, lang);
     const Tb = durSec * 0.34, Tc = durSec * 0.72;   // bouw A -> beat-snap A/B/C -> vergelijk A|B|C
     const hold = 1.3;                                // snap-interval (op de beat)
@@ -945,7 +955,7 @@ export function makeBrand({ ROOT, config }) {
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
-    const name = (opts.name || "").trim() || pickName();   // dynamisch: outreach vult bedrijfsnaam
+    const name = (opts.name || "").trim() || pickName(opts.lang);   // dynamisch: outreach vult bedrijfsnaam
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const storyBeats = resolveStory(opts, name, "geentwee");   // ToT-verhaal loopt mee
     const fams = familyPool(opts);   // Palet-keuze (warm/koel/auto)
@@ -998,7 +1008,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    const name = (opts.name || "").trim() || pickName();   // geen naam ingevuld -> engine kiest zelf
+    const name = (opts.name || "").trim() || pickName(opts.lang);   // geen naam ingevuld -> engine kiest zelf
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
@@ -1095,7 +1105,18 @@ export function makeBrand({ ROOT, config }) {
       let inner = "", overlay = "";
       // de twee niet-actieve patronen op hun slot (vervagen bij inzoom)
       const slotOp = 1 - featureK;
-      if (slotOp > 0.003) { let g = ""; for (let j = 0; j < 3; j++) { if (j === a) continue; g += drawPanel(prep[j].parsed, colorsFor(j, t), slotRect(j, prep[j].aspect), "ts" + j, true); } inner += `<g opacity="${slotOp.toFixed(3)}">${g}</g>`; }
+      if (slotOp > 0.003) {
+        let g = "";
+        for (let j = 0; j < 3; j++) {
+          if (j === a) continue;
+          // een bord dat nog niet aan het bouwen is -> GHOST (laag opaque) zodat het leest als
+          // "komt zo", niet als een stuk/leeg wit paneel in het rijtje.
+          const started = t >= (j * Ta + Ta * 0.24);
+          const op = started ? 1 : 0.28;
+          g += `<g opacity="${op}">${drawPanel(prep[j].parsed, colorsFor(j, t), slotRect(j, prep[j].aspect), "ts" + j, true)}</g>`;
+        }
+        inner += `<g opacity="${slotOp.toFixed(3)}">${g}</g>`;
+      }
       // het actieve patroon: beweegt/groeit van slot naar midden terwijl het inkleurt
       inner += drawPanel(Pa.parsed, colorsFor(a, t), fRect, "tf", true);
       // aan de muur (dissolve erover)
@@ -1293,6 +1314,19 @@ export function makeBrand({ ROOT, config }) {
     const Tintro = Math.min(2.8, durSec * 0.22);
     const revWin = (durSec - Tintro) * 0.72;
     const photoImg = photoUri ? `<image href="${photoUri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>` : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#241a3a"/>`;
+    // ONDERLAAG = het beeld in MOZAÏEK (fijne glazuur-tegeltjes die het beeld vormen, zelfde
+    // techniek als stopzodra), zodat het onthulde beeld mozaïek BLIJFT en geen platte clipart
+    // wordt. We pellen straks het patroon weg en daaronder zit dit tegel-beeld (niet de kale foto).
+    const GX = 26, GY = 36;
+    const gridSvg = (() => { const cw = 100; let c = ""; for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) c += `<rect x="${i * cw}" y="${j * cw}" width="${cw}" height="${cw}"/>`; return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GX * cw} ${GY * cw}" preserveAspectRatio="none">${c}</svg>`; })();
+    const gparsed = film.parseTiles(gridSvg, "radial");
+    const PAL_HEX = Object.values(film.GLAZE_FAMILIES).flat();
+    const PAL_RGB = PAL_HEX.map((hh) => { const n = parseInt(hh.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+    const nearestTone = (r, g, b) => { let bi = 0, bd = 1e18; for (let k = 0; k < PAL_RGB.length; k++) { const p = PAL_RGB[k], dr = r - p[0], dg = g - p[1], db = b - p[2], d = dr * dr + dg * dg + db * db; if (d < bd) { bd = d; bi = k; } } return PAL_HEX[bi]; };
+    const toneFor = (nx, ny) => { if (!gimg || !gimg.grid) return PAL_HEX[0]; const gx = Math.max(0, Math.min(gimg.gw - 1, Math.round(nx * (gimg.gw - 1)))); const gy = Math.max(0, Math.min(gimg.gh - 1, Math.round(ny * (gimg.gh - 1)))); const i = (gy * gimg.gw + gx) * 3; return nearestTone(gimg.grid[i], gimg.grid[i + 1], gimg.grid[i + 2]); };
+    const hasMosaicImg = !!(gimg && gimg.grid);
+    const underWrap = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 ${gparsed.view[2]} ${gparsed.view[3]}" preserveAspectRatio="none">`;
+    const underMosaic = hasMosaicImg ? film.buildSvg(gparsed, gparsed.tiles.map((tl) => toneFor(tl.nx, tl.ny))).replace(/<svg\b[^>]*>/i, underWrap) : photoImg;
     function sceneAt(frame) {
       const t = frame / FPS;
       const p = t < Tintro ? 0 : smooth(Math.min(1, (t - Tintro) / revWin));   // hold -> onthullen
@@ -1302,10 +1336,11 @@ export function makeBrand({ ROOT, config }) {
       for (let i = 0; i < parsed.tiles.length; i++) cols[i] = (parsed.tiles[i].order > 1 - p) ? "none" : glaze[i];
       const wrap = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
       const mosaic = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
-      // de tegel-grid valt aan het eind HELEMAAL weg -> je ziet het beeld scherp (geen ruis)
-      const gridOp = p < 0.80 ? 1 : 1 - smooth((p - 0.80) / 0.20);
+      // ONDER: het beeld als mozaïek (blijft staan). EROVER: het patroon dat van buiten naar binnen
+      // wegpelt. Zo onthult het peelen een TEGEL-beeld, niet een platte foto, en de mozaïek-textuur
+      // blijft tot het eind behouden (geen clipart meer).
       let inner = `<clipPath id="rv"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
-        + `<g clip-path="url(#rv)">${photoImg}<g opacity="${gridOp.toFixed(3)}">${mosaic}</g></g>`
+        + `<g clip-path="url(#rv)">${underMosaic}${mosaic}</g>`
         + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       let overlay = "";
       if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower"); }
@@ -1332,7 +1367,7 @@ export function makeBrand({ ROOT, config }) {
     const durSec = resolveDuration(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
-    const name = (opts.name || "").trim() || pickName();
+    const name = (opts.name || "").trim() || pickName(opts.lang);
     const storyBeats = resolveStory(opts, name, "sfeer");
     // CURATIE: beelden die duidelijk ambacht/setting tonen (handen, atelier, ruimte,
     // architectuur) i.p.v. abstracte mozaïek-closeups die op ons eigen paneel lijken.
@@ -1404,7 +1439,7 @@ export function makeBrand({ ROOT, config }) {
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     // MÉT naam of ZONDER (kunst): expliciete naam wint; anders willekeurig naam óf kunst.
     const explicit = (opts.name || "").trim();
-    const named = explicit ? explicit : (Math.random() < 0.5 ? pickName() : null);
+    const named = explicit ? explicit : (Math.random() < 0.5 ? pickName(opts.lang) : null);
     const pid = pickPatterns(1)[0];
     const b = await getBase(pid), lock = LOCKS[pid] || {};
     const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
@@ -1501,7 +1536,12 @@ export function makeBrand({ ROOT, config }) {
     const revealLine = named
       ? { nl: "Een handgemaakt naambord — met hun naam, in echt glazuur.", en: "A handmade nameplate — with their name, in real glaze.", fr: "Une plaque faite main — à leur nom, en véritable émail." }[lang]
       : { nl: "Met de hand gemaakt. Een stuk kunst voor aan de muur.", en: "Made by hand. A piece of art for the wall.", fr: "Fait main. Une œuvre pour le mur." }[lang];
-    const cta = RVlang({ nl: ["Geef iets dat blijft.", "Iets dat generaties meegaat.", "Geef kunst, geen cadeaubon.", "Een cadeau met een naam erop."], en: ["Give something that lasts.", "Something that outlives trends.", "Give art, not a gift card."], fr: ["Offrez ce qui dure.", "Un cadeau qui traverse les générations.", "Offrez de l'art, pas un bon."] }, lang);
+    // CTA: de naam-belovende regel ("...met een naam erop") alleen toestaan als er ook ECHT een
+    // naam op het paneel staat. Anders belooft de caption iets dat niet in beeld is.
+    const ctaPool = named
+      ? { nl: ["Geef iets dat blijft.", "Iets dat generaties meegaat.", "Geef kunst, geen cadeaubon.", "Een cadeau met een naam erop."], en: ["Give something that lasts.", "Something that outlives trends.", "Give art, not a gift card.", "A gift with a name on it."], fr: ["Offrez ce qui dure.", "Un cadeau qui traverse les générations.", "Offrez de l'art, pas un bon.", "Un cadeau à son nom."] }
+      : { nl: ["Geef iets dat blijft.", "Iets dat generaties meegaat.", "Geef kunst, geen cadeaubon."], en: ["Give something that lasts.", "Something that outlives trends.", "Give art, not a gift card."], fr: ["Offrez ce qui dure.", "Un cadeau qui traverse les générations.", "Offrez de l'art, pas un bon."] };
+    const cta = RVlang(ctaPool, lang);
 
     function sceneAt(frame) {
       const t = frame / FPS;
@@ -1546,7 +1586,7 @@ export function makeBrand({ ROOT, config }) {
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const gold = branding.gold;
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
-    const name = (opts.name || "").trim() || pickName();
+    const name = (opts.name || "").trim() || pickName(opts.lang);
     // één LIGGEND paneel (past straks aan de muur)
     const PANEL_ASPECT = { "9:16": 1.5, "1:1": 1.2, "16:9": 1.9 }[format] || 1.5;
     let subjectId = (opts.subject && (patternList || []).includes(opts.subject)) ? opts.subject : pickPatterns(1)[0];
@@ -1565,11 +1605,16 @@ export function makeBrand({ ROOT, config }) {
     // muur (in-situ) voor de WAAR-fase — paneel past binnen de vrije plek
     const mk = mockupPool.length ? pickFreshObj(mockupPool, "mockups") : null;
     const pl = mk && mk.place;
-    let wH = Math.round((pl && pl.h ? pl.h : 0.34) * H * 0.92), wW = Math.round(wH * A2);
-    if (pl && pl.w) { const fw = Math.round(pl.w * W * 0.92); if (wW > fw) { wW = fw; wH = Math.round(wW / A2); } }
-    const maxW = Math.round(W * 0.74), maxH = Math.round(H * 0.40);
-    if (wW > maxW) { wW = maxW; wH = Math.round(wW / A2); }
-    if (wH > maxH) { wH = maxH; wW = Math.round(wH * A2); }
+    // LIGGEND paneel met een VASTE nette verhouding (PANEL_ASPECT), NIET afgeleid van de patroon-view
+    // (die kon extreem breed uitvallen -> flinterdun streepje, en dan werd de naam onleesbaar klein).
+    // Grootte volgt de vrije muurplek, met een ruime ONDERGRENS zodat het altijd een echt paneel is.
+    const AR = PANEL_ASPECT;
+    let wW = Math.round((pl && pl.w ? pl.w : 0.62) * W * 0.92);
+    let wH = Math.round(wW / AR);
+    const minW = Math.round(W * 0.52), maxW = Math.round(W * 0.78), maxH = Math.round(H * 0.42);
+    if (wW < minW) { wW = minW; wH = Math.round(wW / AR); }
+    if (wW > maxW) { wW = maxW; wH = Math.round(wW / AR); }
+    if (wH > maxH) { wH = maxH; wW = Math.round(wH * AR); }
     let cx = Math.round((pl ? pl.cx : 0.5) * W), cy = Math.round((pl ? pl.cy : 0.46) * H);
     cx = Math.max(Math.round(wW / 2 + W * 0.05), Math.min(W - Math.round(wW / 2 + W * 0.05), cx));
     cy = Math.max(Math.round(wH / 2 + H * 0.205), Math.min(H - Math.round(wH / 2 + H * 0.12), cy));
@@ -1743,7 +1788,7 @@ export function makeBrand({ ROOT, config }) {
     const pad = Math.max(6 * SS, Math.round(panelW * 0.018));
     const innerW = panelW - pad * 2, innerH = panelH - pad * 2;
     let panelX = Math.round((W - panelW) / 2), panelY = Math.round(bandTop + (bandBot - bandTop - panelH) / 2);
-    const name = (opts.name || "").trim() || pickName();   // geen naam ingevuld -> engine kiest zelf
+    const name = (opts.name || "").trim() || pickName(opts.lang);   // geen naam ingevuld -> engine kiest zelf
     const palArr = resolvePalette(opts, templateId).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
     // SATISFYING-CYCLUS: een rij GEVARIEERDE paletten — elke ronde vult 'ie opnieuw in
