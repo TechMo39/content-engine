@@ -23,16 +23,22 @@ async function detectWallRect(absPath) {
   // gradient (textuur): laag = glad vlak (muur); hoog = rand/object/meubel
   const grad = new Float32Array(n);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const i = at(x, y); let gx = 0, gy = 0; if (x + 1 < GW) gx = Math.abs(lum[i] - lum[at(x + 1, y)]); if (y + 1 < GH) gy = Math.abs(lum[i] - lum[at(x, y + 1)]); grad[i] = gx + gy; }
-  // muurkleur = gemiddelde van gladde cellen in de boven-centrale band
-  let wr = 0, wg = 0, wb = 0, wc = 0;
-  for (let y = Math.floor(GH * 0.08); y < GH * 0.50; y++) for (let x = Math.floor(GW * 0.22); x < GW * 0.78; x++) { const i = at(x, y); if (grad[i] < 0.04) { wr += px[i * 3]; wg += px[i * 3 + 1]; wb += px[i * 3 + 2]; wc++; } }
-  if (wc < 30) return null;
-  wr /= wc; wg /= wc; wb /= wc;
+  // MUURKLEUR (robuust): MEDIAAN-kleur van alle gladde cellen in de bovenste 65% (hele breedte,
+  // niet alleen een midden-band). Mediaan negeert een minderheid-ondergrond (baksteen bovenverdieping,
+  // ramen) -> pakt het dominante gladde vlak = de échte muur. Voorkomt dat een winkelpui het paneel
+  // op de bakstenen bovenbouw plakt.
+  const smR = [], smG = [], smB = [];
+  for (let y = Math.floor(GH * 0.05); y < GH * 0.65; y++) for (let x = 0; x < GW; x++) { const i = at(x, y); if (grad[i] < 0.04) { smR.push(px[i * 3]); smG.push(px[i * 3 + 1]); smB.push(px[i * 3 + 2]); } }
+  if (smR.length < 30) return null;
+  const med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
+  const wr = med(smR), wg = med(smG), wb = med(smB);
   const wLum = (Math.max(wr, wg, wb) + Math.min(wr, wg, wb)) / 2 / 255;
-  // muur-masker: glad EN kleur dicht bij de muurkleur EN niet veel feller/donkerder dan de muur
-  // (objecten, planken, mokken, ramen, schaduwen -> GEEN muur; daar mag het paneel niet op/overheen).
+  // muur-masker: glad EN kleur dicht bij de muurkleur. Luminantie-ONDERGRENS ruimer (-0.24) zodat
+  // een ZACHTE schaduw op de muur nog als muur telt (schaduw is glad -> lage grad; alleen harde
+  // randen/objecten worden door de grad-test weggefilterd). Zo wordt een grote wand niet door een
+  // schaduwveeg in losse stukjes gehakt (anders kiest de detector een egaal-belichte hoek).
   const wall = new Uint8Array(n);
-  for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.05 && d < 40 && lum[i] < wLum + 0.09 && lum[i] > wLum - 0.14) ? 1 : 0; }
+  for (let i = 0; i < n; i++) { const dr = px[i * 3] - wr, dg = px[i * 3 + 1] - wg, db = px[i * 3 + 2] - wb; const d = Math.sqrt(dr * dr + dg * dg + db * db); wall[i] = (grad[i] < 0.05 && d < 48 && lum[i] < wLum + 0.10 && lum[i] > wLum - 0.24) ? 1 : 0; }
   // DISTANCE TRANSFORM: afstand van elke muur-cel tot het dichtstbijzijnde niet-muur (object
   // of beeldrand). Het paneel komt in het punt met de MEESTE vrije ruimte -> altijd zo ver
   // mogelijk van kapstok/jas/meubel/plant/mok/raam, met marge rondom (lege muur = lege muur).
@@ -54,13 +60,19 @@ async function detectWallRect(absPath) {
     if (x < GW - 1 && y < GH - 1) rel(i, at(x + 1, y + 1), 1.414);
     if (x > 0 && y < GH - 1) rel(i, at(x - 1, y + 1), 1.414);
   }
-  // beste centrum: max vrije ruimte, met lichte voorkeur voor horizontaal midden en niet te
-  // laag (ooghoogte / boven de meubels).
+  // KEUZE als een mens: hang op de MUUR (nooit vloer/plafond) en zo CENTRAAL mogelijk op
+  // ooghoogte, mits er genoeg vrije ruimte is.
+  //  - alleen cellen op muur-hoogte (cy 0.12..0.52) -> sluit de vloer en het plafond uit.
+  //  - genoeg vrije ruimte vereist (d >= DMIN) zodat het paneel niet over meubels/randen valt.
+  //  - score beloont vrije ruimte, maar straft FORS uit het horizontale midden en te laag, en
+  //    een lichte duw uit te-hoog -> een net, centraal vlak op ooghoogte wint van een grote hoek.
+  const DMIN = 6;
   let best = null;
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-    const d = dist[at(x, y)]; if (d < 4) continue;
+    const d = dist[at(x, y)]; if (d < DMIN) continue;
     const cx = x / GW, cy = y / GH;
-    const score = d - Math.abs(cx - 0.5) * 6 - Math.max(0, cy - 0.5) * 10;
+    if (cy < 0.12 || cy > 0.52) continue;   // alleen muur op ooghoogte, geen vloer/plafond
+    const score = d - Math.abs(cx - 0.5) * 55 - Math.max(0, cy - 0.42) * 25 - Math.max(0, 0.30 - cy) * 18;
     if (!best || score > best.score) best = { score, d, cx, cy };
   }
   if (!best) return null;
@@ -71,7 +83,12 @@ async function detectWallRect(absPath) {
   const freeHalf = Math.max(GH * 0.11, best.d * 0.82);   // veilige half-maat in cellen
   const wF = Math.min(0.80, (freeHalf * 2) / GW);
   const hF = Math.min(0.50, (freeHalf * 2) / GH);
-  return { cx: best.cx, cy: best.cy, w: wF, h: hF };
+  // clamp: houd het hele vak binnen beeld met een kleine marge, zodat het paneel nooit half
+  // buiten beeld of strak tegen een rand hangt.
+  const m = 0.03;
+  const cx = Math.min(1 - m - wF / 2, Math.max(m + wF / 2, best.cx));
+  const cy = Math.min(1 - m - hF / 2, Math.max(m + hF / 2, best.cy));
+  return { cx, cy, w: wF, h: hF };
 }
 
 // ---- naamplaat (port van mPlateColours + mNameLayerSvg uit page.ts) ----
