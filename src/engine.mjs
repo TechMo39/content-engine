@@ -67,7 +67,7 @@ const TYPE_MAX_SEC = {
   cadeau: 35,
   onthul: 24, stopzodra: 24,   // raad-/reveal-clips: kort is spannender
   insitu: 24,
-  droste: 20,   // oneindige inzoom: loopt toch, kort houden
+  droste: 60,   // oneindige inzoom: duur wordt gesnapt op hele tunnel-cycli (naadloze loop)
 };
 
 const social = buildSocial({ ROOT, publicUrlFor });
