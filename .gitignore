@@ -9,3 +9,5 @@ assets/images/
 *.zip
 out/
 node_modules/
+secrets/
+brand-assets/

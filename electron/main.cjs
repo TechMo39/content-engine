@@ -19,7 +19,7 @@ function startServer() {
   server.on("error", (e) => console.error("server start faalde:", e.message));
 }
 
-function waitForServer(cb, tries = 50) {
+function waitForServer(cb, tries = 200) {   // ~60s: de server luistert pas NÁ init (42 sfeer- + 17 mockup-beelden + esbuild)
   const req = http.get(URL, () => { req.destroy(); cb(); });
   req.on("error", () => { if (tries > 0) setTimeout(() => waitForServer(cb, tries - 1), 300); else cb(); });
 }
@@ -35,6 +35,8 @@ function createWindow() {
     autoHideMenuBar: true,
   });
   win.loadURL(URL);
+  // Als de server net nog niet luisterde: automatisch opnieuw laden i.p.v. een blanco venster.
+  win.webContents.on("did-fail-load", () => { setTimeout(() => { if (win && !win.isDestroyed()) win.loadURL(URL); }, 700); });
   // de pagina-<title> niet het venster laten overschrijven -> blijft "Tale of Tiles Studio"
   win.on("page-title-updated", (e) => e.preventDefault());
   // externe links in de standaardbrowser openen, niet in het app-venster
