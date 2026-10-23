@@ -691,6 +691,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "onthul", name: "Onthul (raad-foto achter patroon)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 9: patroon dooft uit -> foto erachter
     { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU — cadeau-reveal
     { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
+    { id: "droste", name: "Oneindige inzoom (droste)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -1746,7 +1747,87 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
   }
 
+  // DROSTE (type 12): ÉÉN ingekleurd patroon vult het scherm; je zoomt in naar het centrale
+  // deelgebied, en DAARIN zit AL het volgende patroon (ander patroon + andere glazuur-familie)
+  // scherp zichtbaar. Zodra dat gebied het scherm vult, is de staat identiek aan het begin ->
+  // naadloze, oneindige tunnel: patroon -> volgend patroon -> volgend -> ...
+  // Techniek: elk niveau wordt EENMAAL naar een hoge-res PNG gerenderd (resvg) en de niveaus
+  // worden met <image> in elkaar genest (centraal FR-deelgebied). Dit is resvg-veilig (geen
+  // geneste <svg>/clipPath die crasht) en blijft scherp. De camera log-zoomt naar het midden.
+  async function makeDrosteRender({ opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const durSec = resolveDuration(opts);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
+    // resvg voor het pre-renderen van de niveaus (data-URI PNG's). Lazy import zodat de brand
+    // 'm alleen laadt als dit type draait; renderer gebruikt dezelfde dependency.
+    const { Resvg } = await import("@resvg/resvg-js");
+    const DEPTH = 5, FR = 1 / 3;   // 5 niveaus diep; venster = centraal 1/3 (vloeiende zoom)
+    const famKeys = Object.keys(film.GLAZE_FAMILIES).sort(() => Math.random() - 0.5);
+    let pats = pickPatterns(DEPTH);
+    while (pats.length && pats.length < DEPTH) pats.push(pats[pats.length - 1]);
+    if (!pats.length) throw new Error("droste: geen patronen");
+    // render elk niveau 1x naar een hoge-res PNG (vast formaat PW x PH, zelfde voor alle niveaus
+    // zodat de nesting klopt). Elk niveau een ander patroon + andere glazuur-familie.
+    const PW = 1500;
+    const base0 = await getBase(pats[0]); const lock0 = LOCKS[pats[0]] || {};
+    const { nX: nX0, nY: nY0 } = tileCounts(base0, lock0, PANEL_ASPECT);
+    const probe = film.parseTiles(await getPatternSvg(pats[0], nX0, nY0), "radial");
+    const PH = Math.round(PW * probe.view[3] / probe.view[2]);
+    const levels = [];
+    for (let i = 0; i < DEPTH; i++) {
+      const pid = pats[i % pats.length], base = await getBase(pid), lock = LOCKS[pid] || {};
+      const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);
+      const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+      const palArr = film.GLAZE_FAMILIES[famKeys[i % famKeys.length]] || film.PAL;
+      const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      const pw = parsed.view[2], ph = parsed.view[3];
+      const wrap = `<svg x="0" y="0" width="${PW}" height="${PH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+      const a = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      const b = film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
+      const doc = `<svg viewBox="0 0 ${PW} ${PH}" xmlns="http://www.w3.org/2000/svg">${a}${b}</svg>`;
+      const png = new Resvg(doc, { fitTo: { mode: "width", value: PW } }).render().asPng();
+      levels.push({ uri: "data:image/png;base64," + png.toString("base64") });
+    }
+    // nest de niveaus met <image>: elk niveau vult (X,Y,Wd,Ht); het volgende in het centrale
+    // FR-deelgebied daarvan. Resvg-veilig (geen geneste svg/clip).
+    function nested(idx, X, Y, Wd, Ht) {
+      const L = levels[idx];
+      let s = `<image href="${L.uri}" x="${X.toFixed(3)}" y="${Y.toFixed(3)}" width="${Wd.toFixed(3)}" height="${Ht.toFixed(3)}" preserveAspectRatio="none"/>`;
+      if (idx < levels.length - 1) {
+        const ww = Wd * FR, wh = Ht * FR, wx = X + (Wd - ww) / 2, wy = Y + (Ht - wh) / 2;
+        s += nested(idx + 1, wx, wy, ww, wh);
+      }
+      return s;
+    }
+    const scene = nested(0, 0, 0, PW, PH);
+    const A = PW / PH;
+    const fit = fitRect(Math.round(W * 0.84), Math.round(H * 0.74), A);
+    const rx = Math.round((W - fit.w) / 2), ry = Math.round(H * 0.52 - fit.h / 2), rr = Math.max(6, fit.w * 0.03);
+    const lerp = (a, b, p) => a * Math.pow(b / a, p);   // log-interpolatie -> vloeiende, naadloze zoom
+    const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      const loopT = (t / durSec) % 1;   // 0..1 per loop; na één loop is het beeld identiek
+      // view (in PW/PH-coords): van vol paneel naar het centrale FR-deelgebied, log-zoom
+      const vw = lerp(PW, PW * FR, loopT), vh = lerp(PH, PH * FR, loopT);
+      const vx = PW / 2 - vw / 2, vy = PH / 2 - vh / 2;
+      const wrap = `<svg x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" viewBox="${vx.toFixed(3)} ${vy.toFixed(3)} ${vw.toFixed(3)} ${vh.toFixed(3)}" preserveAspectRatio="xMidYMid slice">${scene}</svg>`;
+      let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
+        + `<g clip-path="url(#drc)">${wrap}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
+        + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      let overlay = "";
+      if (t < 3.0) { const op = t < 2.0 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.0) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
+    if (templateId === "droste") return await makeDrosteRender({ opts, format });
     if (templateId === "intro") return await makeIntroRender({ opts, format });
     if (templateId === "walkthrough") return await makeWalkthroughRender({ opts, format, log });
     if (templateId === "cadeau") return await makeCadeauRender({ opts, format });
