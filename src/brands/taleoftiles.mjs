@@ -1747,125 +1747,137 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
   }
 
-  // DROSTE (type 12): ÉÉN ingekleurd patroon vult het scherm; je zoomt in naar het centrale
-  // deelgebied, en DAARIN zit AL het volgende patroon (ander patroon + andere glazuur-familie)
-  // scherp zichtbaar. Zodra dat gebied het scherm vult, is de staat identiek aan het begin ->
-  // naadloze, oneindige tunnel: patroon -> volgend patroon -> volgend -> ...
-  // Techniek: elk niveau wordt EENMAAL naar een hoge-res PNG gerenderd (resvg) en de niveaus
-  // worden met <image> in elkaar genest (centraal FR-deelgebied). Dit is resvg-veilig (geen
-  // geneste <svg>/clipPath die crasht) en blijft scherp. De camera log-zoomt naar het midden.
+  // DROSTE (type 12, VECTOR-herbouw): ÉÉN vol ingekleurd patroon vult het scherm. In één ECHT
+  // mozaïek-tegeltje van dat patroon zit — op ware tegel-grootte, bij de start dus vrijwel
+  // onzichtbaar klein — het VOLGENDE patroon. De camera zoomt continu in op dat tegeltje; hoe
+  // dieper, hoe groter het wordt, tot het nieuwe patroon tevoorschijn komt en schermvullend is,
+  // met wéér een tegeltje erin -> oneindige tunnel (als inzoomen op de iris van een oog).
+  // GEEN PNG's: elk zichtbaar niveau wordt PER FRAME als VECTOR (film.buildSvg) getekend op de
+  // viewBox die het op dat moment in beeld heeft -> scherp op elke diepte, geen opgeblazen beeld,
+  // geen harde beeldrand. Resvg-veilig: losse <svg>-wrappers naast elkaar (geen geneste svg/clip/
+  // scale-transforms die resvg laten crashen).
   async function makeDrosteRender({ opts = {}, format = "9:16" }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    let durSec = resolveDuration(opts);   // wordt hieronder gesnapt op hele tunnel-cycli (naadloze loop)
+    let durSec = resolveDuration(opts);   // wordt gesnapt op hele tunnel-cycli (naadloze loop)
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
-    // resvg voor het pre-renderen van de niveaus (data-URI PNG's). Lazy import zodat de brand
-    // 'm alleen laadt als dit type draait; renderer gebruikt dezelfde dependency.
-    const { Resvg } = await import("@resvg/resvg-js");
-    // Oneindige tunnel DOOR een echte tegel: elk niveau is een vol patroon; in ELK niveau wijst
-    // dezelfde (niet-centrale) rastertegel naar het VOLGENDE patroon. De camera zoomt continu in
-    // op die tegel; na één cyclus vult de tegel het scherm -> naadloze doorgang naar het volgende
-    // patroon -> herhaalt. Elk niveau vol op hoge res gerenderd => altijd scherp (geen opgeblazen
-    // mini-tegeltje). Resvg-veilig: losse <image>'s + dunne voeg-rand, geen geneste svg/clip/scale.
-    // aantal verschillende patronen in de tunnel (daarna herhaalt). Zoveel dat één volledige
-    // ronde ongeveer de gevraagde duur beslaat -> de video loopt naadloos (depth NP == patroon 0).
-    const tempoKeyEarly = (opts.tempo || opts.speed || "normaal");
-    const LOOP_SEC_E = tempoKeyEarly === "snel" ? 3.2 : tempoKeyEarly === "rustig" ? 6.0 : 4.5;
-    const CYCLE_PATS = Math.max(3, Math.min(12, Math.round(durSec / LOOP_SEC_E)));
+
+    // Hoeveel verschillende patronen de tunnel diep gaat voordat 'ie herhaalt. Zoveel dat één
+    // volledige ronde ~de gevraagde duur beslaat -> naadloze loop (diepte NP == patroon 0 weer).
+    const tempoKey = (opts.tempo || opts.speed || "normaal");
+    const LOOP_SEC = tempoKey === "snel" ? 3.2 : tempoKey === "rustig" ? 6.0 : 4.5;   // sec per "één patroon dieper"
+    const CYCLE_PATS = Math.max(3, Math.min(12, Math.round(durSec / LOOP_SEC)));
     const famKeys = Object.keys(film.GLAZE_FAMILIES).sort(() => Math.random() - 0.5);
     let pats = pickPatterns(CYCLE_PATS);
     while (pats.length && pats.length < 3) pats.push(pats[pats.length - 1]);
     if (!pats.length) throw new Error("droste: geen patronen");
     const NP = pats.length;
-    // DOEL-TEGEL = één KLEIN mozaïek-tegeltje, niet een heel motief-vak. Zo zie je het volgende
-    // patroon bij de start niet (het zit onzichtbaar klein in één tegeltje); pas als de camera er
-    // diep in valt groeit het tot schermvullend. Niet-centraal zodat de camera een kant op valt.
-    const PANEL_H_OVER_W = (1 / PANEL_ASPECT);
-    const TILE_FR = 0.12;                                // tegel-breedte als fractie van de paneelbreedte
-    const CW = TILE_FR, CH = TILE_FR * PANEL_H_OVER_W;   // ~vierkant tegeltje
-    const CX = 0.30, CY = 0.56;                          // linksboven-hoek doel-tegeltje (niet-centraal)
-    const TCX = CX + CW / 2, TCY = CY + CH / 2;
-    const ovM = 0.4;                                     // overhang: patroon loopt door buiten de stage (geen randgaten)
-    // Bereid per patroon de vector-spec voor (parsed + kleuren). We renderen PER FRAME VERS op de
-    // on-screen grootte van elk zichtbaar niveau => altijd scherp, nooit een opgeblazen mini-PNG.
+
+    // Elk patroon: parse de tegels + bepaal de VASTE eindkleuren (vol ingekleurd paneel), en kies
+    // ÉÉN echt tegeltje als het "venster" naar het volgende patroon. We pakken een tegel die zo
+    // dicht mogelijk bij een doel-plek (niet-centraal, zodat de camera een kant op valt) ligt, en
+    // lezen zijn ECHTE grootte uit het patroon -> het venster is exact één tegel groot (klopt met
+    // "op ware tegel-grootte, bij de start onzichtbaar klein"), geen zelf-gekozen vierkant vak.
+    const TCX_AIM = 0.32, TCY_AIM = 0.40;   // doel-plek voor het venster-tegeltje (patroon-fractie)
     const specs = [];
     for (let i = 0; i < NP; i++) {
       const pid = pats[i], base = await getBase(pid), lock = LOCKS[pid] || {};
       const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);
-      // iets meer herhalingen zodat het patroon ook de overhang-marge vult
-      const parsed = film.parseTiles(await getPatternSvg(pid, nX + 2, nY + 2), "radial");
+      const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
       const palArr = film.GLAZE_FAMILIES[famKeys[i % famKeys.length]] || film.PAL;
       const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
-      specs.push({ parsed, cols, pw: parsed.view[2], ph: parsed.view[3] });
+      const pw = parsed.view[2], ph = parsed.view[3];
+      // Tegel-grootte schatten uit het aantal tegels en het paneel-oppervlak (de tegels zelf
+      // hebben geen expliciete breedte in de parse; nx/ny zijn 0..1 middelpunten). Zo weten we
+      // hoe groot één tegel als fractie van het paneel is -> dat wordt de venster-grootte.
+      const nTiles = Math.max(1, parsed.tiles.length);
+      const tileFr = Math.max(0.06, Math.min(0.22, Math.sqrt((PANEL_ASPECT) / nTiles) * 1.15));
+      // kies de tegel het dichtst bij de doel-plek
+      let bt = parsed.tiles[0], bd = 1e9;
+      for (const tl of parsed.tiles) { const dx = tl.nx - TCX_AIM, dy = tl.ny - TCY_AIM, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; } }
+      // venster = vierkant-in-paneelfractie rond het tegel-middelpunt, exact één tegel groot.
+      // In paneel-fractie: breedte = tileFr; hoogte zo dat het in echte px ~vierkant is.
+      const CWv = tileFr, CHv = tileFr * PANEL_ASPECT;   // *aspect: paneel is hoger dan breed -> fractie-hoogte groter
+      let cx = bt.nx, cy = bt.ny;
+      // binnen het paneel houden met marge zodat het venster nooit half buiten het paneel valt
+      cx = Math.max(CWv / 2 + 0.04, Math.min(1 - CWv / 2 - 0.04, cx));
+      cy = Math.max(CHv / 2 + 0.04, Math.min(1 - CHv / 2 - 0.04, cy));
+      specs.push({ parsed, cols, pw, ph, CW: CWv, CH: CHv, CX: cx - CWv / 2, CY: cy - CHv / 2, TCX: cx, TCY: cy });
     }
     const specAt = (n) => specs[((n % NP) + NP) % NP];
-    // render één patroon naar PNG op ~targetW px (gequantiseerd zodat we hergebruiken). PNG bevat
-    // overhang-marge; de stage [0,1] zit gecentreerd. Resvg-veilig: platte svg, geen geneste svg/clip.
-    const rcache = new Map();
-    function renderPatternPNG(n, targetW) {
-      const qw = Math.max(48, Math.min(Math.round(W * 4), Math.round(targetW / 24) * 24));
-      const key = `${((n % NP) + NP) % NP}_${qw}`;
-      let uri = rcache.get(key); if (uri) return uri;
-      const sp = specAt(n);
-      const EW = Math.round(qw * (1 + 2 * ovM)), EH = Math.round(EW * sp.ph / sp.pw);
-      const wrap = `<svg x="0" y="0" width="${EW}" height="${EH}" viewBox="0 0 ${sp.pw} ${sp.ph}" preserveAspectRatio="xMidYMid slice">`;
-      const a = film.buildSvg(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap);
-      const b = film.buildGlaze(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap);
-      const doc = `<svg viewBox="0 0 ${EW} ${EH}" xmlns="http://www.w3.org/2000/svg">${a}${b}</svg>`;
-      const png = new Resvg(doc, { fitTo: { mode: "width", value: EW } }).render().asPng();
-      uri = "data:image/png;base64," + png.toString("base64");
-      rcache.set(key, uri); return uri;
-    }
-    const A = PANEL_ASPECT;                              // paneel breedte/hoogte-verhouding
+
+    const A = PANEL_ASPECT;
     const fit = fitRect(Math.round(W * 0.84), Math.round(H * 0.74), A);
     const rx = Math.round((W - fit.w) / 2), ry = Math.round(H * 0.52 - fit.h / 2), rr = Math.max(6, fit.w * 0.03);
     const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
-    // LOOP-DUUR: tempo-afhankelijk, vast per "één patroon dieper" (NIET de hele videoduur).
-    const LOOP_SEC = LOOP_SEC_E;
+
     // Naadloze loop: na NP cycli wijst de diepte weer naar patroon 0. Snap de duur op precies
     // één volledige ronde (NP x LOOP_SEC) -> de video loopt perfect rond.
     durSec = NP * LOOP_SEC;
-    // LOKALE coords per cyclus (GEEN diepte-accumulatie) => elke cyclusgrens is frame-continu:
-    // bij u=1 is de view exact de doel-tegel = niveau base+1 vol = u=0 van de volgende cyclus.
-    // Na NP cycli wrappen de patronen (uriAt mod NP) => de hele video loopt perfect rond.
-    // We tekenen een paar niveaus "vooruit" (base, base+1, base+2, base+3) vanuit het stage-vierkant.
-    // level base vult [0,1]^2; level base+k zit in de geneste tegel-keten (CX,CY,CW,CH)^k.
-    function localChain(k) { // positie van niveau base+k in stage-coords (0..1 van 'base')
-      let sx = 1, sy = 1, ox = 0, oy = 0;
-      for (let i = 0; i < k; i++) { ox += sx * CX; oy += sy * CY; sx *= CW; sy *= CH; }
-      return { sx, sy, ox, oy };
+
+    // Teken één niveau (patroon n) als VECTOR in een rechthoek op het scherm (screen-px). Een
+    // eigen <svg>-wrapper met de juiste viewBox-slice schaalt de vector scherp; met de overhang
+    // (ovM) tekenen we iets ruimer dan het venster zodat randen nooit leeglopen bij de inzoom.
+    const ovM = 0.25;
+    function drawLevel(n, sx, sy, sw, sh, id) {
+      const sp = specAt(n);
+      // overhang in screen-px
+      const ex = sx - sw * ovM, ey = sy - sh * ovM, ew = sw * (1 + 2 * ovM), eh = sh * (1 + 2 * ovM);
+      // viewBox van het patroon dat op (ex..ex+ew) hoort: het hele paneel vult sw x sh, dus de
+      // overhang-marge breidt de viewBox evenredig uit buiten [0..pw],[0..ph].
+      const vpadX = sp.pw * ovM, vpadY = sp.ph * ovM;
+      const vb = `${(-vpadX).toFixed(1)} ${(-vpadY).toFixed(1)} ${(sp.pw * (1 + 2 * ovM)).toFixed(1)} ${(sp.ph * (1 + 2 * ovM)).toFixed(1)}`;
+      const wrap = `<svg x="${ex.toFixed(2)}" y="${ey.toFixed(2)}" width="${ew.toFixed(2)}" height="${eh.toFixed(2)}" viewBox="${vb}" preserveAspectRatio="none">`;
+      return film.buildSvg(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap)
+        + film.buildGlaze(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap);
     }
+
     function sceneAt(frame) {
       const t = frame / FPS;
       const d = t / LOOP_SEC;                 // continue diepte in niveaus
-      const baseLv = Math.floor(d), u = d - baseLv;
-      // view in stage-coords: van heel 'base' (u=0) naar zijn doel-tegel (u=1), log-zoom
-      const VW = Math.pow(CW, u), VH = Math.pow(CH, u);
-      const vcx = 0.5 + (TCX - 0.5) * u, vcy = 0.5 + (TCY - 0.5) * u;
+      const baseLv = Math.floor(d), u = d - baseLv;   // 0..1 binnen de huidige cyclus
+      // Het venster van 'base' bepaalt waar we naartoe zoomen. Camera-view in stage-coords
+      // ([0,1] van niveau base): van het hele paneel (u=0) naar exact het venster-tegeltje (u=1).
+      const sp0 = specAt(baseLv);
+      const VW = Math.pow(sp0.CW, u), VH = Math.pow(sp0.CH, u);
+      const vcx = 0.5 + (sp0.TCX - 0.5) * u, vcy = 0.5 + (sp0.TCY - 0.5) * u;
       const VX = vcx - VW / 2, VY = vcy - VH / 2;
-      const s2 = (g, v0, vs) => (g - v0) / vs;
+      // een stage-coord (0..1 van base) -> screen-px binnen het fit-vak
+      const SX = (g) => rx + ((g - VX) / VW) * fit.w;
+      const SY = (g) => ry + ((g - VY) / VH) * fit.h;
+      const SWof = (w) => (w / VW) * fit.w, SHof = (h) => (h / VH) * fit.h;
+
+      // Teken van buiten (k=0 = niveau base, vult ~scherm) naar binnen (diepere niveaus in het
+      // venster-tegeltje). We hebben de geneste venster-ketting nodig: niveau base+k zit in het
+      // venster van base+(k-1). Omdat elk patroon z'n eigen venster-positie/-grootte heeft,
+      // accumuleren we de transformatie stage-coord-ketting.
+      let ox = 0, oy = 0, sxk = 1, syk = 1;   // niveau base+k bezet [ox..ox+sxk]x[oy..oy+syk] in base-coords
       let imgs = "";
-      for (let k = 0; k <= 4; k++) {           // base .. base+4 (klein k = buitenste, groot k = diep)
-        const ch = localChain(k);
-        const x = s2(ch.ox, VX, VW), y = s2(ch.oy, VY, VH), w = ch.sx / VW, h = ch.sy / VH;
-        if (x > 1.3 || y > 1.3 || x + w < -0.3 || y + h < -0.3) continue;
-        const onW = w * fit.w;                                 // on-screen breedte van dit niveau
-        const uri = renderPatternPNG(baseLv + k, onW);         // VERS op die grootte -> scherp
-        // getekend rect met overhang zodat randen nooit leeglopen
-        const px = rx + (x - w * ovM) * fit.w, py = ry + (y - h * ovM) * fit.h;
-        const pw = w * (1 + 2 * ovM) * fit.w, ph = h * (1 + 2 * ovM) * fit.h;
-        imgs += `<image href="${uri}" x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" preserveAspectRatio="none"/>`;
-        if (k > 0) {                            // dunne voeg-rand op de stage-grens: leest als tegel-voeg
-          const bx = rx + x * fit.w, by = ry + y * fit.h, bw = w * fit.w, bh = h * fit.h;
-          if (bw > 2 && bh > 2) { const sw = Math.max(0.6, Math.min(bw, bh) * 0.012);
-            imgs += `<rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`; }
+      for (let k = 0; k <= 5; k++) {
+        // scherm-rechthoek van dit niveau
+        const gx = ox, gy = oy, gw = sxk, gh = syk;
+        const scrX = SX(gx), scrY = SY(gy), scrW = SWof(gw), scrH = SHof(gh);
+        // alleen tekenen als het op het scherm (binnen het fit-vak, met marge) valt
+        if (scrX < rx + fit.w + 40 && scrY < ry + fit.h + 40 && scrX + scrW > rx - 40 && scrY + scrH > ry - 40 && scrW > 0.5) {
+          imgs += drawLevel(baseLv + k, scrX, scrY, scrW, scrH, "dl" + k);
+          if (k > 0 && scrW > 3 && scrH > 3) {   // dunne voeg-rand op de venster-grens: leest als tegel-voeg
+            const sw = Math.max(0.6, Math.min(scrW, scrH) * 0.015);
+            imgs += `<rect x="${scrX.toFixed(2)}" y="${scrY.toFixed(2)}" width="${scrW.toFixed(2)}" height="${scrH.toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`;
+          }
         }
+        // ketting een niveau dieper: het venster van niveau base+k (in zíjn eigen coords) ->
+        // terugprojecteren naar base-coords.
+        const spk = specAt(baseLv + k);
+        ox = ox + sxk * spk.CX; oy = oy + syk * spk.CY;
+        sxk = sxk * spk.CW; syk = syk * spk.CH;
+        if (sxk < 1e-6) break;
       }
+
       let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
-        + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="#efe7d4"/>${imgs}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
+        + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#efe7d4"/>${imgs}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
         + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       let overlay = "";
       if (t < 3.0) { const op = t < 2.0 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.0) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
