@@ -473,51 +473,49 @@ export function makeBrand({ ROOT, config }) {
   // HOOK-tekst: automatisch gekozen (anti-herhaling), NL/EN, met de naam erin. opts.hook
   // overschrijft met eigen tekst; opts.hook="none"/false zet 'm uit. opts.lang = "nl"/"en".
   let lastStory = -1;
-  // VERHAAL per type: een reeks korte beats (kicker + regel) die mét de ambiance meelopen —
-  // geen losse hook, maar een boog (spanning -> ambacht -> payoff). Premium toon, geen cliché.
-  // B2B + particulier bij in-situ; ambacht/erfgoed bij sfeer; kort/visueel bij satisfying.
-  // Rode draad: EEUWENOUD -> NIEUWE TOEPASSING. Echte zellige komt uit Fès (bakermat).
-  // Social = de schoonheid & het verhaal (ambacht, eyecatcher, erfgoed) + zachte comment-CTA;
-  // niet "bestel je naambord" (dat staat op de site). Doelgroep: particulier én zakelijk.
-  // VERHAAL = Tale of Tiles overbrengen: WIE we zijn (handgemaakte zellige, eeuwenoud
-  // ambacht uit Fès), WAT we maken (jouw naam in echt glazuur), en de PAYOFF voor de
-  // kijker (een schilderij op z'n muur / gevel / bureau). Premium, geen cliché, geen
-  // "blijf kijken". De kijker moet na het filmpje weten wat Tale of Tiles is en doet.
-  // VERHAAL-PIJLERS, verspreid over de types (zodat niet elke video hetzelfde zegt):
-  //   insitu     -> TOEPASSING + KWALITEIT (op je muur/gevel, weerbestendig, kleur die blijft)
-  //   sfeer      -> ERFGOED + AMBACHT (wie we zijn, hoe het gemaakt wordt, eeuwenoud -> nu)
-  //   satisfying -> OPNIEUW TOT LEVEN (oud ambacht in een nieuw jasje; je ziet het ontstaan)
-  //   geentwee   -> AMBACHT/UNIEK + keuze (met de hand, nooit twee gelijk, jouw naam)
-  // Elk type heeft 3-4 WISSELENDE sets; samen vertellen ze het hele verhaal. Geen "zellige".
+  // STORIES: per type een ruime set WISSELENDE caption-reeksen. Elke reeks volgt de fase-boog van
+  // het beeld (intro/opening -> wat er GEBEURT (opbouw/ambacht/keuze) -> payoff), zodat de tekst bij
+  // het beeld past. Bewust BREED gevarieerd: niet elke video dezelfde "handgemaakt/Fès"-refrein, maar
+  // ook actie-regels ("kijk hoe elk steentje z'n plek vindt"), vragen ("welke kleur zou jij kiezen?"),
+  // emotie ("iets om door te geven"), praktisch ("klaar om op te hangen") en speels. Anti-herhaling in
+  // resolveStory kiest nooit twee keer dezelfde reeks achter elkaar.
   const STORIES = {
-    insitu: {   // TOEPASSING + KWALITEIT. GEEN gevel/buiten-only-claims (mockup kan ook binnen zijn).
+    insitu: {   // TOEPASSING + KWALITEIT (aan de muur). Geen buiten-only-claims.
       nl: [
         [{ k: "Tale of Tiles", t: "Jouw naam, met de hand gemaakt." }, { t: "In echt glazuur — kleur die blijft." }, { t: "Een schilderij aan je muur." }],
         [{ k: "Echt glazuur", t: "Verbleekt niet, jaren diep van kleur." }, { t: "Binnen én buiten, aan je muur." }, { t: "Met de hand gelegd, tegel voor tegel." }],
         [{ k: "Fès", t: "Wat eeuwen aan paleismuren hing…" }, { t: "…nu als kunst aan die van jou." }, { t: "Geen twee gelijk." }],
-        [{ t: "Eén naam. Eén kunstwerk." }, { k: "Tale of Tiles", t: "Handgemaakt, voor jouw muur of gevel." }],
         [{ t: "Geen poster, geen sticker." }, { k: "Tale of Tiles", t: "Handgelegd mozaïek aan je muur." }, { t: "Kleur die jaren blijft." }],
         [{ t: "Regen, zon of vorst — de kleur blijft." }, { k: "Buiten of binnen", t: "Aan je gevel of in de hal." }, { t: "Gaat generaties mee." }],
         [{ k: "Jouw muur", t: "Verdient meer dan een kaal bordje." }, { t: "Handgemaakt mozaïek, met jouw naam." }, { t: "In echt glazuur." }],
         [{ t: "Jij kiest patroon, kleuren en naam." }, { k: "Tale of Tiles", t: "Wij leggen 'm met de hand." }, { t: "En hij hangt als kunst aan je muur." }],
         [{ t: "Een naambord dat mensen aanraken." }, { t: "Echt reliëf, echt glazuur — geen print." }, { k: "Tale of Tiles", t: "Voor je muur of gevel." }],
-        [{ k: "Tale of Tiles", t: "Kunst met jouw naam erop." }, { t: "Met de hand gelegd in Fès." }, { t: "Een leven lang aan je muur." }],
+        [{ t: "De eerste indruk aan je deur." }, { k: "Tale of Tiles", t: "Een naam in handgelegd mozaïek." }, { t: "Die onthoudt men." }],
+        [{ t: "Van hal tot gevel — overal thuis." }, { t: "Handgemaakt, in jouw kleuren." }, { k: "Tale of Tiles", t: "Een naam met karakter." }],
+        [{ t: "Dit hangt er over tien jaar nog." }, { k: "Echt glazuur", t: "Kleur die niet verbleekt." }, { t: "Met de hand gelegd." }],
+        [{ t: "Niet zomaar een bordje." }, { t: "Een klein kunstwerk met jouw naam." }, { k: "Tale of Tiles", t: "Voor aan je muur." }],
+        [{ t: "Hoe zou dit staan bij jou thuis?" }, { k: "Tale of Tiles", t: "Handgemaakt, in jouw stijl." }, { t: "Een naam om trots op te zijn." }],
       ],
       en: [
         [{ k: "Tale of Tiles", t: "Your name, made by hand." }, { t: "In real glaze — colour that stays." }, { t: "A painting for your wall." }],
         [{ k: "Real glaze", t: "Won't fade, deep colour for years." }, { t: "Indoors or out, on your wall." }, { t: "Set by hand, tile by tile." }],
         [{ k: "Fès", t: "What once lined palace walls…" }, { t: "…now art on yours." }, { t: "No two alike." }],
-        [{ t: "One name. One work of art." }, { k: "Tale of Tiles", t: "Handmade, for your wall or facade." }],
         [{ t: "No poster, no sticker." }, { k: "Tale of Tiles", t: "Hand-laid mosaic on your wall." }, { t: "Colour that lasts for years." }],
         [{ t: "Rain, sun or frost — the colour stays." }, { k: "Indoors or out", t: "On your facade or in the hall." }, { t: "Lasts for generations." }],
         [{ t: "You pick the pattern, colours and name." }, { k: "Tale of Tiles", t: "We lay it by hand." }, { t: "And it hangs as art on your wall." }],
+        [{ t: "The first thing guests see at your door." }, { k: "Tale of Tiles", t: "A name in hand-laid mosaic." }, { t: "They'll remember it." }],
+        [{ t: "This will still be there in ten years." }, { k: "Real glaze", t: "Colour that won't fade." }, { t: "Laid by hand." }],
+        [{ t: "Not just a sign." }, { t: "A small work of art with your name." }, { k: "Tale of Tiles", t: "For your wall." }],
+        [{ t: "How would this look in your home?" }, { k: "Tale of Tiles", t: "Handmade, in your style." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail — une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
         [{ k: "Véritable émail", t: "Ne pâlit pas, des années de couleur." }, { t: "Posé à la main, carreau par carreau." }],
         [{ k: "Fès", t: "Ce qui ornait les palais…" }, { t: "…désormais sur votre mur." }, { t: "Aucun identique." }],
         [{ t: "Un nom. Une œuvre d'art." }, { k: "Tale of Tiles", t: "Fait main, pour votre mur ou façade." }],
-        [{ t: "Vous choisissez motif, couleurs et nom." }, { k: "Tale of Tiles", t: "Nous le posons à la main." }],
+        [{ t: "La première chose qu'on voit à votre porte." }, { k: "Tale of Tiles", t: "Un nom en mosaïque posée main." }],
+        [{ t: "Dans dix ans, il sera toujours là." }, { k: "Véritable émail", t: "Une couleur qui ne pâlit pas." }],
+        [{ t: "Comment serait-il chez vous ?" }, { k: "Tale of Tiles", t: "Fait main, à votre style." }],
       ],
     },
     sfeer: {   // ERFGOED + AMBACHT: eeuwenoud ambacht uit Fès -> vandaag, met jouw naam.
@@ -525,89 +523,95 @@ export function makeBrand({ ROOT, config }) {
         [{ k: "Fès", t: "Een ambacht van duizend jaar." }, { t: "Elke tegel met de hand gesneden en geglazuurd." }, { t: "Geen twee stukjes gelijk." }],
         [{ t: "Klei, water, vuur — en geduld." }, { k: "Tale of Tiles", t: "Zo maken wij jouw naambord." }, { t: "Een schilderij om door te geven." }],
         [{ t: "Eeuwenoud ambacht uit de paleizen van Fès." }, { k: "Vandaag", t: "In een nieuw jasje." }, { t: "Met jouw naam erin." }],
-        [{ t: "Het bestaat niet voor niets al eeuwen." }, { k: "Tale of Tiles", t: "Met de hand gemaakt, voor nu." }],
         [{ t: "Gesneden, geglazuurd, gebakken — met de hand." }, { k: "Fès", t: "Een ambacht dat overleeft." }, { t: "Nu met jouw naam." }],
         [{ t: "Elke kleur komt uit de oven, niet uit een printer." }, { k: "Echt glazuur", t: "Diep, levend, blijvend." }],
         [{ t: "Generaties gaven dit ambacht door." }, { k: "Tale of Tiles", t: "Wij brengen het naar jouw muur." }],
-        [{ t: "Geen twee handen leggen hetzelfde." }, { t: "Daarom is geen enkel paneel gelijk." }, { k: "Fès", t: "Met de hand, stuk voor stuk." }],
         [{ t: "In de medina van Fès, aan een lage tafel…" }, { t: "…wordt jouw naambord stukje voor stukje gelegd." }, { k: "Tale of Tiles", t: "Met de hand." }],
         [{ k: "Erfgoed", t: "Eeuwen oud, nog altijd levend." }, { t: "Jouw naam, in een eeuwenoud ambacht." }, { t: "Om door te geven." }],
+        [{ t: "Licht valt anders op echt glazuur." }, { t: "Daar zit de diepte die een print mist." }, { k: "Tale of Tiles", t: "Voelbaar, levend." }],
+        [{ t: "Geduld dat je terugziet in elk stukje." }, { k: "Fès", t: "Niets gaat hier snel." }, { t: "En dat is precies de bedoeling." }],
+        [{ t: "Een maalem (meester) leerde dit van zijn vader." }, { t: "Die weer van de zijne." }, { k: "Tale of Tiles", t: "Dat ambacht, in jouw naam." }],
+        [{ t: "Wat met de hand gemaakt is, voel je." }, { k: "Tale of Tiles", t: "Geen twee panelen gelijk." }],
       ],
       en: [
         [{ k: "Fès", t: "A thousand-year craft." }, { t: "Every tile cut and glazed by hand." }, { t: "No two pieces alike." }],
         [{ t: "Clay, water, fire — and patience." }, { k: "Tale of Tiles", t: "This is how we make your nameplate." }, { t: "A painting to pass on." }],
         [{ t: "Age-old craft from the palaces of Fès." }, { k: "Today", t: "In a new form." }, { t: "With your name in it." }],
-        [{ t: "It has lasted centuries for a reason." }, { k: "Tale of Tiles", t: "Made by hand, for now." }],
         [{ t: "Cut, glazed, fired — all by hand." }, { k: "Fès", t: "A craft that survives." }, { t: "Now with your name." }],
         [{ t: "Every colour comes from the kiln, not a printer." }, { k: "Real glaze", t: "Deep, alive, lasting." }],
+        [{ t: "Light falls differently on real glaze." }, { t: "That's the depth a print can't fake." }, { k: "Tale of Tiles", t: "Alive, tactile." }],
+        [{ t: "A master learned this from his father." }, { t: "Who learned it from his." }, { k: "Tale of Tiles", t: "That craft, in your name." }],
         [{ t: "No two hands lay it the same." }, { t: "So no panel is ever alike." }, { k: "Fès", t: "By hand, piece by piece." }],
       ],
       fr: [
         [{ k: "Fès", t: "Un art millénaire." }, { t: "Chaque carreau taillé et émaillé à la main." }, { t: "Aucun identique." }],
         [{ t: "Argile, eau, feu — et patience." }, { k: "Tale of Tiles", t: "Voilà comment naît votre plaque." }],
         [{ t: "Art ancestral des palais de Fès." }, { k: "Aujourd'hui", t: "Sous une nouvelle forme." }, { t: "Avec votre nom." }],
-        [{ t: "Chaque couleur sort du four, pas d'une imprimante." }, { k: "Véritable émail", t: "Profond, vivant, durable." }],
+        [{ t: "La lumière joue sur l'émail véritable." }, { t: "Cette profondeur, une impression ne l'a pas." }, { k: "Tale of Tiles", t: "Vivant." }],
         [{ t: "Aucune main ne pose pareil." }, { t: "Aucun panneau n'est identique." }, { k: "Fès", t: "À la main, pièce par pièce." }],
       ],
     },
-    satisfying: {   // OPNIEUW TOT LEVEN: oud ambacht in een nieuw jasje; je ziet het ontstaan.
+    satisfying: {   // OPNIEUW TOT LEVEN: je ziet het ontstaan. Captions volgen het inkleuren.
       nl: [
-        [{ t: "Eeuwenoud ambacht…" }, { k: "Tale of Tiles", t: "…opnieuw tot leven gebracht." }, { t: "Met de hand gelegd, tegel voor tegel." }],
-        [{ k: "Fès", t: "Van paleismuren…" }, { t: "…naar jouw muur van nu." }, { t: "Met de hand gemaakt." }],
-        [{ t: "Tegel voor tegel, met de hand." }, { k: "Tale of Tiles", t: "Een oud ambacht, in een nieuw jasje." }, { t: "Geen twee gelijk." }],
-        [{ t: "Zie het ontstaan, stukje voor stukje." }, { k: "Tale of Tiles", t: "Zoals het al eeuwen gaat." }, { t: "Nu met jouw naam." }],
-        [{ t: "Honderden stukjes, één geheel." }, { k: "Met de hand", t: "Zo groeit jouw naambord." }],
-        [{ t: "Elk stukje op z'n plek — met geduld." }, { k: "Tale of Tiles", t: "Handwerk dat je ziet ontstaan." }, { t: "Een kunstwerk voor je muur." }],
+        [{ t: "Kijk mee hoe dit ontstaat." }, { k: "Tale of Tiles", t: "Tegel voor tegel, met de hand." }, { t: "Tot je naam verschijnt." }],
+        [{ t: "Honderden stukjes vinden hun plek." }, { k: "Met de hand", t: "Zo groeit jouw naambord." }, { t: "Geen twee gelijk." }],
+        [{ t: "Begin met niets…" }, { k: "Tale of Tiles", t: "…eindig met een kunstwerk." }, { t: "Jouw naam in echt glazuur." }],
+        [{ t: "Elk steentje op z'n plek — met geduld." }, { k: "Oud ambacht", t: "In jouw kleuren." }, { t: "Dat zie je ontstaan." }],
+        [{ t: "Welke kleur zie jij het eerst?" }, { t: "Kijk hoe het paneel zich vult." }, { k: "Tale of Tiles", t: "Met de hand gelegd." }],
         [{ t: "Geen machine, geen print." }, { t: "Mensenhanden, tegel voor tegel." }, { k: "Tale of Tiles", t: "Dat voel je." }],
-        [{ k: "Oud ambacht", t: "In jouw kleuren." }, { t: "Jij kiest, wij leggen." }, { t: "Stukje voor stukje." }],
-        [{ t: "Zo ontstaat een naambord dat blijft." }, { k: "Tale of Tiles", t: "Met de hand, in echt glazuur." }],
         [{ t: "Van los stukje tot kunstwerk." }, { k: "Fès", t: "Een ambacht dat leeft." }, { t: "Met jouw naam erin." }],
+        [{ k: "Fès", t: "Van paleismuren…" }, { t: "…naar jouw muur van nu." }, { t: "Stukje voor stukje opgebouwd." }],
+        [{ t: "Even geduld — het wordt mooi." }, { t: "Elke tegel een beetje anders." }, { k: "Tale of Tiles", t: "Nooit twee gelijk." }],
+        [{ t: "Kijk tot het einde." }, { k: "Tale of Tiles", t: "Dan staat je naam er." }, { t: "In handgelegd mozaïek." }],
+        [{ t: "Zo ontstaat iets dat blijft." }, { k: "Met de hand", t: "In echt glazuur." }, { t: "Een naam om te houden." }],
+        [{ t: "Rustig, stukje voor stukje." }, { t: "Zoals het al eeuwen gaat." }, { k: "Tale of Tiles", t: "Nu met jouw naam." }],
       ],
       en: [
-        [{ t: "Age-old craft…" }, { k: "Tale of Tiles", t: "…brought back to life." }, { t: "Laid by hand, tile by tile." }],
-        [{ k: "Fès", t: "From palace walls…" }, { t: "…to your wall today." }, { t: "Made by hand." }],
-        [{ t: "Tile by tile, by hand." }, { k: "Tale of Tiles", t: "An old craft, in a new form." }, { t: "No two alike." }],
-        [{ t: "Watch it take shape, piece by piece." }, { k: "Tale of Tiles", t: "As it's been done for centuries." }, { t: "Now with your name." }],
-        [{ t: "Hundreds of pieces, one whole." }, { k: "By hand", t: "This is how your nameplate grows." }],
+        [{ t: "Watch it come together." }, { k: "Tale of Tiles", t: "Tile by tile, by hand." }, { t: "Until your name appears." }],
+        [{ t: "Hundreds of pieces find their place." }, { k: "By hand", t: "This is how your nameplate grows." }, { t: "No two alike." }],
+        [{ t: "Start with nothing…" }, { k: "Tale of Tiles", t: "…end with a work of art." }, { t: "Your name in real glaze." }],
+        [{ t: "Which colour do you spot first?" }, { t: "Watch the panel fill in." }, { k: "Tale of Tiles", t: "Laid by hand." }],
         [{ t: "No machine, no print." }, { t: "Human hands, tile by tile." }, { k: "Tale of Tiles", t: "You can feel it." }],
+        [{ k: "Fès", t: "From palace walls…" }, { t: "…to your wall today." }, { t: "Built up piece by piece." }],
+        [{ t: "Stay till the end." }, { k: "Tale of Tiles", t: "Then your name is there." }, { t: "In hand-laid mosaic." }],
         [{ t: "From loose piece to work of art." }, { k: "Fès", t: "A living craft." }, { t: "With your name in it." }],
       ],
       fr: [
-        [{ t: "Un art ancestral…" }, { k: "Tale of Tiles", t: "…ramené à la vie." }, { t: "Posé à la main, carreau par carreau." }],
-        [{ k: "Fès", t: "Des murs des palais…" }, { t: "…à votre mur d'aujourd'hui." }, { t: "Fait main." }],
-        [{ t: "Carreau par carreau, à la main." }, { k: "Tale of Tiles", t: "Un art ancien, sous une forme nouvelle." }],
-        [{ t: "Des centaines de pièces, un tout." }, { k: "À la main", t: "Ainsi naît votre plaque." }],
+        [{ t: "Regardez-le prendre forme." }, { k: "Tale of Tiles", t: "Carreau par carreau, à la main." }, { t: "Jusqu'à votre nom." }],
+        [{ t: "Des centaines de pièces trouvent leur place." }, { k: "À la main", t: "Ainsi naît votre plaque." }],
+        [{ t: "Commencez avec rien…" }, { k: "Tale of Tiles", t: "…finissez avec une œuvre." }],
         [{ t: "Ni machine, ni impression." }, { t: "Des mains, carreau par carreau." }, { k: "Tale of Tiles", t: "Ça se ressent." }],
+        [{ k: "Fès", t: "Des murs des palais…" }, { t: "…à votre mur d'aujourd'hui." }, { t: "Pièce par pièce." }],
       ],
     },
-    geentwee: {   // AMBACHT/UNIEK + keuze: met de hand, nooit twee gelijk — net als jouw naam.
+    geentwee: {   // UNIEK + keuze: elk ontwerp anders. Captions bij de flitsende ontwerpen.
       nl: [
-        [{ k: "Tale of Tiles", t: "Eén naam, oneindig veel ontwerpen." }, { t: "Elk met de hand gemaakt — nooit twee gelijk." }, { t: "Welke zou jij kiezen?" }],
-        [{ t: "Elk paneel met de hand gelegd." }, { k: "Jouw naam", t: "In echt glazuur." }, { t: "Een kunstwerk voor je muur." }],
-        [{ t: "Zoveel ontwerpen als je wilt." }, { k: "Tale of Tiles", t: "Geen twee dezelfde." }],
+        [{ k: "Tale of Tiles", t: "Eén naam, oneindig veel ontwerpen." }, { t: "Elk met de hand — nooit twee gelijk." }, { t: "Welke zou jij kiezen?" }],
         [{ t: "Ander patroon, andere kleuren, zelfde naam." }, { k: "Tale of Tiles", t: "Jij bepaalt." }, { t: "Welke past bij jou?" }],
         [{ t: "Honderd namen, honderd kunstwerken." }, { k: "Met de hand", t: "Nooit twee gelijk." }],
         [{ t: "Kies je patroon. Kies je kleuren." }, { k: "Tale of Tiles", t: "En zet je naam erop." }, { t: "Zo simpel, zo uniek." }],
-        [{ t: "Jouw smaak bestaat maar één keer." }, { k: "Tale of Tiles", t: "Je naambord ook." }],
         [{ t: "Van ingetogen tot uitbundig." }, { t: "Jij kiest de stijl." }, { k: "Tale of Tiles", t: "Wij maken 'm met de hand." }],
         [{ t: "Geen twee gelijk — net als jouw naam." }, { k: "Tale of Tiles", t: "Elk met de hand gelegd." }],
         [{ t: "Welke wordt die van jou?" }, { k: "Tale of Tiles", t: "Oneindig veel ontwerpen, één naam." }],
+        [{ t: "Stop zodra je jouw favoriet ziet." }, { k: "Tale of Tiles", t: "Welke is het?" }, { t: "Zeg het in de comments." }],
+        [{ t: "Blauw, terracotta of bont?" }, { t: "Dezelfde naam, telkens anders." }, { k: "Tale of Tiles", t: "Jij kiest." }],
+        [{ t: "Eén ding is zeker:" }, { t: "de jouwe bestaat maar één keer." }, { k: "Tale of Tiles", t: "Met de hand gelegd." }],
       ],
       en: [
-        [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each made by hand — never two alike." }, { t: "Which would you pick?" }],
-        [{ t: "Every panel set by hand." }, { k: "Your name", t: "In real glaze." }, { t: "A piece of art for your wall." }],
-        [{ t: "As many designs as you like." }, { k: "Tale of Tiles", t: "No two the same." }],
+        [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each by hand — never two alike." }, { t: "Which would you pick?" }],
         [{ t: "New pattern, new colours, same name." }, { k: "Tale of Tiles", t: "You decide." }, { t: "Which fits you?" }],
         [{ t: "A hundred names, a hundred artworks." }, { k: "By hand", t: "Never two alike." }],
         [{ t: "Pick your pattern. Pick your colours." }, { k: "Tale of Tiles", t: "And add your name." }],
         [{ t: "No two alike — just like your name." }, { k: "Tale of Tiles", t: "Each laid by hand." }],
+        [{ t: "Stop when you see your favourite." }, { k: "Tale of Tiles", t: "Which one is it?" }, { t: "Tell us below." }],
+        [{ t: "Blue, terracotta or bold?" }, { t: "Same name, every time different." }, { k: "Tale of Tiles", t: "You choose." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Un nom, une infinité de designs." }, { t: "Fait main — jamais deux pareils." }],
-        [{ t: "Chaque panneau posé à la main." }, { k: "Votre nom", t: "En véritable émail." }, { t: "Une œuvre pour votre mur." }],
-        [{ t: "Autant de designs que vous voulez." }, { k: "Tale of Tiles", t: "Jamais deux identiques." }],
         [{ t: "Nouveau motif, nouvelles couleurs, même nom." }, { k: "Tale of Tiles", t: "À vous de choisir." }],
         [{ t: "Aucun pareil — comme votre nom." }, { k: "Tale of Tiles", t: "Chacun posé à la main." }],
+        [{ t: "Arrêtez quand vous voyez le vôtre." }, { k: "Tale of Tiles", t: "Lequel est-ce ?" }],
+        [{ t: "Bleu, terre cuite ou coloré ?" }, { t: "Même nom, toujours différent." }, { k: "Tale of Tiles", t: "À vous." }],
       ],
     },
   };
@@ -694,7 +698,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "onthul", name: "Onthul (raad-foto achter patroon)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 9: patroon dooft uit -> foto erachter
     { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU — cadeau-reveal
     { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
-    { id: "droste", name: "Oneindige inzoom (droste)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop
+    { id: "droste", name: "Oneindige inzoom", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop. (id blijft "droste" voor bestandsnamen/social-parser; de getoonde naam is "Oneindige inzoom")
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -1859,7 +1863,7 @@ export function makeBrand({ ROOT, config }) {
     // ~3.5x inzoom binnen één stap), met EXACT de paneel-verhouding (zodat het beeld het vak vult,
     // geen lege strook). We tegelen ruim zodat het hele vak gevuld is. Kies ook de doel-tegel
     // (dichtst bij het midden) om op in te zoomen.
-    const TILE_W = Math.round(fit.w * SS * 2);                 // PNG-breedte (× SS voor supersample-scherpte)
+    const TILE_W = Math.round(fit.w * SS * 3.2);               // PNG groter -> diepe inzoom blijft scherp
     const TILE_H = Math.round(TILE_W * fit.h / fit.w);          // exact paneel-verhouding
     const steps = [];
     for (let i = 0; i < pats.length; i++) {
@@ -1871,8 +1875,18 @@ export function makeBrand({ ROOT, config }) {
       const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
       const pw = parsed.view[2], ph = parsed.view[3];
       // doel-tegel: dichtst bij het midden (daar zoomen we op in). nx/ny zijn 0..1 in de parse.
-      let bt = parsed.tiles[0], bd = 1e9;
-      for (const tl of parsed.tiles) { const dx = tl.nx - 0.5, dy = tl.ny - 0.5, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; } }
+      let bt = parsed.tiles[0], bd = 1e9, bi = 0;
+      for (let q = 0; q < parsed.tiles.length; q++) { const tl = parsed.tiles[q]; const dx = tl.nx - 0.5, dy = tl.ny - 0.5, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; bi = q; } }
+      // ZOOM-DIEPTE per patroon: zoom precies zover dat ÉÉN tegel het vak ~vult, NIET dieper (anders
+      // beland je in de voeg/achtergrond en wordt het beeld leeg). Tegel-grootte = afstand van de
+      // doel-tegel tot z'n dichtstbijzijnde buur (in nx/ny-fractie). zEnd = ~0.9 / tegel-fractie.
+      let nn = 1e9;
+      for (let q = 0; q < parsed.tiles.length; q++) { if (q === bi) continue; const dx = parsed.tiles[q].nx - bt.nx, dy = parsed.tiles[q].ny - bt.ny; const dd = dx * dx + dy * dy; if (dd > 1e-9 && dd < nn) nn = dd; }
+      const pitch = Math.max(0.06, Math.min(0.5, Math.sqrt(nn) || 0.14));
+      // Zoom tot je een CLUSTER tegels van dichtbij ziet (nog duidelijk patroon met detail), NIET
+      // tot in één egale tegel (dan wordt het beeld een vlakke kleur/lege voeg). ~2x de tegel-
+      // grootte in beeld houdt altijd mozaïek op het scherm; begrensd op een rustige 2.2-3.2x.
+      const zEnd = Math.max(2.2, Math.min(3.2, 0.45 / pitch));
       // Bouw het volle paneel-SVG (tegels + glazuur) en render het naar PNG met het vak-formaat
       // (preserveAspectRatio slice -> vult TILE_W×TILE_H zonder lege rand).
       const wrap = `<svg x="0" y="0" width="${TILE_W}" height="${TILE_H}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
@@ -1883,23 +1897,19 @@ export function makeBrand({ ROOT, config }) {
         + `<linearGradient id="tglzraw" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/><stop offset="0.28" stop-color="#ffffff" stop-opacity="0.18"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#8a8378" stop-opacity="0.34"/></linearGradient></defs>`
         + mos + `</svg>`;
       const png = new Resvg(doc, { fitTo: { mode: "width", value: TILE_W }, font: { loadSystemFonts: false } }).render().asPng();
-      steps.push({ uri: "data:image/png;base64," + png.toString("base64"), tcx: bt.nx, tcy: bt.ny });
+      steps.push({ uri: "data:image/png;base64," + png.toString("base64"), tcx: bt.nx, tcy: bt.ny, zEnd });
     }
     const stepAt = (n) => steps[((n % NP) + NP) % NP];
 
     const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
-    // IRIS-gevoel: dieper en sterker versnellend inzoomen, zodat je echt "in de tegel valt" aan
-    // het eind (geen gelijkmatige zoom). En het volgende patroon KOMT TEVOORSCHIJN uit die tegel
-    // (cross-fade in de laatste fase) i.p.v. een harde wissel -> het lijkt alsof de nieuwe wereld
-    // ín dat tegeltje zat, net als inzoomen op de iris van een oog.
-    const Z_END = 5.0;                                  // dieper -> sterker "erin vallen"
-    const FLASH = Math.min(0.26, STEP_SEC * 0.08);      // KORTE, zachte flits (was te lang/sterk)
-    const MERGE = Math.min(0.55, STEP_SEC * 0.17);      // alleen de laatste momenten: volgend patroon
-    const NXT_Z0 = 1.6;                                 // volgend patroon komt licht ingezoomd binnen
-    // teken één patroon-laag (PNG) ingezoomd op z'n doel-tegel; b=0 vol paneel, b=1 diep in de tegel
-    function layerSvg(sp, b, id) {
-      const z = 1 + (Z_END - 1) * (b * b * b);          // b^3: traag begin, snelle "val" op het eind
-      const cx = 0.5 + (sp.tcx - 0.5) * smooth(b), cy = 0.5 + (sp.tcy - 0.5) * smooth(b);
+    // IRIS-gevoel, nu ECHT: je zoomt DIEP in op één tegel (tot die tegel het scherm vult), en op dat
+    // moment — verborgen door een korte flits — begin je al diep INGEZOOMD in het VOLGENDE patroon,
+    // dat dan uitzoomt tot vol paneel. Zo lijkt het alsof je dóór dat tegeltje in een nieuwe wereld
+    // valt. GEEN twee patronen naast elkaar meer: tijdens de wissel dekt de flits het beeld, en het
+    // volgende patroon komt op EXACT hetzelfde punt binnen waar je induikt (niet gecentreerd).
+    const SWAP = Math.min(0.42, STEP_SEC * 0.12);       // laatste stukje: de "doorval" + flits-wissel
+    // teken een patroon-laag (PNG) met zoom z, gecentreerd op (cx,cy) in paneel-fractie.
+    function layerAt(sp, z, cx, cy) {
       const iw = fit.w * z, ih = fit.h * z;
       const ix = rx + fit.w / 2 - cx * iw, iy = ry + fit.h / 2 - cy * ih;
       return `<image href="${sp.uri}" x="${ix.toFixed(2)}" y="${iy.toFixed(2)}" width="${iw.toFixed(2)}" height="${ih.toFixed(2)}" preserveAspectRatio="none"/>`;
@@ -1910,31 +1920,37 @@ export function makeBrand({ ROOT, config }) {
       const step = Math.floor(t / STEP_SEC);
       const tl = t - step * STEP_SEC;                   // 0..STEP_SEC binnen deze stap
       const sp = stepAt(step);
-      const b = tl / STEP_SEC;                          // 0..1
-      // huidige patroon, ingezoomd op z'n doel-tegel
-      let layers = layerSvg(sp, b, "cur");
-      // LAATSTE FASE: het VOLGENDE patroon komt vol in beeld tevoorschijn (uit de tegel die je in
-      // zoomt) en faadt over het ingezoomde huidige heen -> iris-overgang, geen harde cut.
+      const b = tl / STEP_SEC;                          // 0..1 binnen de stap
       const toEnd = STEP_SEC - tl;
-      if (toEnd < MERGE) {
-        const mk = smooth(1 - toEnd / MERGE);           // 0 -> 1 naar de grens toe
+
+      let layers;
+      if (toEnd >= SWAP) {
+        // NORMALE FASE: inzoomen op de doel-tegel tot die ~het vak vult (zEnd per patroon, niet
+        // dieper -> nooit in de lege voeg). b^3 = traag begin, snelle val op het eind. Centrum
+        // schuift van paneelmidden naar de doel-tegel.
+        const z = 1 + (sp.zEnd - 1) * (b * b * b);
+        const cx = 0.5 + (sp.tcx - 0.5) * smooth(b), cy = 0.5 + (sp.tcy - 0.5) * smooth(b);
+        layers = layerAt(sp, z, cx, cy);
+      } else {
+        // DOORVAL-FASE (laatste SWAP seconden): we zitten al ~in de tegel. We beginnen nu diep
+        // INGEZOOMD in het VOLGENDE patroon (op zíjn doel-tegel) en zoomen dat uit richting vol
+        // paneel. De flits (hieronder) dekt het exacte wisselmoment, dus je ziet nooit twee tegelijk.
         const nxt = stepAt(step + 1);
-        // het volgende patroon komt LICHT ingezoomd binnen (z: 1.6 -> 1) en faadt in -> het voelt
-        // alsof je er doorheen valt en het paneel zich voor je opent, niet een platte overlay.
-        const nz = NXT_Z0 - (NXT_Z0 - 1) * mk;
-        const niw = fit.w * nz, nih = fit.h * nz;
-        const nix = rx + (fit.w - niw) / 2, niy = ry + (fit.h - nih) / 2;
-        layers += `<g opacity="${mk.toFixed(3)}"><image href="${nxt.uri}" x="${nix.toFixed(2)}" y="${niy.toFixed(2)}" width="${niw.toFixed(2)}" height="${nih.toFixed(2)}" preserveAspectRatio="none"/></g>`;
+        const s = smooth(1 - toEnd / SWAP);             // 0 -> 1 over de doorval
+        const z = nxt.zEnd - (nxt.zEnd - 1) * s;        // van diep ingezoomd -> 1 (vol paneel)
+        const cx = 0.5 + (nxt.tcx - 0.5) * (1 - s), cy = 0.5 + (nxt.tcy - 0.5) * (1 - s);
+        layers = layerAt(nxt, z, cx, cy);
       }
       let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
         + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#efe7d4"/>${layers}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
         + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
-      // ZACHTE FLITS: een korte, subtiele oplichting precies op de grens — net genoeg om de
-      // overgang "door de tegel" te laten voelen, niet zo sterk dat het beeld wegvalt.
+      // FLITS die de WISSEL dekt: piekt precies op de stap-grens (daar wisselt huidig<->volgend
+      // patroon), zodat je het wisselmoment nooit als "twee patronen" ziet. Sterk genoeg om de
+      // sprong te verbergen, maar kort (alleen rond de grens). Niet aan het begin van de eerste stap.
       let fop = 0;
-      if (toEnd < FLASH) fop = smooth(1 - toEnd / FLASH);
-      else if (tl < FLASH && step > 0) fop = smooth(1 - tl / FLASH);
-      if (fop > 0.01) inner += `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#fff8ec" opacity="${(fop * 0.45).toFixed(3)}"/></g>`;
+      if (toEnd < SWAP) fop = smooth(1 - toEnd / SWAP);          // oplopend naar de grens (binnen de doorval)
+      else if (tl < SWAP && step > 0) fop = smooth(1 - tl / SWAP); // uitdovend net na de grens
+      if (fop > 0.01) inner += `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#fff8ec" opacity="${(fop * 0.72).toFixed(3)}"/></g>`;
       let overlay = "";
       if (t < 3.0) { const op = t < 2.0 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.0) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
