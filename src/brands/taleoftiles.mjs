@@ -1859,11 +1859,13 @@ export function makeBrand({ ROOT, config }) {
     while (pats.length && pats.length < NP) pats.push(pats[pats.length - 1]);
     if (!pats.length) throw new Error("droste: geen patronen");
 
-    // Per patroon: render ÉÉN keer naar een PNG op ~2x de paneel-breedte (scherp genoeg voor de
-    // ~3.5x inzoom binnen één stap), met EXACT de paneel-verhouding (zodat het beeld het vak vult,
-    // geen lege strook). We tegelen ruim zodat het hele vak gevuld is. Kies ook de doel-tegel
-    // (dichtst bij het midden) om op in te zoomen.
-    const TILE_W = Math.round(fit.w * SS * 3.2);               // PNG groter -> diepe inzoom blijft scherp
+    // Per patroon: render ÉÉN keer naar een grote PNG (scherp genoeg voor de diepe inzoom tot in
+    // één tegel), met EXACT de paneel-verhouding (zodat het beeld het vak vult, geen lege strook).
+    // We tegelen ruim zodat het hele vak gevuld is. Kies ook de doel-tegel (dichtst bij het midden)
+    // om op in te zoomen.
+    // PNG fors groter dan vroeger (was 3.2x): we zoomen nu DIEP in op één tegel (tot ~10x), dus
+    // die ene tegel moet bij maximale zoom nog steeds scherp zijn. ~9x paneel-breedte dekt dat.
+    const TILE_W = Math.round(fit.w * SS * 9);                  // PNG ruim groter -> één tegel blijft scherp bij diepe inzoom
     const TILE_H = Math.round(TILE_W * fit.h / fit.w);          // exact paneel-verhouding
     const steps = [];
     for (let i = 0; i < pats.length; i++) {
@@ -1882,11 +1884,13 @@ export function makeBrand({ ROOT, config }) {
       // doel-tegel tot z'n dichtstbijzijnde buur (in nx/ny-fractie). zEnd = ~0.9 / tegel-fractie.
       let nn = 1e9;
       for (let q = 0; q < parsed.tiles.length; q++) { if (q === bi) continue; const dx = parsed.tiles[q].nx - bt.nx, dy = parsed.tiles[q].ny - bt.ny; const dd = dx * dx + dy * dy; if (dd > 1e-9 && dd < nn) nn = dd; }
-      const pitch = Math.max(0.06, Math.min(0.5, Math.sqrt(nn) || 0.14));
-      // Zoom tot je een CLUSTER tegels van dichtbij ziet (nog duidelijk patroon met detail), NIET
-      // tot in één egale tegel (dan wordt het beeld een vlakke kleur/lege voeg). ~2x de tegel-
-      // grootte in beeld houdt altijd mozaïek op het scherm; begrensd op een rustige 2.2-3.2x.
-      const zEnd = Math.max(2.2, Math.min(3.2, 0.45 / pitch));
+      const pitch = Math.max(0.045, Math.min(0.5, Math.sqrt(nn) || 0.14));
+      // ECHT IRIS-EFFECT: zoom door tot ÉÉN tegel het hele vak vult. 'pitch' is de tegelgrootte
+      // als fractie van het paneel (afstand tussen twee buur-tegels). Eén tegel vult het vak bij
+      // zoom = 1/pitch. We mikken daar nét iets voorbij (1.05/pitch) zodat de tegel de rand raakt,
+      // en begrenzen op 6-13x zodat kleine én grote tegels allebei het scherm vullen zonder in de
+      // lege voeg te belanden. Dit is de kern van de fix: vroeger 2.2-3.2x (hele muur bleef zichtbaar).
+      const zEnd = Math.max(6, Math.min(13, 1.05 / pitch));
       // Bouw het volle paneel-SVG (tegels + glazuur) en render het naar PNG met het vak-formaat
       // (preserveAspectRatio slice -> vult TILE_W×TILE_H zonder lege rand).
       const wrap = `<svg x="0" y="0" width="${TILE_W}" height="${TILE_H}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
@@ -1925,20 +1929,25 @@ export function makeBrand({ ROOT, config }) {
 
       let layers;
       if (toEnd >= SWAP) {
-        // NORMALE FASE: inzoomen op de doel-tegel tot die ~het vak vult (zEnd per patroon, niet
-        // dieper -> nooit in de lege voeg). b^3 = traag begin, snelle val op het eind. Centrum
-        // schuift van paneelmidden naar de doel-tegel.
-        const z = 1 + (sp.zEnd - 1) * (b * b * b);
-        const cx = 0.5 + (sp.tcx - 0.5) * smooth(b), cy = 0.5 + (sp.tcy - 0.5) * smooth(b);
+        // NORMALE FASE: inzoomen op de doel-tegel tot die het vak VULT (zEnd per patroon, nu diep).
+        // EXPONENTIËLE zoom (z = zEnd^b) i.p.v. b^3: bij een diepe inzoom (tot 13x) voelt dat als
+        // gelijkmatig "doorvallen" met constante snelheid, niet als traag-dan-plots-wegspringen.
+        // Het centrum verschuift gelijk-op met de zoom naar de doel-tegel, zodat die tegel precies
+        // in het midden blijft tijdens de hele induik (anders glijdt 'ie uit beeld bij diepe zoom).
+        const z = Math.pow(sp.zEnd, b);
+        const k = (z - 1) / (sp.zEnd - 1);              // 0 bij vol paneel -> 1 bij tegel-vult-scherm
+        const cx = 0.5 + (sp.tcx - 0.5) * k, cy = 0.5 + (sp.tcy - 0.5) * k;
         layers = layerAt(sp, z, cx, cy);
       } else {
-        // DOORVAL-FASE (laatste SWAP seconden): we zitten al ~in de tegel. We beginnen nu diep
+        // DOORVAL-FASE (laatste SWAP seconden): we zitten al diep IN de tegel. We beginnen nu diep
         // INGEZOOMD in het VOLGENDE patroon (op zíjn doel-tegel) en zoomen dat uit richting vol
-        // paneel. De flits (hieronder) dekt het exacte wisselmoment, dus je ziet nooit twee tegelijk.
+        // paneel. Ook hier exponentieel, zodat de doorval naadloos aansluit op de induik ervoor.
+        // De flits (hieronder) dekt het exacte wisselmoment, dus je ziet nooit twee tegels tegelijk.
         const nxt = stepAt(step + 1);
         const s = smooth(1 - toEnd / SWAP);             // 0 -> 1 over de doorval
-        const z = nxt.zEnd - (nxt.zEnd - 1) * s;        // van diep ingezoomd -> 1 (vol paneel)
-        const cx = 0.5 + (nxt.tcx - 0.5) * (1 - s), cy = 0.5 + (nxt.tcy - 0.5) * (1 - s);
+        const z = Math.pow(nxt.zEnd, 1 - s);            // diep ingezoomd (zEnd) -> 1 (vol paneel)
+        const k = (z - 1) / (nxt.zEnd - 1);             // centrum mee terug naar het midden
+        const cx = 0.5 + (nxt.tcx - 0.5) * k, cy = 0.5 + (nxt.tcy - 0.5) * k;
         layers = layerAt(nxt, z, cx, cy);
       }
       let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
