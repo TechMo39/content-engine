@@ -1849,15 +1849,33 @@ export function makeBrand({ ROOT, config }) {
       b = { body: strip(film.buildSvg(sp.parsed, sp.cols)) + strip(film.buildGlaze(sp.parsed, sp.cols)), pw: sp.pw, ph: sp.ph };
       bodyCache.set(key, b); return b;
     }
+    // RESVG-VEILIG: resvg (geom.rs) crasht op ontaarde maten — 0, negatief, NaN, Infinity, of
+    // absurd groot. Bij diepe zoom kan een niveau tot tienduizenden px opblazen (ver buiten de
+    // clip, dus toch onzichtbaar) of juist ~0 worden. We begrenzen daarom ALLES wat in een
+    // <svg>-wrapper gaat tot een ruim-maar-eindig venster rond het fit-vak, en slaan een niveau
+    // met kapotte geometrie helemaal over (return ""). Geen enkele ontaarde waarde bereikt resvg.
+    const fin = (v) => Number.isFinite(v);
+    // ruime teken-grens rond het paneel (alles daarbuiten wordt toch weggeklipt)
+    const BX0 = rx - fit.w, BY0 = ry - fit.h, BX1 = rx + fit.w * 2, BY1 = ry + fit.h * 2;
     function drawLevel(n, sx, sy, sw, sh, id) {
+      if (!fin(sx) || !fin(sy) || !fin(sw) || !fin(sh) || sw <= 0.5 || sh <= 0.5) return "";
       const lb = levelBody(n);
+      if (!fin(lb.pw) || !fin(lb.ph) || lb.pw <= 0 || lb.ph <= 0) return "";
       // overhang in screen-px
-      const ex = sx - sw * ovM, ey = sy - sh * ovM, ew = sw * (1 + 2 * ovM), eh = sh * (1 + 2 * ovM);
-      // viewBox van het patroon dat op (ex..ex+ew) hoort: het hele paneel vult sw x sh, dus de
-      // overhang-marge breidt de viewBox evenredig uit buiten [0..pw],[0..ph].
-      const vpadX = lb.pw * ovM, vpadY = lb.ph * ovM;
-      const vb = `${(-vpadX).toFixed(1)} ${(-vpadY).toFixed(1)} ${(lb.pw * (1 + 2 * ovM)).toFixed(1)} ${(lb.ph * (1 + 2 * ovM)).toFixed(1)}`;
-      const wrap = `<svg x="${ex.toFixed(2)}" y="${ey.toFixed(2)}" width="${ew.toFixed(2)}" height="${eh.toFixed(2)}" viewBox="${vb}" preserveAspectRatio="none">`;
+      let ex = sx - sw * ovM, ey = sy - sh * ovM, ew = sw * (1 + 2 * ovM), eh = sh * (1 + 2 * ovM);
+      // klem het getekende rechthoek op een ruim venster rond het paneel: zo wordt een diep
+      // opgeblazen niveau nooit tienduizenden px groot (dat liet resvg crashen), terwijl het
+      // zichtbare deel exact hetzelfde blijft (de rest werd toch geklipt).
+      const cx0 = Math.max(BX0, ex), cy0 = Math.max(BY0, ey), cx1 = Math.min(BX1, ex + ew), cy1 = Math.min(BY1, ey + eh);
+      if (!(cx1 > cx0 + 0.5) || !(cy1 > cy0 + 0.5)) return "";
+      // viewBox-deel dat bij het geklemde rechthoek hoort (evenredig meesnijden), in patroon-coords
+      const fullVW = lb.pw * (1 + 2 * ovM), fullVH = lb.ph * (1 + 2 * ovM);
+      const vx = -lb.pw * ovM + ((cx0 - ex) / ew) * fullVW;
+      const vy = -lb.ph * ovM + ((cy0 - ey) / eh) * fullVH;
+      const vw = ((cx1 - cx0) / ew) * fullVW, vh = ((cy1 - cy0) / eh) * fullVH;
+      if (!fin(vx) || !fin(vy) || !fin(vw) || !fin(vh) || vw <= 0 || vh <= 0) return "";
+      const vb = `${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}`;
+      const wrap = `<svg x="${cx0.toFixed(2)}" y="${cy0.toFixed(2)}" width="${(cx1 - cx0).toFixed(2)}" height="${(cy1 - cy0).toFixed(2)}" viewBox="${vb}" preserveAspectRatio="none">`;
       return wrap + lb.body + `</svg>`;
     }
 
@@ -1868,7 +1886,10 @@ export function makeBrand({ ROOT, config }) {
       // Het venster van 'base' bepaalt waar we naartoe zoomen. Camera-view in stage-coords
       // ([0,1] van niveau base): van het hele paneel (u=0) naar exact het venster-tegeltje (u=1).
       const sp0 = specAt(baseLv);
-      const VW = Math.pow(sp0.CW, u), VH = Math.pow(sp0.CH, u);
+      // VW/VH = hoe klein de camera-view is t.o.v. het hele paneel (u=0 -> 1, u=1 -> 1 tegel).
+      // Vloer eronder zodat een heel klein venster-tegeltje de deling (w/VW) niet naar Infinity
+      // laat lopen -> geen ontaarde maten richting resvg.
+      const VW = Math.max(1e-4, Math.pow(sp0.CW, u)), VH = Math.max(1e-4, Math.pow(sp0.CH, u));
       const vcx = 0.5 + (sp0.TCX - 0.5) * u, vcy = 0.5 + (sp0.TCY - 0.5) * u;
       const VX = vcx - VW / 2, VY = vcy - VH / 2;
       // een stage-coord (0..1 van base) -> screen-px binnen het fit-vak
@@ -1886,8 +1907,10 @@ export function makeBrand({ ROOT, config }) {
         // scherm-rechthoek van dit niveau
         const gx = ox, gy = oy, gw = sxk, gh = syk;
         const scrX = SX(gx), scrY = SY(gy), scrW = SWof(gw), scrH = SHof(gh);
-        // alleen tekenen als het op het scherm (binnen het fit-vak, met marge) valt
-        if (scrX < rx + fit.w + 40 && scrY < ry + fit.h + 40 && scrX + scrW > rx - 40 && scrY + scrH > ry - 40 && scrW > 0.5) {
+        // alleen verder als alle maten eindig + zinnig zijn (diepe zoom kan -> Infinity/NaN),
+        // en als het niveau op het scherm (binnen het fit-vak, met marge) valt.
+        const okGeom = fin(scrX) && fin(scrY) && fin(scrW) && fin(scrH) && scrW > 0.5 && scrH > 0.5;
+        if (okGeom && scrX < rx + fit.w + 40 && scrY < ry + fit.h + 40 && scrX + scrW > rx - 40 && scrY + scrH > ry - 40) {
           // FADE-IN van het VOLGENDE patroon (k>=1): een tegel van het huidige paneel is gewoon
           // ingekleurd; het volgende patroon zit er NIET zichtbaar in. Het verschijnt pas als je
           // diep genoeg bent ingezoomd dat die tegel een flink deel van het scherm vult. Dus:
@@ -1901,12 +1924,17 @@ export function makeBrand({ ROOT, config }) {
           }
           if (op > 0.002) {
             const body = drawLevel(baseLv + k, scrX, scrY, scrW, scrH, "dl" + k);
-            let rim = "";
-            if (k > 0 && scrW > 3 && scrH > 3) {   // dunne voeg-rand op de venster-grens: leest als tegel-voeg
-              const sw = Math.max(0.6, Math.min(scrW, scrH) * 0.015);
-              rim = `<rect x="${scrX.toFixed(2)}" y="${scrY.toFixed(2)}" width="${scrW.toFixed(2)}" height="${scrH.toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`;
+            if (body) {   // drawLevel geeft "" terug bij ontaarde geometrie -> dan ook geen rand
+              let rim = "";
+              if (k > 0) {   // dunne voeg-rand op de venster-grens (geklemd op het veilige venster)
+                const rX0 = Math.max(BX0, scrX), rY0 = Math.max(BY0, scrY), rX1 = Math.min(BX1, scrX + scrW), rY1 = Math.min(BY1, scrY + scrH);
+                if (rX1 > rX0 + 3 && rY1 > rY0 + 3) {
+                  const sw = Math.max(0.6, Math.min(rX1 - rX0, rY1 - rY0) * 0.015);
+                  rim = `<rect x="${rX0.toFixed(2)}" y="${rY0.toFixed(2)}" width="${(rX1 - rX0).toFixed(2)}" height="${(rY1 - rY0).toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`;
+                }
+              }
+              imgs += op >= 0.999 ? (body + rim) : `<g opacity="${op.toFixed(3)}">${body}${rim}</g>`;
             }
-            imgs += op >= 0.999 ? (body + rim) : `<g opacity="${op.toFixed(3)}">${body}${rim}</g>`;
           }
         }
         // ketting een niveau dieper: het venster van niveau base+k (in zíjn eigen coords) ->
