@@ -1577,10 +1577,15 @@ export function makeBrand({ ROOT, config }) {
         + bowSvg(s, wrapK, sc);
     }
 
-    const Du = Math.min(1.3, durSec * 0.08);
-    const T1 = durSec * 0.24, Tb = durSec * 0.56, Tswap = durSec * 0.80;   // ingepakt | uitpakken+opbouw | muur #1 | muur #2
-    const Wd = Math.min(1.0, durSec * 0.08);   // overgang paneel -> muur
-    const Sd = Math.min(0.8, durSec * 0.06);   // overgang muur #1 -> muur #2
+    // SECONDE-1 HOOK (Mo): flits heel kort het EINDCADEAU (het afgewerkte paneel+naam aan de muur)
+    // vooraan, dan weer terug naar het ingepakte cadeau en het normale uitpakken. "Kijk wat eruit
+    // komt" -> dan het uitpakken. De rest van de tijdlijn loopt over durEff.
+    const CHOOK = Math.min(0.7, durSec * 0.05);
+    const durEff = Math.max(1, durSec - CHOOK);
+    const Du = Math.min(1.3, durEff * 0.08);
+    const T1 = durEff * 0.24, Tb = durEff * 0.56, Tswap = durEff * 0.80;   // ingepakt | uitpakken+opbouw | muur #1 | muur #2
+    const Wd = Math.min(1.0, durEff * 0.08);   // overgang paneel -> muur
+    const Sd = Math.min(0.8, durEff * 0.06);   // overgang muur #1 -> muur #2
     const hooks = {
       nl: ["Wat geef je iemand die alles al heeft?", "Op zoek naar een cadeau dat niemand anders geeft?", "Een cadeau dat ze nooit meer weggeven.", "Geen bloemen die verwelken."],
       en: ["What do you give someone who has everything?", "Looking for a gift no one else gives?", "A gift they'll never give away.", "No flowers that wilt."],
@@ -1598,7 +1603,16 @@ export function makeBrand({ ROOT, config }) {
     const cta = RVlang(ctaPool, lang);
 
     function sceneAt(frame) {
-      const t = frame / FPS;
+      const tAbs = frame / FPS;
+      // HOOK: eindcadeau aan de muur, kort, met een witte flits-uit die overgaat in het ingepakte
+      // cadeau. Daarna loopt de echte tijdlijn (t) vanaf 0.
+      if (tAbs < CHOOK) {
+        let innerH = wallScene(mk1 || mk2, fullCols, "h");
+        const fop = tAbs > CHOOK * 0.55 ? smooth((tAbs - CHOOK * 0.55) / (CHOOK * 0.45)) : 0;
+        if (fop > 0.01) innerH += `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff8ec" opacity="${(fop * 0.9).toFixed(3)}"/>`;
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: "", logoUri: branding.logoUri });
+      }
+      const t = tAbs - CHOOK;
       const cols = (t < T1) ? BLANKS
         : film.flowColorsAt(parsed, { palette: palArr, durSec: (Tb - T1), buildSec: (Tb - T1) * 0.82, buildStart: 0, popSec: 0.05 }, t - T1);
       // clip voor de inpak-overlay (zelfde rechthoek als het gecentreerde paneel)
@@ -1771,8 +1785,18 @@ export function makeBrand({ ROOT, config }) {
       return `<clipPath id="imc${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
         + `<g clip-path="url(#imc${id})">${mos}${glazeSvg(x, y, w, h, "img" + id)}</g>`;
     }
+    // SECONDE-1 HOOK (licht, lage prio): open heel kort met het afgewerkte paneel aan de muur
+    // (de payoff) voordat de wat/hoe/waar-uitleg start. Alleen een korte voorflits; de uitleg-
+    // tijdlijn zelf blijft ongemoeid (we tonen in dit venster enkel het eindbeeld i.p.v. de opbouw).
+    const IHOOK = Math.min(0.8, durSec * 0.04);
     function sceneAt(frame) {
       const t = frame / FPS;
+      if (t < IHOOK) {
+        let innerH = `<g>${roomSVG}</g>` + mosaicInRect(wx, wy, wW, wH, finals[2] || finals[0], "h");
+        let overlayH = "";
+        if (name) { const op = t < IHOOK * 0.6 ? 1 : 1 - smooth((t - IHOOK * 0.6) / (IHOOK * 0.4)); if (op > 0.01) overlayH += `<g opacity="${op.toFixed(3)}">${platePlace(name, np2, wx + wW / 2, wy + wH / 2, Math.round(wH * 0.20), wW * 0.9)}</g>`; }
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
+      }
       const cols = colAt(t);
       let wallK = 0;
       if (t >= T2 && t < T3) wallK = smooth((t - T2) / (T3 - T2));
@@ -2003,10 +2027,14 @@ export function makeBrand({ ROOT, config }) {
     const camZoom = 1.22;   // RUSTIGE zoom: te veel zoom op 24fps strobet/schokt (was 1.7/2.0)
     // OPBOUW is het grote middenstuk: tegel voor tegel inkleuren terwijl de camera
     // héél langzaam terugtrekt. Daarna een korte HOLD op het afgemaakte paneel.
-    let Ti = 3.5, Dt = 1.0, To = 3.5, Tb, Thold;
+    // IN-SITU heeft GEEN foto-intro-zoom (de muur is het kader), dus de lange intro is daar enkel
+    // een lege-muur-wachttijd. Met de seconde-1 hook willen we juist dat de opbouw meteen na de
+    // hook begint. Daarom: voor in-situ een korte intro (= de hook), zodat de opbouw direct volgt.
+    const _ihk = insitu ? Math.min(1.1, durSec * 0.07) : 0;
+    let Ti = insitu ? _ihk : 3.5, Dt = 1.0, To = insitu ? 0 : 3.5, Tb, Thold;
     if (bookend) { const mid = Math.max(2, durSec - Ti - To); Tb = mid * 0.66; Thold = mid - Tb; }
     else { Ti = 0; Tb = Math.max(1, durSec * 0.6); Thold = 0; }
-    const buildStart = bookend ? Ti : 0;   // inkleuren start ná de intro-inzoom
+    const buildStart = bookend ? Ti : 0;   // inkleuren start ná de intro (bij in-situ: ná de hook)
     const pw = parsed.view[2], ph = parsed.view[3];
     // tegel-klik UIT — het constante getik was irritant, niet satisfying. Alleen muziek
     // eronder. (Mechaniek blijft in de kern; later eventueel met een échte ASMR-sample.)
@@ -2085,8 +2113,24 @@ export function makeBrand({ ROOT, config }) {
       return 0;
     }
 
+    // SECONDE-1 HOOK voor IN-SITU (Mo): open met het AFGEWERKTE paneel + naam aan de muur (de
+    // payoff), kleur het dan heel snel leeg, en start daarna de normale opbouw-op-de-muur. Zo zie
+    // je meteen wat het wordt. Alleen in-situ; sfeer en de rest van dit pad raken we niet.
+    const IH_ON = insitu;
+    const IHOOK = IH_ON ? Math.min(1.1, durSec * 0.07) : 0;
+    const IHOLD = IHOOK * 0.4;
     function sceneAt(frame) {
       const t = frame / FPS, tleft = durSec - t;
+      if (IH_ON && t < IHOOK) {
+        const dk = t < IHOLD ? 1 : 1 - smooth((t - IHOLD) / (IHOOK - IHOLD));   // 1=vol -> 0=leeg
+        const hookCols = film.flowColorsAt(parsed, { palette: flowPal, durSec: 1, buildSec: 1, buildStart: 0, popSec: 0.05 }, dk);
+        const vw0 = pw, vh0 = ph, wrapH = `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
+        const mosH = film.buildSvg(parsed, hookCols).replace(/<svg\b[^>]*>/i, wrapH) + film.buildGlaze(parsed, hookCols).replace(/<svg\b[^>]*>/i, wrapH);
+        let innerH = insituWall + `<clipPath id="ihc"><rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="${Math.max(4, panelW * 0.03)}"/></clipPath><g clip-path="url(#ihc)">${mosH}${glazeSvg(panelX, panelY, panelW, panelH, "ih")}</g>`;
+        let overlayH = "";
+        if (name) { const op = t < IHOLD ? 1 : 1 - smooth((t - IHOLD) / (IHOOK - IHOLD)); if (op > 0.01) overlayH += `<g opacity="${op.toFixed(3)}">${platePlace(name, plateColours(flowPal), panelX + panelW / 2, panelY + panelH / 2, Math.round(panelH * 0.19), panelW * 0.9)}</g>`; }
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
+      }
       // Camera: bookendK = foto aan begin/eind (mét medaillon); rK = foto-reveal tussendoor
       // (zónder medaillon). zMos/zPho = inzoom op mozaïek/foto.
       let bookendK = 0, zMos = 1, zPho = 1, tailK = 0, frameK = 0;
