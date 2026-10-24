@@ -1888,8 +1888,22 @@ export function makeBrand({ ROOT, config }) {
     const stepAt = (n) => steps[((n % NP) + NP) % NP];
 
     const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
-    const Z_END = 3.5;                                  // inzoom-diepte binnen één stap
-    const FLASH = Math.min(0.5, STEP_SEC * 0.14);       // flits-duur rond de stap-grens
+    // IRIS-gevoel: dieper en sterker versnellend inzoomen, zodat je echt "in de tegel valt" aan
+    // het eind (geen gelijkmatige zoom). En het volgende patroon KOMT TEVOORSCHIJN uit die tegel
+    // (cross-fade in de laatste fase) i.p.v. een harde wissel -> het lijkt alsof de nieuwe wereld
+    // ín dat tegeltje zat, net als inzoomen op de iris van een oog.
+    const Z_END = 5.0;                                  // dieper -> sterker "erin vallen"
+    const FLASH = Math.min(0.26, STEP_SEC * 0.08);      // KORTE, zachte flits (was te lang/sterk)
+    const MERGE = Math.min(0.55, STEP_SEC * 0.17);      // alleen de laatste momenten: volgend patroon
+    const NXT_Z0 = 1.6;                                 // volgend patroon komt licht ingezoomd binnen
+    // teken één patroon-laag (PNG) ingezoomd op z'n doel-tegel; b=0 vol paneel, b=1 diep in de tegel
+    function layerSvg(sp, b, id) {
+      const z = 1 + (Z_END - 1) * (b * b * b);          // b^3: traag begin, snelle "val" op het eind
+      const cx = 0.5 + (sp.tcx - 0.5) * smooth(b), cy = 0.5 + (sp.tcy - 0.5) * smooth(b);
+      const iw = fit.w * z, ih = fit.h * z;
+      const ix = rx + fit.w / 2 - cx * iw, iy = ry + fit.h / 2 - cy * ih;
+      return `<image href="${sp.uri}" x="${ix.toFixed(2)}" y="${iy.toFixed(2)}" width="${iw.toFixed(2)}" height="${ih.toFixed(2)}" preserveAspectRatio="none"/>`;
+    }
 
     function sceneAt(frame) {
       const t = frame / FPS;
@@ -1897,24 +1911,30 @@ export function makeBrand({ ROOT, config }) {
       const tl = t - step * STEP_SEC;                   // 0..STEP_SEC binnen deze stap
       const sp = stepAt(step);
       const b = tl / STEP_SEC;                          // 0..1
-      const z = 1 + (Z_END - 1) * (b * b);              // versnellend inzoomen (1 -> Z_END)
-      // camera-centrum schuift van paneelmidden naar de doel-tegel
-      const cx = 0.5 + (sp.tcx - 0.5) * smooth(b), cy = 0.5 + (sp.tcy - 0.5) * smooth(b);
-      // <image>-zoom: de PNG wordt op fit.w*z geschaald en zo gepand dat (cx,cy) in het midden
-      // van het vak staat. GEEN geneste svg/viewBox-upscale -> resvg-veilig.
-      const iw = fit.w * z, ih = fit.h * z;
-      const ix = rx + fit.w / 2 - cx * iw, iy = ry + fit.h / 2 - cy * ih;
-      const img = `<image href="${sp.uri}" x="${ix.toFixed(2)}" y="${iy.toFixed(2)}" width="${iw.toFixed(2)}" height="${ih.toFixed(2)}" preserveAspectRatio="none"/>`;
-      let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
-        + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#efe7d4"/>${img}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
-        + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
-      // FLITS: korte witte oplichting die naar de stap-grens toe piekt en er net na uitdooft;
-      // dekt de sprong naar het volgende volle patroon. (Niet aan het begin van de allereerste.)
+      // huidige patroon, ingezoomd op z'n doel-tegel
+      let layers = layerSvg(sp, b, "cur");
+      // LAATSTE FASE: het VOLGENDE patroon komt vol in beeld tevoorschijn (uit de tegel die je in
+      // zoomt) en faadt over het ingezoomde huidige heen -> iris-overgang, geen harde cut.
       const toEnd = STEP_SEC - tl;
+      if (toEnd < MERGE) {
+        const mk = smooth(1 - toEnd / MERGE);           // 0 -> 1 naar de grens toe
+        const nxt = stepAt(step + 1);
+        // het volgende patroon komt LICHT ingezoomd binnen (z: 1.6 -> 1) en faadt in -> het voelt
+        // alsof je er doorheen valt en het paneel zich voor je opent, niet een platte overlay.
+        const nz = NXT_Z0 - (NXT_Z0 - 1) * mk;
+        const niw = fit.w * nz, nih = fit.h * nz;
+        const nix = rx + (fit.w - niw) / 2, niy = ry + (fit.h - nih) / 2;
+        layers += `<g opacity="${mk.toFixed(3)}"><image href="${nxt.uri}" x="${nix.toFixed(2)}" y="${niy.toFixed(2)}" width="${niw.toFixed(2)}" height="${nih.toFixed(2)}" preserveAspectRatio="none"/></g>`;
+      }
+      let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
+        + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#efe7d4"/>${layers}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
+        + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+      // ZACHTE FLITS: een korte, subtiele oplichting precies op de grens — net genoeg om de
+      // overgang "door de tegel" te laten voelen, niet zo sterk dat het beeld wegvalt.
       let fop = 0;
       if (toEnd < FLASH) fop = smooth(1 - toEnd / FLASH);
       else if (tl < FLASH && step > 0) fop = smooth(1 - tl / FLASH);
-      if (fop > 0.01) inner += `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#fff8ec" opacity="${(fop * 0.92).toFixed(3)}"/></g>`;
+      if (fop > 0.01) inner += `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#fff8ec" opacity="${(fop * 0.45).toFixed(3)}"/></g>`;
       let overlay = "";
       if (t < 3.0) { const op = t < 2.0 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.0) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
