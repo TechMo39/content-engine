@@ -202,14 +202,23 @@ let running = false;
 function enqueue(job) { return new Promise((resolve) => { queue.push({ job, resolve }); drain(); }); }
 async function drain() {
   if (running) return; running = true;
+  let gedaan = 0, mislukt = 0;
   while (queue.length) {
     const { job, resolve } = queue.shift();
     try {
       log(`▶ render — ${job.brand}/${job.template || "-"} (${job.format || "9:16"})${queue.length ? `  · nog ${queue.length} in de rij` : ""}`);
-      resolve(await runOne(job));
-    } catch (e) { log(`✗ FOUT: ${e.message}`); resolve({ error: e.message }); }
+      const r = await runOne(job);
+      // Een render die geen bruikbaar resultaat teruggeeft telt ook als mislukt, zodat
+      // een stille leegloop (bv. walkthrough zonder prebuilt) niet onopgemerkt verdwijnt.
+      if (r && r.error) { mislukt++; log(`✗ FOUT: ${job.template || "-"} — ${r.error}`); }
+      else if (!r || !r.url) { mislukt++; log(`✗ FOUT: ${job.template || "-"} — geen video teruggekregen`); }
+      else gedaan++;
+      resolve(r);
+    } catch (e) { mislukt++; log(`✗ FOUT: ${job.template || "-"} — ${e.message}`); resolve({ error: e.message }); }
   }
   running = false;
+  // Eindtelling pas loggen als er echt een batch was (meer dan één gemaakt of iets mislukt).
+  if (gedaan + mislukt > 1 || mislukt) log(`■ wachtrij leeg — ${gedaan} klaar${mislukt ? `, ${mislukt} mislukt` : ""}`);
 }
 function p2(n) { return String(n).padStart(2, "0"); }
 function stamp() { const d = new Date(); return `${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`; }
@@ -355,6 +364,10 @@ const server = http.createServer(async (req, res) => {
       // in de volgorde van het template-lijstje. Geen (of lege) lijst = alle types (zoals voorheen).
       const want = Array.isArray(bd.types) && bd.types.length ? new Set(bd.types) : null;
       const sel = want ? brand.templates.filter((t) => want.has(t.id)) : brand.templates;
+      // BEWIJS: laat zien wat de UI stuurde en wat we er echt van gaan maken. Zie je hier
+      // 2 gevraagd maar 1 gekozen, dan stuurde de UI een verkeerde/onbekende id. Zie je
+      // 2 gekozen maar straks 1 klaar, dan faalde er een render (zoek de ✗ FOUT-regel).
+      if (want) log(`• selectie ontvangen: [${[...want].join(", ")}] → ${sel.length} match(es): [${sel.map((t) => t.id).join(", ")}]`);
       let n = 0;
       for (const t of sel) {
         // Per-type max-duur: kies je bv. 45s voor "render alles", dan worden de types die
