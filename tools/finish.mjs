@@ -81,10 +81,14 @@ const FPS = 30;
 let FONTARG = "";
 try { if (fs.existsSync(FONT)) { fs.copyFileSync(FONT, path.join(tmp, "font.ttf")); FONTARG = "fontfile=font.ttf:"; } } catch {}
 
-// per-filmpje lichte variatie in de snelheid (binnen de grote lijn)
-const spIntro = jitter(2.6, 0.4);   // homepage + naar de configurator: snel
-const spBuild = jitter(1.0, 0.08);  // inkleuren + naam: de hero, rustig
-const spFin = jitter(1.2, 0.12);    // voorbeeld + ruimtes: iets sneller
+// per-filmpje lichte variatie in de snelheid (binnen de grote lijn).
+// RUSTIGER dan vroeger (was 2.6 / 1.0 / 1.2): de kijker moet elke stap kunnen VOLGEN. Alles een
+// flinke stap trager zodat het niet langs-flitst. Intro mag nog iets vlotter dan de hero, maar
+// geen dubbele snelheid meer; de hero (inkleuren + naam) draait net onder echte tijd, en het
+// slot (voorbeeld + ruimtes) vrijwel op echte tijd.
+const spIntro = jitter(1.5, 0.15);  // naar de configurator: iets vlotter, maar te volgen
+const spBuild = jitter(0.85, 0.06); // inkleuren + naam: de hero, rustig (trager dan echt)
+const spFin = jitter(0.95, 0.08);   // voorbeeld + ruimtes: vrijwel echte tijd, rustig
 
 // 1) drie segmenten op snelheid zetten
 ff(["-i", RAW, "-ss", "0", "-to", String(colorStart), "-filter:v", `setpts=PTS/${spIntro},fps=${FPS}`, "-an", "-pix_fmt", "yuv420p", "-c:v", "libx264", seg("A.mp4")]);

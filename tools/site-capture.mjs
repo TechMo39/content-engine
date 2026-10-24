@@ -234,18 +234,19 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   const sigs = await page.$$eval(tileSel, (els) => [...new Set(els.map((e) => e.getAttribute("data-sig")).filter(Boolean))]).catch(() => []);
   log("groepen: " + sigs.length);
   let gi = 0;
-  for (const sig of sigs.slice(0, 40)) {
-    // de eerste paar keer de cursor zichtbaar een kleur laten pakken + naar de groep bewegen,
-    // zodat de kijker het mechanisme SNAPT; daarna vlotter door (anders te traag/te lang).
-    const showIt = gi < 3;
+  // RUSTIGER: minder groepen (max 18 i.p.v. 40) en LANGERE holds, zodat elke kleurklik te volgen
+  // is i.p.v. een flikkering. De eerste vier laten we met de zichtbare cursor zien zodat de kijker
+  // het mechanisme snapt; daarna iets vlotter, maar nog steeds met rust tussen de klikken.
+  for (const sig of sigs.slice(0, 18)) {
+    const showIt = gi < 4;
     await pickCol(showIt);
     const grp = page.locator('#mSvgStage .pfield [data-sig="' + sig + '"]').first();
-    if (showIt) { try { const bb = await grp.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.4); await cursorTap(page, 0.12); } } catch {} }
+    if (showIt) { try { const bb = await grp.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.5); await cursorTap(page, 0.18); } } catch {} }
     await grp.dispatchEvent("click").catch(() => {});
-    await hold(page, sigs.length <= 10 ? 0.45 : 0.24);
+    await hold(page, showIt ? 0.7 : 0.45);
     gi++;
   }
-  await hold(page, 1.0);
+  await hold(page, 1.2);
 
   // 4b) alleen DETAIL: tegel-voor-tegel verfijnen (veeg boven->onder), op het al volle paneel.
   if (mode === "detail") {
@@ -253,20 +254,21 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
     if (await cmTile.count().catch(() => 0)) { await cmTile.dispatchEvent("click").catch(() => {}); await hold(page, 0.5); }
     // volgorde 1x bepalen op positie; klikken daarna via stabiel data-tid (schuift niet mee)
     const order = await page.$$eval(tileSel, (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { tid: e.getAttribute("data-tid"), y: r.top, x: r.left }; }).filter((t) => t.tid).sort((a, b) => (Math.round(a.y / 14) - Math.round(b.y / 14)) || (a.x - b.x)).map((t) => t.tid)).catch(() => []);
-    const want = Number(process.env.TOT_DENSITY || 160);
+    // RUSTIGER: veel MINDER tegels (standaard 40 i.p.v. 160) en LANGERE holds per tegel, zodat je
+    // echt ZIET dat er tegel voor tegel ingekleurd wordt i.p.v. een razendsnelle flikkering. De
+    // cursor volgt nu elke 3e tegel (meer zichtbare hand), met een iets langere beweging.
+    const want = Number(process.env.TOT_DENSITY || 40);
     const STEP = Math.max(1, Math.round(order.length / Math.max(1, want)));
     let c = 0;
     for (let i = 0; i < order.length; i += STEP) {
       if (c % 3 === 0) await pickCol(c < 4);   // eerste paar kleurkeuzes zichtbaar met de cursor
       const tile = page.locator('#mSvgStage .pfield [data-tid="' + order[i] + '"]').first();
-      // de cursor volgt elke ~5e tegel (anders te veel beweging/te traag), zodat het leest als
-      // "tegel voor tegel met de hand ingekleurd" i.p.v. kleuren die vanzelf verschijnen.
-      if (c % 5 === 0) { try { const bb = await tile.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.14); } } catch {} }
+      if (c % 3 === 0) { try { const bb = await tile.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.22); } } catch {} }
       await tile.dispatchEvent("click").catch(() => {});
-      await hold(page, 0.07);
+      await hold(page, 0.2);
       c++;
     }
-    await hold(page, 1.2);
+    await hold(page, 1.4);
   }
   } // einde inkleur-blok (alleen uitgevoerd als er swatches waren)
   mark("colorEnd");
@@ -289,29 +291,30 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
     await hold(page, 0.6);
   } else log("let op: #mName niet gevonden");
 
-  // 6) VOORBEELD: het complete paneel (patroon + kleur + naam) groot en RUSTIG in beeld
+  // 6) VOORBEELD: het complete paneel (patroon + kleur + naam) groot en RUSTIG in beeld.
+  // Langer laten staan zodat de kijker het eindresultaat echt opneemt (was 2.0s).
   mark("preview");
-  await focusOn(page, "#mSvgStage", { zoom: 1.6, topFrac: 0.22, sec: 1.2 });
-  await hold(page, 2.0);
+  await focusOn(page, "#mSvgStage", { zoom: 1.6, topFrac: 0.22, sec: 1.4 });
+  await hold(page, 3.0);
 
   // 7) BEKIJK IN EEN RUIMTE: in situ — kantoor, gevel, balie. Per scene de cursor zichtbaar op de
-  // knop, dan rustig de scene tonen. Eén nette inzoom per scene (geen gespring).
+  // knop, dan RUSTIG de scene tonen. Langere holds (was 0.8/1.5) zodat elke ruimte blijft hangen.
   mark("scenes");
   if (await page.locator("#mScenePick").count().catch(() => 0)) {
     await setZoom(page, 1);
-    await scrollToSel(page, "#mScenePick", H * 0.12, 0.8);
+    await scrollToSel(page, "#mScenePick", H * 0.12, 1.0);
     for (const [val, label] of [["office", "Kantoor"], ["facade", "Gevel"], ["wall", "Balie"]]) {
       const b = page.locator('#mScenePick [data-scene="' + val + '"]').first();
       if (!(await b.count().catch(() => 0))) continue;
       log("ruimte: " + label);
-      await cursorToSel(page, '#mScenePick [data-scene="' + val + '"]', 0.45).catch(() => {});   // cursor op de knop
+      await cursorToSel(page, '#mScenePick [data-scene="' + val + '"]', 0.55).catch(() => {});   // cursor op de knop
       await b.dispatchEvent("click").catch(() => {});
-      await hold(page, 0.8);
-      await focusOn(page, "#mSceneStage", { zoom: 1.25, topFrac: 0.16, sec: 0.9 });               // rustige inzoom op de scene
-      await hold(page, 1.5);
+      await hold(page, 1.1);
+      await focusOn(page, "#mSceneStage", { zoom: 1.25, topFrac: 0.16, sec: 1.1 });               // rustige inzoom op de scene
+      await hold(page, 2.2);
     }
     await setZoom(page, 1);
-    await hold(page, 0.8);
+    await hold(page, 1.0);
   }
 
   mark("end");
