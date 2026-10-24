@@ -13,6 +13,11 @@ h2{font-size:12px;letter-spacing:2px;color:#9b8fc0;text-transform:uppercase;marg
 .seg{display:inline-flex;gap:8px;flex-wrap:wrap}
 .seg button,.chip{background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:20px;padding:7px 12px;font-size:13px;cursor:pointer}
 .seg button.on,.chip.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
+#templates button{display:inline-flex;align-items:center;gap:7px}
+.tplcb{font-size:13px;line-height:1;opacity:.75;cursor:pointer;padding:0 1px;border-radius:4px}
+.tplcb:hover{opacity:1}
+.tplcb.on{opacity:1;color:#39d98a}
+#templates button.on .tplcb.on{color:#1f7a4d}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .acc{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px}
@@ -132,7 +137,8 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
     <div class="sec" id="subjSec"><h2 class="acc" id="subjToggle"><span class="arr">▸</span> 2 · Patroon <span class="hint" style="font-weight:400">(optioneel — engine kiest zelf)</span> <span class="pick" id="subjPick"></span></h2><div id="subjWrap" style="display:none"><div id="subjects"></div><div class="hint" id="subjHint"></div></div></div>
-    <div class="sec" id="tplSec"><h2>3 · Template</h2><div class="seg" id="templates"></div></div>
+    <div class="sec" id="tplSec"><h2>3 · Template <span class="hint" style="font-weight:400">(vink aan voor een selectie-render)</span></h2><div class="seg" id="templates"></div>
+      <div class="row" style="margin-top:8px"><button id="tplAll" class="chip" style="font-size:11px">Alles aan/uit</button><span class="hint" id="tplSelCount"></span></div></div>
     <div class="sec" id="optSec"><h2>4 · Opties</h2><div id="opts"></div></div>
     <div class="sec"><h2>5 · Muziek & formaat</h2>
       <label class="row">Muziek <span style="display:flex;gap:6px;align-items:center"><select id="music"><option value="">(automatisch — op type)</option></select><button id="mprev" title="Beluister" style="background:#1b1430;border:1px solid #3a2f52;color:var(--gold);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:13px">▶</button></span></label>
@@ -141,6 +147,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
       <label class="row">Taal <span class="seg" id="langSeg"><button data-lang="nl" class="on">NL</button><button data-lang="en">EN</button><button data-lang="fr">FR</button></span></label>
     </div>
     <button class="render" id="go" disabled>Kies merk + type</button>
+    <button class="render" id="gosel" style="background:#1b1430;color:var(--gold);border:1px solid var(--gold);margin-top:6px;display:none">Render selectie (0)</button>
     <button class="render" id="goall" style="background:#1b1430;color:var(--gold);border:1px solid var(--gold);margin-top:6px">Render alle types (wachtrij)</button>
   </div>
   <div class="col mid"><div id="player"><div>Je video verschijnt hier<br>na het renderen.</div></div><div id="msg" class="hint"></div></div>
@@ -188,8 +195,12 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const state={brand:null,subject:null,template:null,format:"9:16",music:"",opts:{lang:"nl",palette:"auto",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
+const state={brand:null,subject:null,template:null,selected:new Set(),format:"9:16",music:"",opts:{lang:"nl",palette:"auto",durationSec:24,reveal:"radial",tempo:"normaal",name:"",image:"",base:"confetti",endColorway:true,shapes:["heart","star"]}};
 let BRANDOPTS=[];
+let ALL_TYPES=[];
+// SELECTIE-render: welke types staan aangevinkt. Aanvinken via het vakje op elke template-knop.
+function toggleSel(id,cb){ if(state.selected.has(id)){state.selected.delete(id);cb.textContent='☐';cb.classList.remove('on');} else {state.selected.add(id);cb.textContent='☑';cb.classList.add('on');} updateSelBtn(); }
+function updateSelBtn(){ const n=state.selected?state.selected.size:0; const btn=$('#gosel'); if(btn){ btn.style.display=n?'':'none'; btn.textContent='Render selectie ('+n+')'; } const c=$('#tplSelCount'); if(c)c.textContent=n?(n+' gekozen'):''; }
 
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);box.scrollTop=box.scrollHeight;};}
 
@@ -208,9 +219,19 @@ async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick
     (sj.subjects||[]).forEach(s=>{const b=document.createElement('button');b.className='chip';b.textContent=s.id;b.onclick=()=>{$$('#subjects .chip').forEach(c=>c.classList.remove('on'));b.classList.add('on');state.subject=s.id;$('#subjPick').textContent='— '+s.id;setSubjOpen(false);ready();};sc.appendChild(b);});
     $('#subjHint').textContent='Kies een onderwerp of vul hieronder een naam in.';
   }
-  // templates
-  const tc=$('#templates');tc.innerHTML='';state.template=null;
-  (tp.templates||[]).forEach((t,i)=>{const b=document.createElement('button');b.textContent=t.name;b.onclick=()=>{$$('#templates button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});state.opts.image='';buildOpts();ready();};tc.appendChild(b);if(i===0){b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});}});
+  // templates — klik op de naam = kies voor enkele render; klik op het vinkje = aan/uit voor selectie
+  const tc=$('#templates');tc.innerHTML='';state.template=null;state.selected=new Set();ALL_TYPES=(tp.templates||[]).map(t=>t.id);
+  (tp.templates||[]).forEach((t,i)=>{
+    const b=document.createElement('button');
+    const cb=document.createElement('span');cb.className='tplcb';cb.textContent='☐';cb.title='Aan/uit voor selectie-render';
+    cb.onclick=(ev)=>{ev.stopPropagation();toggleSel(t.id,cb);};
+    const nm=document.createElement('span');nm.textContent=t.name;
+    b.append(cb,nm);
+    b.onclick=()=>{$$('#templates button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});state.opts.image='';buildOpts();ready();};
+    tc.appendChild(b);
+    if(i===0){b.classList.add('on');state.template=t.id;Object.assign(state.opts,t.defaults||{});}
+  });
+  updateSelBtn();
   buildOpts();ready();
 }
 
@@ -275,6 +296,18 @@ $('#goall').onclick=async()=>{const btn=$('#goall');btn.disabled=true;$('#msg').
     $('#msg').textContent=j.queued?(j.queued+' types in de wachtrij — volg het log; de video\'s komen in /out/.'):'Mislukt: '+(j.error||'onbekend');
   }catch(e){$('#msg').textContent='Fout: '+e.message;}
   btn.disabled=false;};
+// Render alleen de aangevinkte types (in de wachtrij).
+$('#gosel').onclick=async()=>{const btn=$('#gosel');const types=[...(state.selected||[])];if(!types.length)return;btn.disabled=true;$('#msg').textContent=types.length+' gekozen type(s) in de wachtrij zetten…';
+  try{const r=await fetch('/api/render-all',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:state.brand,format:state.format,music:state.music,opts:state.opts,types})});
+    const j=await r.json();
+    $('#msg').textContent=j.queued?(j.queued+' type(s) in de wachtrij — volg het log; de video\'s komen in /out/.'):'Mislukt: '+(j.error||'onbekend');
+  }catch(e){$('#msg').textContent='Fout: '+e.message;}
+  btn.disabled=false;};
+// Alles aan/uit: vinkt in één klik alle types aan of allemaal uit.
+$('#tplAll').onclick=()=>{const allOn=state.selected.size>=ALL_TYPES.length;const cbs=$$('#templates .tplcb');
+  if(allOn){state.selected.clear();cbs.forEach(c=>{c.textContent='☐';c.classList.remove('on');});}
+  else{ALL_TYPES.forEach(id=>state.selected.add(id));cbs.forEach((c,i)=>{c.textContent='☑';c.classList.add('on');});}
+  updateSelBtn();};
 // ---- BIBLIOTHEEK ----
 const lib={items:[],brand:'',kind:'',q:'',loaded:false};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
