@@ -65,6 +65,9 @@ const colorStart = m.colorStart ?? D * 0.28;
 const preview = m.preview ?? D * 0.62;
 const scenes = m.scenes ?? D * 0.70;
 const end = m.end ?? D;
+// extra fase-markers (nieuw in de opname) met nette terugval als ze ontbreken
+const patternStart = m.patternStart ?? (m.homepageEnd ?? D * 0.04);
+const nameStart = m.nameStart ?? (colorStart + (preview - colorStart) * 0.72);
 
 // pad zelf opbouwen (NIET de return van mkdirSync gebruiken: die geeft op Windows soms een
 // extended-length pad "\\?\C:\..." terug, en dat breekt het drawtext-filter).
@@ -93,7 +96,8 @@ const hookStart = Math.min(end - 1.8, scenes + 1.0);
 let hookVf = `setpts=PTS,fps=${FPS}`;
 if (CAP1) {
   fs.writeFileSync(seg("cap1.txt"), CAP1);
-  hookVf += `,drawtext=${FONTARG}textfile=cap1.txt:fontsize=62:fontcolor=white:box=1:boxcolor=black@0.42:boxborderw=26:x=(w-text_w)/2:y=h*0.80`;
+  // zelfde sterke, leesbare stijl als de guide-stappen (witte contour + stevige donkere balk)
+  hookVf += `,drawtext=${FONTARG}textfile=cap1.txt:fontsize=50:fontcolor=white:borderw=3:bordercolor=black@0.85:box=1:boxcolor=black@0.62:boxborderw=30:x=(w-text_w)/2:y=h*0.72`;
 }
 ff(["-i", RAW, "-ss", String(hookStart), "-t", "1.6", "-filter:v", hookVf, "-an", "-pix_fmt", "yuv420p", "-c:v", "libx264", seg("hook.mp4")]);
 
@@ -108,22 +112,51 @@ const fc = [];
 fc.push("[1]scale=210:-1[lg]");
 fc.push("[0][lg]overlay=W-w-34:H-h-150:format=auto[v1]");
 let vlab = "[v1]";
-// GUIDE-STAPPEN: begeleid de kijker door de site (1 patroon -> 2 kleuren -> 3 naam -> 4 muur).
-// Verdeeld over de body (op fractie, robuust t.o.v. de snelheids-ramps), onderregel.
+// GUIDE-STAPPEN GESYNCHRONISEERD MET HET BEELD: de oude code plakte de teksten op VASTE fracties
+// (7/34/60/82%), los van wat er op dat moment scrollde -> tekst klopte niet met beeld (Mo's klacht).
+// Nu koppelen we elke stap aan de ECHTE fase-marker uit de opname, omgerekend naar de body-tijdlijn
+// (hook 1.6s vooraan + de 3 versnelde segmenten A/B/C). Zo staat "Kies je patroon" ook écht bij het
+// patroon kiezen, "Kies je kleuren" bij het inkleuren, enz.
+const HOOK_LEN = 1.6;
+const aLen = colorStart / spIntro;                 // body-duur van segment A
+const bLen = (preview - colorStart) / spBuild;     // body-duur van segment B
+// zet een RUW tijdstip (seconden in de originele opname) om naar body-seconden
+function rawToBody(raw) {
+  if (raw <= colorStart) return HOOK_LEN + raw / spIntro;                       // in A
+  if (raw <= preview)    return HOOK_LEN + aLen + (raw - colorStart) / spBuild; // in B
+  return HOOK_LEN + aLen + bLen + Math.max(0, raw - preview) / spFin;           // in C
+}
+// GEMEENSCHAPPELIJKE, GOED LEESBARE caption-stijl: grotere tekst, stevige donkere balk met wat
+// doorzicht (leest op de lichte site), dikke rand, en een dunne witte contourlijn om de letters
+// (borderw) zodat ze nooit wegvallen. Vaste plek net onder het midden (botst niet met de site-koppen
+// bovenin en niet met de prijs-balk onderin).
+const capStyle = (txtfile, t0, t1) =>
+  `drawtext=${FONTARG}textfile=${txtfile}:fontsize=52:fontcolor=white:borderw=3:bordercolor=black@0.85:box=1:boxcolor=black@0.60:boxborderw=28:x=(w-text_w)/2:y=h*0.72:enable='between(t,${t0},${t1})'`;
 if (STEPS.length) {
-  const fracs = [0.07, 0.34, 0.60, 0.82];
+  // elke stap z'n eigen fase-venster (ruw), omgerekend naar body-tijd; tekst staat van het begin
+  // van de fase tot kort erna zichtbaar (niet de hele fase, anders blijft 'ie te lang hangen).
+  const windows = [
+    [patternStart, colorStart],   // 1 · Kies je patroon
+    [colorStart, nameStart],      // 2 · Kies je kleuren
+    [nameStart, preview],         // 3 · Zet je naam erop
+    [scenes, end],                // 4 · Aan je muur
+  ];
   STEPS.slice(0, 4).forEach((txt, i) => {
     if (!txt) return;
     fs.writeFileSync(seg(`st${i}.txt`), String(txt));
-    const t0 = +(bodyDur * (fracs[i] ?? (0.1 + i * 0.25))).toFixed(2), t1 = +(t0 + 2.8).toFixed(2);
-    const nl = `[${vlab.slice(1, -1)}]drawtext=${FONTARG}textfile=st${i}.txt:fontsize=52:fontcolor=white:box=1:boxcolor=black@0.46:boxborderw=22:x=(w-text_w)/2:y=h*0.80:enable='between(t,${t0},${t1})'[vs${i}]`;
-    fc.push(nl); vlab = `[vs${i}]`;
+    const [r0, r1] = windows[i] || [patternStart, end];
+    const b0 = rawToBody(r0 + 0.3);                                  // net ná het begin van de fase
+    const b1 = Math.min(b0 + 3.0, rawToBody(r1));                    // max ~3s zichtbaar, binnen de fase
+    const t0 = +Math.max(0, b0).toFixed(2), t1 = +Math.max(t0 + 1.2, b1).toFixed(2);
+    fc.push(`[${vlab.slice(1, -1)}]${capStyle(`st${i}.txt`, t0, t1)}[vs${i}]`);
+    vlab = `[vs${i}]`;
   });
 }
 if (CAP2) {
   fs.writeFileSync(seg("cap2.txt"), CAP2);
   const t = +(bodyDur - 2.6).toFixed(2);
-  fc.push(`[${vlab.slice(1, -1)}]drawtext=${FONTARG}textfile=cap2.txt:fontsize=58:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=24:x=(w-text_w)/2:y=h*0.12:enable='gte(t,${t})'[v2]`);
+  // eindregel bovenin (onder de site-koppen), zelfde leesbare stijl
+  fc.push(`[${vlab.slice(1, -1)}]drawtext=${FONTARG}textfile=cap2.txt:fontsize=50:fontcolor=white:borderw=3:bordercolor=black@0.85:box=1:boxcolor=black@0.62:boxborderw=28:x=(w-text_w)/2:y=h*0.14:enable='gte(t,${t})'[v2]`);
   vlab = "[v2]";
 }
 const args = ["-i", seg("body.mp4"), "-i", LOGO];

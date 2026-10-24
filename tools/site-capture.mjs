@@ -66,6 +66,59 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
     return true;
   }, (Array.isArray(needles) ? needles : [needles]).map((s) => s.toLowerCase()));
 
+  // ---- ZICHTBARE CURSOR: een zwevende aanwijzer in de pagina, zodat de kijker ZIET dat er
+  // geklikt wordt (de echte klik gaat nog steeds via dispatchEvent, dit is puur beeld). We
+  // injecteren 'm één keer en bewegen 'm vloeiend naar het doel, met een klik-rimpel.
+  const cursorInit = async (page) => page.evaluate(() => {
+    if (document.getElementById("__wtcur")) return;
+    const c = document.createElement("div"); c.id = "__wtcur";
+    c.style.cssText = "position:fixed;left:0;top:0;width:26px;height:26px;z-index:2147483647;pointer-events:none;transition:none;will-change:transform;transform:translate(-100px,-100px)";
+    c.innerHTML = '<svg width="26" height="26" viewBox="0 0 26 26"><path d="M2 2 L2 20 L7 15 L11 23 L14 22 L10 14 L17 14 Z" fill="#fff" stroke="#1a1327" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    document.body.appendChild(c);
+    const r = document.createElement("div"); r.id = "__wtrip";
+    r.style.cssText = "position:fixed;left:0;top:0;width:34px;height:34px;border-radius:50%;z-index:2147483646;pointer-events:none;border:2px solid #d6b35a;opacity:0;transform:translate(-100px,-100px) scale(0.3)";
+    document.body.appendChild(r);
+  });
+  // viewport-positie (midden) van een element, rekening houdend met document.zoom
+  const centerOf = async (page, sel) => page.evaluate((s) => {
+    const el = document.querySelector(s); if (!el) return null;
+    const z = parseFloat(document.documentElement.style.zoom || "1") || 1;
+    const r = el.getBoundingClientRect();
+    return { x: (r.left + r.width / 2) * z, y: (r.top + r.height / 2) * z };
+  }, sel);
+  const cursorSet = async (page, x, y) => page.evaluate(([X, Y]) => { const c = document.getElementById("__wtcur"); if (c) c.style.transform = `translate(${X}px,${Y}px)`; }, [x, y]);
+  // beweeg de cursor vloeiend van z'n huidige plek naar (x,y) over sec seconden (filmt mee)
+  let curX = W / 2, curY = H / 2;
+  const cursorMove = async (page, x, y, sec = 0.5) => {
+    const n = Math.max(1, Math.round((sec || 0.5) * FPS)), fx = curX, fy = curY;
+    for (let i = 0; i < n; i++) { const k = ease(i / (n - 1 || 1)); await cursorSet(page, fx + (x - fx) * k, fy + (y - fy) * k); await shot(page); }
+    curX = x; curY = y;
+  };
+  // klik-rimpel op de cursor-plek (beeld); de echte klik doet de caller via dispatchEvent
+  const cursorTap = async (page, sec = 0.22) => {
+    await page.evaluate(([X, Y]) => { const r = document.getElementById("__wtrip"); if (r) { r.style.transition = "none"; r.style.transform = `translate(${X - 4}px,${Y - 4}px) scale(0.3)`; r.style.opacity = "0.9"; requestAnimationFrame(() => { r.style.transition = "transform .22s ease-out,opacity .22s ease-out"; r.style.transform = `translate(${X - 4}px,${Y - 4}px) scale(1.5)`; r.style.opacity = "0"; }); } }, [curX, curY]);
+    await hold(page, sec);
+  };
+  // beweeg cursor naar een selector + tik (puur beeld); geeft terug of het element bestond
+  const cursorToSel = async (page, sel, moveSec = 0.5) => {
+    const p = await centerOf(page, sel); if (!p) return false;
+    await cursorMove(page, p.x, p.y, moveSec); await cursorTap(page); return true;
+  };
+
+  // ---- FOCUS OP ÉÉN ELEMENT: scroll + zoom zo dat dit element groot en rustig in beeld staat.
+  // Vervangt het heen-en-weer tussen vaste zooms: we richten de "camera" op wat er nu toe doet.
+  const focusOn = async (page, sel, { zoom = 1.6, topFrac = 0.30, sec = 1.0 } = {}) => {
+    await setZoom(page, 1);                                   // meet op ware grootte
+    const y = await yOf(page, sel); if (y == null) return false;
+    await scrollToY(page, Math.max(0, y - H * topFrac), sec * 0.6);
+    // zoom vloeiend op (een paar tussenstappen) i.p.v. een harde sprong
+    const steps = Math.max(1, Math.round(sec * 0.4 * FPS));
+    for (let i = 1; i <= steps; i++) { await setZoom(page, 1 + (zoom - 1) * ease(i / steps)); await shot(page); }
+    // na het inzoomen het element terug netjes in beeld schuiven
+    const y2 = await yOf(page, sel); if (y2 != null) await scrollToY(page, Math.max(0, y2 - H * (topFrac / zoom)), 0.4);
+    return true;
+  };
+
   // sandbox-vriendelijke launch; op jouw laptop pakt-ie de standaard chromium.
   const launchOpts = { headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] };
   if (process.env.PW_CHROME) { launchOpts.executablePath = process.env.PW_CHROME; launchOpts.ignoreDefaultArgs = ["--headless"]; launchOpts.args.unshift("--headless=new"); }
@@ -90,40 +143,38 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   }
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await hold(page, 1.0);
+  await cursorInit(page);
+  await hold(page, 0.6);
 
-  // 1) HOMEPAGE rustig doorscrollen langs de secties
-  log("scroll homepage");
-  const H1 = await page.evaluate(() => document.body.scrollHeight);
-  const stops = [];
-  for (const sel of ["#voorbeelden", "#videos"]) { const y = await yOf(page, sel); if (y != null) stops.push(Math.max(0, y - H * 0.15)); }
-  if (!stops.length) { stops.push(H1 * 0.30, H1 * 0.55); }
-  for (const s of stops) { await scrollToY(page, s, 2.2); await hold(page, 1.0); }
-  mark("homepageEnd");
-
-  // 2) naar de CONFIGURATOR
-  log("naar configurator");
-  if (!(await scrollToSel(page, "#ontwerpen", H * 0.06, 2.0))) await scrollToSel(page, "#studio", H * 0.06, 2.0);
-  await hold(page, 0.8);
+  // 1) GEEN homepage-rondleiding meer (die kostte alleen tijd en toonde niet het ontwerpen).
+  // We gaan DIRECT naar de configurator — dat is waar de walkthrough over gaat.
+  log("direct naar configurator");
+  if (!(await scrollToSel(page, "#ontwerpen", H * 0.06, 1.2))) await scrollToSel(page, "#studio", H * 0.06, 1.2);
+  mark("homepageEnd");   // behouden als marker-naam voor finish.mjs (= begin configurator)
+  await hold(page, 0.6);
 
   // 3) PATROON kiezen — eerst een willekeurige CATEGORIE openen (anders zijn de meeste
   //    patronen verborgen: in de code staat .patgrid{display:none}, alleen .open staat in
   //    beeld), daarna een willekeurig patroon uit die geopende categorie. Zo zijn ALLE
   //    patronen bereikbaar en roteert het patroon echt per run.
+  mark("patternStart");
   await expandAcc(page, ["patroon", "pattern"]);
-  await hold(page, 0.5);
+  await hold(page, 0.4);
+  // FOCUS op het patroon-keuzegebied (rustige, grote uitsnede op wat er nu toe doet).
+  await focusOn(page, "#mPattern", { zoom: 1.35, topFrac: 0.14, sec: 1.0 });
   const cats = page.locator("#mPattern .patcat");
   const ncat = await cats.count().catch(() => 0);
   log("patroon-categorieen: " + ncat);
   const fieldTiles = page.locator("#mSvgStage .pfield polygon, #mSvgStage .pfield path, #mSvgStage .pfield rect");
-  let patternOk = false;
+  let patternOk = false, lastPatSig = null;
   for (let attempt = 0; attempt < 5 && !patternOk; attempt++) {
     if (ncat) {                                  // open een (nieuwe) willekeurige categorie
       const ci = Math.floor(Math.random() * ncat);
       log("  categorie #" + ci);
       await cats.nth(ci).scrollIntoViewIfNeeded().catch(() => {});
+      await cursorToSel(page, `#mPattern .patcat:nth-of-type(${ci + 1})`, 0.45).catch(() => {});   // cursor naar de categorie
       await cats.nth(ci).click({ force: true }).catch(() => {});
-      await hold(page, 0.6);
+      await hold(page, 0.5);
     }
     let pat = page.locator("#mPattern .patgrid.open .patbtn");
     let npat = await pat.count().catch(() => 0);
@@ -132,13 +183,14 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
     const pk = Math.floor(Math.random() * npat);
     log("  -> patroon #" + pk + " (van " + npat + " in categorie)");
     await pat.nth(pk).scrollIntoViewIfNeeded().catch(() => {});
-    await hold(page, 0.3);
+    // CURSOR zichtbaar naar de gekozen patroon-knop bewegen en tikken (beeld), dan echt klikken.
+    try { const bb = await pat.nth(pk).boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.5); await cursorTap(page); } } catch {}
     await pat.nth(pk).click({ force: true }).catch(() => {});
     const n = await waitCount(fieldTiles, 18, 400);   // wacht tot de tegels gerenderd zijn (max ~7s)
     if (n > 0) { log("  tegels gerenderd: " + n); patternOk = true; }
     else log("  geen tegels, andere categorie/patroon...");
   }
-  await hold(page, 1.2);
+  await hold(page, 1.0);
 
   // 4) INKLEUREN — betrouwbaar: we klikken NIET op schermcoordinaten (die liepen weg bij
   //    re-render/scroll en raakten soms de formaat-balk), maar sturen de klik rechtstreeks
@@ -149,8 +201,8 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   log("inkleur-modus: " + mode);
   mark("colorStart");
 
-  await setZoom(page, 1.7);                              // INZOOMEN op de live preview = eyecatcher
-  await scrollToSel(page, "#mSvgStage", H * 0.26, 1.2);
+  // FOCUS op de live preview + het palet (dat is de hero: hier gebeurt het inkleuren).
+  await focusOn(page, "#mSvgStage", { zoom: 1.6, topFrac: 0.24, sec: 1.1 });
 
   let sw = page.locator(".tilesw");
   let nsw = await waitCount(sw, 30, 400);                 // ruim wachten tot de palet-strip er is (~12s)
@@ -161,7 +213,14 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   const palN = Math.min(5, Math.max(3, nsw || 3));
   const palStart = nsw > palN ? Math.floor(Math.random() * (nsw - palN)) : 0;
   const palIdx = Array.from({ length: palN }, (_, i) => palStart + i);
-  const pickCol = async () => { if (nsw) await sw.nth(palIdx[Math.floor(Math.random() * palIdx.length)]).dispatchEvent("click").catch(() => {}); };  // samenhangend
+  // kies een swatch; met showCursor=true beweegt de zichtbare cursor er eerst heen + tikt
+  // (zodat de kijker ZIET dat er een kleur gekozen wordt). De echte selectie blijft dispatchEvent.
+  const pickCol = async (showCursor = false) => {
+    if (!nsw) return;
+    const idx = palIdx[Math.floor(Math.random() * palIdx.length)];
+    if (showCursor) { try { const bb = await sw.nth(idx).boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.4); await cursorTap(page, 0.12); } } catch {} }
+    await sw.nth(idx).dispatchEvent("click").catch(() => {});
+  };
   const tileSel = "#mSvgStage .pfield polygon, #mSvgStage .pfield path, #mSvgStage .pfield rect";
   const nt = await waitCount(page.locator(tileSel), 20, 400);
   log("kleuren: " + nsw + " swatches, " + nt + " tegels");
@@ -174,12 +233,19 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   if (await cmGroup.count().catch(() => 0)) { await cmGroup.dispatchEvent("click").catch(() => {}); await hold(page, 0.5); }
   const sigs = await page.$$eval(tileSel, (els) => [...new Set(els.map((e) => e.getAttribute("data-sig")).filter(Boolean))]).catch(() => []);
   log("groepen: " + sigs.length);
+  let gi = 0;
   for (const sig of sigs.slice(0, 40)) {
-    await pickCol();
-    await page.locator('#mSvgStage .pfield [data-sig="' + sig + '"]').first().dispatchEvent("click").catch(() => {});
-    await hold(page, sigs.length <= 10 ? 0.5 : 0.28);
+    // de eerste paar keer de cursor zichtbaar een kleur laten pakken + naar de groep bewegen,
+    // zodat de kijker het mechanisme SNAPT; daarna vlotter door (anders te traag/te lang).
+    const showIt = gi < 3;
+    await pickCol(showIt);
+    const grp = page.locator('#mSvgStage .pfield [data-sig="' + sig + '"]').first();
+    if (showIt) { try { const bb = await grp.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.4); await cursorTap(page, 0.12); } } catch {} }
+    await grp.dispatchEvent("click").catch(() => {});
+    await hold(page, sigs.length <= 10 ? 0.45 : 0.24);
+    gi++;
   }
-  await hold(page, 1.2);
+  await hold(page, 1.0);
 
   // 4b) alleen DETAIL: tegel-voor-tegel verfijnen (veeg boven->onder), op het al volle paneel.
   if (mode === "detail") {
@@ -191,17 +257,22 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
     const STEP = Math.max(1, Math.round(order.length / Math.max(1, want)));
     let c = 0;
     for (let i = 0; i < order.length; i += STEP) {
-      if (c % 3 === 0) await pickCol();
-      await page.locator('#mSvgStage .pfield [data-tid="' + order[i] + '"]').first().dispatchEvent("click").catch(() => {});
+      if (c % 3 === 0) await pickCol(c < 4);   // eerste paar kleurkeuzes zichtbaar met de cursor
+      const tile = page.locator('#mSvgStage .pfield [data-tid="' + order[i] + '"]').first();
+      // de cursor volgt elke ~5e tegel (anders te veel beweging/te traag), zodat het leest als
+      // "tegel voor tegel met de hand ingekleurd" i.p.v. kleuren die vanzelf verschijnen.
+      if (c % 5 === 0) { try { const bb = await tile.boundingBox(); if (bb) { const z = await page.evaluate(() => parseFloat(document.documentElement.style.zoom || "1") || 1); await cursorMove(page, (bb.x + bb.width / 2) * z, (bb.y + bb.height / 2) * z, 0.14); } } catch {} }
+      await tile.dispatchEvent("click").catch(() => {});
       await hold(page, 0.07);
       c++;
     }
-    await hold(page, 1.4);
+    await hold(page, 1.2);
   }
   } // einde inkleur-blok (alleen uitgevoerd als er swatches waren)
   mark("colorEnd");
 
   // 5) NAAM typen — nu pas, op het al ingekleurde paneel. Accordion "Jouw tekst" openklappen.
+  mark("nameStart");
   await setZoom(page, 1);                                // uitzoomen zodat het naamveld bereikbaar is
   await expandAcc(page, ["tekst", "text"]);
   await hold(page, 0.4);
@@ -209,37 +280,38 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   if (await nm.count().catch(() => 0)) {
     log("typ naam: " + NAME);
     await nm.scrollIntoViewIfNeeded().catch(() => {});
-    await hold(page, 0.4);
+    // FOCUS op het naamveld + de cursor er zichtbaar heen bewegen en erin "klikken".
+    await focusOn(page, "#mName", { zoom: 1.5, topFrac: 0.26, sec: 0.9 });
+    await cursorToSel(page, "#mName", 0.5).catch(() => {});
     await nm.click().catch(() => {});
     await nm.fill("").catch(() => {});
     for (const ch of NAME) { await nm.type(ch, { delay: 0 }).catch(() => {}); await shot(page); await shot(page); await shot(page); }
-    await hold(page, 0.5);
+    await hold(page, 0.6);
   } else log("let op: #mName niet gevonden");
 
-  // 6) VOORBEELD: het complete paneel (patroon + kleur + naam) groot in beeld
+  // 6) VOORBEELD: het complete paneel (patroon + kleur + naam) groot en RUSTIG in beeld
   mark("preview");
-  await setZoom(page, 1.7);
-  await scrollToSel(page, "#mSvgStage", H * 0.24, 1.4);
-  await hold(page, 1.9);
-  await setZoom(page, 1);
+  await focusOn(page, "#mSvgStage", { zoom: 1.6, topFrac: 0.22, sec: 1.2 });
+  await hold(page, 2.0);
 
-  // 7) BEKIJK IN EEN RUIMTE: in situ — kantoor, gevel, balie — per scene INZOOMEN op het voorbeeld
+  // 7) BEKIJK IN EEN RUIMTE: in situ — kantoor, gevel, balie. Per scene de cursor zichtbaar op de
+  // knop, dan rustig de scene tonen. Eén nette inzoom per scene (geen gespring).
   mark("scenes");
   if (await page.locator("#mScenePick").count().catch(() => 0)) {
+    await setZoom(page, 1);
+    await scrollToSel(page, "#mScenePick", H * 0.12, 0.8);
     for (const [val, label] of [["office", "Kantoor"], ["facade", "Gevel"], ["wall", "Balie"]]) {
       const b = page.locator('#mScenePick [data-scene="' + val + '"]').first();
       if (!(await b.count().catch(() => 0))) continue;
       log("ruimte: " + label);
-      await setZoom(page, 1);
-      await scrollToSel(page, "#mSceneStage", H * 0.18, 0.8);
+      await cursorToSel(page, '#mScenePick [data-scene="' + val + '"]', 0.45).catch(() => {});   // cursor op de knop
       await b.dispatchEvent("click").catch(() => {});
-      await hold(page, 1.0);                     // de volle scene tonen (paneel netjes op de muur)
-      await setZoom(page, 1.2);                  // lichte inzoom — paneel blijft realistisch op de muur
-      await scrollToSel(page, "#mSceneStage", H * 0.16, 1.0);
-      await hold(page, 1.6);
+      await hold(page, 0.8);
+      await focusOn(page, "#mSceneStage", { zoom: 1.25, topFrac: 0.16, sec: 0.9 });               // rustige inzoom op de scene
+      await hold(page, 1.5);
     }
     await setZoom(page, 1);
-    await hold(page, 1.0);
+    await hold(page, 0.8);
   }
 
   mark("end");
