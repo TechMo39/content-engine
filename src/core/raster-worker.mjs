@@ -14,11 +14,18 @@ try {
   FONT_FILES = readdirSync(dir).filter((f) => /\.(ttf|otf|ttc)$/i.test(f)).map((f) => path.join(dir, f));
 } catch { FONT_FILES = []; }
 
+// SNELHEID: loadSystemFonts liet resvg bij ELK frame (1000+ per video) de hele Windows-
+// fontmap doorzoeken — puur verspilde tijd, want de fonts wisselen nooit tussen frames.
+// Onze eigen fonts (fontFiles hierboven) dekken alle merk-tekst; generieke namen in de SVG
+// ("DejaVu Serif, serif") levert resvg zelf. Daarom systeem-fonts UIT -> fors sneller,
+// over ALLE video-types. Lijken letters ooit verkeerd: zet loadSystemFonts terug op true.
+const FONT_OPT = { loadSystemFonts: false, fontFiles: FONT_FILES };
+
 parentPort.on("message", (m) => {
   try {
     const png = new Resvg(m.svg, {
       fitTo: { mode: "width", value: m.width },
-      font: { loadSystemFonts: true, fontFiles: FONT_FILES },
+      font: FONT_OPT,
     }).render().asPng();
     writeFileSync(m.out, png);
     parentPort.postMessage({ frame: m.frame });
