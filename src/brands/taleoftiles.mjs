@@ -781,7 +781,15 @@ export function makeBrand({ ROOT, config }) {
     if (!prep.length) throw new Error("satisfying: geen patronen");
     const bandTop = Math.round(H * 0.175), bandBot = Math.round(H * 0.90);
     const rectFor = (aspect) => { let h = bandBot - bandTop, w = Math.round(h * aspect); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / aspect); } return { x: Math.round((W - w) / 2), y: Math.round(H * 0.52 - h / 2), w, h }; };
-    const Tseg = durSec / nSeg, Tx = Math.min(0.7, Tseg * 0.06);
+    // SECONDE-1 HOOK (algoritme): open NIET met een leeg bord. Toon heel kort het VOLLE ingekleurde
+    // eindbeeld (de climax), kleur het dan razendsnel leeg -> de kijker weet meteen "dit patroon
+    // gaat ingekleurd worden" en blijft kijken hóe. Daarna start de normale opbouw. Alleen bij de
+    // allereerste seconde. De opbouw-tijdlijn loopt over de resterende duur (durEff) zodat het
+    // laatste segment netjes binnen de video valt.
+    const HOOK = Math.min(1.1, durSec * 0.07);   // ~0.8-1.1s
+    const HOLD = HOOK * 0.38;                     // eerst het volle beeld even vasthouden
+    const durEff = Math.max(1, durSec - HOOK);
+    const Tseg = durEff / nSeg, Tx = Math.min(0.7, Tseg * 0.06);
     const Tfill = Tseg * 0.70;   // rustig opbouwen is de hoofdmoot, dan een royale payoff-hold
     function fillColors(P, tl) {
       return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: Tfill, buildSec: Tfill, buildStart: 0, popSec: 0.05 }, tl);
@@ -799,7 +807,23 @@ export function makeBrand({ ROOT, config }) {
     }
     function sceneAt(frame) {
       const t = frame / FPS;
-      const seg = Math.min(nSeg - 1, Math.floor(t / Tseg)), tl = t - seg * Tseg;
+      // HOOK-venster: vol eindbeeld -> razendsnel leegkleuren. Daarna loopt de echte tijdlijn
+      // (t_eff) gewoon vanaf 0, dus de opbouw verandert verder niets.
+      if (t < HOOK) {
+        const P0 = prep[0];
+        // 0..HOLD: vol vasthouden; HOLD..HOOK: leegkleuren (fill achteruit afgespeeld)
+        const dk = t < HOLD ? 1 : 1 - smooth((t - HOLD) / (HOOK - HOLD));   // 1=vol -> 0=leeg
+        const cols = film.flowColorsAt(P0.parsed, { palette: P0.palArr, durSec: 1, buildSec: 1, buildStart: 0, popSec: 0.05 }, dk);
+        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.06 * (1 - dk), { x: 0, y: 0 });
+        let overlayH = "";
+        if (name && t < HOLD + (HOOK - HOLD) * 0.5) {
+          const r = rectFor(P0.aspect), op = t < HOLD ? 1 : 1 - smooth((t - HOLD) / ((HOOK - HOLD) * 0.5));
+          if (op > 0.01) overlayH += `<g opacity="${op.toFixed(3)}">${platePlace(name, P0.np, r.x + r.w / 2, r.y + r.h / 2, Math.round(r.h * 0.17), r.w * 0.9)}</g>`;
+        }
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
+      }
+      const tEff = t - HOOK;
+      const seg = Math.min(nSeg - 1, Math.floor(tEff / Tseg)), tl = tEff - seg * Tseg;
       let inner = "";
       if (seg > 0 && tl < Tx) { const P0 = prep[seg - 1]; inner += drawPanel(P0, P0.finalCols, "sp" + (seg - 1), 1 - smooth(tl / Tx)); }
       const P = prep[seg];
@@ -832,10 +856,10 @@ export function makeBrand({ ROOT, config }) {
         }
       }
       if (storyBeats.length) {
-        const tA = 0.5, tB = Math.min(durSec * 0.5, Tfill * 0.9), n = storyBeats.length, slot = (tB - tA) / n, fade = Math.min(0.6, slot * 0.3);
+        const tA = 0.5, tB = Math.min(durEff * 0.5, Tfill * 0.9), n = storyBeats.length, slot = (tB - tA) / n, fade = Math.min(0.6, slot * 0.3);
         for (let i = 0; i < n; i++) {
           const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0;
-          if (t >= s0 && t < s1) { if (t < s0 + fade) bo = smooth((t - s0) / fade); else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade); else bo = 1; }
+          if (tEff >= s0 && tEff < s1) { if (tEff < s0 + fade) bo = smooth((tEff - s0) / fade); else if (tEff > s1 - fade) bo = 1 - smooth((tEff - (s1 - fade)) / fade); else bo = 1; }
           if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower");
         }
       }
@@ -859,11 +883,22 @@ export function makeBrand({ ROOT, config }) {
     const b = await getBase(pid), lock = LOCKS[pid] || {};
     const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
     const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
-    // 3 contrasterende families (uit 3 verschillende kleurgroepen) -> duidelijk andere kleurwegen
+    // DRIE DUIDELIJK VERSCHILLENDE KLEURWEGEN (Mo: de oude combinaties waren te saai, alle 3 leken
+    // op elkaar omdat ze alleen uit tonale families kwamen). Nu bewust 3 contrasterende KARAKTERS,
+    // zoals de 3 mail-stijlen: één warm-tonaal, één koel-tonaal, en één BONT/kleurrijk (bont/feest,
+    // 12 kleuren) die echt knalt -> de keuze "welke vind jij?" wordt pas interessant als de 3 echt
+    // van elkaar verschillen.
     const _cpool = familyPool(opts);
     const _cauto = !(["warm", "cool", "koel"].includes(opts.palette || ""));
     let fams;
-    if (_cauto) { const cwGroups = [["kobalt", "mono_blauw", "oceaan"], ["smaragd", "mono_groen"], ["terracotta", "saffraan"], ["aubergine"]]; const cwPick = (a) => a[Math.floor(Math.random() * a.length)]; fams = cwGroups.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(cwPick); }
+    if (_cauto) {
+      const warmG = ["terracotta", "saffraan", "aubergine"];
+      const coolG = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen"];
+      const vividG = ["bont", "feest"];
+      const pick = (a) => a[Math.floor(Math.random() * a.length)];
+      // vaste volgorde warm -> koel -> bont, elk z'n eigen groep -> altijd 3 echt andere karakters
+      fams = [pick(warmG), pick(coolG), pick(vividG)].sort(() => Math.random() - 0.5);
+    }
     else { const sh = _cpool.slice().sort(() => Math.random() - 0.5); fams = [sh[0], sh[1 % sh.length], sh[2 % sh.length]]; }
     const pals3 = fams.map((f) => film.GLAZE_FAMILIES[f]);
     const finals = pals3.map((p) => film.flowColorsAt(parsed, { palette: p, durSec: 1, buildSec: 1, buildStart: 0 }, 1000));
@@ -1082,7 +1117,12 @@ export function makeBrand({ ROOT, config }) {
       if (name && P.np) { nm = platePlace(name, P.np, cx, cy, Math.round(wH * 0.18), wW * 0.9); }
       return room + shadow + deco + panel + nm;
     }
-    const Ta = durSec / 3;
+    // SECONDE-1 HOOK (Mo): begin NIET met lege slots die opbouwen, maar toon heel kort de 3
+    // AFGEWERKTE, ingekleurde patronen naast elkaar (de climax/keuze), dan start de normale
+    // reeks (slot voor slot opbouwen). "Welke vind jij?" werkt pas als je ze meteen ziet.
+    const THOOK = Math.min(1.0, durSec * 0.06);
+    const durEff = Math.max(1, durSec - THOOK);
+    const Ta = durEff / 3;
     // Captions ÉÉN keer kiezen (RVlang = Math.random) -> niet per frame, anders flikkert de tekst.
     const openTxt = RVlang({ nl: ["Eén naam, drie stijlen", "Dezelfde naam, drie keer anders", "Drie ontwerpen, één naam"], en: ["One name, three styles", "Same name, three looks", "Three designs, one name"], fr: ["Un nom, trois styles", "Même nom, trois styles", "Trois designs, un nom"] }, lang);
     const ctaMain = RVlang({ nl: ["Welke vind jij het mooiste?", "Welke zou jij ophangen?", "A, B of C?"], en: ["Which one's your favourite?", "Which would you hang?", "A, B or C?"], fr: ["Lequel préférez-vous ?", "Lequel accrocheriez-vous ?", "A, B ou C ?"] }, lang);
@@ -1094,7 +1134,17 @@ export function makeBrand({ ROOT, config }) {
       return film.flowColorsAt(P.parsed, { palette: P.palArr, durSec: be - bs, buildSec: be - bs, buildStart: 0 }, t - bs);
     }
     function sceneAt(frame) {
-      const t = frame / FPS;
+      const tAbs = frame / FPS;
+      // HOOK-venster: de 3 afgewerkte patronen meteen in beeld, dan start de echte reeks.
+      if (tAbs < THOOK) {
+        let innerH = "";
+        for (let j = 0; j < 3; j++) innerH += drawPanel(prep[j].parsed, prep[j].finalCols, slotRect(j, prep[j].aspect), "th" + j, true);
+        let overlayH = "";
+        const op = tAbs < THOOK * 0.6 ? 1 : 1 - smooth((tAbs - THOOK * 0.6) / (THOOK * 0.4));
+        if (op > 0.01) overlayH += captionOverlay(openTxt, null, W, H, op, "lower");
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
+      }
+      const t = tAbs - THOOK;
       const a = Math.min(2, Math.floor(t / Ta)), f = (t - a * Ta) / Ta;
       let featureK, wallK;
       if (f < 0.14) { featureK = 0; wallK = 0; }
