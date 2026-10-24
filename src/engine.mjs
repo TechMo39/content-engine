@@ -351,8 +351,12 @@ const server = http.createServer(async (req, res) => {
       const bd = await readBody(req);
       const brand = reg.byId[bd.brand];
       if (!brand) { json(res, { error: "onbekend merk" }, 400); return; }
+      // SELECTIE: stuurt de UI een lijst type-id's mee (bd.types), dan renderen we ALLEEN die,
+      // in de volgorde van het template-lijstje. Geen (of lege) lijst = alle types (zoals voorheen).
+      const want = Array.isArray(bd.types) && bd.types.length ? new Set(bd.types) : null;
+      const sel = want ? brand.templates.filter((t) => want.has(t.id)) : brand.templates;
       let n = 0;
-      for (const t of brand.templates) {
+      for (const t of sel) {
         // Per-type max-duur: kies je bv. 45s voor "render alles", dan worden de types die
         // alleen REKKEN (en dus sloom worden bij lange duur) automatisch kort gehouden; de
         // types die juist MEER brengen bij langere duur pakken gewoon je gekozen duur.
@@ -362,7 +366,7 @@ const server = http.createServer(async (req, res) => {
         enqueue({ brand: bd.brand, subject: bd.subject || null, template: t.id, format: bd.format || "9:16", music: bd.music || "", opts });
         n++;
       }
-      log(`▶ wachtrij: ${n} types toegevoegd — ze worden één voor één gemaakt`);
+      log(`▶ wachtrij: ${n} ${want ? "gekozen " : ""}type${n === 1 ? "" : "s"} toegevoegd — ze worden één voor één gemaakt`);
       json(res, { queued: n });
       return;
     }
