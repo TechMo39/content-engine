@@ -238,7 +238,10 @@ function captionOverlay(main, kicker, W, H, op, pos = "lower") {
   const rise = (1 - O) * (H * 0.012);   // komt heel licht omhoog zetten
   let cy;
   if (pos === "top") cy = Math.round(H * 0.15);
-  else cy = Math.round(H * 0.815);
+  // Onderregel hoger gezet (was 0.815): op YouTube Shorts plakt de account-balk + analytics
+  // onderin over ~78%+ heen, waardoor de tekst daar onleesbaar werd. Op 0.72 zit 'ie boven die
+  // balk, en op Instagram/Facebook (waar onderin al vrij was) blijft 'ie gewoon netjes zichtbaar.
+  else cy = Math.round(H * 0.72);
   const blockH = (kicker ? kfs + fs * 0.5 : 0) + 10 + lh * lines.length;
   let y = cy - blockH / 2 + rise;
   let out = "";
@@ -246,7 +249,7 @@ function captionOverlay(main, kicker, W, H, op, pos = "lower") {
   if (pos !== "top") {
     out += `<defs><linearGradient id="capscrim" x1="0" y1="0" x2="0" y2="1">`
       + `<stop offset="0" stop-color="#0a0712" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="${(0.62 * O).toFixed(3)}"/></linearGradient></defs>`
-      + `<rect x="0" y="${Math.round(H * 0.66)}" width="${W}" height="${Math.round(H * 0.34)}" fill="url(#capscrim)"/>`;
+      + `<rect x="0" y="${Math.round(H * 0.56)}" width="${W}" height="${Math.round(H * 0.44)}" fill="url(#capscrim)"/>`;
   }
   out += `<g opacity="${O.toFixed(3)}" text-anchor="middle">`;
   if (kicker) {
@@ -1758,7 +1761,10 @@ export function makeBrand({ ROOT, config }) {
   // scale-transforms die resvg laten crashen).
   async function makeDrosteRender({ opts = {}, format = "9:16" }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24;
+    // SNELHEID: droste tekent per frame meerdere vector-lagen; supersampling (SS=2 = alles op
+    // dubbele resolutie) is daarbij de zwaarste kostenpost. Bij een continu BEWEGENDE inzoom zie
+    // je het verschil tussen SS=1 en SS=2 nauwelijks, dus SS=1 -> ~4x minder rasterwerk.
+    const SS = 1, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
     let durSec = resolveDuration(opts);   // wordt gesnapt op hele tunnel-cycli (naadloze loop)
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
@@ -1781,7 +1787,7 @@ export function makeBrand({ ROOT, config }) {
     // dicht mogelijk bij een doel-plek (niet-centraal, zodat de camera een kant op valt) ligt, en
     // lezen zijn ECHTE grootte uit het patroon -> het venster is exact één tegel groot (klopt met
     // "op ware tegel-grootte, bij de start onzichtbaar klein"), geen zelf-gekozen vierkant vak.
-    const TCX_AIM = 0.32, TCY_AIM = 0.40;   // doel-plek voor het venster-tegeltje (patroon-fractie)
+    const TCX_AIM = 0.5, TCY_AIM = 0.5;   // venster-tegel zo centraal mogelijk (iris in het midden)
     const specs = [];
     for (let i = 0; i < NP; i++) {
       const pid = pats[i], base = await getBase(pid), lock = LOCKS[pid] || {};
@@ -1790,17 +1796,23 @@ export function makeBrand({ ROOT, config }) {
       const palArr = film.GLAZE_FAMILIES[famKeys[i % famKeys.length]] || film.PAL;
       const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
       const pw = parsed.view[2], ph = parsed.view[3];
-      // Tegel-grootte schatten uit het aantal tegels en het paneel-oppervlak (de tegels zelf
-      // hebben geen expliciete breedte in de parse; nx/ny zijn 0..1 middelpunten). Zo weten we
-      // hoe groot één tegel als fractie van het paneel is -> dat wordt de venster-grootte.
-      const nTiles = Math.max(1, parsed.tiles.length);
-      const tileFr = Math.max(0.06, Math.min(0.22, Math.sqrt((PANEL_ASPECT) / nTiles) * 1.15));
-      // kies de tegel het dichtst bij de doel-plek
-      let bt = parsed.tiles[0], bd = 1e9;
-      for (const tl of parsed.tiles) { const dx = tl.nx - TCX_AIM, dy = tl.ny - TCY_AIM, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; } }
-      // venster = vierkant-in-paneelfractie rond het tegel-middelpunt, exact één tegel groot.
-      // In paneel-fractie: breedte = tileFr; hoogte zo dat het in echte px ~vierkant is.
-      const CWv = tileFr, CHv = tileFr * PANEL_ASPECT;   // *aspect: paneel is hoger dan breed -> fractie-hoogte groter
+      // ECHTE tegel-grootte uit de data: het venster MOET exact één mozaïek-tegel groot zijn,
+      // zodat het volgende patroon bij de start onzichtbaar klein is (het is gewoon één tegel in
+      // het patroon dat je ziet) en pas tevoorschijn komt als de camera er diep in zoomt — het
+      // iris-effect. GEEN kunstmatig minimum/opgeblazen vierkant (dat liet patroon 2 al als blokje
+      // zien, fout). We meten de typische afstand tussen een tegel en z'n dichtstbijzijnde buur
+      // (in nx/ny-fractie): dat IS de tegelgrootte als paneel-fractie.
+      const tl0 = parsed.tiles;
+      // kies de tegel het dichtst bij de doel-plek (niet-centraal, zodat de camera een kant op valt)
+      let bt = tl0[0], bd = 1e9, bi = 0;
+      for (let q = 0; q < tl0.length; q++) { const tl = tl0[q]; const dx = tl.nx - TCX_AIM, dy = tl.ny - TCY_AIM, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; bi = q; } }
+      // afstand van die tegel tot z'n dichtstbijzijnde buur = de tegel-pitch (fractie van paneel)
+      let nnX = 1, nnY = 1, nn = 1e9;
+      for (let q = 0; q < tl0.length; q++) { if (q === bi) continue; const dx = Math.abs(tl0[q].nx - bt.nx), dy = Math.abs(tl0[q].ny - bt.ny); const dd = dx * dx + dy * dy; if (dd > 1e-9 && dd < nn) { nn = dd; nnX = dx; nnY = dy; } }
+      const pitch = Math.max(nnX, nnY, Math.hypot(nnX, nnY) * 0.7) || 0.08;
+      // venster = één tegel-pitch (met een vleugje marge zodat het net binnen één tegel valt).
+      // GEEN ondergrens: hoe meer tegels, hoe kleiner het venster, hoe langer/dieper je inzoomt.
+      const CWv = Math.min(0.5, pitch * 0.92), CHv = CWv;   // in nx/ny-ruimte is 1 tegel ~vierkant
       let cx = bt.nx, cy = bt.ny;
       // binnen het paneel houden met marge zodat het venster nooit half buiten het paneel valt
       cx = Math.max(CWv / 2 + 0.04, Math.min(1 - CWv / 2 - 0.04, cx));
@@ -1822,17 +1834,31 @@ export function makeBrand({ ROOT, config }) {
     // eigen <svg>-wrapper met de juiste viewBox-slice schaalt de vector scherp; met de overhang
     // (ovM) tekenen we iets ruimer dan het venster zodat randen nooit leeglopen bij de inzoom.
     const ovM = 0.25;
-    function drawLevel(n, sx, sy, sw, sh, id) {
+    // SNELHEID: de tegel-markup (buildSvg+buildGlaze) is per patroon ELK frame identiek — alleen
+    // de <svg>-wrapper (positie/grootte op het scherm) verandert bij het inzoomen. Daarom bouwen
+    // we die markup ÉÉN keer per patroon (zonder de openings-<svg>) en cachen 'm; per frame zetten
+    // we er alleen de nieuwe wrapper omheen. Scheelt ~alle buildSvg-herbouw (het dure werk) terwijl
+    // het beeld exact hetzelfde blijft -> scherp én snel.
+    const bodyCache = new Map();
+    function levelBody(n) {
+      const key = ((n % NP) + NP) % NP;
+      let b = bodyCache.get(key); if (b) return b;
       const sp = specAt(n);
+      // strip de <svg ...> openings-tag van elk deel; we plakken er per frame zelf één voor.
+      const strip = (s) => s.replace(/^[\s\S]*?<svg\b[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+      b = { body: strip(film.buildSvg(sp.parsed, sp.cols)) + strip(film.buildGlaze(sp.parsed, sp.cols)), pw: sp.pw, ph: sp.ph };
+      bodyCache.set(key, b); return b;
+    }
+    function drawLevel(n, sx, sy, sw, sh, id) {
+      const lb = levelBody(n);
       // overhang in screen-px
       const ex = sx - sw * ovM, ey = sy - sh * ovM, ew = sw * (1 + 2 * ovM), eh = sh * (1 + 2 * ovM);
       // viewBox van het patroon dat op (ex..ex+ew) hoort: het hele paneel vult sw x sh, dus de
       // overhang-marge breidt de viewBox evenredig uit buiten [0..pw],[0..ph].
-      const vpadX = sp.pw * ovM, vpadY = sp.ph * ovM;
-      const vb = `${(-vpadX).toFixed(1)} ${(-vpadY).toFixed(1)} ${(sp.pw * (1 + 2 * ovM)).toFixed(1)} ${(sp.ph * (1 + 2 * ovM)).toFixed(1)}`;
+      const vpadX = lb.pw * ovM, vpadY = lb.ph * ovM;
+      const vb = `${(-vpadX).toFixed(1)} ${(-vpadY).toFixed(1)} ${(lb.pw * (1 + 2 * ovM)).toFixed(1)} ${(lb.ph * (1 + 2 * ovM)).toFixed(1)}`;
       const wrap = `<svg x="${ex.toFixed(2)}" y="${ey.toFixed(2)}" width="${ew.toFixed(2)}" height="${eh.toFixed(2)}" viewBox="${vb}" preserveAspectRatio="none">`;
-      return film.buildSvg(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap)
-        + film.buildGlaze(sp.parsed, sp.cols).replace(/<svg\b[^>]*>/i, wrap);
+      return wrap + lb.body + `</svg>`;
     }
 
     function sceneAt(frame) {
@@ -1856,16 +1882,31 @@ export function makeBrand({ ROOT, config }) {
       // accumuleren we de transformatie stage-coord-ketting.
       let ox = 0, oy = 0, sxk = 1, syk = 1;   // niveau base+k bezet [ox..ox+sxk]x[oy..oy+syk] in base-coords
       let imgs = "";
-      for (let k = 0; k <= 5; k++) {
+      for (let k = 0; k <= 3; k++) {   // 4 lagen diep is ruim genoeg; dieper zie je toch niet (minder werk/frame)
         // scherm-rechthoek van dit niveau
         const gx = ox, gy = oy, gw = sxk, gh = syk;
         const scrX = SX(gx), scrY = SY(gy), scrW = SWof(gw), scrH = SHof(gh);
         // alleen tekenen als het op het scherm (binnen het fit-vak, met marge) valt
         if (scrX < rx + fit.w + 40 && scrY < ry + fit.h + 40 && scrX + scrW > rx - 40 && scrY + scrH > ry - 40 && scrW > 0.5) {
-          imgs += drawLevel(baseLv + k, scrX, scrY, scrW, scrH, "dl" + k);
-          if (k > 0 && scrW > 3 && scrH > 3) {   // dunne voeg-rand op de venster-grens: leest als tegel-voeg
-            const sw = Math.max(0.6, Math.min(scrW, scrH) * 0.015);
-            imgs += `<rect x="${scrX.toFixed(2)}" y="${scrY.toFixed(2)}" width="${scrW.toFixed(2)}" height="${scrH.toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`;
+          // FADE-IN van het VOLGENDE patroon (k>=1): een tegel van het huidige paneel is gewoon
+          // ingekleurd; het volgende patroon zit er NIET zichtbaar in. Het verschijnt pas als je
+          // diep genoeg bent ingezoomd dat die tegel een flink deel van het scherm vult. Dus:
+          // onzichtbaar (opacity 0) zolang het venster klein is, langzaam zichtbaar naarmate het
+          // groeit tot ~schermvullend. k=0 (het paneel dat je nu ziet) is altijd vol zichtbaar.
+          let op = 1;
+          if (k > 0) {
+            const frac = scrW / fit.w;            // hoe groot dit niveau nu op het scherm is (0..1)
+            const A0 = 0.22, A1 = 0.75;           // onder A0 = onzichtbaar; boven A1 = vol zichtbaar
+            op = frac <= A0 ? 0 : frac >= A1 ? 1 : smooth((frac - A0) / (A1 - A0));
+          }
+          if (op > 0.002) {
+            const body = drawLevel(baseLv + k, scrX, scrY, scrW, scrH, "dl" + k);
+            let rim = "";
+            if (k > 0 && scrW > 3 && scrH > 3) {   // dunne voeg-rand op de venster-grens: leest als tegel-voeg
+              const sw = Math.max(0.6, Math.min(scrW, scrH) * 0.015);
+              rim = `<rect x="${scrX.toFixed(2)}" y="${scrY.toFixed(2)}" width="${scrW.toFixed(2)}" height="${scrH.toFixed(2)}" fill="none" stroke="#d7d0c2" stroke-width="${sw.toFixed(2)}"/>`;
+            }
+            imgs += op >= 0.999 ? (body + rim) : `<g opacity="${op.toFixed(3)}">${body}${rim}</g>`;
           }
         }
         // ketting een niveau dieper: het venster van niveau base+k (in zíjn eigen coords) ->
