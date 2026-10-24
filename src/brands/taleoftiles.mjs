@@ -1855,8 +1855,12 @@ export function makeBrand({ ROOT, config }) {
     // <svg>-wrapper gaat tot een ruim-maar-eindig venster rond het fit-vak, en slaan een niveau
     // met kapotte geometrie helemaal over (return ""). Geen enkele ontaarde waarde bereikt resvg.
     const fin = (v) => Number.isFinite(v);
-    // ruime teken-grens rond het paneel (alles daarbuiten wordt toch weggeklipt)
-    const BX0 = rx - fit.w, BY0 = ry - fit.h, BX1 = rx + fit.w * 2, BY1 = ry + fit.h * 2;
+    // HARDE EIS van resvg: een genest <svg> MOET volledig binnen het echte beeld (0..W, 0..H)
+    // liggen. Een genest <svg> dat deels of helemaal buiten beeld valt laat resvg (geom.rs)
+    // crashen — bewezen met een repro. Daarom klemmen we elk niveau op PRECIES het beeldvlak
+    // (niet op een ruimere marge); alles buiten beeld is toch onzichtbaar. De paneel-clip ligt
+    // sowieso binnen dit vlak, dus het zichtbare beeld blijft exact hetzelfde.
+    const BX0 = 0, BY0 = 0, BX1 = W, BY1 = H;
     function drawLevel(n, sx, sy, sw, sh, id) {
       if (!fin(sx) || !fin(sy) || !fin(sw) || !fin(sh) || sw <= 0.5 || sh <= 0.5) return "";
       const lb = levelBody(n);
@@ -1874,6 +1878,13 @@ export function makeBrand({ ROOT, config }) {
       const vy = -lb.ph * ovM + ((cy0 - ey) / eh) * fullVH;
       const vw = ((cx1 - cx0) / ew) * fullVW, vh = ((cy1 - cy0) / eh) * fullVH;
       if (!fin(vx) || !fin(vy) || !fin(vw) || !fin(vh) || vw <= 0 || vh <= 0) return "";
+      // RESVG-CRASH-GRENS (bewezen met repro): een genest <svg> dat z'n viewBox STERK opschaalt
+      // (render-breedte / viewBox-breedte) ÉN een verschoven viewBox-oorsprong heeft, laat resvg
+      // (geom.rs) crashen zodra die schaal ~4x of meer is. Dat gebeurt alleen bij het BUITENSTE
+      // niveau héél diep in de zoom — dan ben je er al doorheen gezoomd en bedekt een dieper
+      // niveau het scherm al, dus dit niveau is toch onzichtbaar. We slaan het veilig over (cap 3.2).
+      const upscale = Math.max((cx1 - cx0) / vw, (cy1 - cy0) / vh);
+      if (fin(upscale) && upscale >= 3.2) return "";
       const vb = `${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}`;
       const wrap = `<svg x="${cx0.toFixed(2)}" y="${cy0.toFixed(2)}" width="${(cx1 - cx0).toFixed(2)}" height="${(cy1 - cy0).toFixed(2)}" viewBox="${vb}" preserveAspectRatio="none">`;
       return wrap + lb.body + `</svg>`;
