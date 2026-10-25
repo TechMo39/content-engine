@@ -1,5 +1,5 @@
 // MERK-MODULE: Tale of Tiles. Alle tegel-specifieke dingen (patronen, tegeling,
-// voeg, naamplaat) zitten HIER — de kern weet hier niks van.
+// voeg, naamplaat) zitten HIER, de kern weet hier niks van.
 // Levert: branding, onderwerpen (patronen), templates (video-types), en makeRender().
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -10,7 +10,7 @@ import esbuild from "esbuild";
 import { composeChrome, fitRect, loadLogo, loadImageFile, imagePalette, enrichPalette, imageGridRGB, blurImageFile, FORMATS, escapeXml, FFMPEG } from "../core/renderer.mjs";
 
 // AUTOMATISCHE MUUR-DETECTIE: lees een mockup-foto en bepaal zélf waar het paneel op de
-// muur komt (midden-x, midden-y, hoogte — genormaliseerd 0..1 van het 9:16-beeld). Zoekt
+// muur komt (midden-x, midden-y, hoogte, genormaliseerd 0..1 van het 9:16-beeld). Zoekt
 // het grootste rustige, egale muurvlak op ooghoogte en vermijdt meubels/vloer/plafond.
 // Geen handwerk: dit draait bij het laden van elke mockup. null = geen duidelijk vlak.
 async function detectWallRect(absPath) {
@@ -105,7 +105,7 @@ function moorArch(x, y, w, h) {
     + `C ${(cx + w * 0.30).toFixed(1)} ${y} ${(x + w + bulge).toFixed(1)} ${(sy - sh * 0.5).toFixed(1)} ${x + w} ${sy} `
     + `L ${x + w} ${y + h} Z`;
 }
-// Slanke pilaar met kapiteel en basis (goud contour op plum) — paleis-gevoel.
+// Slanke pilaar met kapiteel en basis (goud contour op plum), paleis-gevoel.
 function column(cx, topY, botY, cw, gold, plum) {
   const x = cx - cw / 2, capH = cw * 0.85, baseH = cw * 0.75, sx = (cw * 0.22).toFixed(1);
   return `<rect x="${(x - cw * 0.22).toFixed(1)}" y="${topY.toFixed(1)}" width="${(cw * 1.44).toFixed(1)}" height="${capH.toFixed(1)}" rx="2" fill="${plum}" stroke="${gold}" stroke-width="1.6"/>`
@@ -114,7 +114,7 @@ function column(cx, topY, botY, cw, gold, plum) {
     + `<line x1="${(cx + cw * 0.16).toFixed(1)}" y1="${(topY + capH + 3).toFixed(1)}" x2="${(cx + cw * 0.16).toFixed(1)}" y2="${(botY - baseH - 3).toFixed(1)}" stroke="${gold}" stroke-width="0.8" opacity="0.5"/>`
     + `<rect x="${(x - cw * 0.22).toFixed(1)}" y="${(botY - baseH).toFixed(1)}" width="${(cw * 1.44).toFixed(1)}" height="${baseH.toFixed(1)}" rx="2" fill="${plum}" stroke="${gold}" stroke-width="1.6"/>`;
 }
-// Mozaïek-medaillon (khatim-ster + ring) — het merk-symbool dat de video opent/sluit.
+// Mozaïek-medaillon (khatim-ster + ring), het merk-symbool dat de video opent/sluit.
 function medallion(cx, cy, R, gold) {
   const s1 = star8(cx, cy, R, R * 0.42);
   return `<g>`
@@ -133,7 +133,7 @@ function plateColours(cols) {
   cols.forEach((c) => { const r = _hexRgb(c); const sat = Math.max(r[0], r[1], r[2]) - Math.min(r[0], r[1], r[2]); if (sat > best) { best = sat; edge = c; } });
   // PLAAT kleurt nu DUIDELIJK mee met het patroon: meer verzadigde tint dan voorheen (was 70%
   // naar crème = bijna neutraal). Een leesbaarheidsvloer tilt 'm zo nodig terug naar crème,
-  // zodat de donkere letters altijd leesbaar blijven — ook op een diep/donker palet.
+  // zodat de donkere letters altijd leesbaar blijven, ook op een diep/donker palet.
   let plate = _mix(edge, "#f6f1e8", 0.52);
   for (let i = 0; i < 2 && _lum(plate) < 168; i++) plate = _mix(plate, "#f8f3ea", 0.5);
   return { plate, ink: _mix(darkest, "#17120e", 0.20), edge };
@@ -304,7 +304,7 @@ export function makeBrand({ ROOT, config }) {
       const slg = ({ nl: "HANDGEMAAKTE MOZAÏEKKUNST.", en: "HANDMADE MOSAIC ART.", fr: "MOSAÏQUE FAITE MAIN." })[branding.lang] || "HANDGEMAAKTE MOZAÏEKKUNST.";
       if (branding.markLogo) {
         const ar = 389 / 96;
-        const lw = Math.round(W * 0.36), lh = Math.round(lw / ar);   // kleiner (was 0.44) — hing te veel over de panelen
+        const lw = Math.round(W * 0.36), lh = Math.round(lw / ar);   // kleiner (was 0.44), hing te veel over de panelen
         const px = Math.round(lw * 0.055), py = Math.round(lh * 0.34);
         const pw = lw + px * 2, ph = lh + py * 2;
         const plateX = Math.round((W - pw) / 2), plateY = Math.round(H * 0.032), rx = Math.round(ph * 0.24);
@@ -334,7 +334,7 @@ export function makeBrand({ ROOT, config }) {
   const baseCache = new Map(), svgCache = new Map();
 
   // PERSISTENTE ANTI-HERHALING: onthoud de laatst gebruikte keuzes (patroon, naam, muziek,
-  // familie, mockup, sfeerbeeld) in een klein JSON in out/, zodat elke render écht nieuw is —
+  // familie, mockup, sfeerbeeld) in een klein JSON in out/, zodat elke render écht nieuw is ,
   // niet alleen binnen één draaiende sessie, maar ook ná een herstart. "Ik wil altijd nieuwe
   // filmpjes." Houdt ~60% van elke pool als "recent gebruikt" tegen en rouleert door de rest.
   const STATE_FILE = path.resolve(ROOT, config.outDir, ".engine-state.json");
@@ -366,7 +366,7 @@ export function makeBrand({ ROOT, config }) {
   function pickFreshObj(pool, key) { const id = pickFresh((pool || []).map((x) => x.id), key); return id ? (pool.find((x) => x.id === id) || null) : null; }
 
   // Foto-pool: Mo legt zijn (Gemini-)foto's in assets/images/taleoftiles/.
-  // Mockup-pool: lege-muur/ruimte-foto's in assets/images/taleoftiles/mockups/ —
+  // Mockup-pool: lege-muur/ruimte-foto's in assets/images/taleoftiles/mockups/ ,
   // daarop plakken we ons ÉCHTE paneel (in-situ), zodat de foto altijd het patroon matcht.
   async function loadImages() {
     imagePool = []; mockupPool = []; sfeerPool = []; guessPool = [];
@@ -390,7 +390,7 @@ export function makeBrand({ ROOT, config }) {
       // Geen handwerk, geen sidecar. Lukt detectie niet -> null -> terugval op midden.
       let place = null;
       try { place = await detectWallRect(abs); } catch {}
-      // vooraf geblurde muur (scherptediepte) — één keer, niet elk frame
+      // vooraf geblurde muur (scherptediepte), één keer, niet elk frame
       let blur = "";
       try { blur = await blurImageFile(abs); } catch {}
       mockupPool.push({ id: f, uri, blur, place });
@@ -446,7 +446,7 @@ export function makeBrand({ ROOT, config }) {
     const file = path.resolve(ROOT, "assets/patterns", pattern + ".svg");
     let base;
     try { base = await fs.readFile(file, "utf8"); }
-    catch { throw new Error(`patroon ${pattern} niet gevonden in assets/patterns/ — draai eerst de fetch (README)`); }
+    catch { throw new Error(`patroon ${pattern} niet gevonden in assets/patterns/, draai eerst de fetch (README)`); }
     baseCache.set(pattern, base); return base;
   }
   function unitSize(base, lock) { const u = film.parseTiles(film.tilePattern(base, lock, 1, 1)); return { w: u.view[2], h: u.view[3] }; }
@@ -482,26 +482,26 @@ export function makeBrand({ ROOT, config }) {
   const STORIES = {
     insitu: {   // TOEPASSING + KWALITEIT (aan de muur). Geen buiten-only-claims.
       nl: [
-        [{ k: "Tale of Tiles", t: "Jouw naam, met de hand gemaakt." }, { t: "In echt glazuur — kleur die blijft." }, { t: "Een schilderij aan je muur." }],
+        [{ k: "Tale of Tiles", t: "Jouw naam, met de hand gemaakt." }, { t: "In echt glazuur, kleur die blijft." }, { t: "Een schilderij aan je muur." }],
         [{ k: "Echt glazuur", t: "Verbleekt niet, jaren diep van kleur." }, { t: "Binnen én buiten, aan je muur." }, { t: "Met de hand gelegd, tegel voor tegel." }],
         [{ k: "Fès", t: "Wat eeuwen aan paleismuren hing…" }, { t: "…nu als kunst aan die van jou." }, { t: "Geen twee gelijk." }],
         [{ t: "Geen poster, geen sticker." }, { k: "Tale of Tiles", t: "Handgelegd mozaïek aan je muur." }, { t: "Kleur die jaren blijft." }],
-        [{ t: "Regen, zon of vorst — de kleur blijft." }, { k: "Buiten of binnen", t: "Aan je gevel of in de hal." }, { t: "Gaat generaties mee." }],
+        [{ t: "Regen, zon of vorst, de kleur blijft." }, { k: "Buiten of binnen", t: "Aan je gevel of in de hal." }, { t: "Gaat generaties mee." }],
         [{ k: "Jouw muur", t: "Verdient meer dan een kaal bordje." }, { t: "Handgemaakt mozaïek, met jouw naam." }, { t: "In echt glazuur." }],
         [{ t: "Jij kiest patroon, kleuren en naam." }, { k: "Tale of Tiles", t: "Wij leggen 'm met de hand." }, { t: "En hij hangt als kunst aan je muur." }],
-        [{ t: "Een naambord dat mensen aanraken." }, { t: "Echt reliëf, echt glazuur — geen print." }, { k: "Tale of Tiles", t: "Voor je muur of gevel." }],
+        [{ t: "Een naambord dat mensen aanraken." }, { t: "Echt reliëf, echt glazuur, geen print." }, { k: "Tale of Tiles", t: "Voor je muur of gevel." }],
         [{ t: "De eerste indruk aan je deur." }, { k: "Tale of Tiles", t: "Een naam in handgelegd mozaïek." }, { t: "Die onthoudt men." }],
-        [{ t: "Van hal tot gevel — overal thuis." }, { t: "Handgemaakt, in jouw kleuren." }, { k: "Tale of Tiles", t: "Een naam met karakter." }],
+        [{ t: "Van hal tot gevel, overal thuis." }, { t: "Handgemaakt, in jouw kleuren." }, { k: "Tale of Tiles", t: "Een naam met karakter." }],
         [{ t: "Dit hangt er over tien jaar nog." }, { k: "Echt glazuur", t: "Kleur die niet verbleekt." }, { t: "Met de hand gelegd." }],
         [{ t: "Niet zomaar een bordje." }, { t: "Een klein kunstwerk met jouw naam." }, { k: "Tale of Tiles", t: "Voor aan je muur." }],
         [{ t: "Hoe zou dit staan bij jou thuis?" }, { k: "Tale of Tiles", t: "Handgemaakt, in jouw stijl." }, { t: "Een naam om trots op te zijn." }],
       ],
       en: [
-        [{ k: "Tale of Tiles", t: "Your name, made by hand." }, { t: "In real glaze — colour that stays." }, { t: "A painting for your wall." }],
+        [{ k: "Tale of Tiles", t: "Your name, made by hand." }, { t: "In real glaze, colour that stays." }, { t: "A painting for your wall." }],
         [{ k: "Real glaze", t: "Won't fade, deep colour for years." }, { t: "Indoors or out, on your wall." }, { t: "Set by hand, tile by tile." }],
         [{ k: "Fès", t: "What once lined palace walls…" }, { t: "…now art on yours." }, { t: "No two alike." }],
         [{ t: "No poster, no sticker." }, { k: "Tale of Tiles", t: "Hand-laid mosaic on your wall." }, { t: "Colour that lasts for years." }],
-        [{ t: "Rain, sun or frost — the colour stays." }, { k: "Indoors or out", t: "On your facade or in the hall." }, { t: "Lasts for generations." }],
+        [{ t: "Rain, sun or frost, the colour stays." }, { k: "Indoors or out", t: "On your facade or in the hall." }, { t: "Lasts for generations." }],
         [{ t: "You pick the pattern, colours and name." }, { k: "Tale of Tiles", t: "We lay it by hand." }, { t: "And it hangs as art on your wall." }],
         [{ t: "The first thing guests see at your door." }, { k: "Tale of Tiles", t: "A name in hand-laid mosaic." }, { t: "They'll remember it." }],
         [{ t: "This will still be there in ten years." }, { k: "Real glaze", t: "Colour that won't fade." }, { t: "Laid by hand." }],
@@ -509,7 +509,7 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "How would this look in your home?" }, { k: "Tale of Tiles", t: "Handmade, in your style." }],
       ],
       fr: [
-        [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail — une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
+        [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail, une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
         [{ k: "Véritable émail", t: "Ne pâlit pas, des années de couleur." }, { t: "Posé à la main, carreau par carreau." }],
         [{ k: "Fès", t: "Ce qui ornait les palais…" }, { t: "…désormais sur votre mur." }, { t: "Aucun identique." }],
         [{ t: "Un nom. Une œuvre d'art." }, { k: "Tale of Tiles", t: "Fait main, pour votre mur ou façade." }],
@@ -521,9 +521,9 @@ export function makeBrand({ ROOT, config }) {
     sfeer: {   // ERFGOED + AMBACHT: eeuwenoud ambacht uit Fès -> vandaag, met jouw naam.
       nl: [
         [{ k: "Fès", t: "Een ambacht van duizend jaar." }, { t: "Elke tegel met de hand gesneden en geglazuurd." }, { t: "Geen twee stukjes gelijk." }],
-        [{ t: "Klei, water, vuur — en geduld." }, { k: "Tale of Tiles", t: "Zo maken wij jouw naambord." }, { t: "Een schilderij om door te geven." }],
+        [{ t: "Klei, water, vuur, en geduld." }, { k: "Tale of Tiles", t: "Zo maken wij jouw naambord." }, { t: "Een schilderij om door te geven." }],
         [{ t: "Eeuwenoud ambacht uit de paleizen van Fès." }, { k: "Vandaag", t: "In een nieuw jasje." }, { t: "Met jouw naam erin." }],
-        [{ t: "Gesneden, geglazuurd, gebakken — met de hand." }, { k: "Fès", t: "Een ambacht dat overleeft." }, { t: "Nu met jouw naam." }],
+        [{ t: "Gesneden, geglazuurd, gebakken, met de hand." }, { k: "Fès", t: "Een ambacht dat overleeft." }, { t: "Nu met jouw naam." }],
         [{ t: "Elke kleur komt uit de oven, niet uit een printer." }, { k: "Echt glazuur", t: "Diep, levend, blijvend." }],
         [{ t: "Generaties gaven dit ambacht door." }, { k: "Tale of Tiles", t: "Wij brengen het naar jouw muur." }],
         [{ t: "In de medina van Fès, aan een lage tafel…" }, { t: "…wordt jouw naambord stukje voor stukje gelegd." }, { k: "Tale of Tiles", t: "Met de hand." }],
@@ -535,9 +535,9 @@ export function makeBrand({ ROOT, config }) {
       ],
       en: [
         [{ k: "Fès", t: "A thousand-year craft." }, { t: "Every tile cut and glazed by hand." }, { t: "No two pieces alike." }],
-        [{ t: "Clay, water, fire — and patience." }, { k: "Tale of Tiles", t: "This is how we make your nameplate." }, { t: "A painting to pass on." }],
+        [{ t: "Clay, water, fire, and patience." }, { k: "Tale of Tiles", t: "This is how we make your nameplate." }, { t: "A painting to pass on." }],
         [{ t: "Age-old craft from the palaces of Fès." }, { k: "Today", t: "In a new form." }, { t: "With your name in it." }],
-        [{ t: "Cut, glazed, fired — all by hand." }, { k: "Fès", t: "A craft that survives." }, { t: "Now with your name." }],
+        [{ t: "Cut, glazed, fired, all by hand." }, { k: "Fès", t: "A craft that survives." }, { t: "Now with your name." }],
         [{ t: "Every colour comes from the kiln, not a printer." }, { k: "Real glaze", t: "Deep, alive, lasting." }],
         [{ t: "Light falls differently on real glaze." }, { t: "That's the depth a print can't fake." }, { k: "Tale of Tiles", t: "Alive, tactile." }],
         [{ t: "A master learned this from his father." }, { t: "Who learned it from his." }, { k: "Tale of Tiles", t: "That craft, in your name." }],
@@ -545,7 +545,7 @@ export function makeBrand({ ROOT, config }) {
       ],
       fr: [
         [{ k: "Fès", t: "Un art millénaire." }, { t: "Chaque carreau taillé et émaillé à la main." }, { t: "Aucun identique." }],
-        [{ t: "Argile, eau, feu — et patience." }, { k: "Tale of Tiles", t: "Voilà comment naît votre plaque." }],
+        [{ t: "Argile, eau, feu, et patience." }, { k: "Tale of Tiles", t: "Voilà comment naît votre plaque." }],
         [{ t: "Art ancestral des palais de Fès." }, { k: "Aujourd'hui", t: "Sous une nouvelle forme." }, { t: "Avec votre nom." }],
         [{ t: "La lumière joue sur l'émail véritable." }, { t: "Cette profondeur, une impression ne l'a pas." }, { k: "Tale of Tiles", t: "Vivant." }],
         [{ t: "Aucune main ne pose pareil." }, { t: "Aucun panneau n'est identique." }, { k: "Fès", t: "À la main, pièce par pièce." }],
@@ -556,12 +556,12 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Kijk mee hoe dit ontstaat." }, { k: "Tale of Tiles", t: "Tegel voor tegel, met de hand." }, { t: "Tot je naam verschijnt." }],
         [{ t: "Honderden stukjes vinden hun plek." }, { k: "Met de hand", t: "Zo groeit jouw naambord." }, { t: "Geen twee gelijk." }],
         [{ t: "Begin met niets…" }, { k: "Tale of Tiles", t: "…eindig met een kunstwerk." }, { t: "Jouw naam in echt glazuur." }],
-        [{ t: "Elk steentje op z'n plek — met geduld." }, { k: "Oud ambacht", t: "In jouw kleuren." }, { t: "Dat zie je ontstaan." }],
+        [{ t: "Elk steentje op z'n plek, met geduld." }, { k: "Oud ambacht", t: "In jouw kleuren." }, { t: "Dat zie je ontstaan." }],
         [{ t: "Welke kleur zie jij het eerst?" }, { t: "Kijk hoe het paneel zich vult." }, { k: "Tale of Tiles", t: "Met de hand gelegd." }],
         [{ t: "Geen machine, geen print." }, { t: "Mensenhanden, tegel voor tegel." }, { k: "Tale of Tiles", t: "Dat voel je." }],
         [{ t: "Van los stukje tot kunstwerk." }, { k: "Fès", t: "Een ambacht dat leeft." }, { t: "Met jouw naam erin." }],
         [{ k: "Fès", t: "Van paleismuren…" }, { t: "…naar jouw muur van nu." }, { t: "Stukje voor stukje opgebouwd." }],
-        [{ t: "Even geduld — het wordt mooi." }, { t: "Elke tegel een beetje anders." }, { k: "Tale of Tiles", t: "Nooit twee gelijk." }],
+        [{ t: "Even geduld, het wordt mooi." }, { t: "Elke tegel een beetje anders." }, { k: "Tale of Tiles", t: "Nooit twee gelijk." }],
         [{ t: "Kijk tot het einde." }, { k: "Tale of Tiles", t: "Dan staat je naam er." }, { t: "In handgelegd mozaïek." }],
         [{ t: "Zo ontstaat iets dat blijft." }, { k: "Met de hand", t: "In echt glazuur." }, { t: "Een naam om te houden." }],
         [{ t: "Rustig, stukje voor stukje." }, { t: "Zoals het al eeuwen gaat." }, { k: "Tale of Tiles", t: "Nu met jouw naam." }],
@@ -586,30 +586,30 @@ export function makeBrand({ ROOT, config }) {
     },
     geentwee: {   // UNIEK + keuze: elk ontwerp anders. Captions bij de flitsende ontwerpen.
       nl: [
-        [{ k: "Tale of Tiles", t: "Eén naam, oneindig veel ontwerpen." }, { t: "Elk met de hand — nooit twee gelijk." }, { t: "Welke zou jij kiezen?" }],
+        [{ k: "Tale of Tiles", t: "Eén naam, oneindig veel ontwerpen." }, { t: "Elk met de hand, nooit twee gelijk." }, { t: "Welke zou jij kiezen?" }],
         [{ t: "Ander patroon, andere kleuren, zelfde naam." }, { k: "Tale of Tiles", t: "Jij bepaalt." }, { t: "Welke past bij jou?" }],
         [{ t: "Honderd namen, honderd kunstwerken." }, { k: "Met de hand", t: "Nooit twee gelijk." }],
         [{ t: "Kies je patroon. Kies je kleuren." }, { k: "Tale of Tiles", t: "En zet je naam erop." }, { t: "Zo simpel, zo uniek." }],
         [{ t: "Van ingetogen tot uitbundig." }, { t: "Jij kiest de stijl." }, { k: "Tale of Tiles", t: "Wij maken 'm met de hand." }],
-        [{ t: "Geen twee gelijk — net als jouw naam." }, { k: "Tale of Tiles", t: "Elk met de hand gelegd." }],
+        [{ t: "Geen twee gelijk, net als jouw naam." }, { k: "Tale of Tiles", t: "Elk met de hand gelegd." }],
         [{ t: "Welke wordt die van jou?" }, { k: "Tale of Tiles", t: "Oneindig veel ontwerpen, één naam." }],
         [{ t: "Stop zodra je jouw favoriet ziet." }, { k: "Tale of Tiles", t: "Welke is het?" }, { t: "Zeg het in de comments." }],
         [{ t: "Blauw, terracotta of bont?" }, { t: "Dezelfde naam, telkens anders." }, { k: "Tale of Tiles", t: "Jij kiest." }],
         [{ t: "Eén ding is zeker:" }, { t: "de jouwe bestaat maar één keer." }, { k: "Tale of Tiles", t: "Met de hand gelegd." }],
       ],
       en: [
-        [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each by hand — never two alike." }, { t: "Which would you pick?" }],
+        [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each by hand, never two alike." }, { t: "Which would you pick?" }],
         [{ t: "New pattern, new colours, same name." }, { k: "Tale of Tiles", t: "You decide." }, { t: "Which fits you?" }],
         [{ t: "A hundred names, a hundred artworks." }, { k: "By hand", t: "Never two alike." }],
         [{ t: "Pick your pattern. Pick your colours." }, { k: "Tale of Tiles", t: "And add your name." }],
-        [{ t: "No two alike — just like your name." }, { k: "Tale of Tiles", t: "Each laid by hand." }],
+        [{ t: "No two alike, just like your name." }, { k: "Tale of Tiles", t: "Each laid by hand." }],
         [{ t: "Stop when you see your favourite." }, { k: "Tale of Tiles", t: "Which one is it?" }, { t: "Tell us below." }],
         [{ t: "Blue, terracotta or bold?" }, { t: "Same name, every time different." }, { k: "Tale of Tiles", t: "You choose." }],
       ],
       fr: [
-        [{ k: "Tale of Tiles", t: "Un nom, une infinité de designs." }, { t: "Fait main — jamais deux pareils." }],
+        [{ k: "Tale of Tiles", t: "Un nom, une infinité de designs." }, { t: "Fait main, jamais deux pareils." }],
         [{ t: "Nouveau motif, nouvelles couleurs, même nom." }, { k: "Tale of Tiles", t: "À vous de choisir." }],
-        [{ t: "Aucun pareil — comme votre nom." }, { k: "Tale of Tiles", t: "Chacun posé à la main." }],
+        [{ t: "Aucun pareil, comme votre nom." }, { k: "Tale of Tiles", t: "Chacun posé à la main." }],
         [{ t: "Arrêtez quand vous voyez le vôtre." }, { k: "Tale of Tiles", t: "Lequel est-ce ?" }],
         [{ t: "Bleu, terre cuite ou coloré ?" }, { t: "Même nom, toujours différent." }, { k: "Tale of Tiles", t: "À vous." }],
       ],
@@ -626,7 +626,7 @@ export function makeBrand({ ROOT, config }) {
     lastStory = idx;
     return sets[idx].map((b) => ({ ...b }));
   }
-  // PALET-KEUZE bepaalt UIT WELKE glazuur-families de engine kiest — zodat de knop écht iets
+  // PALET-KEUZE bepaalt UIT WELKE glazuur-families de engine kiest, zodat de knop écht iets
   // doet, en consistent over ALLE types: "warm" = warme families, "koel"/"cool" = koele,
   // "auto"/leeg = alle families (mix, met anti-herhaling). Zo is er altijd verschil.
   const WARM_FAMS = ["terracotta", "saffraan", "aubergine"];
@@ -696,7 +696,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "walkthrough", name: "Website walkthrough", music: ["upbeat", "lofi", "calm"], defaults: {} },  // live site/configurator opname -> content-ready (lokaal)
     { id: "stopzodra", name: "Stop zodra je 't ziet (game)", music: ["upbeat", "lofi", "calm"], defaults: {} },  // type 8: zoom-uit raadspel
     { id: "onthul", name: "Onthul (raad-foto achter patroon)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 9: patroon dooft uit -> foto erachter
-    { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU — cadeau-reveal
+    { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU, cadeau-reveal
     { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
     { id: "droste", name: "Oneindige inzoom", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop. (id blijft "droste" voor bestandsnamen/social-parser; de getoonde naam is "Oneindige inzoom")
   ];
@@ -715,23 +715,47 @@ export function makeBrand({ ROOT, config }) {
   }
 
   // AUTO-NAAM: als er geen naam is ingevuld kiest de engine er zelf één (anti-herhaling).
-  // Fictieve namen — mix van zaaknamen (verkoopt het gevelbord), familie/huis en voornamen.
+  // Fictieve namen, mix van zaaknamen (verkoopt het gevelbord), familie/huis en voornamen.
   // Zwaarder NL + EN, dan FR. Nooit echte personen/merken.
-  // Namen PER TAAL — een NL-video mag nooit een Franse naam tonen (en omgekeerd). pickName kiest
+  // Namen PER TAAL, een NL-video mag nooit een Franse naam tonen (en omgekeerd). pickName kiest
   // uit de lijst die bij de taal van de video hoort. Nooit echte personen/merken.
   const NAMES_BY_LANG = {
     nl: [
-      // NL — zaak
-      "Café De Kaai", "Brasserie 't Anker", "Bakkerij Noordhoek", "Salon Nour", "Atelier Vonk",
-      "Koffiehuis Mokka", "Restaurant Olij", "Café De Hoek", "Lunchroom Fleur", "Slagerij Van Dijk",
-      // NL — familie / voornaam
-      "Familie De Vries", "Huize Berg", "Familie El Amrani", "Sofie", "Daan", "Imane", "Youssef", "Lotte", "Noor",
+      // NL zaaknamen (overwegend Nederlands)
+      "Café De Kaai", "Brasserie 't Anker", "Bakkerij Noordhoek", "Atelier Vonk", "Koffiehuis Mokka",
+      "Restaurant Olij", "Café De Hoek", "Lunchroom Fleur", "Slagerij Van Dijk", "Bistro De Linde",
+      "Grand Café Central", "Café 't Pleintje", "Eetcafé De Buren", "Boekhandel Mores", "Bloemist Tulp",
+      "Kapsalon Knip", "Herberg De Zwaan", "Proeflokaal Noord", "Taverne De Haven", "Delicatessen Van Loon",
+      // NL familienamen
+      "Familie De Vries", "Familie Jansen", "Familie Bakker", "Familie Visser", "Familie Meijer",
+      "Familie De Boer", "Familie Mulder", "Huize Berg", "Huize Zonnehof",
+      // NL voornamen
+      "Daan", "Sanne", "Bram", "Lotte", "Sem", "Fleur", "Jesse", "Eva", "Lars", "Julia",
+      "Thijs", "Anne", "Tim", "Lisa", "Bas", "Emma", "Niels", "Sofie", "Stijn", "Roos", "Luuk", "Tess",
+      // een paar Marokkaans-Nederlandse (realistisch voor de NL-markt, minderheid)
+      "Familie El Amrani", "Salon Nour", "Youssef", "Imane",
     ],
     en: [
-      "The Copper Spoon", "Harbour & Co.", "Nord Coffee", "The Ivy Table", "The Harpers", "Olivia", "Liam", "Maya", "Leo",
+      // EN zaaknamen
+      "The Copper Spoon", "Harbour & Co.", "Nord Coffee", "The Ivy Table", "The Oak & Ember",
+      "Maple & Rye", "The Gilded Fox", "Brambles Tea Room", "The Blue Door", "Camden Coffee",
+      "The Thornbury", "Wren & Finch", "The Olive Branch", "Rosewood & Co.",
+      // EN familienamen
+      "The Harpers", "The Bennetts", "The Hayes", "The Carters", "The Winters",
+      // EN voornamen
+      "Olivia", "Liam", "Maya", "Leo", "Emma", "Noah", "Ava", "Oliver", "Grace", "Jack",
+      "Lily", "Henry", "Ella", "Charlie", "Sophie", "George", "Amelia", "Harry",
     ],
     fr: [
-      "Chez Amélie", "Maison Dorée", "Café du Coin", "L'Atelier Bleu", "Camille", "Léa", "Hugo",
+      // FR zaaknamen
+      "Chez Amélie", "Maison Dorée", "Café du Coin", "L'Atelier Bleu", "Le Petit Jardin",
+      "Brasserie Lumière", "La Table d'Or", "Chez Mathilde", "Le Comptoir", "Café des Arts",
+      "La Maison Verte", "Le Coin Doré", "Pâtisserie Belle", "Le Jardin Bleu",
+      // FR familienamen
+      "Famille Dubois", "Famille Laurent", "Famille Moreau", "Maison Lefèvre",
+      // FR voornamen
+      "Camille", "Léa", "Hugo", "Louise", "Jules", "Chloé", "Louis", "Manon", "Gabriel", "Emma",
+      "Lucas", "Juliette", "Arthur", "Alice", "Nathan", "Jade",
     ],
   };
   function pickName(rawLang) {
@@ -741,7 +765,7 @@ export function makeBrand({ ROOT, config }) {
   }
 
   // AUTO-PATROON: de engine kiest zelf een patroon (anti-herhaling) zodat Mo niks hoeft te
-  // kiezen — alleen Render. Geldt voor ALLE types. pickPatterns(n) voor meerdere (trio).
+  // kiezen, alleen Render. Geldt voor ALLE types. pickPatterns(n) voor meerdere (trio).
   function pickPatterns(n = 1) {
     const pool = (patternList || []).filter(Boolean);
     if (!pool.length) return [];
@@ -765,7 +789,7 @@ export function makeBrand({ ROOT, config }) {
     const storyBeats = resolveStory(opts, name, "satisfying");
     // Organische vulrichtingen (geen lineaire sweeps -> geen blokken). Elk patroon een andere.
     const REVEALS = ["spiralout", "radial", "spiral"];
-    // Traditioneel glazuur-palet per patroon (kobalt/terracotta/smaragd/...), NIET de regenboog —
+    // Traditioneel glazuur-palet per patroon (kobalt/terracotta/smaragd/...), NIET de regenboog ,
     // dát is wat echte zellige-uitstraling geeft i.p.v. snoep. Anti-herhaling door te schudden.
     const famOrder = familyPool(opts).slice().sort(() => Math.random() - 0.5);   // Palet-keuze (warm/koel/auto)
     // ~13s per patroon: rustig genoeg om de opbouw te voelen, maar het bord komt écht vol.
@@ -1191,10 +1215,10 @@ export function makeBrand({ ROOT, config }) {
 
   // bouw een render-plan voor de kern: { W,H,FPS,SS,durSec, sceneAt(frame) }
   // WEBSITE-WALKTHROUGH: neemt de LIVE site op (recorder) en maakt 'm content-ready (finish:
-  // hook, snelheid op de markers, caption, logo, muziek). Draait lokaal — heeft de browser en
+  // hook, snelheid op de markers, caption, logo, muziek). Draait lokaal, heeft de browser en
   // de live site nodig. Levert een KANT-EN-KLARE mp4 terug via { prebuilt }, zodat de engine
   // 'm direct gebruikt en de SVG-frame-pijplijn overslaat.
-  // Draai een sub-proces en stuur elke uitvoer-regel LIVE door naar log() — zo verschijnt de
+  // Draai een sub-proces en stuur elke uitvoer-regel LIVE door naar log(), zo verschijnt de
   // walkthrough-voortgang in het app-paneel (SSE) én in de terminal, net als de andere types.
   // (Vroeger: stdio:"inherit" -> alleen terminal, paneel bleef leeg.)
   function runStreamed(node, args, env, log, tag) {
@@ -1224,7 +1248,7 @@ export function makeBrand({ ROOT, config }) {
     const work = path.resolve(ROOT, config.outDir, ".walk-" + Date.now());
     await fs.mkdir(work, { recursive: true });
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl";
-    // De live site bestaat alleen in NL en EN — geen FR. Vraag je FR, dan nemen we de
+    // De live site bestaat alleen in NL en EN, geen FR. Vraag je FR, dan nemen we de
     // EN-site op met EN-teksten (consistente video) i.p.v. FR-tekst over een niet-FR site.
     const siteLang = lang === "fr" ? "en" : lang; branding.lang = siteLang;
     const mode = (opts.mode === "simpel" || opts.mode === "detail") ? opts.mode : (Math.random() < 0.5 ? "simpel" : "detail");
@@ -1233,9 +1257,9 @@ export function makeBrand({ ROOT, config }) {
     // 1) opnemen -> ruwe mp4 + markers
     const recEnv = { ...process.env, TOT_OUT: work, TOT_LANG: siteLang, TOT_MODE: mode, FFMPEG: ffmpeg };
     if (name) recEnv.TOT_NAME = name;
-    if (log) log("● walkthrough — opname van de live site start…");
+    if (log) log("● walkthrough, opname van de live site start…");
     const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
-    if (r1.status !== 0) throw new Error("opname (site-capture) faalde — draait de engine op de machine met de browser en is de site bereikbaar?");
+    if (r1.status !== 0) throw new Error("opname (site-capture) faalde, draait de engine op de machine met de browser en is de site bereikbaar?");
     const raw = path.join(work, "site-walkthrough.mp4");
 
     // 2) muziek + captions kiezen, dan content-ready maken
@@ -1247,20 +1271,20 @@ export function makeBrand({ ROOT, config }) {
     })[siteLang];
     // GUIDE-STAPPEN: neem de kijker mee door de configurator i.p.v. kaal de site tonen.
     const steps = ({
-      nl: ["Kies je patroon", "Kleur 'm in — kleurgroepen of per tegel", "Zet je naam erop", "Zie 't op je muur"],
-      en: ["Pick your pattern", "Colour it — by group or tile", "Add your name", "See it on your wall"],
-      fr: ["Choisissez votre motif", "Colorez — par groupe ou par carreau", "Ajoutez votre nom", "Voyez-le sur votre mur"],
+      nl: ["Kies je patroon", "Kleur 'm in, kleurgroepen of per tegel", "Zet je naam erop", "Zie 't op je muur"],
+      en: ["Pick your pattern", "Colour it, by group or tile", "Add your name", "See it on your wall"],
+      fr: ["Choisissez votre motif", "Colorez, par groupe ou par carreau", "Ajoutez votre nom", "Voyez-le sur votre mur"],
     })[siteLang];
     const finEnv = { ...process.env, FFMPEG: ffmpeg, TOT_CAPTION: caps[0], TOT_CAPTION2: caps[1], TOT_STEPS: JSON.stringify(steps), TOT_FINAL: path.join(work, "site-final.mp4") };
     if (music) finEnv.TOT_MUSIC = music;
-    if (log) log("● walkthrough — content-ready (hook, snelheid, caption, muziek)…");
+    if (log) log("● walkthrough, content-ready (hook, snelheid, caption, muziek)…");
     const r2 = await runStreamed(node, [finisher, raw], finEnv, log, "· montage:");
     if (r2.status !== 0) throw new Error("content-ready stap (finish) faalde");
 
     return { prebuilt: path.join(work, "site-final.mp4"), music: "", lang: siteLang, cleanup: work };
   }
 
-  // TYPE 8 — "Stop zodra je 't ziet" (guess/engagement): de camera start extreem ingezoomd op
+  // TYPE 8, "Stop zodra je 't ziet" (guess/engagement): de camera start extreem ingezoomd op
   // het afgemaakte naambord; je ziet alleen losse tegels en kunt niet zien wat het is. Hij
   // zoomt héél langzaam uit -> je raadt het, en de volledige plaat + naam lost op als antwoord.
   // Zoom is de hele truc (wat Mo wil: zoom goed gebruiken). Traditioneel palet.
@@ -1272,7 +1296,7 @@ export function makeBrand({ ROOT, config }) {
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["upbeat", "lofi", "calm"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
-    // FIJN, UNIFORM zellige-mozaïek (kleine vierkante tegeltjes — klassiek zellige). Zo
+    // FIJN, UNIFORM zellige-mozaïek (kleine vierkante tegeltjes, klassiek zellige). Zo
     // resolveert het beeld ALTIJD; grote/gestreepte patronen maakten het onleesbaar.
     const GX = 26, GY = 36;   // ~0.72 portret, genoeg resolutie voor een herkenbaar beeld
     const gridSvg = (() => { const cw = 100; let c = ""; for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) c += `<rect x="${i * cw}" y="${j * cw}" width="${cw}" height="${cw}"/>`; return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GX * cw} ${GY * cw}" preserveAspectRatio="none">${c}</svg>`; })();
@@ -1414,7 +1438,7 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
   }
 
-  // SFEER (herbouwd): wisselt ons ÉIGEN patroon (liggend, rechthoekig — net als de
+  // SFEER (herbouwd): wisselt ons ÉIGEN patroon (liggend, rechthoekig, net als de
   // configurator, GEEN boog/pilaren) af met een ÉCHT sfeerbeeld (ambacht/atelier/ruimte/
   // architectuur). Rustig tempo (sfeer = ook een beetje satisfying): foto -> patroon kleurt
   // in -> foto -> vol patroon met de naam. Captions vertellen het Tale of Tiles-verhaal.
@@ -1527,7 +1551,7 @@ export function makeBrand({ ROOT, config }) {
       if (nameOn && named && np) s += `<g>${platePlace(named, np, X + RW / 2, Y + RH / 2, Math.round(RH * 0.17), RW * 0.9)}</g>`;
       return s;
     }
-    // Het paneel aan een ECHTE muur (mockup + diepte + lijst) — hergebruikt de in-situ-opmaak.
+    // Het paneel aan een ECHTE muur (mockup + diepte + lijst), hergebruikt de in-situ-opmaak.
     function wallScene(mk, cols, id) {
       const A2 = Math.max(1.2, Math.min(1.65, pw / ph)), pl = mk && mk.place;
       let wH = Math.round(pl ? pl.h * H : H * 0.34), wW = Math.round(wH * A2);
@@ -1597,7 +1621,7 @@ export function makeBrand({ ROOT, config }) {
     };
     const hook = RVlang(hooks, lang);
     const revealLine = named
-      ? { nl: "Een handgemaakt naambord — met hun naam, in echt glazuur.", en: "A handmade nameplate — with their name, in real glaze.", fr: "Une plaque faite main — à leur nom, en véritable émail." }[lang]
+      ? { nl: "Een handgemaakt naambord, met hun naam, in echt glazuur.", en: "A handmade nameplate, with their name, in real glaze.", fr: "Une plaque faite main, à leur nom, en véritable émail." }[lang]
       : { nl: "Met de hand gemaakt. Een stuk kunst voor aan de muur.", en: "Made by hand. A piece of art for the wall.", fr: "Fait main. Une œuvre pour le mur." }[lang];
     // CTA: de naam-belovende regel ("...met een naam erop") alleen toestaan als er ook ECHT een
     // naam op het paneel staat. Anders belooft de caption iets dat niet in beeld is.
@@ -1674,7 +1698,7 @@ export function makeBrand({ ROOT, config }) {
     const pals = [fam0, ...others].map((k) => PALS()[k] || film.PAL);
     const finals = pals.map((p) => film.flowColorsAt(parsed, { palette: p, durSec: 1, buildSec: 1, buildStart: 0 }, 1000));
     const np2 = plateColours(pals[2] || pals[0]);
-    // muur (in-situ) voor de WAAR-fase — paneel past binnen de vrije plek
+    // muur (in-situ) voor de WAAR-fase, paneel past binnen de vrije plek
     const mk = mockupPool.length ? pickFreshObj(mockupPool, "mockups") : null;
     const pl = mk && mk.place;
     // LIGGEND paneel met een VASTE nette verhouding (PANEL_ASPECT), NIET afgeleid van de patroon-view
@@ -1708,9 +1732,9 @@ export function makeBrand({ ROOT, config }) {
     const INTRO_SCRIPTS = {
       nl: [
         { wat: { t: "Handgemaakte mozaïekkunst met jouw naam.", k: "Dit is Tale of Tiles" }, hoe: { t: "Jij kiest het patroon, de kleuren en je naam.", k: "Zelf ontworpen" }, waar: { t: "En het hangt als kunst aan jouw muur of gevel.", k: "Aan jouw muur" } },
-        { wat: { t: "Met de hand gelegd, tegel voor tegel.", k: "Een eeuwenoud ambacht" }, hoe: { t: "Gesneden, geglazuurd en gebakken — met de hand.", k: "Uit Fès" }, waar: { t: "Nu als een schilderij aan jouw muur.", k: "Vandaag bij jou" } },
-        { wat: { t: "Geen print — mozaïek dat je voelt.", k: "Echt glazuur, echt reliëf" }, hoe: { t: "Verbleekt niet, binnen én buiten.", k: "Kleur die blijft" }, waar: { t: "Aan je gevel of in de hal, generaties lang.", k: "Blijvend" } },
-        { wat: { t: "Eén naam, oneindig veel ontwerpen.", k: "Nooit twee gelijk" }, hoe: { t: "Kies je patroon, je kleuren, je naam.", k: "Jij bepaalt" }, waar: { t: "Klaar om op te hangen — een kunstwerk voor je muur.", k: "Aan jouw muur" } },
+        { wat: { t: "Met de hand gelegd, tegel voor tegel.", k: "Een eeuwenoud ambacht" }, hoe: { t: "Gesneden, geglazuurd en gebakken, met de hand.", k: "Uit Fès" }, waar: { t: "Nu als een schilderij aan jouw muur.", k: "Vandaag bij jou" } },
+        { wat: { t: "Geen print, mozaïek dat je voelt.", k: "Echt glazuur, echt reliëf" }, hoe: { t: "Verbleekt niet, binnen én buiten.", k: "Kleur die blijft" }, waar: { t: "Aan je gevel of in de hal, generaties lang.", k: "Blijvend" } },
+        { wat: { t: "Eén naam, oneindig veel ontwerpen.", k: "Nooit twee gelijk" }, hoe: { t: "Kies je patroon, je kleuren, je naam.", k: "Jij bepaalt" }, waar: { t: "Klaar om op te hangen, een kunstwerk voor je muur.", k: "Aan jouw muur" } },
         { wat: { t: "Handgemaakte kunst met hun naam.", k: "Meer dan een bordje" }, hoe: { t: "Stuk voor stuk gemaakt, speciaal voor hen.", k: "Met de hand" }, waar: { t: "Een schilderij om door te geven.", k: "Iets dat blijft" } },
         { wat: { t: "Wat eeuwen aan paleismuren hing…", k: "Fès" }, hoe: { t: "…nu met de hand gelegd, in jouw kleuren.", k: "Hetzelfde ambacht" }, waar: { t: "Aan jouw muur van nu, binnen of buiten.", k: "Van paleis tot jouw muur" } },
         { wat: { t: "Jouw bedrijfsnaam als handgemaakt kunstwerk.", k: "Voor je zaak" }, hoe: { t: "Gelegd in de kleuren van jouw huisstijl.", k: "Op maat" }, waar: { t: "Het eerste wat gasten zien aan je gevel.", k: "Aan je pui" } },
@@ -1728,9 +1752,9 @@ export function makeBrand({ ROOT, config }) {
       ],
       en: [
         { wat: { t: "Handmade mosaic art with your name.", k: "This is Tale of Tiles" }, hoe: { t: "You pick the pattern, the colours, your name.", k: "Your design" }, waar: { t: "And it hangs as art on your wall or facade.", k: "On your wall" } },
-        { wat: { t: "Laid by hand, tile by tile.", k: "An age-old craft" }, hoe: { t: "Cut, glazed and fired — all by hand.", k: "From Fès" }, waar: { t: "Now a painting on your wall.", k: "Today, yours" } },
-        { wat: { t: "No print — mosaic you can feel.", k: "Real glaze, real relief" }, hoe: { t: "Won't fade, indoors or out.", k: "Colour that stays" }, waar: { t: "On your facade or in the hall, for generations.", k: "Lasting" } },
-        { wat: { t: "One name, endless designs.", k: "Never two alike" }, hoe: { t: "Pick your pattern, your colours, your name.", k: "You decide" }, waar: { t: "Ready to hang — a piece of art for your wall.", k: "On your wall" } },
+        { wat: { t: "Laid by hand, tile by tile.", k: "An age-old craft" }, hoe: { t: "Cut, glazed and fired, all by hand.", k: "From Fès" }, waar: { t: "Now a painting on your wall.", k: "Today, yours" } },
+        { wat: { t: "No print, mosaic you can feel.", k: "Real glaze, real relief" }, hoe: { t: "Won't fade, indoors or out.", k: "Colour that stays" }, waar: { t: "On your facade or in the hall, for generations.", k: "Lasting" } },
+        { wat: { t: "One name, endless designs.", k: "Never two alike" }, hoe: { t: "Pick your pattern, your colours, your name.", k: "You decide" }, waar: { t: "Ready to hang, a piece of art for your wall.", k: "On your wall" } },
         { wat: { t: "Handmade art with their name.", k: "More than a label" }, hoe: { t: "Made piece by piece, just for them.", k: "By hand" }, waar: { t: "A painting to pass on.", k: "Something that lasts" } },
         { wat: { t: "What once lined palace walls…", k: "Fès" }, hoe: { t: "…now laid by hand, in your colours.", k: "The same craft" }, waar: { t: "On your wall today, indoors or out.", k: "From palace to your wall" } },
         { wat: { t: "Your business name as handmade art.", k: "For your venue" }, hoe: { t: "Laid in your brand colours.", k: "Bespoke" }, waar: { t: "The first thing guests see at the door.", k: "On your storefront" } },
@@ -1748,9 +1772,9 @@ export function makeBrand({ ROOT, config }) {
       ],
       fr: [
         { wat: { t: "De l'art mosaïque fait main, à votre nom.", k: "Voici Tale of Tiles" }, hoe: { t: "Vous choisissez le motif, les couleurs et le nom.", k: "Votre création" }, waar: { t: "Et il orne votre mur ou façade.", k: "Sur votre mur" } },
-        { wat: { t: "Posé à la main, carreau par carreau.", k: "Un art ancestral" }, hoe: { t: "Taillé, émaillé et cuit — à la main.", k: "De Fès" }, waar: { t: "Désormais un tableau sur votre mur.", k: "Aujourd'hui, chez vous" } },
+        { wat: { t: "Posé à la main, carreau par carreau.", k: "Un art ancestral" }, hoe: { t: "Taillé, émaillé et cuit, à la main.", k: "De Fès" }, waar: { t: "Désormais un tableau sur votre mur.", k: "Aujourd'hui, chez vous" } },
         { wat: { t: "Pas une impression, une mosaïque qui se sent.", k: "Émail et relief" }, hoe: { t: "Ne se décolore pas, dedans comme dehors.", k: "Couleur durable" }, waar: { t: "Sur votre façade ou votre hall, des générations.", k: "Durable" } },
-        { wat: { t: "Un nom, une infinité de designs.", k: "Jamais deux pareils" }, hoe: { t: "Choisissez motif, couleurs et nom.", k: "À vous de décider" }, waar: { t: "Prêt à accrocher — une œuvre pour votre mur.", k: "Sur votre mur" } },
+        { wat: { t: "Un nom, une infinité de designs.", k: "Jamais deux pareils" }, hoe: { t: "Choisissez motif, couleurs et nom.", k: "À vous de décider" }, waar: { t: "Prêt à accrocher, une œuvre pour votre mur.", k: "Sur votre mur" } },
         { wat: { t: "De l'art fait main, à leur nom.", k: "Plus qu'une plaque" }, hoe: { t: "Fait pièce par pièce, rien que pour eux.", k: "À la main" }, waar: { t: "Un tableau à transmettre.", k: "Qui dure" } },
         { wat: { t: "Ce qui ornait les palais…", k: "Fès" }, hoe: { t: "…posé à la main, dans vos couleurs.", k: "Le même art" }, waar: { t: "Sur votre mur d'aujourd'hui, dedans ou dehors.", k: "Du palais à votre mur" } },
         { wat: { t: "Le nom de votre enseigne en art fait main.", k: "Pour votre lieu" }, hoe: { t: "Posé dans les couleurs de votre marque.", k: "Sur mesure" }, waar: { t: "La première chose que l'on voit à l'entrée.", k: "Sur votre devanture" } },
@@ -1831,144 +1855,223 @@ export function makeBrand({ ROOT, config }) {
   // DROSTE (type 12, IMAGE+FLITS-herbouw): RESVG-VEILIG. De eerdere aanpakken lieten resvg
   // crashen op een ingezoomde geneste <svg>-viewBox. Daarom renderen we elk patroon ÉÉN keer
   // naar een PNG (dat doet resvg foutloos, geen rare zoom) en zoomen we daarna in met een
-  // gewone <image> (positie + grootte) — géén geneste svg, géén viewBox-upscale, dus resvg kan
+  // gewone <image> (positie + grootte), géén geneste svg, géén viewBox-upscale, dus resvg kan
   // niet crashen. Per stap staat MAAR ÉÉN patroon in beeld: vol paneel -> camera zoomt in op één
   // tegel -> korte lichtflits dekt de sprong -> volgend patroon weer vol in beeld. Iris-effect,
   // geen nesten. Naadloze loop: na NP stappen is de keten rond.
-  async function makeDrosteRender({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24;
-    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+  // ONEINDIGE INZOOM (herbouw, OPTIE 1: ffmpeg-zoompan). De vorige aanpakken lieten resvg crashen
+  // omdat ze per frame een ingezoomde SVG renderden (geom.rs unwrap on None). Nieuwe techniek, die
+  // de crash bij de WORTEL wegneemt: resvg rendert elk patroon EEN KEER naar een scherpe paneel-PNG
+  // op NETTE grootte (nooit een crash-conditie), en ffmpeg doet ALLE zoom + de doorval via zoompan.
+  // Per patroon een in-zoom-clip (vol paneel -> diep op de doel-tegel), de volgende begint diep en
+  // zoomt uit (de "doorval"); een korte witte flits (xfade fadewhite) dekt het naadje. Levert een
+  // kant-en-klare mp4 via { prebuilt }, net als de walkthrough -> de engine gebruikt 'm direct.
+  async function makeDrosteRender({ opts = {}, format = "9:16", log = () => {} }) {
+    // ONEINDIGE INZOOM (iris). In EEN steen zit ECHT het volgende patroon (geklipt op de ECHTE
+    // tegelvorm -> ook ruit/ster/pad, niet alleen vierkant; met glazuur = onderdeel van het mozaiek).
+    // Van ver zie je het licht; de camera duikt er cinematisch op in (pauze -> versnellen -> vertragen),
+    // gaat DOOR tot de steen het scherm VULT, een korte pauze "je bent erin", dan een FLITS en je zit
+    // in het volgende patroon, dat weer zo'n steen heeft. Oneindig.
+    // CRASH-VEILIG: resvg rendert ALLEEN platte patronen + maskers/glans van 1 vorm (nooit clip of
+    // genest ingezoomd SVG -> dat crasht resvg op complexe patronen). Clippen + zoom + flits = ffmpeg.
+    const [BW, BH] = FORMATS[format] || FORMATS["9:16"];
+    const W = BW * 2, H = BH * 2;
+    const FPS = 24;
     let durSec = resolveDuration(opts);
-    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
-    const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const { Resvg } = await import("@resvg/resvg-js");
+    const ffmpeg = FFMPEG || "ffmpeg";
 
     const tempoKey = (opts.tempo || opts.speed || "normaal");
-    const STEP_SEC = tempoKey === "snel" ? 2.6 : tempoKey === "rustig" ? 4.6 : 3.5;
-    const NP = Math.max(3, Math.min(14, Math.round(durSec / STEP_SEC)));
-    durSec = NP * STEP_SEC;   // snap op hele stappen -> naadloze loop
-
-    const A = PANEL_ASPECT;
-    const fit = fitRect(Math.round(W * 0.84), Math.round(H * 0.74), A);
-    const rx = Math.round((W - fit.w) / 2), ry = Math.round(H * 0.52 - fit.h / 2), rr = Math.max(6, fit.w * 0.03);
+    const STEP_SEC = tempoKey === "snel" ? 3.2 : tempoKey === "rustig" ? 4.8 : 4.0;   // ruimer voor cinematische pacing
+    const NP = Math.max(3, Math.min(8, Math.round(durSec / STEP_SEC)));
+    durSec = NP * STEP_SEC;
 
     const famKeys = Object.keys(film.GLAZE_FAMILIES).sort(() => Math.random() - 0.5);
     let pats = pickPatterns(NP);
     while (pats.length && pats.length < NP) pats.push(pats[pats.length - 1]);
-    if (!pats.length) throw new Error("droste: geen patronen");
+    if (!pats.length) throw new Error("oneindige inzoom: geen patronen");
 
-    // Per patroon: render ÉÉN keer naar een grote PNG (scherp genoeg voor de diepe inzoom tot in
-    // één tegel), met EXACT de paneel-verhouding (zodat het beeld het vak vult, geen lege strook).
-    // We tegelen ruim zodat het hele vak gevuld is. Kies ook de doel-tegel (dichtst bij het midden)
-    // om op in te zoomen.
-    // PNG fors groter dan vroeger (was 3.2x): we zoomen nu DIEP in op één tegel (tot ~10x), dus
-    // die ene tegel moet bij maximale zoom nog steeds scherp zijn. ~9x paneel-breedte dekt dat.
-    const TILE_W = Math.round(fit.w * SS * 9);                  // PNG ruim groter -> één tegel blijft scherp bij diepe inzoom
-    const TILE_H = Math.round(TILE_W * fit.h / fit.w);          // exact paneel-verhouding
-    const steps = [];
-    for (let i = 0; i < pats.length; i++) {
-      const pid = pats[i], base = await getBase(pid), lock = LOCKS[pid] || {};
-      const { nX, nY } = tileCounts(base, lock, PANEL_ASPECT);
-      // iets ruimer tegelen dan nodig -> het vak is altijd vol, ook aan de randen bij het pannen
-      const parsed = film.parseTiles(await getPatternSvg(pid, nX + 1, nY + 1), "radial");
-      const palArr = film.GLAZE_FAMILIES[famKeys[i % famKeys.length]] || film.PAL;
-      const cols = film.flowColorsAt(parsed, { palette: palArr, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
-      const pw = parsed.view[2], ph = parsed.view[3];
-      // doel-tegel: dichtst bij het midden (daar zoomen we op in). nx/ny zijn 0..1 in de parse.
-      let bt = parsed.tiles[0], bd = 1e9, bi = 0;
-      for (let q = 0; q < parsed.tiles.length; q++) { const tl = parsed.tiles[q]; const dx = tl.nx - 0.5, dy = tl.ny - 0.5, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = tl; bi = q; } }
-      // ZOOM-DIEPTE per patroon: zoom precies zover dat ÉÉN tegel het vak ~vult, NIET dieper (anders
-      // beland je in de voeg/achtergrond en wordt het beeld leeg). Tegel-grootte = afstand van de
-      // doel-tegel tot z'n dichtstbijzijnde buur (in nx/ny-fractie). zEnd = ~0.9 / tegel-fractie.
-      let nn = 1e9;
-      for (let q = 0; q < parsed.tiles.length; q++) { if (q === bi) continue; const dx = parsed.tiles[q].nx - bt.nx, dy = parsed.tiles[q].ny - bt.ny; const dd = dx * dx + dy * dy; if (dd > 1e-9 && dd < nn) nn = dd; }
-      const pitch = Math.max(0.045, Math.min(0.5, Math.sqrt(nn) || 0.14));
-      // ECHT IRIS-EFFECT: zoom door tot ÉÉN tegel het hele vak vult. 'pitch' is de tegelgrootte
-      // als fractie van het paneel (afstand tussen twee buur-tegels). Eén tegel vult het vak bij
-      // zoom = 1/pitch. We mikken daar nét iets voorbij (1.05/pitch) zodat de tegel de rand raakt,
-      // en begrenzen op 6-13x zodat kleine én grote tegels allebei het scherm vullen zonder in de
-      // lege voeg te belanden. Dit is de kern van de fix: vroeger 2.2-3.2x (hele muur bleef zichtbaar).
-      const zEnd = Math.max(6, Math.min(13, 1.05 / pitch));
-      // Bouw het volle paneel-SVG (tegels + glazuur) en render het naar PNG met het vak-formaat
-      // (preserveAspectRatio slice -> vult TILE_W×TILE_H zonder lege rand).
-      const wrap = `<svg x="0" y="0" width="${TILE_W}" height="${TILE_H}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
-      const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
-      // de glazuur-glans-defs (url(#tglz)) zitten normaal in composeChrome; hier zelf meegeven.
-      const doc = `<svg viewBox="0 0 ${TILE_W} ${TILE_H}" xmlns="http://www.w3.org/2000/svg">`
-        + `<defs><linearGradient id="tglz" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/><stop offset="0.2" stop-color="#ffffff" stop-opacity="0.14"/><stop offset="0.55" stop-color="#000000" stop-opacity="0"/><stop offset="0.82" stop-color="#000000" stop-opacity="0.2"/><stop offset="1" stop-color="#000000" stop-opacity="0.45"/></linearGradient>`
-        + `<linearGradient id="tglzraw" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/><stop offset="0.28" stop-color="#ffffff" stop-opacity="0.18"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#8a8378" stop-opacity="0.34"/></linearGradient></defs>`
-        + mos + `</svg>`;
-      const png = new Resvg(doc, { fitTo: { mode: "width", value: TILE_W }, font: { loadSystemFonts: false } }).render().asPng();
-      steps.push({ uri: "data:image/png;base64," + png.toString("base64"), tcx: bt.nx, tcy: bt.ny, zEnd });
+    const work = path.resolve(ROOT, config.outDir, ".iris-" + Date.now());
+    await fs.mkdir(work, { recursive: true });
+    const runFf = (args) => new Promise((resolve) => {
+      const p = spawn(ffmpeg, ["-v", "error", "-y", ...args], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+      let e = ""; if (p.stderr) p.stderr.on("data", (d) => (e += d.toString()));
+      p.on("error", () => resolve({ code: 1, err: "ffmpeg start faalde" }));
+      p.on("close", (c) => resolve({ code: c, err: e }));
+    });
+
+    const SW = 4800, SH = Math.round(SW * 16 / 9);
+    const GLZ = `<defs><linearGradient id="tglz" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/><stop offset="0.55" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity="0.4"/></linearGradient>`
+      + `<linearGradient id="tglzraw" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/><stop offset="1" stop-color="#8a8378" stop-opacity="0.3"/></linearGradient></defs>`;
+
+    // NORMALE tegeling (zoals satisfying/in-situ via tileCounts) = rijk fijn mozaiek, GEEN reuzeplakken.
+    const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
+    const prep = async (pid, fam) => {
+      const b = await getBase(pid), lock = LOCKS[pid] || {};
+      const tc = tileCounts(b, lock, PANEL_ASPECT);
+      // Iets grotere tegels dan normaal (x0.65): nog steeds een rijk mozaiek (geen plakken), maar
+      // een enkele tegel is groot genoeg om er SCHERP en VOLLEDIG op in te zoomen (anders blijft de
+      // doeltegel te klein en wordt de overgang een cross-fade tussen twee schalen i.p.v. 1 inzoom).
+      const nX = Math.max(2, Math.round(tc.nX * 0.65)), nY = Math.max(3, Math.round(tc.nY * 0.65));
+      const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
+      const cols = film.flowColorsAt(parsed, { palette: film.GLAZE_FAMILIES[fam] || film.PAL, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
+      return { parsed, cols, pw: parsed.view[2], ph: parsed.view[3] };
+    };
+    const flatPng = async (P, outPath) => {
+      const wrap = `<svg x="0" y="0" width="${SW}" height="${SH}" viewBox="0 0 ${P.pw} ${P.ph}" preserveAspectRatio="xMidYMid slice">`;
+      const mos = film.buildSvg(P.parsed, P.cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, P.cols).replace(/<svg\b[^>]*>/i, wrap);
+      await fs.writeFile(outPath, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">${GLZ}${mos}</svg>`, { fitTo: { mode: "width", value: SW }, font: { loadSystemFonts: false } }).render().asPng());
+    };
+    // geometrie + bbox + raw-center van EEN tegel-vorm, generiek (polygon/rect/path) -> ECHTE tegelvorm
+    const shapeInfo = (tag) => {
+      const t = tag.toLowerCase();
+      if (t.includes("<rect")) { const g = (k) => parseFloat((tag.match(new RegExp(k + '="([^"]*)"')) || [])[1] || 0); const x = g("x"), y = g("y"), w = g("width"), h = g("height"); return { geom: `<rect x="${x}" y="${y}" width="${w}" height="${h}"`, cx: x + w / 2, cy: y + h / 2, bb: [x, y, x + w, y + h] }; }
+      const isPoly = t.includes("<polygon");
+      const src = isPoly ? ((tag.match(/points="([^"]*)"/) || [])[1] || "") : ((tag.match(/\bd="([^"]*)"/) || [])[1] || "");
+      const n = (src.match(/-?[0-9.]+/g) || []).map(Number); let sx = 0, sy = 0, c = 0, mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
+      for (let i = 0; i + 1 < n.length; i += 2) { sx += n[i]; sy += n[i + 1]; c++; mnx = Math.min(mnx, n[i]); mny = Math.min(mny, n[i + 1]); mxx = Math.max(mxx, n[i]); mxy = Math.max(mxy, n[i + 1]); }
+      const geom = isPoly ? `<polygon points="${src}"` : `<path d="${src}"`;
+      return { geom, cx: c ? sx / c : 0, cy: c ? sy / c : 0, bb: [mnx, mny, mxx, mxy] };
+    };
+
+    const preps = [], flats = [];
+    for (let i = 0; i < pats.length; i++) { const P = await prep(pats[i], famKeys[i % famKeys.length]); preps.push(P); const fp = path.join(work, "flat" + i + ".png"); await flatPng(P, fp); flats.push(fp); log(`  inzoom-paneel ${i + 1}/${pats.length} klaar`); }
+
+    const levels = [];
+    for (let i = 0; i < preps.length; i++) {
+      const A = preps[i];
+      const scale = Math.max(SW / A.pw, SH / A.ph);
+      const offx = (A.pw * scale - SW) / 2, offy = (A.ph * scale - SH) / 2;
+      const toScr = (x, y) => [x * scale - offx, y * scale - offy];
+      let bt = A.parsed.tiles[0], bd = 1e9;
+      for (const t of A.parsed.tiles) { const [sx, sy] = toScr(t.gx, t.gy); const dx = sx / SW - 0.5, dy = sy / SH - 0.5, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = t; } }
+      const rawTag = A.parsed.svg.slice(bt.start, bt.end);
+      const si = shapeInfo(rawTag);
+      let ax0, ay0, ax1, ay1;
+      if (si.bb[0] < si.bb[2] && si.bb[1] < si.bb[3]) { const tx = bt.gx - si.cx, ty = bt.gy - si.cy; ax0 = si.bb[0] + tx; ay0 = si.bb[1] + ty; ax1 = si.bb[2] + tx; ay1 = si.bb[3] + ty; }
+      else { const s = A.pw * 0.08; ax0 = bt.gx - s; ay0 = bt.gy - s; ax1 = bt.gx + s; ay1 = bt.gy + s; }
+      const tx = bt.gx - si.cx, ty = bt.gy - si.cy;
+      const [sx0, sy0] = toScr(ax0, ay0), [sx1, sy1] = toScr(ax1, ay1);
+      const px0 = Math.round(sx0), py0 = Math.round(sy0), pw2 = Math.max(8, Math.round(sx1 - sx0)), ph2 = Math.max(8, Math.round(sy1 - sy0));
+      // MASK + GLANS met de ECHTE tegelvorm, verschoven via <g transform> (geen clipPath -> veilig)
+      const shapeWhite = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" fill="#ffffff" stroke="none">${si.geom}/></g>`;
+      const shapeGlz = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" stroke="none" fill="url(#tglz)">${si.geom}/></g>`;
+      const mk = path.join(work, "mk" + i + ".png"), gl = path.join(work, "gl" + i + ".png");
+      // CRUCIAAL: mask + glans met DEZELFDE slice-wrap als de flats (viewBox 0 0 SW SH, binnenin het
+      // patroon met preserveAspectRatio slice). Anders staat de mask in het vierkante patroon-stelsel
+      // terwijl de flats 9:16-gesneden zijn -> de tegelvorm belandt op de verkeerde plek (naast de zoom).
+      const sliceInner = (content) => `<svg x="0" y="0" width="${SW}" height="${SH}" viewBox="0 0 ${A.pw} ${A.ph}" preserveAspectRatio="xMidYMid slice">${content}</svg>`;
+      await fs.writeFile(mk, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg"><rect width="${SW}" height="${SH}" fill="#000000"/>${sliceInner(shapeWhite)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      await fs.writeFile(gl, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">${GLZ}${sliceInner(shapeGlz)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      const level = path.join(work, "level" + i + ".png");
+      const nextFlat = flats[(i + 1) % flats.length];
+      // Volgende patroon COVER-vult de tegel (zelfde beeldverhouding, bijsnijden, geen vervorming)
+      // -> het patroon is TEGELDEKKEND binnen de echte tegelvorm, geen klein lapje in het midden.
+      const r = await runFf(["-i", flats[i], "-i", nextFlat, "-i", mk, "-i", gl, "-filter_complex",
+        `[1:v]scale=${pw2}:${ph2}:force_original_aspect_ratio=increase,crop=${pw2}:${ph2}[bs];color=black@0:s=${SW}x${SH},format=rgba[cv];[cv][bs]overlay=${px0}:${py0}[bl];[2:v]format=gray,scale=${SW}:${SH}[mk];[bl][mk]alphamerge[bm];[0:v][bm]overlay=0:0[ab];[ab][3:v]overlay=0:0[o]`,
+        "-map", "[o]", "-frames:v", "1", level]);
+      if (r.code !== 0) throw new Error("niveau-composiet faalde: " + (r.err || "").trim().split("\n").pop());
+      // Zoom DIEP genoeg dat de tegel (met het volgende patroon erin) het HELE scherm vult: naar de
+      // grootste schermdimensie, zodat je geen omringende tegels meer ziet aan het eind van de inzoom.
+      const tcx = (sx0 + sx1) / 2 / SW, tcy = (sy0 + sy1) / 2 / SH;
+      const fillZ = Math.max(SW / Math.max(1, (sx1 - sx0)), SH / Math.max(1, (sy1 - sy0)));
+      const ZD = Math.max(6, Math.min(22, fillZ));
+      levels.push({ png: level, plain: flats[i], tcx, tcy, ZD });
+      log(`  inzoom-niveau ${i + 1}/${preps.length} klaar`);
     }
-    const stepAt = (n) => steps[((n % NP) + NP) % NP];
 
-    const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
-    // IRIS-gevoel, nu ECHT: je zoomt DIEP in op één tegel (tot die tegel het scherm vult), en op dat
-    // moment — verborgen door een korte flits — begin je al diep INGEZOOMD in het VOLGENDE patroon,
-    // dat dan uitzoomt tot vol paneel. Zo lijkt het alsof je dóór dat tegeltje in een nieuwe wereld
-    // valt. GEEN twee patronen naast elkaar meer: tijdens de wissel dekt de flits het beeld, en het
-    // volgende patroon komt op EXACT hetzelfde punt binnen waar je induikt (niet gecentreerd).
-    const SWAP = Math.min(0.42, STEP_SEC * 0.12);       // laatste stukje: de "doorval" + flits-wissel
-    // teken een patroon-laag (PNG) met zoom z, gecentreerd op (cx,cy) in paneel-fractie.
-    function layerAt(sp, z, cx, cy) {
-      const iw = fit.w * z, ih = fit.h * z;
-      const ix = rx + fit.w / 2 - cx * iw, iy = ry + fit.h / 2 - cy * ih;
-      return `<image href="${sp.uri}" x="${ix.toFixed(2)}" y="${iy.toFixed(2)}" width="${iw.toFixed(2)}" height="${ih.toFixed(2)}" preserveAspectRatio="none"/>`;
-    }
-
-    function sceneAt(frame) {
-      const t = frame / FPS;
-      const step = Math.floor(t / STEP_SEC);
-      const tl = t - step * STEP_SEC;                   // 0..STEP_SEC binnen deze stap
-      const sp = stepAt(step);
-      const b = tl / STEP_SEC;                          // 0..1 binnen de stap
-      const toEnd = STEP_SEC - tl;
-
-      let layers;
-      if (toEnd >= SWAP) {
-        // NORMALE FASE: inzoomen op de doel-tegel tot die het vak VULT (zEnd per patroon, nu diep).
-        // EXPONENTIËLE zoom (z = zEnd^b) i.p.v. b^3: bij een diepe inzoom (tot 13x) voelt dat als
-        // gelijkmatig "doorvallen" met constante snelheid, niet als traag-dan-plots-wegspringen.
-        // Het centrum verschuift gelijk-op met de zoom naar de doel-tegel, zodat die tegel precies
-        // in het midden blijft tijdens de hele induik (anders glijdt 'ie uit beeld bij diepe zoom).
-        const z = Math.pow(sp.zEnd, b);
-        const k = (z - 1) / (sp.zEnd - 1);              // 0 bij vol paneel -> 1 bij tegel-vult-scherm
-        const cx = 0.5 + (sp.tcx - 0.5) * k, cy = 0.5 + (sp.tcy - 0.5) * k;
-        layers = layerAt(sp, z, cx, cy);
-      } else {
-        // DOORVAL-FASE (laatste SWAP seconden): we zitten al diep IN de tegel. We beginnen nu diep
-        // INGEZOOMD in het VOLGENDE patroon (op zíjn doel-tegel) en zoomen dat uit richting vol
-        // paneel. Ook hier exponentieel, zodat de doorval naadloos aansluit op de induik ervoor.
-        // De flits (hieronder) dekt het exacte wisselmoment, dus je ziet nooit twee tegels tegelijk.
-        const nxt = stepAt(step + 1);
-        const s = smooth(1 - toEnd / SWAP);             // 0 -> 1 over de doorval
-        const z = Math.pow(nxt.zEnd, 1 - s);            // diep ingezoomd (zEnd) -> 1 (vol paneel)
-        const k = (z - 1) / (nxt.zEnd - 1);             // centrum mee terug naar het midden
-        const cx = 0.5 + (nxt.tcx - 0.5) * k, cy = 0.5 + (nxt.tcy - 0.5) * k;
-        layers = layerAt(nxt, z, cx, cy);
+    // 3) cinematische zoom-clip met STEEN-INFADE. Twee lagen zoomen identiek: het patroon ZONDER
+    //    steen (plain) en MET steen (stone). De steen-laag fadet IN tijdens de zoom -> aan het begin
+    //    zie je het volgende patroon NIET, pas als je nadert komt het langzaam in beeld. PAUZE aan het
+    //    begin (je ziet het volle patroon) en aan het eind (het hele volgende patroon vult het scherm).
+    const D = Math.round(STEP_SEC * FPS);
+    const hs = Math.round(0.8 * FPS);   // begin-pauze (vol patroon) - ruim genoeg om de dissolve te dekken
+    const he = Math.round(0.8 * FPS);   // eind-pauze (het hele volgende patroon vult het scherm)
+    const zf = Math.max(1, D - hs - he);
+    // Zoom via PER-FRAME crop+scale (ffmpeg crop), NIET zoompan: zoompan geeft op fijn-gedetailleerde
+    // patronen een foute zoomfactor/centrering (inhoud-afhankelijke bug). crop is deterministisch en
+    // exact. Hold-frames (begin/eind) worden hergebruikt zodat we alleen de zoomfase echt renderen.
+    let lv_ZD, lv_tcx, lv_tcy;
+    const smoother = (on) => { if (on < hs) return 1; if (on >= D - he) return lv_ZD; const pp = (on - hs) / zf; const s = pp * pp * pp * (pp * (pp * 6 - 15) + 10); return Math.pow(lv_ZD, s); };
+    const makeZoom = async (src, outMp4) => {
+      const fdir = outMp4 + "_f";
+      await fs.mkdir(fdir, { recursive: true });
+      const fname = (i) => path.join(fdir, String(i).padStart(4, "0") + ".png");
+      const crop = async (Z, i) => {
+        const cw = Math.max(2, Math.round(SW / Z)), ch = Math.max(2, Math.round(SH / Z));
+        let cx = Math.round(SW * lv_tcx - cw / 2), cy = Math.round(SH * lv_tcy - ch / 2);
+        cx = Math.max(0, Math.min(SW - cw, cx)); cy = Math.max(0, Math.min(SH - ch, cy));
+        const rr = await runFf(["-i", src, "-vf", `crop=${cw}:${ch}:${cx}:${cy},scale=${W}:${H}:flags=lanczos`, "-frames:v", "1", fname(i)]);
+        if (rr.code !== 0) throw new Error("inzoom-crop faalde: " + (rr.err || "").trim().split("\n").pop());
+      };
+      // Alleen de unieke zoomfase-frames echt croppen; begin/eind-hold zijn identiek (hergebruik).
+      const uniq = [];
+      for (let on = 0; on < D; on++) { if (on === 0 || (on >= hs && on <= D - he)) uniq.push(on); }
+      // PARALLEL in batches (sneller op multi-core, maar niet te veel tegelijk ivm geheugen).
+      const BATCH = 4;
+      for (let k = 0; k < uniq.length; k += BATCH) {
+        await Promise.all(uniq.slice(k, k + BATCH).map((on) => crop(smoother(on), on)));
       }
-      let inner = `<clipPath id="drc"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}"/></clipPath>`
-        + `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#efe7d4"/>${layers}${glazeSvg(rx, ry, fit.w, fit.h, "dr")}</g>`
-        + `<rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
-      // FLITS die de WISSEL dekt: piekt precies op de stap-grens (daar wisselt huidig<->volgend
-      // patroon), zodat je het wisselmoment nooit als "twee patronen" ziet. Sterk genoeg om de
-      // sprong te verbergen, maar kort (alleen rond de grens). Niet aan het begin van de eerste stap.
-      let fop = 0;
-      if (toEnd < SWAP) fop = smooth(1 - toEnd / SWAP);          // oplopend naar de grens (binnen de doorval)
-      else if (tl < SWAP && step > 0) fop = smooth(1 - tl / SWAP); // uitdovend net na de grens
-      if (fop > 0.01) inner += `<g clip-path="url(#drc)"><rect x="${rx}" y="${ry}" width="${fit.w}" height="${fit.h}" fill="#fff8ec" opacity="${(fop * 0.72).toFixed(3)}"/></g>`;
-      let overlay = "";
-      if (t < 3.0) { const op = t < 2.0 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.0) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
-      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+      for (let on = 1; on < hs; on++) await fs.copyFile(fname(0), fname(on));               // begin-hold = frame 0
+      for (let on = D - he + 1; on < D; on++) await fs.copyFile(fname(D - he), fname(on));   // eind-hold = frame D-he
+      const rr = await runFf(["-framerate", String(FPS), "-i", path.join(fdir, "%04d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p", outMp4]);
+      if (rr.code !== 0) throw new Error("inzoom-montage faalde: " + (rr.err || "").trim().split("\n").pop());
+      try { await fs.rm(fdir, { recursive: true, force: true }); } catch {}
+    };
+    async function makeClip(lv, outPath) {
+      lv_ZD = lv.ZD; lv_tcx = lv.tcx; lv_tcy = lv.tcy;
+      // 1 zoom per laag (plain = patroon zonder steen; stone = met steen), dan samenvoegen met de infade.
+      const zpl = outPath + ".pl.mp4", zst = outPath + ".st.mp4";
+      await makeZoom(lv.plain, zpl);
+      await makeZoom(lv.png, zst);
+      let r;
+      // steen fadet IN van begin-zoom tot ~80% van de zoom (langzaam zichtbaar), + glazuur-effecten.
+      const fadeSt = (hs / FPS).toFixed(2), fadeDur = (zf * 0.8 / FPS).toFixed(2);
+      r = await runFf(["-i", zpl, "-i", zst, "-filter_complex",
+        `[1:v]format=rgba,fade=t=in:st=${fadeSt}:d=${fadeDur}:alpha=1[st];[0:v][st]overlay=0:0,eq=contrast=1.08:saturation=1.10,vignette=PI/5,format=yuv420p[o]`,
+        "-map", "[o]", "-r", String(FPS), "-c:v", "libx264", "-pix_fmt", "yuv420p", outPath]);
+      if (r.code !== 0) throw new Error("inzoom-clip (samenvoegen) faalde: " + (r.err || "").trim().split("\n").pop());
+      try { await fs.rm(zpl, { force: true }); await fs.rm(zst, { force: true }); } catch {}
     }
-    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
-  }
+    const clipPaths = [];
+    for (let i = 0; i < levels.length; i++) { const out = path.join(work, "clip" + i + ".mp4"); await makeClip(levels[i], out); clipPaths.push(out); log(`  inzoom-clip ${i + 1}/${levels.length} klaar`); }
 
+    // 4) keten: ZACHTE overvloeiing (dissolve) op elke naad i.p.v. een harde flits -> smooth doorlopen
+    //    van "steen vult scherm" naar het scherpe volledige volgende patroon.
+    const XF = 0.7;
+    let chain = clipPaths[0];
+    for (let i = 1; i < clipPaths.length; i++) {
+      const next = path.join(work, "chain" + i + ".mp4");
+      const prevDur = STEP_SEC * i - XF * (i - 1);
+      const r = await runFf(["-i", chain, "-i", clipPaths[i], "-filter_complex", `[0][1]xfade=transition=dissolve:duration=${XF}:offset=${(prevDur - XF).toFixed(2)}`, "-c:v", "libx264", "-pix_fmt", "yuv420p", next]);
+      if (r.code !== 0) throw new Error("keten faalde: " + (r.err || "").trim().split("\n").pop());
+      chain = next; log(`  keten ${i + 1}/${clipPaths.length} geplakt`);
+    }
+
+    const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
+    const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
+    const stripBg = (svg) => svg.replace(/<rect width="\d+" height="\d+" fill="url\(#bg\)"\/>/, "");
+    const chromeSvg = stripBg(composeChrome({ branding, W, H, panel: null, innerField: "", overlay: "", logoUri: branding.logoUri }));
+    const captionSvg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${captionOverlay(line, null, W, H, 1, "lower")}</svg>`;
+    const chromePng = path.join(work, "chrome.png"), captionPng = path.join(work, "caption.png");
+    await fs.writeFile(chromePng, new Resvg(chromeSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
+    await fs.writeFile(captionPng, new Resvg(captionSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
+    const finalPath = path.join(work, "iris-final.mp4");
+    const hasMusic = !!autoMusic;
+    // Echte duur van de keten (dissolves korten elke naad in) -> anders bevriest het laatste frame.
+    const chainDur = STEP_SEC * NP - XF * (NP - 1);
+    const fa = ["-i", chain, "-loop", "1", "-t", String(chainDur), "-i", chromePng, "-loop", "1", "-t", String(chainDur), "-i", captionPng];
+    if (hasMusic) fa.push("-i", autoMusic);
+    fa.push("-filter_complex", `[2]format=rgba,fade=t=out:st=2.6:d=0.6:alpha=1[cap];[0][1]overlay=0:0[vc];[vc][cap]overlay=0:0[v]`, "-map", "[v]");
+    if (hasMusic) fa.push("-map", "3:a", "-c:a", "aac");
+    fa.push("-t", String(chainDur), "-r", String(FPS), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-movflags", "+faststart", finalPath);
+    const rf = await runFf(fa);
+    if (rf.code !== 0) throw new Error("afwerking (chrome+muziek) faalde: " + (rf.err || "").trim().split("\n").pop());
+    return { prebuilt: finalPath, music: "", lang, cleanup: work };
+  }
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
-    if (templateId === "droste") return await makeDrosteRender({ opts, format });
+    if (templateId === "droste") return await makeDrosteRender({ opts, format, log });
     if (templateId === "intro") return await makeIntroRender({ opts, format });
     if (templateId === "walkthrough") return await makeWalkthroughRender({ opts, format, log });
     if (templateId === "cadeau") return await makeCadeauRender({ opts, format });
@@ -2013,7 +2116,7 @@ export function makeBrand({ ROOT, config }) {
     const name = (opts.name || "").trim() || pickName(opts.lang);   // geen naam ingevuld -> engine kiest zelf
     const palArr = resolvePalette(opts, templateId).arr || film.PAL;
     const np = name ? plateColours(palArr) : null;
-    // SATISFYING-CYCLUS: een rij GEVARIEERDE paletten — elke ronde vult 'ie opnieuw in
+    // SATISFYING-CYCLUS: een rij GEVARIEERDE paletten, elke ronde vult 'ie opnieuw in
     // een ander kleurenverhaal. Eerste ronde = het gekozen palet (sluit aan op badge/naam),
     // daarna geschud door de andere levendige paletten/families.
     const cyclePals = (() => {
@@ -2081,7 +2184,7 @@ export function makeBrand({ ROOT, config }) {
     else { Ti = 0; Tb = Math.max(1, durSec * 0.6); Thold = 0; }
     const buildStart = bookend ? Ti : 0;   // inkleuren start ná de intro (bij in-situ: ná de hook)
     const pw = parsed.view[2], ph = parsed.view[3];
-    // tegel-klik UIT — het constante getik was irritant, niet satisfying. Alleen muziek
+    // tegel-klik UIT, het constante getik was irritant, niet satisfying. Alleen muziek
     // eronder. (Mechaniek blijft in de kern; later eventueel met een échte ASMR-sample.)
     const clicks = [];
     // IN-SITU: ons AFGEMAAKTE paneel op de mockup-muur geplakt. De camera kan er als één
@@ -2096,8 +2199,8 @@ export function makeBrand({ ROOT, config }) {
       // vorm (slice), dus de inhoud blijft kloppen.
       const A2 = Math.max(1.2, Math.min(1.65, pw / ph));
       const pl = chosenMockup && chosenMockup.place;
-      // Het paneel moet BINNEN de gedetecteerde vrije plek passen — breedte én hoogte, met
-      // marge — zodat het als een opgehangen werk oogt en nooit over bakstenen/planten/rand
+      // Het paneel moet BINNEN de gedetecteerde vrije plek passen, breedte én hoogte, met
+      // marge, zodat het als een opgehangen werk oogt en nooit over bakstenen/planten/rand
       // heen loopt. Daarna nog harde plafonds zodat het het beeld nooit domineert.
       const freeW = Math.round((pl && pl.w ? pl.w : 0.52) * W * 0.90);
       const freeH = Math.round((pl && pl.h ? pl.h : 0.34) * H * 0.90);
@@ -2149,7 +2252,7 @@ export function makeBrand({ ROOT, config }) {
     const cornerMaskD = `${maskRectD} ${archD}`;
     const breath = (tt) => 1 + 0.10 * (0.5 - 0.5 * Math.cos(2 * Math.PI * 2 * (tt / durSec)));   // heel zachte zoom-adem (getemperd)
     // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
-    // — patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
+    //, patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
     function revealK(tt) {
       const fS = Ti + Tb, fE = durSec - To, span = fE - fS;
       if (span < 7) return 0;
@@ -2181,7 +2284,7 @@ export function makeBrand({ ROOT, config }) {
       let bookendK = 0, zMos = 1, zPho = 1, tailK = 0, frameK = 0;
       if (bookend && insitu) {
         // IN-SITU: de muur is het kader. GEEN foto-intro/outro-zoom. Het paneel bouwt zich
-        // op de muur op en BLIJFT daarna hangen — de video eindigt op het opgehangen werk
+        // op de muur op en BLIJFT daarna hangen, de video eindigt op het opgehangen werk
         // in de ruimte (de payoff die "...tot aan jouw muur" belooft). De lange hold na de
         // opbouw is bewust: je ziet het kunstwerk rustig aan de muur hangen.
         zMos = 1; zPho = 1; bookendK = 0; frameK = 0;
@@ -2225,7 +2328,7 @@ export function makeBrand({ ROOT, config }) {
       const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB)
         + film.buildGlaze(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB);   // + per-tegel glazuur-reliëf
       // LICHTVEEG: één zachte glans trekt diagonaal over het afgemaakte paneel (glazuur
-      // vangt licht) — loopt ná de opbouw, tijdens de hold.
+      // vangt licht), loopt ná de opbouw, tijdens de hold.
       let sweep = "";
       {
         const hs = buildStart + Tb + 0.2, he = (bookend && !insitu ? durSec - To : durSec) - 0.3;
@@ -2263,7 +2366,7 @@ export function makeBrand({ ROOT, config }) {
         const outK = (bookend && !insitu) ? photoK : tailK;
         let op;
         if (isCycle) {
-          // SATISFYING: de naam pulseert mee met elke ronde — graveert zodra het paneel vol is
+          // SATISFYING: de naam pulseert mee met elke ronde, graveert zodra het paneel vol is
           // (de payoff) en vervaagt als 't weer leegloopt, zodat je de hele cyclus blijft zien.
           const cycN = Math.max(1, Math.round((durSec * tempoMul) / 7));
           const Tc = durSec / cycN, Tf = Tc * 0.46, Th = Tc * 0.12, Td = Tc * 0.40;
@@ -2309,7 +2412,7 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks };
   }
 
-  // thumbnail: kaal patroon leesbaar (cream op plum) — voor de patroonkiezer
+  // thumbnail: kaal patroon leesbaar (cream op plum), voor de patroonkiezer
   async function thumbSvg(pattern) {
     let svg = await getBase(pattern);
     return svg.replace(/fill:\s*#[0-9a-fA-F]{3,6}/g, "fill:#e8dcc0").replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#e8dcc0"')
@@ -2322,3 +2425,4 @@ export function makeBrand({ ROOT, config }) {
     options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }
+
