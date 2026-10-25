@@ -1901,7 +1901,7 @@ export function makeBrand({ ROOT, config }) {
       p.on("close", (c) => resolve({ code: c, err: e }));
     });
 
-    const SW = 4800, SH = Math.round(SW * 16 / 9);
+    const SW = 5000, SH = Math.round(SW * 16 / 9);
     const GLZ = `<defs><linearGradient id="tglz" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/><stop offset="0.55" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity="0.4"/></linearGradient>`
       + `<linearGradient id="tglzraw" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/><stop offset="1" stop-color="#8a8378" stop-opacity="0.3"/></linearGradient></defs>`;
 
@@ -1909,11 +1909,7 @@ export function makeBrand({ ROOT, config }) {
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
     const prep = async (pid, fam) => {
       const b = await getBase(pid), lock = LOCKS[pid] || {};
-      const tc = tileCounts(b, lock, PANEL_ASPECT);
-      // Iets grotere tegels dan normaal (x0.65): nog steeds een rijk mozaiek (geen plakken), maar
-      // een enkele tegel is groot genoeg om er SCHERP en VOLLEDIG op in te zoomen (anders blijft de
-      // doeltegel te klein en wordt de overgang een cross-fade tussen twee schalen i.p.v. 1 inzoom).
-      const nX = Math.max(2, Math.round(tc.nX * 0.65)), nY = Math.max(3, Math.round(tc.nY * 0.65));
+      const { nX, nY } = tileCounts(b, lock, PANEL_ASPECT);
       const parsed = film.parseTiles(await getPatternSvg(pid, nX, nY), "radial");
       const cols = film.flowColorsAt(parsed, { palette: film.GLAZE_FAMILIES[fam] || film.PAL, durSec: 1, buildSec: 1, buildStart: 0 }, 1000);
       return { parsed, cols, pw: parsed.view[2], ph: parsed.view[3] };
@@ -1958,25 +1954,19 @@ export function makeBrand({ ROOT, config }) {
       const shapeWhite = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" fill="#ffffff" stroke="none">${si.geom}/></g>`;
       const shapeGlz = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" stroke="none" fill="url(#tglz)">${si.geom}/></g>`;
       const mk = path.join(work, "mk" + i + ".png"), gl = path.join(work, "gl" + i + ".png");
-      // CRUCIAAL: mask + glans met DEZELFDE slice-wrap als de flats (viewBox 0 0 SW SH, binnenin het
-      // patroon met preserveAspectRatio slice). Anders staat de mask in het vierkante patroon-stelsel
-      // terwijl de flats 9:16-gesneden zijn -> de tegelvorm belandt op de verkeerde plek (naast de zoom).
-      const sliceInner = (content) => `<svg x="0" y="0" width="${SW}" height="${SH}" viewBox="0 0 ${A.pw} ${A.ph}" preserveAspectRatio="xMidYMid slice">${content}</svg>`;
-      await fs.writeFile(mk, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg"><rect width="${SW}" height="${SH}" fill="#000000"/>${sliceInner(shapeWhite)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
-      await fs.writeFile(gl, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">${GLZ}${sliceInner(shapeGlz)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      await fs.writeFile(mk, new Resvg(`<svg viewBox="0 0 ${A.pw} ${A.ph}" xmlns="http://www.w3.org/2000/svg"><rect width="${A.pw}" height="${A.ph}" fill="#000000"/>${shapeWhite}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      await fs.writeFile(gl, new Resvg(`<svg viewBox="0 0 ${A.pw} ${A.ph}" xmlns="http://www.w3.org/2000/svg">${GLZ}${shapeGlz}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
       const level = path.join(work, "level" + i + ".png");
       const nextFlat = flats[(i + 1) % flats.length];
-      // Volgende patroon COVER-vult de tegel (zelfde beeldverhouding, bijsnijden, geen vervorming)
-      // -> het patroon is TEGELDEKKEND binnen de echte tegelvorm, geen klein lapje in het midden.
       const r = await runFf(["-i", flats[i], "-i", nextFlat, "-i", mk, "-i", gl, "-filter_complex",
-        `[1:v]scale=${pw2}:${ph2}:force_original_aspect_ratio=increase,crop=${pw2}:${ph2}[bs];color=black@0:s=${SW}x${SH},format=rgba[cv];[cv][bs]overlay=${px0}:${py0}[bl];[2:v]format=gray,scale=${SW}:${SH}[mk];[bl][mk]alphamerge[bm];[0:v][bm]overlay=0:0[ab];[ab][3:v]overlay=0:0[o]`,
+        `[1:v]scale=${pw2}:${ph2}[bs];color=black@0:s=${SW}x${SH},format=rgba[cv];[cv][bs]overlay=${px0}:${py0}[bl];[2:v]format=gray,scale=${SW}:${SH}[mk];[bl][mk]alphamerge[bm];[0:v][bm]overlay=0:0[ab];[ab][3:v]overlay=0:0[o]`,
         "-map", "[o]", "-frames:v", "1", level]);
       if (r.code !== 0) throw new Error("niveau-composiet faalde: " + (r.err || "").trim().split("\n").pop());
-      // Zoom DIEP genoeg dat de tegel (met het volgende patroon erin) het HELE scherm vult: naar de
-      // grootste schermdimensie, zodat je geen omringende tegels meer ziet aan het eind van de inzoom.
+      // Zoom tot het HELE volgende patroon in beeld is (de steen vult het scherm). Exact vullen
+      // (lichte overfill 1.05) zodat je het hele patroon ziet, niet een uitsnede.
       const tcx = (sx0 + sx1) / 2 / SW, tcy = (sy0 + sy1) / 2 / SH;
-      const fillZ = Math.max(SW / Math.max(1, (sx1 - sx0)), SH / Math.max(1, (sy1 - sy0)));
-      const ZD = Math.max(6, Math.min(22, fillZ));
+      const fillZ = SW / Math.max(1, (sx1 - sx0));
+      const ZD = Math.max(5, Math.min(16, fillZ * 1.05));
       levels.push({ png: level, plain: flats[i], tcx, tcy, ZD });
       log(`  inzoom-niveau ${i + 1}/${preps.length} klaar`);
     }
@@ -1986,46 +1976,21 @@ export function makeBrand({ ROOT, config }) {
     //    zie je het volgende patroon NIET, pas als je nadert komt het langzaam in beeld. PAUZE aan het
     //    begin (je ziet het volle patroon) en aan het eind (het hele volgende patroon vult het scherm).
     const D = Math.round(STEP_SEC * FPS);
-    const hs = Math.round(0.8 * FPS);   // begin-pauze (vol patroon) - ruim genoeg om de dissolve te dekken
-    const he = Math.round(0.8 * FPS);   // eind-pauze (het hele volgende patroon vult het scherm)
+    const hs = Math.round(0.6 * FPS);   // begin-pauze (vol patroon)
+    const he = Math.round(0.5 * FPS);   // eind-pauze (het hele volgende patroon in beeld)
     const zf = Math.max(1, D - hs - he);
-    // Zoom via PER-FRAME crop+scale (ffmpeg crop), NIET zoompan: zoompan geeft op fijn-gedetailleerde
-    // patronen een foute zoomfactor/centrering (inhoud-afhankelijke bug). crop is deterministisch en
-    // exact. Hold-frames (begin/eind) worden hergebruikt zodat we alleen de zoomfase echt renderen.
-    let lv_ZD, lv_tcx, lv_tcy;
-    const smoother = (on) => { if (on < hs) return 1; if (on >= D - he) return lv_ZD; const pp = (on - hs) / zf; const s = pp * pp * pp * (pp * (pp * 6 - 15) + 10); return Math.pow(lv_ZD, s); };
-    const makeZoom = async (src, outMp4) => {
-      const fdir = outMp4 + "_f";
-      await fs.mkdir(fdir, { recursive: true });
-      const fname = (i) => path.join(fdir, String(i).padStart(4, "0") + ".png");
-      const crop = async (Z, i) => {
-        const cw = Math.max(2, Math.round(SW / Z)), ch = Math.max(2, Math.round(SH / Z));
-        let cx = Math.round(SW * lv_tcx - cw / 2), cy = Math.round(SH * lv_tcy - ch / 2);
-        cx = Math.max(0, Math.min(SW - cw, cx)); cy = Math.max(0, Math.min(SH - ch, cy));
-        const rr = await runFf(["-i", src, "-vf", `crop=${cw}:${ch}:${cx}:${cy},scale=${W}:${H}:flags=lanczos`, "-frames:v", "1", fname(i)]);
-        if (rr.code !== 0) throw new Error("inzoom-crop faalde: " + (rr.err || "").trim().split("\n").pop());
-      };
-      // Alleen de unieke zoomfase-frames echt croppen; begin/eind-hold zijn identiek (hergebruik).
-      const uniq = [];
-      for (let on = 0; on < D; on++) { if (on === 0 || (on >= hs && on <= D - he)) uniq.push(on); }
-      // PARALLEL in batches (sneller op multi-core, maar niet te veel tegelijk ivm geheugen).
-      const BATCH = 4;
-      for (let k = 0; k < uniq.length; k += BATCH) {
-        await Promise.all(uniq.slice(k, k + BATCH).map((on) => crop(smoother(on), on)));
-      }
-      for (let on = 1; on < hs; on++) await fs.copyFile(fname(0), fname(on));               // begin-hold = frame 0
-      for (let on = D - he + 1; on < D; on++) await fs.copyFile(fname(D - he), fname(on));   // eind-hold = frame D-he
-      const rr = await runFf(["-framerate", String(FPS), "-i", path.join(fdir, "%04d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p", outMp4]);
-      if (rr.code !== 0) throw new Error("inzoom-montage faalde: " + (rr.err || "").trim().split("\n").pop());
-      try { await fs.rm(fdir, { recursive: true, force: true }); } catch {}
-    };
     async function makeClip(lv, outPath) {
-      lv_ZD = lv.ZD; lv_tcx = lv.tcx; lv_tcy = lv.tcy;
-      // 1 zoom per laag (plain = patroon zonder steen; stone = met steen), dan samenvoegen met de infade.
+      // smootherstep over de zoomfase = zachte versnelling + vertraging.
+      const p = `((on-${hs})/${zf})`;
+      const ss = `(${p}*${p}*${p}*(${p}*(${p}*6-15)+10))`;
+      const zExpr = `if(lt(on,${hs}),1,if(lt(on,${D - he}),pow(${lv.ZD.toFixed(3)},${ss}),${lv.ZD.toFixed(3)}))`;
+      const zoomVf = `scale=${W * 2}:${H * 2}:flags=lanczos,zoompan=z='${zExpr}':x='iw*${lv.tcx.toFixed(4)}-(iw/zoom)/2':y='ih*${lv.tcy.toFixed(4)}-(ih/zoom)/2':d=1:s=${W * 2}x${H * 2}:fps=${FPS},scale=${W}:${H}:flags=lanczos,format=yuv420p`;
+      // 1 zoompan per laag (los = robuust/snel), dan samenvoegen met de infade.
       const zpl = outPath + ".pl.mp4", zst = outPath + ".st.mp4";
-      await makeZoom(lv.plain, zpl);
-      await makeZoom(lv.png, zst);
-      let r;
+      let r = await runFf(["-loop", "1", "-i", lv.plain, "-t", String(STEP_SEC), "-r", String(FPS), "-vf", zoomVf, "-c:v", "libx264", "-pix_fmt", "yuv420p", zpl]);
+      if (r.code !== 0) throw new Error("inzoom-clip (plain) faalde: " + (r.err || "").trim().split("\n").pop());
+      r = await runFf(["-loop", "1", "-i", lv.png, "-t", String(STEP_SEC), "-r", String(FPS), "-vf", zoomVf, "-c:v", "libx264", "-pix_fmt", "yuv420p", zst]);
+      if (r.code !== 0) throw new Error("inzoom-clip (steen) faalde: " + (r.err || "").trim().split("\n").pop());
       // steen fadet IN van begin-zoom tot ~80% van de zoom (langzaam zichtbaar), + glazuur-effecten.
       const fadeSt = (hs / FPS).toFixed(2), fadeDur = (zf * 0.8 / FPS).toFixed(2);
       r = await runFf(["-i", zpl, "-i", zst, "-filter_complex",
@@ -2039,7 +2004,7 @@ export function makeBrand({ ROOT, config }) {
 
     // 4) keten: ZACHTE overvloeiing (dissolve) op elke naad i.p.v. een harde flits -> smooth doorlopen
     //    van "steen vult scherm" naar het scherpe volledige volgende patroon.
-    const XF = 0.7;
+    const XF = 0.4;
     let chain = clipPaths[0];
     for (let i = 1; i < clipPaths.length; i++) {
       const next = path.join(work, "chain" + i + ".mp4");
@@ -2059,13 +2024,11 @@ export function makeBrand({ ROOT, config }) {
     await fs.writeFile(captionPng, new Resvg(captionSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
     const finalPath = path.join(work, "iris-final.mp4");
     const hasMusic = !!autoMusic;
-    // Echte duur van de keten (dissolves korten elke naad in) -> anders bevriest het laatste frame.
-    const chainDur = STEP_SEC * NP - XF * (NP - 1);
-    const fa = ["-i", chain, "-loop", "1", "-t", String(chainDur), "-i", chromePng, "-loop", "1", "-t", String(chainDur), "-i", captionPng];
+    const fa = ["-i", chain, "-loop", "1", "-t", String(durSec), "-i", chromePng, "-loop", "1", "-t", String(durSec), "-i", captionPng];
     if (hasMusic) fa.push("-i", autoMusic);
     fa.push("-filter_complex", `[2]format=rgba,fade=t=out:st=2.6:d=0.6:alpha=1[cap];[0][1]overlay=0:0[vc];[vc][cap]overlay=0:0[v]`, "-map", "[v]");
     if (hasMusic) fa.push("-map", "3:a", "-c:a", "aac");
-    fa.push("-t", String(chainDur), "-r", String(FPS), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-movflags", "+faststart", finalPath);
+    fa.push("-t", String(durSec), "-r", String(FPS), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-movflags", "+faststart", finalPath);
     const rf = await runFf(fa);
     if (rf.code !== 0) throw new Error("afwerking (chrome+muziek) faalde: " + (rf.err || "").trim().split("\n").pop());
     return { prebuilt: finalPath, music: "", lang, cleanup: work };
