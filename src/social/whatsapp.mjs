@@ -1,18 +1,23 @@
 // SOCIAL-PLATFORM: WhatsApp. Er is GEEN officiele API om naar WhatsApp Kanalen/Status te posten
 // (alleen onofficiele third-party diensten, met ban-risico). Daarom is WhatsApp geen auto-post-
-// kanaal maar een HANDMATIGE EXPORT: de engine zet de video + caption klaar in een map, en Mo
-// post die zelf in de WhatsApp-app. Zelfde vorm als een echt platform, maar needsAuth:false ->
-// de UI toont geen "Koppel"-knop en het kanaal geldt meteen als klaar.
+// kanaal maar een HANDMATIGE EXPORT VIA INTERNET: de engine zet de video op R2 (publieke /img/-URL,
+// zelfde route die de worker al serveert) en geeft die URL + caption terug. De Socials-tab toont
+// er een QR + link bij. Mo scant de QR met z'n telefoon -> video opent -> downloaden -> zelf in
+// WhatsApp posten. needsAuth:false -> geen "Koppel"-knop, het kanaal geldt meteen als klaar.
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export function makeWhatsApp({ suggest } = {}) {
+export function makeWhatsApp({ suggest, r2Put, imgBase } = {}) {
+  const BASE = (imgBase || "https://taleoftiles.com/img").replace(/\/$/, "");
   // type uit de videonaam halen (taleoftiles-<type>-<datum>-...mp4), voor een nette fallback-caption.
   const typeOf = (file) => {
     const base = path.basename(file || "").replace(/\.[^.]+$/, "");
     const parts = base.split("-");
     return parts.length > 1 ? parts[1] : "";
   };
+  // R2-sleutel = stabiel per bestand+taal, zodat dezelfde video dezelfde URL houdt (opnieuw
+  // "exporteren" overschrijft gewoon) en de map niet volloopt met duplicaten.
+  const keyFor = (file, lang) => `whatsapp/${lang}/${path.basename(file)}`;
 
   return {
     id: "whatsapp",
@@ -21,26 +26,21 @@ export function makeWhatsApp({ suggest } = {}) {
     needsAuth: false,
     suggest,
 
-    // Geen login nodig: de export-map is altijd "verbonden".
+    // Geen login nodig: de export is altijd "verbonden".
     async authStatus(lang) {
-      return { connected: true, who: "export-map" };
+      return { connected: true, who: "export via link" };
     },
 
-    // Niet via API posten: kopieer de mp4 naar out/whatsapp/<lang>/ en schrijf de caption ernaast
-    // in een .txt met dezelfde basename. Mo post het daarna handmatig in WhatsApp.
+    // EXPORT: zet de mp4 op R2 (publieke /img/-URL) en geef die + de caption terug. Geen
+    // auto-post; de Socials-tab toont er een QR/link bij. meta = {title, description, tags}.
     async upload(videoPath, meta = {}, lang, log) {
       const lg = ["en", "fr"].includes(lang) ? lang : "nl";
-      const out = path.dirname(videoPath);                 // render-outputmap (OUT)
-      const dir = path.join(out, "whatsapp", lg);
-      await fs.mkdir(dir, { recursive: true });
+      if (typeof r2Put !== "function") throw new Error("WhatsApp-export heeft R2 nodig (UPLOAD_KEY in .env + worker-route)");
 
-      const baseName = path.basename(videoPath);
-      const stem = baseName.replace(/\.[^.]+$/, "");
-      const destVideo = path.join(dir, baseName);
-      const destText = path.join(dir, stem + ".txt");
-
-      // video kopieren (overschrijft een eerdere export van dezelfde video)
-      await fs.copyFile(videoPath, destVideo);
+      const key = keyFor(videoPath, lg);
+      const buf = await fs.readFile(videoPath);
+      await r2Put(key, buf, "video/mp4");
+      const url = `${BASE}/${key}`;
 
       // caption: meta.description, anders een suggest-tekst voor deze taal/type, anders merk-regel.
       let caption = (meta && typeof meta.description === "string") ? meta.description.trim() : "";
@@ -49,10 +49,10 @@ export function makeWhatsApp({ suggest } = {}) {
         caption = (caption || "").trim();
       }
       if (!caption) caption = "Tale of Tiles, handgemaakte mozaiekkunst. taleoftiles.com";
-      await fs.writeFile(destText, caption + "\n", "utf8");
 
-      if (typeof log === "function") log("WhatsApp " + lg.toUpperCase() + ": klaargezet in " + dir + " (video + caption .txt). Handmatig posten in WhatsApp.");
-      return { url: dir, postId: "" };
+      if (typeof log === "function") log("WhatsApp " + lg.toUpperCase() + ": op R2 gezet -> " + url + " (scan de QR in de Socials-tab, download op je telefoon, post zelf in WhatsApp).");
+      // whatsapp:true zodat de UI weet dat dit geen echte post is maar een export (QR tonen).
+      return { url, postId: key, whatsapp: true, caption };
     },
 
     async stats(postId, lang) {
