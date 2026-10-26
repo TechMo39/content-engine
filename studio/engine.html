@@ -152,6 +152,9 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .pd-badge.gray{background:#6b6080}
 .planreject{background:none;border:none;color:#9b6080;cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
 .planreject:hover{color:#e06a6a}
+.plancell-posted{border-color:#2f6a4a;background:#15241c}
+.planposted{color:#5fd39a;font-size:11px;font-weight:600;text-align:right;white-space:nowrap}
+.planpostinfo{color:#9db8a8;font-size:11px}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
   <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button><button id="tab-social">Socials</button><button id="tab-plan">Planning</button></nav></div>
@@ -413,6 +416,16 @@ function renderPlan(){
       const slot=slots.find(s=>s.time===time&&s.lang===lang)||{time,lang,file:null,url:null};
       const cands=candidates.filter(c=>c.lang===lang);
       const cell=document.createElement('div');cell.className='plancell';
+      // Al gepost (of deels): slot vergrendelen en tonen als gepost, zodat je niet per ongeluk dubbel post.
+      if(slot.status==='geplaatst'||slot.status==='deels'){
+        cell.classList.add('plancell-posted');
+        const lbl=slot.status==='deels'?'Deels gepost':'Gepost';
+        cell.innerHTML=`<div class="planslot-top"><b>${PLANLBL[lang]||lang}</b><span class="planposted">✓ ${lbl}</span></div>
+          <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
+          <div class="planpostinfo">${esc(slot.typeName||slot.type||'')}</div>`;
+        const vp=cell.querySelector('video');if(vp&&slot.url)vp.onclick=()=>openModal({kind:'video',url:slot.url});
+        row.appendChild(cell);return;
+      }
       const opts=['<option value="">— leeg —</option>'].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
       const accs=planAccountsFor(lang).map(a=>esc(a.label)).join(', ')||'geen kanaal';
       cell.innerHTML=`<div class="planslot-top"><b>${PLANLBL[lang]||lang}</b><span class="planacc">${accs}</span><button class="planreject" title="Afkeuren en verwijderen uit de map">✕</button></div>
@@ -444,7 +457,7 @@ function renderPlan(){
   g.appendChild(tbl);
 }
 async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan en klik Akkoord.';}
-async function savePlan(){const slots=(plan.data.slots||[]).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,status:'gepland'}));$('#planMsg').textContent='Opslaan…';try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.filter(s=>s.file).length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}}
+async function savePlan(){const slots=(plan.data.slots||[]).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,status:(s.status==='geplaatst'||s.status==='deels')?s.status:'gepland'}));$('#planMsg').textContent='Opslaan…';try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.filter(s=>s.file).length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}}
 $('#planPropose').onclick=proposePlan;
 $('#planSave').onclick=savePlan;
 $('#planPrevWk').onclick=()=>shiftWeek(-1);
