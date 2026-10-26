@@ -60,6 +60,7 @@ const HIBERNA = heeft("hiberna");
 const TALEN = String(arg("talen", "nl,en,fr")).split(",").map((s) => s.trim()).filter(Boolean);
 const TYPES_ARG = String(arg("types", "")).trim();
 const FORMAT = arg("format", "9:16");
+const DUUR = Number(arg("duur", "48")) || 48;   // doel-lengte in seconden; per type gesnapt op hele cycli (rond 45-50s)
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 const nu = () => new Date().toLocaleTimeString("nl-NL");
 const log = (s) => console.log(`[${nu()}] ${s}`);
@@ -163,7 +164,7 @@ async function haalTypes() {
 // http heeft geen standaard-timeout: de aanvraag blijft open zolang de render duurt.
 function renderEen(template, lang) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ brand: BRAND, template, format: FORMAT, opts: { lang } });
+    const body = JSON.stringify({ brand: BRAND, template, format: FORMAT, opts: { lang, durationSec: DUUR } });
     const req = http.request(
       { host: "127.0.0.1", port: 4600, path: "/api/render", method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) } },
       (res) => {
