@@ -90,8 +90,7 @@ function postJson(p, body) {
   let gepost = 0, mislukt = 0;
   for (const s of due) {
     let plats = connected[s.lang] || [];
-    // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab) ->
-    // nooit automatisch posten, ook niet als 'alle kanalen' (leeg platforms) geldt.
+    // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab).
     plats = plats.filter((p) => p !== "whatsapp");
     // PER-PLATFORM KEUZE: heeft dit slot een platform-selectie, dan alleen die (en alleen de
     // gekoppelde ervan). Leeg/afwezig = alle gekoppelde kanalen van de taal (oud gedrag).
