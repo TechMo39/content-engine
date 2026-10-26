@@ -512,8 +512,8 @@ export function makeBrand({ ROOT, config }) {
         [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail, une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
         [{ k: "Véritable émail", t: "Ne pâlit pas, des années de couleur." }, { t: "Posé à la main, carreau par carreau." }],
         [{ k: "Fès", t: "Ce qui ornait les palais…" }, { t: "…désormais sur votre mur." }, { t: "Aucun identique." }],
-        [{ t: "Un nom. Une œuvre d'art." }, { k: "Tale of Tiles", t: "Fait main, pour votre mur ou façade." }],
-        [{ t: "La première chose qu'on voit à votre porte." }, { k: "Tale of Tiles", t: "Un nom en mosaïque posée main." }],
+        [{ t: "Un nom. Une œuvre d'art." }, { k: "Tale of Tiles", t: "Fait main, pour votre mur ou votre façade." }],
+        [{ t: "La première chose qu'on voit à votre porte." }, { k: "Tale of Tiles", t: "Un nom en mosaïque posée à la main." }],
         [{ t: "Dans dix ans, il sera toujours là." }, { k: "Véritable émail", t: "Une couleur qui ne pâlit pas." }],
         [{ t: "Comment serait-il chez vous ?" }, { k: "Tale of Tiles", t: "Fait main, à votre style." }],
       ],
@@ -629,20 +629,41 @@ export function makeBrand({ ROOT, config }) {
   // PALET-KEUZE bepaalt UIT WELKE glazuur-families de engine kiest, zodat de knop écht iets
   // doet, en consistent over ALLE types: "warm" = warme families, "koel"/"cool" = koele,
   // "auto"/leeg = alle families (mix, met anti-herhaling). Zo is er altijd verschil.
-  const WARM_FAMS = ["terracotta", "saffraan", "aubergine"];
-  const COOL_FAMS = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen"];
+  const WARM_FAMS = ["terracotta", "saffraan", "aubergine", "koraal", "okergeel", "roze"];
+  const COOL_FAMS = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "turkoois", "violet"];
+  // KALM vs COMBINATIE. De tonale families (één kleur, vijf tinten) ogen braaf; de echte variatie
+  // en het westerse, kleurrijke gevoel komt van de COMBINATIE-paletten (meerdere kleuren per paneel).
+  // Bij Automatisch trekken we daarom sterk naar de combinaties, met af en toe een kalm paleel voor
+  // rust/contrast. Warm/Koel blijven bewust tonaal (die knoppen zijn voor een rustige, eenkleurige look).
+  const CALM_FAMS = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen", "terracotta", "saffraan", "aubergine", "roze", "koraal", "okergeel", "turkoois", "violet"];
+  const COMBO_FAMS = ["mosterd_marine", "koraal_petrol", "middellandse", "smaragd_goud", "bordeaux_blush", "indigo_oranje", "salie_terracotta", "oudroze_bos", "lila_salie", "perzik_pruim", "mint_koraal", "oker_petrol", "jade_robijn", "saffier_amber", "aubergine_mint", "kaneel_hemels", "framboos_olijf", "inkt_citrus", "bont", "feest"];
   function familyPool(opts) {
     const fams = Object.keys(film.GLAZE_FAMILIES);
     const k = (opts && opts.palette) || "";
     if (k === "warm") return fams.filter((f) => WARM_FAMS.includes(f));
     if (k === "cool" || k === "koel") return fams.filter((f) => COOL_FAMS.includes(f));
-    return fams;   // auto/modern/leeg = alle families
+    return fams;   // auto/leeg = alle families
+  }
+  // Kies n VERSCHILLENDE families met anti-herhaling over renders (historie in .engine-state.json,
+  // dus ook tussen posts door). Automatisch = combinaties ~2x gewicht + kalm als vulling, zodat elke
+  // render kleurrijk en anders is. exclude = families om over te slaan. Dit is de kern van de variatie:
+  // elk type dat hier doorheen kiest rouleert door het hele, verbrede palet.
+  function pickFamilies(opts, n, exclude = []) {
+    const k = (opts && opts.palette) || "";
+    let pool;
+    if (k === "warm") pool = WARM_FAMS.slice();
+    else if (k === "cool" || k === "koel") pool = COOL_FAMS.slice();
+    else pool = COMBO_FAMS.concat(COMBO_FAMS, CALM_FAMS);   // combinaties dubbel gewogen
+    pool = pool.filter((f) => !exclude.includes(f));
+    const distinct = new Set(pool).size;
+    const chosen = pickFreshN(pool, "fams", Math.min(n, distinct));
+    while (chosen.length < n && distinct > chosen.length) { const c = pool[Math.floor(Math.random() * pool.length)]; if (!chosen.includes(c)) chosen.push(c); }
+    return chosen;
   }
   function resolvePalette(opts, templateId) {
     const fams = Object.keys(film.GLAZE_FAMILIES);
     if (fams.includes(opts.palette)) return { key: opts.palette, arr: PALS()[opts.palette] };   // expliciete familie wint
-    const pool = familyPool(opts);
-    const key = pickFresh(pool, "families") || pool[0] || fams[0];
+    const key = pickFamilies(opts, 1)[0] || familyPool(opts)[0] || fams[0];
     return { key, arr: PALS()[key] };
   }
   function storyboardFrom(opts) {
@@ -661,6 +682,15 @@ export function makeBrand({ ROOT, config }) {
     if (Number.isFinite(n) && n > 0) return Math.max(6, Math.min(600, n));   // tot 10 min, geen kunstmatige cap
     return { kort: 14, middel: 24, lang: 38 }[opts.duration] || 24;
   }
+  // --- TEMPO + LENGTE (werken op ALLE types) --------------------------------------
+  // Tempo = hoe snel de beweging loopt (>1 sneller, <1 rustiger). De Lengte-schuif is een RICHTLIJN.
+  const TEMPO_MUL = { snel: 1.4, normaal: 1.0, rustig: 0.72 };
+  function tmul(opts) { return TEMPO_MUL[(opts && opts.tempo) || "normaal"] || 1.0; }
+  // Doorloop-types (1 verhaal dat afloopt): tempo versnelt/vertraagt de hele doorloop.
+  function playDur(opts, minS, maxS) { let d = resolveDuration(opts) / tmul(opts); d = Math.max(minS != null ? minS : 5, d); if (maxS != null) d = Math.min(maxS, d); return d; }
+  // Loop/montage-types: rollen door N cycli. Tempo verkort de cyclus; de lengte snapt op HELE
+  // cycli zodat een video nooit midden in een cyclus afkapt. baseUnit = cyclus bij normaal tempo.
+  function loopDur(opts, baseUnit, minN = 1, maxN = 999) { const u = Math.max(0.2, baseUnit / tmul(opts)); const n = Math.max(minN, Math.min(maxN, Math.round(resolveDuration(opts) / u))); return { n, unit: u, dur: +(n * u).toFixed(3) }; }
   // SATISFYING (template 1, geperfectioneerd): langer + trager + naadloze loop.
   // Begint neutraal -> kleurt rustig in -> ademt door kleurlagen -> vervaagt aan het eind
   // weer naar neutraal, zodat de video naadloos opnieuw begint (loop).
@@ -698,7 +728,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "onthul", name: "Onthul (raad-foto achter patroon)", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 9: patroon dooft uit -> foto erachter
     { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU, cadeau-reveal
     { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
-    { id: "droste", name: "Oneindige inzoom", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop. (id blijft "droste" voor bestandsnamen/social-parser; de getoonde naam is "Oneindige inzoom")
+    { id: "zoom", name: "Oneindige inzoom", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop.
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -782,7 +812,8 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    const durSec = resolveDuration(opts);
+    let durSec = resolveDuration(opts);
+    const _satL = loopDur(opts, 13, 1, 30); durSec = _satL.dur;   // tempo verkort patroon-tijd; lengte snapt op hele patronen
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const name = (opts.name || "").trim() || pickName(opts.lang);   // de naam = waar het naartoe bouwt
@@ -793,7 +824,7 @@ export function makeBrand({ ROOT, config }) {
     // dát is wat echte zellige-uitstraling geeft i.p.v. snoep. Anti-herhaling door te schudden.
     const famOrder = familyPool(opts).slice().sort(() => Math.random() - 0.5);   // Palet-keuze (warm/koel/auto)
     // ~13s per patroon: rustig genoeg om de opbouw te voelen, maar het bord komt écht vol.
-    const nSeg = Math.max(1, Math.round(durSec / 13));
+    const nSeg = _satL.n;
     const pats = pickPatterns(nSeg); while (pats.length && pats.length < nSeg) pats.push(pats[pats.length - 1]);
     const prep = [];
     for (let i = 0; i < pats.length; i++) {
@@ -902,7 +933,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    const durSec = resolveDuration(opts);
+    const durSec = playDur(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const name = (opts.name || "").trim() || pickName(opts.lang);
@@ -920,12 +951,8 @@ export function makeBrand({ ROOT, config }) {
     const _cauto = !(["warm", "cool", "koel"].includes(opts.palette || ""));
     let fams;
     if (_cauto) {
-      const warmG = ["terracotta", "saffraan", "aubergine"];
-      const coolG = ["kobalt", "mono_blauw", "oceaan", "smaragd", "mono_groen"];
-      const vividG = ["bont", "feest"];
-      const pick = (a) => a[Math.floor(Math.random() * a.length)];
-      // vaste volgorde warm -> koel -> bont, elk z'n eigen groep -> altijd 3 echt andere karakters
-      fams = [pick(warmG), pick(coolG), pick(vividG)].sort(() => Math.random() - 0.5);
+      // 3 verschillende kleurrijke combinatie-paletten; rouleren per render (anti-herhaling).
+      fams = pickFamilies(opts, 3);
     }
     else { const sh = _cpool.slice().sort(() => Math.random() - 0.5); fams = [sh[0], sh[1 % sh.length], sh[2 % sh.length]]; }
     const pals3 = fams.map((f) => film.GLAZE_FAMILIES[f]);
@@ -938,7 +965,7 @@ export function makeBrand({ ROOT, config }) {
     const poll = { nl: "Welke past bij jou?", en: "Which fits you?", fr: "Lequel pour vous ?" }[lang];
     const pollKick = RVlang({ nl: ["Zeg het in de comments", "Laat een A, B of C achter", "Jouw keuze?"], en: ["Tell us in the comments", "Drop an A, B or C", "Your pick?"], fr: ["Dites-le en commentaire", "Un A, B ou C ?", "Votre choix ?"] }, lang);
     const Tb = durSec * 0.34, Tc = durSec * 0.72;   // bouw A -> beat-snap A/B/C -> vergelijk A|B|C
-    const hold = 1.3;                                // snap-interval (op de beat)
+    const hold = 1.3 / tmul(opts);                   // snap-interval (op de beat), tempo-geschaald
     const drawCW = (cols, r, id) => {
       const wrp = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${pw} ${ph}" preserveAspectRatio="xMidYMid slice">`;
       const m = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrp) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrp);
@@ -1020,6 +1047,7 @@ export function makeBrand({ ROOT, config }) {
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
     const durSec = resolveDuration(opts);
+    const TM = tmul(opts);   // tempo: snellere/rustigere flits op ALLE flits-indexen
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const name = (opts.name || "").trim() || pickName(opts.lang);   // dynamisch: outreach vult bedrijfsnaam
@@ -1044,9 +1072,9 @@ export function makeBrand({ ROOT, config }) {
     function sceneAt(frame) {
       const t = frame / FPS;
       // RUSTIGER tempo (was te snel): elk ontwerp ~0.9s -> licht versnellend naar ~0.55s.
-      const flash = Math.max(0.55, 0.9 - t * 0.008);
+      const flash = Math.max(0.55, 0.9 - t * 0.008) / TM;
       // tel hoeveel flitsen al voorbij zijn (met versnelling) voor een stabiele index
-      let acc = 0, k = 0, idx = 0; while (acc < t && k < 10000) { acc += Math.max(0.55, 0.9 - acc * 0.008); if (acc <= t) idx++; k++; }
+      let acc = 0, k = 0, idx = 0; while (acc < t && k < 10000) { acc += Math.max(0.55, 0.9 - acc * 0.008) / TM; if (acc <= t) idx++; k++; }
       const P = prep[idx % prep.length];
       const r = rectFor(P.aspect);
       const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${P.parsed.view[2]} ${P.parsed.view[3]}" preserveAspectRatio="xMidYMid slice">`;
@@ -1076,7 +1104,7 @@ export function makeBrand({ ROOT, config }) {
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
     const name = (opts.name || "").trim() || pickName(opts.lang);   // geen naam ingevuld -> engine kiest zelf
-    const durSec = resolveDuration(opts);
+    const durSec = playDur(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
@@ -1089,7 +1117,7 @@ export function makeBrand({ ROOT, config }) {
     const _tpool = familyPool(opts);
     const _tauto = !(["warm", "cool", "koel"].includes(opts.palette || ""));
     let fams3;
-    if (_tauto) { const famGroups = [["kobalt", "mono_blauw", "oceaan"], ["smaragd", "mono_groen"], ["terracotta", "saffraan"], ["aubergine"]]; const pickOne = (a) => a[Math.floor(Math.random() * a.length)]; fams3 = famGroups.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(pickOne); }
+    if (_tauto) { fams3 = pickFamilies(opts, 3); }   // 3 verschillende hue-buckets, rouleert per render
     else { const sh = _tpool.slice().sort(() => Math.random() - 0.5); fams3 = [sh[0], sh[1 % sh.length], sh[2 % sh.length]]; }
     const prep = [];
     for (let i = 0; i < pats.length; i++) {
@@ -1292,7 +1320,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.70, "1:1": 1.0, "16:9": 1.55 }[format] || 0.70;
-    const durSec = (opts.durationSec == null && opts.duration == null) ? 11 : resolveDuration(opts);
+    const durSec = ((opts.durationSec == null && opts.duration == null) ? 11 : resolveDuration(opts)) / tmul(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["upbeat", "lofi", "calm"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
@@ -1326,11 +1354,11 @@ export function makeBrand({ ROOT, config }) {
     const px = Math.round((W - w) / 2), py = Math.round(H * 0.52 - h / 2), rr = Math.max(8, w * 0.03);
     const fx = 0.34 + Math.random() * 0.32, fy = 0.30 + Math.random() * 0.30;   // willekeurig startpunt
     const Z0 = 2.6;   // sterke maar veilige inzoom (resvg paniekeert boven ~3.5)
-    const line = { nl: "Stop zodra je 't herkent", en: "Pause when you recognise it", fr: "Arrête quand tu reconnais" }[lang];
+    const line = { nl: "Stop zodra je 't herkent", en: "Pause when you recognise it", fr: "Arrêtez dès que vous le reconnaissez" }[lang];
     // het LEVEL als gouden kicker boven de regel (zo zie je: dit is een makkelijke/moeilijke)
     const LVL_LBL = { makkelijk: { nl: "Makkelijk", en: "Easy", fr: "Facile" }, gemiddeld: { nl: "Gemiddeld", en: "Medium", fr: "Moyen" }, moeilijk: { nl: "Moeilijk", en: "Hard", fr: "Difficile" }, expert: { nl: "Expert", en: "Expert", fr: "Expert" } };
     const kick = level ? (LVL_LBL[level][lang] || LVL_LBL[level].nl) : { nl: "Wat is het?", en: "What is it?", fr: "Qu'est-ce que c'est ?" }[lang];
-    const intro = RVlang({ nl: ["Raad wat het is", "Wat zie jij ontstaan?", "Herken jij 't?"], en: ["Guess what it is", "What do you see?", "Can you tell?"], fr: ["Devinez quoi", "Que voyez-vous ?", "Reconnais-tu ?"] }, lang);
+    const intro = RVlang({ nl: ["Raad wat het is", "Wat zie jij ontstaan?", "Herken jij 't?"], en: ["Guess what it is", "What do you see?", "Can you tell?"], fr: ["Devinez ce que c'est", "Que voyez-vous ?", "Le reconnaissez-vous ?"] }, lang);
     // INTRO: eerst even stilstaan (ingezoomd) + het spel uitleggen, dán pas uitzoomen/onthullen.
     const Tintro = Math.min(2.8, durSec * 0.22);
     function sceneAt(frame) {
@@ -1369,7 +1397,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.72, "1:1": 1.0, "16:9": 1.5 }[format] || 0.72;
-    const durSec = (opts.durationSec == null && opts.duration == null) ? 14 : resolveDuration(opts);
+    const durSec = ((opts.durationSec == null && opts.duration == null) ? 14 : resolveDuration(opts)) / tmul(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
@@ -1388,9 +1416,9 @@ export function makeBrand({ ROOT, config }) {
     const pw = parsed.view[2], ph = parsed.view[3], Ap = pw / ph;
     let h = Math.round(H * 0.72), w = Math.round(h * Ap); if (w > W * 0.82) { w = Math.round(W * 0.82); h = Math.round(w / Ap); }
     const x = Math.round((W - w) / 2), y = Math.round(H * 0.52 - h / 2), rr = Math.max(8, w * 0.03);
-    const line = { nl: "Stop zodra je 't herkent", en: "Pause when you recognise it", fr: "Arrête quand tu reconnais" }[lang];
+    const line = { nl: "Stop zodra je 't herkent", en: "Pause when you recognise it", fr: "Arrêtez dès que vous le reconnaissez" }[lang];
     const LVL_LBL = { makkelijk: { nl: "Makkelijk", en: "Easy", fr: "Facile" }, gemiddeld: { nl: "Gemiddeld", en: "Medium", fr: "Moyen" }, moeilijk: { nl: "Moeilijk", en: "Hard", fr: "Difficile" }, expert: { nl: "Expert", en: "Expert", fr: "Expert" } };
-    const kick = level ? (LVL_LBL[level][lang] || LVL_LBL[level].nl) : { nl: "Wat zie jij?", en: "What is it?", fr: "Qu'est-ce ?" }[lang];
+    const kick = level ? (LVL_LBL[level][lang] || LVL_LBL[level].nl) : { nl: "Wat zie jij?", en: "What is it?", fr: "Qu'est-ce que c'est ?" }[lang];
     const intro = RVlang({ nl: ["Raad wat er onder zit", "Wat zit eronder?", "Herken jij 't al?"], en: ["Guess what's underneath", "What's underneath?", "Can you tell yet?"], fr: ["Devinez ce qui se cache", "Qu'y a-t-il dessous ?", "Devinez vite"] }, lang);
     // INTRO: eerst even stilstaan op het volle patroon + uitleg, dán pas onthullen.
     const Tintro = Math.min(2.8, durSec * 0.22);
@@ -1446,7 +1474,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 1.5, "1:1": 1.2, "16:9": 1.9 }[format] || 1.5;   // liggend
-    const durSec = resolveDuration(opts);
+    const durSec = playDur(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const name = (opts.name || "").trim() || pickName(opts.lang);
@@ -1515,7 +1543,7 @@ export function makeBrand({ ROOT, config }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
     const PANEL_ASPECT = { "9:16": 0.74, "1:1": 1.0, "16:9": 1.5 }[format] || 0.74;
-    const durSec = resolveDuration(opts);
+    const durSec = playDur(opts);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
@@ -1617,7 +1645,7 @@ export function makeBrand({ ROOT, config }) {
     const hooks = {
       nl: ["Wat geef je iemand die alles al heeft?", "Op zoek naar een cadeau dat niemand anders geeft?", "Een cadeau dat ze nooit meer weggeven.", "Geen bloemen die verwelken."],
       en: ["What do you give someone who has everything?", "Looking for a gift no one else gives?", "A gift they'll never give away.", "No flowers that wilt."],
-      fr: ["Que offrir à qui a déjà tout ?", "Un cadeau que personne d'autre n'offre ?", "Un cadeau qu'on ne redonne jamais."],
+      fr: ["Quoi offrir à qui a déjà tout ?", "Un cadeau que personne d'autre n'offre ?", "Un cadeau qu'on ne redonne jamais.", "Pas de fleurs qui fanent."],
     };
     const hook = RVlang(hooks, lang);
     const revealLine = named
@@ -1677,7 +1705,7 @@ export function makeBrand({ ROOT, config }) {
   async function makeIntroRender({ opts = {}, format = "9:16" }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
-    const durSec = Math.max(18, Math.min(40, resolveDuration(opts)));
+    const durSec = playDur(opts, 18, 40);
     const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const gold = branding.gold;
@@ -1771,9 +1799,9 @@ export function makeBrand({ ROOT, config }) {
         { wat: { t: "An ancient pattern, coloured for today.", k: "Timeless" }, hoe: { t: "Classic mosaic in your style.", k: "Your twist" }, waar: { t: "At home in any modern interior.", k: "Modern heritage" } },
       ],
       fr: [
-        { wat: { t: "De l'art mosaïque fait main, à votre nom.", k: "Voici Tale of Tiles" }, hoe: { t: "Vous choisissez le motif, les couleurs et le nom.", k: "Votre création" }, waar: { t: "Et il orne votre mur ou façade.", k: "Sur votre mur" } },
+        { wat: { t: "De la mosaïque faite main, à votre nom.", k: "Voici Tale of Tiles" }, hoe: { t: "Vous choisissez le motif, les couleurs et le nom.", k: "Votre création" }, waar: { t: "Et elle orne votre mur ou votre façade.", k: "Sur votre mur" } },
         { wat: { t: "Posé à la main, carreau par carreau.", k: "Un art ancestral" }, hoe: { t: "Taillé, émaillé et cuit, à la main.", k: "De Fès" }, waar: { t: "Désormais un tableau sur votre mur.", k: "Aujourd'hui, chez vous" } },
-        { wat: { t: "Pas une impression, une mosaïque qui se sent.", k: "Émail et relief" }, hoe: { t: "Ne se décolore pas, dedans comme dehors.", k: "Couleur durable" }, waar: { t: "Sur votre façade ou votre hall, des générations.", k: "Durable" } },
+        { wat: { t: "Pas une impression, une mosaïque qui se ressent.", k: "Émail et relief" }, hoe: { t: "Ne se décolore pas, dedans comme dehors.", k: "Couleur durable" }, waar: { t: "Sur votre façade ou votre hall, des générations.", k: "Durable" } },
         { wat: { t: "Un nom, une infinité de designs.", k: "Jamais deux pareils" }, hoe: { t: "Choisissez motif, couleurs et nom.", k: "À vous de décider" }, waar: { t: "Prêt à accrocher, une œuvre pour votre mur.", k: "Sur votre mur" } },
         { wat: { t: "De l'art fait main, à leur nom.", k: "Plus qu'une plaque" }, hoe: { t: "Fait pièce par pièce, rien que pour eux.", k: "À la main" }, waar: { t: "Un tableau à transmettre.", k: "Qui dure" } },
         { wat: { t: "Ce qui ornait les palais…", k: "Fès" }, hoe: { t: "…posé à la main, dans vos couleurs.", k: "Le même art" }, waar: { t: "Sur votre mur d'aujourd'hui, dedans ou dehors.", k: "Du palais à votre mur" } },
@@ -1852,7 +1880,7 @@ export function makeBrand({ ROOT, config }) {
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
   }
 
-  // DROSTE (type 12, IMAGE+FLITS-herbouw): RESVG-VEILIG. De eerdere aanpakken lieten resvg
+  // ZOOM (type 12, IMAGE+FLITS-herbouw): RESVG-VEILIG. De eerdere aanpakken lieten resvg
   // crashen op een ingezoomde geneste <svg>-viewBox. Daarom renderen we elk patroon ÉÉN keer
   // naar een PNG (dat doet resvg foutloos, geen rare zoom) en zoomen we daarna in met een
   // gewone <image> (positie + grootte), géén geneste svg, géén viewBox-upscale, dus resvg kan
@@ -1866,7 +1894,7 @@ export function makeBrand({ ROOT, config }) {
   // Per patroon een in-zoom-clip (vol paneel -> diep op de doel-tegel), de volgende begint diep en
   // zoomt uit (de "doorval"); een korte witte flits (xfade fadewhite) dekt het naadje. Levert een
   // kant-en-klare mp4 via { prebuilt }, net als de walkthrough -> de engine gebruikt 'm direct.
-  async function makeDrosteRender({ opts = {}, format = "9:16", log = () => {} }) {
+  async function makeZoomRender({ opts = {}, format = "9:16", log = () => {} }) {
     // ONEINDIGE INZOOM (iris). In EEN steen zit ECHT het volgende patroon (geklipt op de ECHTE
     // tegelvorm -> ook ruit/ster/pad, niet alleen vierkant; met glazuur = onderdeel van het mozaiek).
     // Van ver zie je het licht; de camera duikt er cinematisch op in (pauze -> versnellen -> vertragen),
@@ -1882,9 +1910,12 @@ export function makeBrand({ ROOT, config }) {
     const { Resvg } = await import("@resvg/resvg-js");
     const ffmpeg = FFMPEG || "ffmpeg";
 
-    const tempoKey = (opts.tempo || opts.speed || "normaal");
-    const STEP_SEC = tempoKey === "snel" ? 3.2 : tempoKey === "rustig" ? 4.8 : 4.0;   // ruimer voor cinematische pacing
-    const NP = Math.max(3, Math.min(8, Math.round(durSec / STEP_SEC)));
+    // Lengte: default 60s als niets gekozen (de oude engine-default voor dit type). Tempo verkort de
+    // stap; NP = aantal patronen, gesnapt (3..40) zodat de loop netjes sluit en niets afkapt.
+    const _unit = Math.max(0.2, 4.0 / tmul(opts));
+    const _doel = (opts.durationSec == null && opts.duration == null) ? 60 : resolveDuration(opts);
+    const NP = Math.max(3, Math.min(40, Math.round(_doel / _unit)));
+    const STEP_SEC = _unit;
     durSec = NP * STEP_SEC;
 
     const famKeys = Object.keys(film.GLAZE_FAMILIES).sort(() => Math.random() - 0.5);
@@ -1948,35 +1979,38 @@ export function makeBrand({ ROOT, config }) {
       for (const t of A.parsed.tiles) { const [sx, sy] = toScr(t.gx, t.gy); const dx = sx / SW - 0.5, dy = sy / SH - 0.5, d = dx * dx + dy * dy; if (d < bd) { bd = d; bt = t; } }
       const rawTag = A.parsed.svg.slice(bt.start, bt.end);
       const si = shapeInfo(rawTag);
+      // Tegel-bbox in schermcoords (alleen om het 9:16-venster op te centreren + te schalen).
       let ax0, ay0, ax1, ay1;
       if (si.bb[0] < si.bb[2] && si.bb[1] < si.bb[3]) { const tx = bt.gx - si.cx, ty = bt.gy - si.cy; ax0 = si.bb[0] + tx; ay0 = si.bb[1] + ty; ax1 = si.bb[2] + tx; ay1 = si.bb[3] + ty; }
       else { const s = A.pw * 0.08; ax0 = bt.gx - s; ay0 = bt.gy - s; ax1 = bt.gx + s; ay1 = bt.gy + s; }
-      const tx = bt.gx - si.cx, ty = bt.gy - si.cy;
-      const [sx0, sy0] = toScr(ax0, ay0), [sx1, sy1] = toScr(ax1, ay1);
-      const px0 = Math.round(sx0), py0 = Math.round(sy0), pw2 = Math.max(8, Math.round(sx1 - sx0)), ph2 = Math.max(8, Math.round(sy1 - sy0));
-      // MASK + GLANS met de ECHTE tegelvorm, verschoven via <g transform> (geen clipPath -> veilig)
-      const shapeWhite = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" fill="#ffffff" stroke="none">${si.geom}/></g>`;
-      const shapeGlz = `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)})" stroke="none" fill="url(#tglz)">${si.geom}/></g>`;
+      const [bsx0, bsy0] = toScr(ax0, ay0), [bsx1, bsy1] = toScr(ax1, ay1);
+      const bcx = (bsx0 + bsx1) / 2, bcy = (bsy0 + bsy1) / 2;
+      const bw = Math.max(8, bsx1 - bsx0), bh = Math.max(8, bsy1 - bsy0);
+      // DE NAAD-FIX: het zoom-doel is een EXACT 9:16-venster (zelfde verhouding als het volle paneel),
+      // GEEN scheve tegelvorm meer. Zoomdiepte wordt afgeleid uit de tegelgrootte (zodat het venster
+      // ongeveer de tegel beslaat), begrensd op een aangename 6..16. rw/rh worden daarna EXACT uit ZD
+      // berekend, zodat het cropvenster bij maximale zoom (SW/ZD x SH/ZD) EXACT gelijk is aan dit venster.
+      const AR = SW / SH;                                   // 9/16
+      const fitZ = SW / Math.max(1, Math.min(bw, bh * AR) * 0.82);  // venster ~82% in de tegel
+      const ZD = Math.max(6, Math.min(16, fitZ));
+      const rw = Math.round(SW / ZD), rh = Math.round(SH / ZD);
+      let px0 = Math.round(bcx - rw / 2), py0 = Math.round(bcy - rh / 2);
+      px0 = Math.max(0, Math.min(SW - rw, px0)); py0 = Math.max(0, Math.min(SH - rh, py0));
+      // Masker = exact dit rechte 9:16-venster (resvg rendert alleen een rechthoek -> crash-veilig).
       const mk = path.join(work, "mk" + i + ".png"), gl = path.join(work, "gl" + i + ".png");
-      // CRUCIAAL: mask + glans met DEZELFDE slice-wrap als de flats (viewBox 0 0 SW SH, binnenin het
-      // patroon met preserveAspectRatio slice). Anders staat de mask in het vierkante patroon-stelsel
-      // terwijl de flats 9:16-gesneden zijn -> de tegelvorm belandt op de verkeerde plek (naast de zoom).
-      const sliceInner = (content) => `<svg x="0" y="0" width="${SW}" height="${SH}" viewBox="0 0 ${A.pw} ${A.ph}" preserveAspectRatio="xMidYMid slice">${content}</svg>`;
-      await fs.writeFile(mk, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg"><rect width="${SW}" height="${SH}" fill="#000000"/>${sliceInner(shapeWhite)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
-      await fs.writeFile(gl, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">${GLZ}${sliceInner(shapeGlz)}</svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      await fs.writeFile(mk, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg"><rect width="${SW}" height="${SH}" fill="#000000"/><rect x="${px0}" y="${py0}" width="${rw}" height="${rh}" fill="#ffffff"/></svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
+      await fs.writeFile(gl, new Resvg(`<svg viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">${GLZ}<rect x="${px0}" y="${py0}" width="${rw}" height="${rh}" fill="url(#tglz)"/></svg>`, { fitTo: { mode: "width", value: SW } }).render().asPng());
       const level = path.join(work, "level" + i + ".png");
       const nextFlat = flats[(i + 1) % flats.length];
-      // Volgende patroon COVER-vult de tegel (zelfde beeldverhouding, bijsnijden, geen vervorming)
-      // -> het patroon is TEGELDEKKEND binnen de echte tegelvorm, geen klein lapje in het midden.
+      // Volgende patroon EXACT in 9:16 in het venster gebakken (scale=rw:rh, zelfde slice als het volle
+      // paneel -> GEEN herkadering, geen vervorming). Bij maximale zoom is dit venster 1-op-1 het
+      // openingsframe van het volgende niveau -> doorlopende val, geen stop + swap.
       const r = await runFf(["-i", flats[i], "-i", nextFlat, "-i", mk, "-i", gl, "-filter_complex",
-        `[1:v]scale=${pw2}:${ph2}:force_original_aspect_ratio=increase,crop=${pw2}:${ph2}[bs];color=black@0:s=${SW}x${SH},format=rgba[cv];[cv][bs]overlay=${px0}:${py0}[bl];[2:v]format=gray,scale=${SW}:${SH}[mk];[bl][mk]alphamerge[bm];[0:v][bm]overlay=0:0[ab];[ab][3:v]overlay=0:0[o]`,
+        `[1:v]scale=${rw}:${rh}[bs];color=black@0:s=${SW}x${SH},format=rgba[cv];[cv][bs]overlay=${px0}:${py0}[bl];[2:v]format=gray,scale=${SW}:${SH}[mk];[bl][mk]alphamerge[bm];[0:v][bm]overlay=0:0[ab];[ab][3:v]overlay=0:0[o]`,
         "-map", "[o]", "-frames:v", "1", level]);
       if (r.code !== 0) throw new Error("niveau-composiet faalde: " + (r.err || "").trim().split("\n").pop());
-      // Zoom DIEP genoeg dat de tegel (met het volgende patroon erin) het HELE scherm vult: naar de
-      // grootste schermdimensie, zodat je geen omringende tegels meer ziet aan het eind van de inzoom.
-      const tcx = (sx0 + sx1) / 2 / SW, tcy = (sy0 + sy1) / 2 / SH;
-      const fillZ = Math.max(SW / Math.max(1, (sx1 - sx0)), SH / Math.max(1, (sy1 - sy0)));
-      const ZD = Math.max(6, Math.min(22, fillZ));
+      // Zoom-center = het midden van het venster; eindigt EXACT op het venster (ZD = SW/rw).
+      const tcx = (px0 + rw / 2) / SW, tcy = (py0 + rh / 2) / SH;
       levels.push({ png: level, plain: flats[i], tcx, tcy, ZD });
       log(`  inzoom-niveau ${i + 1}/${preps.length} klaar`);
     }
@@ -1986,8 +2020,8 @@ export function makeBrand({ ROOT, config }) {
     //    zie je het volgende patroon NIET, pas als je nadert komt het langzaam in beeld. PAUZE aan het
     //    begin (je ziet het volle patroon) en aan het eind (het hele volgende patroon vult het scherm).
     const D = Math.round(STEP_SEC * FPS);
-    const hs = Math.round(0.8 * FPS);   // begin-pauze (vol patroon) - ruim genoeg om de dissolve te dekken
-    const he = Math.round(0.8 * FPS);   // eind-pauze (het hele volgende patroon vult het scherm)
+    const hs = Math.round(0.3 * FPS);   // KORTE begin-settle: de zoom staat bijna niet stil (hypnotisch)
+    const he = Math.round(0.3 * FPS);   // KORTE eind-settle, dekt nog net de dissolve
     const zf = Math.max(1, D - hs - he);
     // Zoom via PER-FRAME crop+scale (ffmpeg crop), NIET zoompan: zoompan geeft op fijn-gedetailleerde
     // patronen een foute zoomfactor/centrering (inhoud-afhankelijke bug). crop is deterministisch en
@@ -2039,7 +2073,7 @@ export function makeBrand({ ROOT, config }) {
 
     // 4) keten: ZACHTE overvloeiing (dissolve) op elke naad i.p.v. een harde flits -> smooth doorlopen
     //    van "steen vult scherm" naar het scherpe volledige volgende patroon.
-    const XF = 0.7;
+    const XF = 0.3;
     let chain = clipPaths[0];
     for (let i = 1; i < clipPaths.length; i++) {
       const next = path.join(work, "chain" + i + ".mp4");
@@ -2050,28 +2084,70 @@ export function makeBrand({ ROOT, config }) {
     }
 
     const autoMusic = await pickMusic(["calm", "lofi", "upbeat"]);
-    const line = { nl: "Oneindig patroon, oneindig ambacht", en: "Endless pattern, endless craft", fr: "Motif infini, artisanat infini" }[lang];
-    const stripBg = (svg) => svg.replace(/<rect width="\d+" height="\d+" fill="url\(#bg\)"\/>/, "");
-    const chromeSvg = stripBg(composeChrome({ branding, W, H, panel: null, innerField: "", overlay: "", logoUri: branding.logoUri }));
-    const captionSvg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${captionOverlay(line, null, W, H, 1, "lower")}</svg>`;
-    const chromePng = path.join(work, "chrome.png"), captionPng = path.join(work, "caption.png");
-    await fs.writeFile(chromePng, new Resvg(chromeSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
-    await fs.writeFile(captionPng, new Resvg(captionSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
-    const finalPath = path.join(work, "iris-final.mp4");
-    const hasMusic = !!autoMusic;
     // Echte duur van de keten (dissolves korten elke naad in) -> anders bevriest het laatste frame.
     const chainDur = STEP_SEC * NP - XF * (NP - 1);
-    const fa = ["-i", chain, "-loop", "1", "-t", String(chainDur), "-i", chromePng, "-loop", "1", "-t", String(chainDur), "-i", captionPng];
+
+    // --- CAPTIONS (het is een social-post): hook vooraan, ambacht/waarde-regels gespreid door de
+    //     zoom, CTA aan het eind. NL/EN/FR, net als de andere types. Elke beat een eigen venster.
+    const hook = RVlang({ nl: ["Blijf kijken tot het einde", "Kijk hoe diep dit gaat", "Oneindig patroon, oneindig ambacht"], en: ["Watch till the end", "See how deep it goes", "Endless pattern, endless craft"], fr: ["Regardez jusqu'au bout", "Voyez la profondeur", "Motif infini, artisanat infini"] }, lang);
+    const waarde = {
+      nl: ["Elk patroon met de hand gelegd", "Echt glazuur, oneindige diepte", "Geen twee tegels gelijk", "Eeuwenoud ambacht uit Fès"],
+      en: ["Every pattern laid by hand", "Real glaze, endless depth", "No two tiles alike", "Age-old craft from Fès"],
+      fr: ["Chaque motif posé à la main", "Émail véritable, profondeur infinie", "Aucun carreau identique", "Art ancestral de Fès"],
+    }[lang];
+    const cta = { nl: "Ontwerp die van jou", en: "Design yours", fr: "Créez le vôtre" }[lang];
+    const beats = [];
+    const endCta = 3.2;
+    const midStart = 3.6, midEnd = Math.max(midStart + 2, chainDur - endCta - 0.4);
+    beats.push({ t: hook, k: null, s: 0.3, e: Math.min(3.4, midStart) });
+    const nMid = Math.max(1, Math.min(waarde.length, Math.round((midEnd - midStart) / 4)));
+    for (let i = 0; i < nMid; i++) {
+      const s = midStart + (i * (midEnd - midStart)) / nMid, e = midStart + ((i + 1) * (midEnd - midStart)) / nMid;
+      beats.push({ t: waarde[i % waarde.length], k: null, s: s + 0.2, e: e - 0.2 });
+    }
+    beats.push({ t: cta, k: "Tale of Tiles", s: chainDur - endCta, e: chainDur - 0.2 });
+
+    const stripBg = (svg) => svg.replace(/<rect width="\d+" height="\d+" fill="url\(#bg\)"\/>/, "");
+    const chromeSvg = stripBg(composeChrome({ branding, W, H, panel: null, innerField: "", overlay: "", logoUri: branding.logoUri }));
+    const chromePng = path.join(work, "chrome.png");
+    await fs.writeFile(chromePng, new Resvg(chromeSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
+    const capPngs = [];
+    for (let i = 0; i < beats.length; i++) {
+      const b = beats[i];
+      const capSvg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${captionOverlay(b.t, b.k, W, H, 1, "lower")}</svg>`;
+      const p = path.join(work, "cap" + i + ".png");
+      await fs.writeFile(p, new Resvg(capSvg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: true } }).render().asPng());
+      capPngs.push(p);
+    }
+
+    const finalPath = path.join(work, "iris-final.mp4");
+    const hasMusic = !!autoMusic;
+    // Inputs: 0=zoom-keten, 1=chrome, 2..=caption-beats, dan muziek.
+    const fa = ["-i", chain, "-loop", "1", "-t", String(chainDur), "-i", chromePng];
+    for (const p of capPngs) fa.push("-loop", "1", "-t", String(chainDur), "-i", p);
     if (hasMusic) fa.push("-i", autoMusic);
-    fa.push("-filter_complex", `[2]format=rgba,fade=t=out:st=2.6:d=0.6:alpha=1[cap];[0][1]overlay=0:0[vc];[vc][cap]overlay=0:0[v]`, "-map", "[v]");
-    if (hasMusic) fa.push("-map", "3:a", "-c:a", "aac");
+    // HYPNOTISCH: zachte doorlopende draai + ademende verzadiging over de HELE keten (globale tijd,
+    // dus geen sprong op de naden), met overscan zodat er nooit zwarte hoeken ontstaan. Daarna de
+    // chrome en de getimede captions eroverheen.
+    const filt = [];
+    filt.push(`[0]scale=iw*1.12:ih*1.12,rotate=a=0.04*sin(2*PI*t/9):ow=iw:oh=ih:c=black,crop=${W}:${H},eq=contrast=1.06:saturation=1.08+0.05*sin(2*PI*t/4):eval=frame,format=yuv420p[bg]`);
+    filt.push(`[bg][1]overlay=0:0[v0]`);
+    let last = "v0";
+    for (let i = 0; i < capPngs.length; i++) {
+      const b = beats[i], idx = 2 + i, nx = "v" + (i + 1);
+      filt.push(`[${idx}]format=rgba,fade=t=in:st=${b.s.toFixed(2)}:d=0.4:alpha=1,fade=t=out:st=${(b.e - 0.4).toFixed(2)}:d=0.4:alpha=1[c${i}]`);
+      filt.push(`[${last}][c${i}]overlay=0:0[${nx}]`);
+      last = nx;
+    }
+    fa.push("-filter_complex", filt.join(";"), "-map", "[" + last + "]");
+    if (hasMusic) fa.push("-map", String(2 + capPngs.length) + ":a", "-c:a", "aac");
     fa.push("-t", String(chainDur), "-r", String(FPS), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-movflags", "+faststart", finalPath);
     const rf = await runFf(fa);
-    if (rf.code !== 0) throw new Error("afwerking (chrome+muziek) faalde: " + (rf.err || "").trim().split("\n").pop());
+    if (rf.code !== 0) throw new Error("afwerking (chrome+captions+muziek) faalde: " + (rf.err || "").trim().split("\n").pop());
     return { prebuilt: finalPath, music: "", lang, cleanup: work };
   }
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
-    if (templateId === "droste") return await makeDrosteRender({ opts, format, log });
+    if (templateId === "zoom") return await makeZoomRender({ opts, format, log });
     if (templateId === "intro") return await makeIntroRender({ opts, format });
     if (templateId === "walkthrough") return await makeWalkthroughRender({ opts, format, log });
     if (templateId === "cadeau") return await makeCadeauRender({ opts, format });
@@ -2425,4 +2501,3 @@ export function makeBrand({ ROOT, config }) {
     options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }
-
