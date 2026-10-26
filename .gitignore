@@ -11,3 +11,7 @@ out/
 node_modules/
 secrets/
 brand-assets/
+
+r2.json
+r2b.json
+test-upload.cjs
