@@ -1380,7 +1380,7 @@ export function makeBrand({ ROOT, config }) {
       // subtiel en premium zodra het beeld vol is onthuld.
       if (gimg && level && level !== "makkelijk" && k > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
-        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `C'est un ${word}` }[lang];
+        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `Réponse : ${word}` }[lang];
         const op = smooth(Math.min(1, (k - 0.86) / 0.1));
         overlay += captionOverlay(ans, null, W, H, op, "lower");
       }
@@ -1458,7 +1458,7 @@ export function makeBrand({ ROOT, config }) {
       // ANTWOORD vanaf 'gemiddeld' (niet bij makkelijk), zodra het beeld vol onthuld is
       if (gimg && level && level !== "makkelijk" && p > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
-        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `C'est un ${word}` }[lang];
+        const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `Réponse : ${word}` }[lang];
         overlay += captionOverlay(ans, null, W, H, smooth(Math.min(1, (p - 0.86) / 0.1)), "lower");
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
@@ -2501,3 +2501,4 @@ export function makeBrand({ ROOT, config }) {
     options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }
+

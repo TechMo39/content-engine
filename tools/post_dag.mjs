@@ -89,8 +89,14 @@ function postJson(p, body) {
 
   let gepost = 0, mislukt = 0;
   for (const s of due) {
-    const plats = connected[s.lang] || [];
-    if (!plats.length) { log(`⚠ ${s.time} ${s.lang.toUpperCase()}: geen gekoppeld kanaal, overslaan.`); continue; }
+    let plats = connected[s.lang] || [];
+    // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab) ->
+    // nooit automatisch posten, ook niet als 'alle kanalen' (leeg platforms) geldt.
+    plats = plats.filter((p) => p !== "whatsapp");
+    // PER-PLATFORM KEUZE: heeft dit slot een platform-selectie, dan alleen die (en alleen de
+    // gekoppelde ervan). Leeg/afwezig = alle gekoppelde kanalen van de taal (oud gedrag).
+    if (Array.isArray(s.platforms) && s.platforms.length) plats = plats.filter((p) => s.platforms.includes(p));
+    if (!plats.length) { log(`⚠ ${s.time} ${s.lang.toUpperCase()}: geen gekoppeld/gekozen kanaal, overslaan.`); continue; }
     let okAny = false, errAny = false;
     for (const platform of plats) {
       const label = `${s.time} ${s.lang.toUpperCase()} → ${platform}`;
@@ -122,3 +128,4 @@ function postJson(p, body) {
   stopOnzeEngine();
   process.exit(0);
 })().catch((e) => { console.error("post_dag faalde:", e && e.message || e); process.exit(1); });
+

@@ -70,7 +70,9 @@ const TYPE_MAX_SEC = {
   droste: 60,   // oneindige inzoom: duur wordt gesnapt op hele tunnel-cycli (naadloze loop)
 };
 
-const social = buildSocial({ ROOT, publicUrlFor });
+// r2Put + imgBase ook los doorgeven: WhatsApp-export zet de mp4 op R2 (permanente /img/-URL),
+// niet via de tijdelijke publicUrlFor (die wist na het posten weer).
+const social = buildSocial({ ROOT, publicUrlFor, r2Put, imgBase: IMG_BASE });
 const socialStore = makeSocialStore(OUT);
 
 // ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
@@ -327,7 +329,7 @@ const server = http.createServer(async (req, res) => {
           const gekozen = slots.filter((s) => s.lang === lang).map((s) => s.type);   // spreiding: ander type per taal
           const pick = pool.find((c) => !gekozen.includes(c.type)) || pool[0] || null;
           if (pick) pool.splice(pool.indexOf(pick), 1);
-          slots.push({ time, lang, file: pick ? pick.file : null, url: pick ? pick.url : null, type: pick ? pick.type : null, typeName: pick ? pick.typeName : null, status: "concept" });
+          slots.push({ time, lang, file: pick ? pick.file : null, url: pick ? pick.url : null, type: pick ? pick.type : null, typeName: pick ? pick.typeName : null, platforms: [], status: "concept" });
         }
       }
       const plan = await readPlan();
@@ -340,7 +342,7 @@ const server = http.createServer(async (req, res) => {
       const bd = await readBody(req);
       const date = bd.date || planToday();
       const plan = await readPlan();
-      plan[date] = { slots: (bd.slots || []).map((s) => ({ time: s.time, lang: s.lang, file: s.file || null, url: s.url || null, type: s.type || null, typeName: s.typeName || null, status: s.status || "gepland" })) };
+      plan[date] = { slots: (bd.slots || []).map((s) => ({ time: s.time, lang: s.lang, file: s.file || null, url: s.url || null, type: s.type || null, typeName: s.typeName || null, platforms: Array.isArray(s.platforms) ? s.platforms : [], status: s.status || "gepland" })) };
       await writePlan(plan);
       json(res, { ok: true, date, slots: plan[date].slots });
       return;
@@ -602,9 +604,11 @@ const server = http.createServer(async (req, res) => {
       log(`▶ social: ${bd.platform} ${lang.toUpperCase()} ← ${bd.file}`);
       try {
         const r = await p.upload(path.resolve(OUT, bd.file), meta, lang, log);
-        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() });
+        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "posted", postId: r.postId || "", url: r.url || "", caption: r.caption || "", at: Date.now() });
         log(`✓ social: ${bd.platform} ${lang.toUpperCase()} geplaatst — ${r.url || r.postId || ""}`);
-        json(res, { ok: true, post: rec });
+        // WhatsApp = export (geen echte post): geef de vlag + publieke URL + caption mee zodat de
+        // UI een QR/link + kopieerbare tekst kan tonen i.p.v. "geplaatst".
+        json(res, { ok: true, post: rec, whatsapp: !!r.whatsapp, url: r.url || "", caption: r.caption || "" });
       } catch (e) {
         const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "failed", error: e.message });
         log(`✗ social: ${bd.platform} ${lang.toUpperCase()} — ${e.message}`);
@@ -623,3 +627,4 @@ server.listen(PORT, () => {
   if (process.env.STUDIO_NO_OPEN) return;
   try { const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]]; spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref(); } catch {}
 });
+
