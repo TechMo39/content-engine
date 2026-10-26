@@ -130,9 +130,31 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .socgrouphead{font-size:13px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:18px 0 10px;display:flex;align-items:center;gap:10px}
 .socgrouphead .cnt{font-size:11px;color:#9b8fc0;letter-spacing:0;text-transform:none}
 .socgrouphead::after{content:"";flex:1;height:1px;background:#3a2f52}
+/* ---- Planning ---- */
+.planbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 16px}
+.planhdr{font-size:15px;color:var(--gold);font-weight:600;margin-right:6px}
+.plantbl{display:flex;flex-direction:column;gap:14px}
+.planrow{display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:12px;align-items:stretch}
+.plantime{display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--gold);font-weight:600}
+.plancell{background:#1b1430;border:1px solid #3a2f52;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.planslot-top{font-size:12px;color:var(--cream);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.planacc{color:#9b8fc0;font-size:10px;text-align:right}
+.planprev{background:#000;border-radius:8px;aspect-ratio:9/16;max-height:240px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.planprev video{width:100%;height:100%;object-fit:cover;cursor:pointer}
+.planempty{color:#6b6080;font-size:12px}
+.planpick{width:100%;background:#241a3a;color:var(--cream);border:1px solid #3a2f52;border-radius:8px;padding:6px;font-size:12px}
+.planweek{display:flex;gap:6px;flex:1;flex-wrap:wrap}
+.planday{position:relative;background:#1b1430;border:1px solid #3a2f52;color:var(--cream);border-radius:10px;padding:6px 10px;min-width:56px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.planday.on{background:var(--gold);color:#241a10;border-color:var(--gold);font-weight:600}
+.pd-wd{font-size:10px;text-transform:uppercase;opacity:.8}
+.pd-dt{font-size:13px}
+.pd-badge{position:absolute;top:-6px;right:-6px;background:#2f9b57;color:#fff;border-radius:10px;font-size:10px;padding:1px 6px}
+.pd-badge.gray{background:#6b6080}
+.planreject{background:none;border:none;color:#9b6080;cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.planreject:hover{color:#e06a6a}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
-  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button><button id="tab-social">Socials</button></nav></div>
+  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-mail">Mail-plaatjes</button><button id="tab-lib">Bibliotheek</button><button id="tab-social">Socials</button><button id="tab-plan">Planning</button></nav></div>
 <div class="wrap" id="view-studio">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
@@ -189,6 +211,22 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
   </div>
   <div id="socGroups"></div>
   <div id="socEmpty" class="libempty" style="display:none"></div>
+</section>
+
+<section id="view-plan" style="display:none">
+  <div class="planbar">
+    <button id="planPrevWk" class="chip" title="Vorige week">‹</button>
+    <div id="planWeek" class="planweek"></div>
+    <button id="planNextWk" class="chip" title="Volgende week">›</button>
+  </div>
+  <div class="planbar">
+    <span id="planDate" class="planhdr"></span>
+    <button id="planPropose" class="chip">Dagvoorstel maken</button>
+    <button id="planSave" class="chip" style="background:var(--gold);color:#241a10;font-weight:600">Akkoord — opslaan</button>
+    <span id="planMsg" class="hint"></span>
+  </div>
+  <div id="planGrid"></div>
+  <div id="planEmpty" class="libempty" style="display:none"></div>
 </section>
 
 <div id="libModal" class="libmodal" style="display:none"><div class="libmodal-in"><button id="libClose" class="libclose">✕</button><div id="libModalBody"></div></div></div>
@@ -316,18 +354,101 @@ function showView(which){
   $('#view-mail').style.display=which==='mail'?'block':'none';
   $('#view-lib').style.display=which==='lib'?'block':'none';
   $('#view-social').style.display=which==='social'?'block':'none';
+  $('#view-plan').style.display=which==='plan'?'block':'none';
   $('#tab-studio').classList.toggle('on',which==='studio');
   $('#tab-mail').classList.toggle('on',which==='mail');
   $('#tab-lib').classList.toggle('on',which==='lib');
   $('#tab-social').classList.toggle('on',which==='social');
-  $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':which==='social'?'video → kanaal → keuren → posten':'alle gerenderde output op één plek';
+  $('#tab-plan').classList.toggle('on',which==='plan');
+  $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':which==='social'?'video → kanaal → keuren → posten':which==='plan'?'kandidaten → dagvoorstel → akkoord':'alle gerenderde output op één plek';
   if(which==='lib'&&!lib.loaded)loadLibrary();
   if(which==='social'&&!soc.loaded)loadSocial();
+  if(which==='plan'&&!plan.loaded)loadPlan();
 }
 $('#tab-studio').onclick=()=>showView('studio');
 $('#tab-mail').onclick=()=>showView('mail');
 $('#tab-lib').onclick=()=>showView('lib');
 $('#tab-social').onclick=()=>showView('social');
+$('#tab-plan').onclick=()=>showView('plan');
+
+// ---- Planning-tab: weekstrip + dagvoorstel -> akkoord/swap + afkeuren ----
+const plan={loaded:false,data:null,date:null,weekBase:null};
+const PLANLBL={nl:'NL',en:'EN',fr:'FR'};
+const WKD=['ma','di','wo','do','vr','za','zo'];
+const plToday=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Amsterdam'});
+const fmtDay=ds=>{const p=String(ds).split('-');return p[2]+'-'+p[1];};
+function planAccountsFor(lang){return (plan.data.accounts||[]).filter(a=>a.lang===lang&&a.enabled);}
+async function loadWeek(base){
+  plan.weekBase=base||plan.date||plToday();
+  let j={days:[]};try{j=await (await fetch('/api/plan/week?date='+plan.weekBase)).json();}catch(e){}
+  const w=$('#planWeek');w.innerHTML='';
+  (j.days||[]).forEach((d,i)=>{
+    const b=document.createElement('button');b.className='planday'+((d.date===plan.date)?' on':'');
+    let badge='';if(d.gepland)badge=`<span class="pd-badge">${d.gepland}</span>`;else if(d.filled)badge=`<span class="pd-badge gray">${d.filled}</span>`;
+    b.innerHTML=`<span class="pd-wd">${WKD[i]}</span><span class="pd-dt">${fmtDay(d.date)}</span>${badge}`;
+    b.onclick=()=>loadPlan(d.date);
+    w.appendChild(b);
+  });
+}
+function shiftWeek(delta){const d=new Date((plan.weekBase||plan.date||plToday())+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+delta*7);loadWeek(d.toISOString().slice(0,10));}
+async function loadPlan(date){
+  plan.date=date||plan.date||plToday();
+  $('#planGrid').innerHTML='';$('#planMsg').textContent='Laden…';plan.loaded=true;
+  let j=null;try{j=await (await fetch('/api/plan?date='+plan.date)).json();}catch(e){}
+  plan.data=j||{slots:[],candidates:[],accounts:[],times:['10:00','16:00','20:00'],langs:['nl','en','fr'],date:plan.date};
+  $('#planDate').textContent='Plan voor '+(plan.data.date||plan.date);$('#planMsg').textContent='';
+  renderPlan();
+  loadWeek(plan.weekBase||plan.date);
+}
+function renderPlan(){
+  const g=$('#planGrid');g.innerHTML='';
+  const times=plan.data.times||['10:00','16:00','20:00'],langs=plan.data.langs||['nl','en','fr'],slots=plan.data.slots||[],candidates=plan.data.candidates||[];
+  if(!slots.length){$('#planEmpty').style.display='';$('#planEmpty').textContent=candidates.length?'Nog geen plan voor deze dag. Klik "Dagvoorstel maken".':'Nog geen gerenderde video\'s. Render eerst (automatisch \'s nachts of via de Studio).';return;}
+  $('#planEmpty').style.display='none';
+  const tbl=document.createElement('div');tbl.className='plantbl';
+  times.forEach(time=>{
+    const row=document.createElement('div');row.className='planrow';
+    const th=document.createElement('div');th.className='plantime';th.textContent=time;row.appendChild(th);
+    langs.forEach(lang=>{
+      const slot=slots.find(s=>s.time===time&&s.lang===lang)||{time,lang,file:null,url:null};
+      const cands=candidates.filter(c=>c.lang===lang);
+      const cell=document.createElement('div');cell.className='plancell';
+      const opts=['<option value="">— leeg —</option>'].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
+      const accs=planAccountsFor(lang).map(a=>esc(a.label)).join(', ')||'geen kanaal';
+      cell.innerHTML=`<div class="planslot-top"><b>${PLANLBL[lang]||lang}</b><span class="planacc">${accs}</span><button class="planreject" title="Afkeuren en verwijderen uit de map">✕</button></div>
+        <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
+        <select class="planpick">${opts}</select>`;
+      const bindPlay=(url)=>{const vv=cell.querySelector('video');if(vv&&url)vv.onclick=()=>openModal({kind:'video',url});};
+      bindPlay(slot.url);
+      cell.querySelector('.planpick').onchange=e=>{
+        const file=e.target.value,c=cands.find(x=>x.file===file);
+        let s=slots.find(ss=>ss.time===time&&ss.lang===lang);if(!s){s={time,lang};slots.push(s);}
+        s.file=file||null;s.url=c?c.url:null;s.type=c?c.type:null;s.typeName=c?c.typeName:null;
+        cell.querySelector('.planprev').innerHTML=c?`<video src="${esc(c.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>';
+        bindPlay(c?c.url:null);
+      };
+      cell.querySelector('.planreject').onclick=async()=>{
+        const s=slots.find(ss=>ss.time===time&&ss.lang===lang);
+        if(!s||!s.file){$('#planMsg').textContent='Geen video in dit slot om af te keuren.';return;}
+        if(!confirm('Deze video afkeuren en verwijderen uit de map?'))return;
+        const file=s.file;
+        try{await fetch('/api/candidate/delete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({file})});}catch(e){}
+        plan.data.candidates=(plan.data.candidates||[]).filter(c=>c.file!==file);
+        (plan.data.slots||[]).forEach(ss=>{if(ss.file===file){ss.file=null;ss.url=null;ss.type=null;ss.typeName=null;}});
+        $('#planMsg').textContent='Afgekeurd en verwijderd.';renderPlan();
+      };
+      row.appendChild(cell);
+    });
+    tbl.appendChild(row);
+  });
+  g.appendChild(tbl);
+}
+async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan en klik Akkoord.';}
+async function savePlan(){const slots=(plan.data.slots||[]).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,status:'gepland'}));$('#planMsg').textContent='Opslaan…';try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.filter(s=>s.file).length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}}
+$('#planPropose').onclick=proposePlan;
+$('#planSave').onclick=savePlan;
+$('#planPrevWk').onclick=()=>shiftWeek(-1);
+$('#planNextWk').onclick=()=>shiftWeek(1);
 $('#mailGo').onclick=async()=>{
   const names=$('#mailNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!names.length){$('#mailMsg').textContent='Vul minstens één bedrijfsnaam in.';return;}
@@ -590,4 +711,3 @@ function renderSoc(){
 
 log();loadBrands();
 </script></body></html>
-
