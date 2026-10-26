@@ -29,6 +29,7 @@ const BRAND = "taleoftiles";
 const OUT_LOG_DIR = path.join(ENGINE_DIR, "out", "logs");
 const MARKER = path.join(OUT_LOG_DIR, "render_dag.txt");   // inhaal.bat checkt de datum hiervan
 const SWEEP_DAGEN = 7;   // kandidaten die zo lang ongebruikt in out/ staan -> out/archief/
+const ARCHIEF_DAGEN = 30;   // video's die zo lang in out/archief/ staan -> definitief verwijderd
 
 // Opruimen: verse pool klein houden. Geposte video's staan al in out/geplaatst/ (door de poster),
 // dus wat hier nog in out/ staat en ouder is dan SWEEP_DAGEN is ongebruikt -> naar out/archief/.
@@ -48,6 +49,20 @@ async function sweepArchief() {
     }
   } catch (_) {}
   if (verplaatst) log(`archief: ${verplaatst} ongebruikte video('s) ouder dan ${SWEEP_DAGEN} dagen -> out/archief/`);
+  // ARCHIEF ZELF OOK LEGEN: zodat out/archief/ niet eeuwig groeit. Alles daar ouder dan
+  // ARCHIEF_DAGEN wordt definitief verwijderd (geposte video's staan veilig in out/geplaatst/).
+  const archGrens = Date.now() - ARCHIEF_DAGEN * 24 * 3600 * 1000;
+  let gewist = 0;
+  try {
+    for (const f of await fs.promises.readdir(archief)) {
+      if (!/\.mp4$/i.test(f)) continue;
+      const src = path.join(archief, f);
+      let st; try { st = await fs.promises.stat(src); } catch { continue; }
+      if (!st.isFile() || st.mtimeMs > archGrens) continue;
+      try { await fs.promises.unlink(src); gewist++; } catch (_) {}
+    }
+  } catch (_) {}
+  if (gewist) log(`archief: ${gewist} oude video('s) ouder dan ${ARCHIEF_DAGEN} dagen definitief verwijderd`);
 }
 
 const heeft = (v) => process.argv.includes("--" + v);
@@ -219,3 +234,4 @@ function renderEen(template, lang) {
   }
   process.exit(0);
 })().catch((e) => { console.error("render_dag faalde:", e && e.message || e); process.exit(1); });
+
