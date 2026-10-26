@@ -72,6 +72,40 @@ const TYPE_MAX_SEC = {
 
 const social = buildSocial({ ROOT, publicUrlFor });
 const socialStore = makeSocialStore(OUT);
+
+// ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
+const PLAN_FILE = path.join(OUT, ".plan.json");
+const PLAN_TIMES = ["10:00", "16:00", "20:00"];
+const PLAN_LANGS = ["nl", "en", "fr"];
+const planToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });   // Europese dag
+async function readPlan() { try { return JSON.parse(await fs.readFile(PLAN_FILE, "utf8")); } catch { return {}; } }
+async function writePlan(p) { try { await fs.writeFile(PLAN_FILE, JSON.stringify(p, null, 2)); } catch {} }
+// Verse video-kandidaten uit out/ (zelfde bron als de Bibliotheek).
+async function planCandidates() {
+  const out = [];
+  try {
+    for (const f of await fs.readdir(OUT)) {
+      if (!/\.mp4$/i.test(f)) continue;
+      if (/-\d{12,}\.mp4$/i.test(f)) continue;
+      let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
+      if (st.size < 4096) continue;
+      const m = parseOutName(f.replace(/\.mp4$/i, ""));
+      const _d = new Date(st.mtimeMs), _p = (n) => String(n).padStart(2, "0");
+      const datum = _p(_d.getDate()) + "-" + _p(_d.getMonth() + 1) + " " + _p(_d.getHours()) + ":" + _p(_d.getMinutes());
+      out.push({ file: f, url: "/out/" + encodeURIComponent(f), type: m.template || null, typeName: m.template ? (TEMPLATE_NAME[m.template] || titleCase(m.template)) : "Video", lang: ["en", "fr"].includes(m.lang) ? m.lang : "nl", name: m.name || "", datum, mtime: st.mtimeMs });
+    }
+  } catch {}
+  out.sort((a, b) => b.mtime - a.mtime);
+  return out;
+}
+// Al geposte of al geplande bestanden -> niet opnieuw voorstellen.
+async function planUsedFiles() {
+  const used = new Set();
+  try { for (const r of await socialStore.all()) if (r && r.file) used.add(r.file); } catch {}
+  const p = await readPlan();
+  for (const d of Object.keys(p)) for (const s of ((p[d] && p[d].slots) || [])) if (s.file) used.add(s.file);
+  return used;
+}
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
 
 // ---- ANTI-HERHALING: welke titels/omschrijvingen zijn al gepost (of als concept bewaard) voor
@@ -272,6 +306,71 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) }); return; }
     if (u.pathname === "/api/subjects") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { subjects: [] }); return; } json(res, { subjects: await b.listSubjects() }); return; }
     if (u.pathname === "/api/templates") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { templates: [] }); return; } json(res, { templates: b.templates, options: b.options || [] }); return; }
+    // ---- PLANNING-endpoints (laag 2) ----
+    if (u.pathname === "/api/plan" && req.method === "GET") {
+      const date = u.searchParams.get("date") || planToday();
+      const plan = await readPlan();
+      json(res, { date, times: PLAN_TIMES, langs: PLAN_LANGS, slots: (plan[date] && plan[date].slots) || [], candidates: await planCandidates(), accounts: social.listAccounts() });
+      return;
+    }
+    if (u.pathname === "/api/plan/propose" && req.method === "POST") {
+      const bd = await readBody(req);
+      const date = bd.date || planToday();
+      const cands = await planCandidates();
+      const used = await planUsedFiles();
+      const byLang = {};
+      for (const l of PLAN_LANGS) byLang[l] = cands.filter((c) => c.lang === l && !used.has(c.file));
+      const slots = [];
+      for (const time of PLAN_TIMES) {
+        for (const lang of PLAN_LANGS) {
+          const pool = byLang[lang];
+          const gekozen = slots.filter((s) => s.lang === lang).map((s) => s.type);   // spreiding: ander type per taal
+          const pick = pool.find((c) => !gekozen.includes(c.type)) || pool[0] || null;
+          if (pick) pool.splice(pool.indexOf(pick), 1);
+          slots.push({ time, lang, file: pick ? pick.file : null, url: pick ? pick.url : null, type: pick ? pick.type : null, typeName: pick ? pick.typeName : null, status: "concept" });
+        }
+      }
+      const plan = await readPlan();
+      plan[date] = { slots };
+      await writePlan(plan);
+      json(res, { date, slots });
+      return;
+    }
+    if (u.pathname === "/api/plan/save" && req.method === "POST") {
+      const bd = await readBody(req);
+      const date = bd.date || planToday();
+      const plan = await readPlan();
+      plan[date] = { slots: (bd.slots || []).map((s) => ({ time: s.time, lang: s.lang, file: s.file || null, url: s.url || null, type: s.type || null, typeName: s.typeName || null, status: s.status || "gepland" })) };
+      await writePlan(plan);
+      json(res, { ok: true, date, slots: plan[date].slots });
+      return;
+    }
+    // Weekoverzicht: 7 dagen (ma-zo) rond de gevraagde datum, met tellingen per dag.
+    if (u.pathname === "/api/plan/week" && req.method === "GET") {
+      const base = u.searchParams.get("date") || planToday();
+      const d = new Date(base + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));   // terug naar maandag
+      const plan = await readPlan();
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const dd = new Date(d); dd.setUTCDate(d.getUTCDate() + i);
+        const ds = dd.toISOString().slice(0, 10);
+        const slots = (plan[ds] && plan[ds].slots) || [];
+        days.push({ date: ds, filled: slots.filter((s) => s.file).length, gepland: slots.filter((s) => s.status === "gepland").length });
+      }
+      json(res, { weekStart: days[0].date, days });
+      return;
+    }
+    // Kandidaat afkeuren = mp4 uit out/ verwijderen (reject).
+    if (u.pathname === "/api/candidate/delete" && req.method === "POST") {
+      const bd = await readBody(req);
+      const f = String(bd.file || "");
+      if (!f || f.includes("/") || f.includes("\\") || !/\.mp4$/i.test(f)) { json(res, { error: "ongeldige bestandsnaam" }, 400); return; }
+      const p = path.join(OUT, f);
+      if (!p.startsWith(OUT)) { json(res, { error: "nee" }, 403); return; }
+      try { await fs.unlink(p); json(res, { ok: true }); } catch (e) { json(res, { error: e.message }, 500); }
+      return;
+    }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
     if (u.pathname === "/api/images") {
       const b = reg.byId[u.searchParams.get("brand")];
