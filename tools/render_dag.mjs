@@ -76,6 +76,7 @@ const TALEN = String(arg("talen", "nl,en,fr")).split(",").map((s) => s.trim()).f
 const TYPES_ARG = String(arg("types", "")).trim();
 const FORMAT = arg("format", "9:16");
 const DUUR = Number(arg("duur", "48")) || 48;   // doel-lengte in seconden; per type gesnapt op hele cycli (rond 45-50s)
+const AANTAL = Number(arg("aantal", "4")) || 4;   // aantal video's PER TAAL (willekeurige types); 0/leeg niet, default 4
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 const nu = () => new Date().toLocaleTimeString("nl-NL");
 const log = (s) => console.log(`[${nu()}] ${s}`);
@@ -202,16 +203,22 @@ function renderEen(template, lang) {
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
   await volgEngineLog();   // vanaf nu stroomt de engine-log mee
 
-  let types = TYPES_ARG ? TYPES_ARG.split(",").map((s) => s.trim()).filter(Boolean) : await haalTypes();
-  if (!types.length) { console.error("Geen types gevonden. Stop."); process.exit(1); }
-  const totaal = types.length * TALEN.length;
+  const alleTypes = TYPES_ARG ? TYPES_ARG.split(",").map((s) => s.trim()).filter(Boolean) : await haalTypes();
+  if (!alleTypes.length) { console.error("Geen types gevonden. Stop."); process.exit(1); }
+  // OOGST: per taal AANTAL video's, met WILLEKEURIGE types (elke nacht andere keuze -> variatie
+  // zonder alle types te maken). --types blijft leidend als het gegeven is (handmatige test):
+  // dan render je precies die types. Anders: AANTAL willekeurige per taal, nooit meer dan beschikbaar.
+  const schud = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  const perTaal = {};
+  for (const lang of TALEN) perTaal[lang] = TYPES_ARG ? alleTypes.slice() : schud(alleTypes).slice(0, Math.min(AANTAL, alleTypes.length));
+  const totaal = TALEN.reduce((n, l) => n + perTaal[l].length, 0);
   log("talen: " + TALEN.join(", "));
-  log("types: " + types.join(", "));
+  log("per taal: " + TALEN.map((l) => l + "=" + perTaal[l].length + " [" + perTaal[l].join(",") + "]").join("  |  "));
   log("te renderen: " + totaal + (DOEN ? "" : "  (DROOG - geef --doen om echt te renderen)"));
 
   let ok = 0, fail = 0, done = 0;
   for (const lang of TALEN) {
-    for (const t of types) {
+    for (const t of perTaal[lang]) {
       done++;
       const label = `${done}/${totaal}  ${t} [${lang}]`;
       if (!DOEN) { log("(droog) " + label); continue; }
@@ -222,7 +229,7 @@ function renderEen(template, lang) {
     }
   }
 
-  const samenvatting = `${new Date().toISOString()}  klaar: ${ok} ok, ${fail} mislukt (talen ${TALEN.join("/")}, ${types.length} types)`;
+  const samenvatting = `${new Date().toISOString()}  klaar: ${ok} ok, ${fail} mislukt (talen ${TALEN.join("/")}, ${totaal} video's)`;
   log("ALLES KLAAR -> " + ok + " ok, " + fail + " mislukt");
   if (DOEN) { try { await fs.promises.appendFile(MARKER, samenvatting + "\n"); } catch (_) {} }
 

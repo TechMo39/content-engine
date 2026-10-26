@@ -144,6 +144,12 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 /* ---- Planning ---- */
 .planbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 16px}
 .planhdr{font-size:15px;color:var(--gold);font-weight:600;margin-right:6px}
+.planflex{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
+.plancol{display:flex;flex-direction:column;gap:10px}
+.plancol-head{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:var(--gold);font-weight:600;padding:0 2px}
+.planadd{background:#241a3a;border:1px dashed var(--gold);color:var(--gold);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer}
+.planadd:hover{background:#2e2147}
+.pp-timein{width:72px;background:#241a3a;color:var(--gold);border:1px solid #3a2f52;border-radius:7px;padding:4px;font-size:13px;font-weight:600}
 .plantbl{display:flex;flex-direction:column;gap:14px}
 .planrow{display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:12px;align-items:stretch}
 .plantime{display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--gold);font-weight:600}
@@ -417,82 +423,90 @@ async function loadPlan(date){
   plan.date=date||plan.date||plToday();
   $('#planGrid').innerHTML='';$('#planMsg').textContent='Laden…';plan.loaded=true;
   let j=null;try{j=await (await fetch('/api/plan?date='+plan.date)).json();}catch(e){}
-  plan.data=j||{slots:[],candidates:[],accounts:[],times:['10:00','16:00','20:00'],langs:['nl','en','fr'],date:plan.date};
+  plan.data=j||{slots:[],candidates:[],accounts:[],times:['11:00','19:00'],langs:['nl','en','fr'],date:plan.date};
   $('#planDate').textContent='Plan voor '+(plan.data.date||plan.date);$('#planMsg').textContent='';
   renderPlan();
   loadWeek(plan.weekBase||plan.date);
 }
+// FLEXIBELE PLANNER: per taal een lijst posts. Je voegt een post toe (+) of haalt er een weg (✕),
+// dus 1, 2, 3 of wat je wilt per taal. Elke post: tijd, video, en de kanalen (platform-vinkjes).
+function planCardFor(slot,idx){
+  const slots=plan.data.slots,candidates=plan.data.candidates||[],lang=slot.lang;
+  const cands=candidates.filter(c=>c.lang===lang);
+  const cell=document.createElement('div');cell.className='plancell';
+  if(slot.status==='geplaatst'||slot.status==='deels'){
+    cell.classList.add('plancell-posted');
+    const lbl=slot.status==='deels'?'Deels gepost':'Gepost';
+    cell.innerHTML=`<div class="planslot-top"><b>${esc(slot.time||'')}</b><span class="planposted">✓ ${lbl}</span></div>
+      <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
+      <div class="planpostinfo">${esc(slot.typeName||slot.type||'')}</div>`;
+    const vp=cell.querySelector('video');if(vp&&slot.url)vp.onclick=()=>openModal({kind:'video',url:slot.url});
+    return cell;
+  }
+  const opts=['<option value="">— leeg —</option>'].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
+  const plats=planAccountsFor(lang);
+  const sel=slot.platforms&&slot.platforms.length?slot.platforms.slice():plats.map(a=>a.platform);  // leeg veld = alle kanalen
+  const platsHtml=plats.length
+    ? `<div class="planplats">`+plats.map(a=>`<span class="planplat${sel.includes(a.platform)?' on':''}" data-pf="${esc(a.platform)}">${esc(a.label)}</span>`).join('')+`</div>`
+    : `<div class="planplats"><span class="planplat none">geen kanaal</span></div>`;
+  cell.innerHTML=`<div class="planslot-top"><input type="time" class="pp-timein" value="${esc(slot.time||'12:00')}"><button class="planreject" title="Deze post verwijderen (en video uit de map als die afgekeurd wordt)">✕</button></div>
+    <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
+    <select class="planpick">${opts}</select>
+    ${platsHtml}`;
+  const bindPlay=(url)=>{const vv=cell.querySelector('video');if(vv&&url)vv.onclick=()=>openModal({kind:'video',url});};
+  bindPlay(slot.url);
+  cell.querySelector('.pp-timein').onchange=e=>{slots[idx].time=e.target.value||'12:00';};
+  const allPf=plats.map(a=>a.platform);
+  cell.querySelectorAll('.planplat[data-pf]').forEach(el=>el.onclick=()=>{
+    el.classList.toggle('on');
+    const on=[...cell.querySelectorAll('.planplat.on')].map(e=>e.dataset.pf).filter(Boolean);
+    slots[idx].platforms=(on.length===allPf.length)?[]:on;
+  });
+  cell.querySelector('.planpick').onchange=e=>{
+    const file=e.target.value,c=cands.find(x=>x.file===file);
+    slots[idx].file=file||null;slots[idx].url=c?c.url:null;slots[idx].type=c?c.type:null;slots[idx].typeName=c?c.typeName:null;
+    cell.querySelector('.planprev').innerHTML=c?`<video src="${esc(c.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>';
+    bindPlay(c?c.url:null);
+  };
+  cell.querySelector('.planreject').onclick=async()=>{
+    const file=slots[idx].file;
+    if(!file){slots.splice(idx,1);renderPlan();return;}   // lege post -> gewoon weghalen
+    if(!confirm('Deze post verwijderen? Kies OK om ook de video uit de map te verwijderen (afkeuren), of annuleer.')){return;}
+    try{await fetch('/api/candidate/delete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({file})});}catch(e){}
+    plan.data.candidates=(plan.data.candidates||[]).filter(c=>c.file!==file);
+    plan.data.slots=slots.filter((_,i)=>i!==idx);
+    $('#planMsg').textContent='Post verwijderd, video afgekeurd.';renderPlan();
+  };
+  return cell;
+}
 function renderPlan(){
   const g=$('#planGrid');g.innerHTML='';
-  const times=plan.data.times||['10:00','16:00','20:00'],langs=plan.data.langs||['nl','en','fr'],slots=plan.data.slots||[],candidates=plan.data.candidates||[];
-  if(!slots.length){$('#planEmpty').style.display='';$('#planEmpty').textContent=candidates.length?'Nog geen plan voor deze dag. Klik "Dagvoorstel maken".':'Nog geen gerenderde video\'s. Render eerst (automatisch \'s nachts of via de Studio).';return;}
+  const langs=plan.data.langs||['nl','en','fr'],slots=plan.data.slots||[],candidates=plan.data.candidates||[];
+  if(!slots.length&&!candidates.length){$('#planEmpty').style.display='';$('#planEmpty').textContent='Nog geen gerenderde video\'s. Render eerst (automatisch \'s nachts of via de Studio).';return;}
   $('#planEmpty').style.display='none';
-  const tbl=document.createElement('div');tbl.className='plantbl';
-  times.forEach(time=>{
-    const row=document.createElement('div');row.className='planrow';
-    const th=document.createElement('div');th.className='plantime';th.textContent=time;row.appendChild(th);
-    langs.forEach(lang=>{
-      const slot=slots.find(s=>s.time===time&&s.lang===lang)||{time,lang,file:null,url:null};
-      const cands=candidates.filter(c=>c.lang===lang);
-      const cell=document.createElement('div');cell.className='plancell';
-      // Al gepost (of deels): slot vergrendelen en tonen als gepost, zodat je niet per ongeluk dubbel post.
-      if(slot.status==='geplaatst'||slot.status==='deels'){
-        cell.classList.add('plancell-posted');
-        const lbl=slot.status==='deels'?'Deels gepost':'Gepost';
-        cell.innerHTML=`<div class="planslot-top"><b>${PLANLBL[lang]||lang}</b><span class="planposted">✓ ${lbl}</span></div>
-          <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
-          <div class="planpostinfo">${esc(slot.typeName||slot.type||'')}</div>`;
-        const vp=cell.querySelector('video');if(vp&&slot.url)vp.onclick=()=>openModal({kind:'video',url:slot.url});
-        row.appendChild(cell);return;
-      }
-      const opts=['<option value="">— leeg —</option>'].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
-      // Kanalen die je voor deze taal kunt kiezen (de ingeschakelde platforms). De poster post
-      // alleen naar wat én hier gekozen is én echt gekoppeld. Leeg = alle (oud "one for all").
-      const plats=planAccountsFor(lang);
-      const sel=slot.platforms&&slot.platforms.length?slot.platforms.slice():plats.map(a=>a.platform);  // leeg veld = alles aan
-      const platsHtml=plats.length
-        ? `<div class="planplats">`+plats.map(a=>`<span class="planplat${sel.includes(a.platform)?' on':''}" data-pf="${esc(a.platform)}">${esc(a.label)}</span>`).join('')+`</div>`
-        : `<div class="planplats"><span class="planplat none">geen kanaal</span></div>`;
-      cell.innerHTML=`<div class="planslot-top"><b>${PLANLBL[lang]||lang}</b><button class="planreject" title="Afkeuren en verwijderen uit de map">✕</button></div>
-        <div class="planprev">${slot.url?`<video src="${esc(slot.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>'}</div>
-        <select class="planpick">${opts}</select>
-        ${platsHtml}`;
-      const bindPlay=(url)=>{const vv=cell.querySelector('video');if(vv&&url)vv.onclick=()=>openModal({kind:'video',url});};
-      bindPlay(slot.url);
-      // platform-vinkjes: klik wisselt aan/uit; sla de selectie op in het slot. Staat alles aan,
-      // dan bewaren we een lege lijst (= "alle kanalen", zodat een later gekoppeld kanaal meedoet).
-      const allPf=plats.map(a=>a.platform);
-      const syncPlats=()=>{
-        let s=slots.find(ss=>ss.time===time&&ss.lang===lang);if(!s){s={time,lang};slots.push(s);}
-        const on=[...cell.querySelectorAll('.planplat.on')].map(e=>e.dataset.pf).filter(Boolean);
-        s.platforms=(on.length===allPf.length)?[]:on;   // alles aan -> leeg (= alle)
-      };
-      cell.querySelectorAll('.planplat[data-pf]').forEach(el=>el.onclick=()=>{el.classList.toggle('on');syncPlats();});
-      cell.querySelector('.planpick').onchange=e=>{
-        const file=e.target.value,c=cands.find(x=>x.file===file);
-        let s=slots.find(ss=>ss.time===time&&ss.lang===lang);if(!s){s={time,lang};slots.push(s);}
-        s.file=file||null;s.url=c?c.url:null;s.type=c?c.type:null;s.typeName=c?c.typeName:null;
-        cell.querySelector('.planprev').innerHTML=c?`<video src="${esc(c.url)}" muted preload="metadata"></video>`:'<div class="planempty">leeg</div>';
-        bindPlay(c?c.url:null);
-      };
-      cell.querySelector('.planreject').onclick=async()=>{
-        const s=slots.find(ss=>ss.time===time&&ss.lang===lang);
-        if(!s||!s.file){$('#planMsg').textContent='Geen video in dit slot om af te keuren.';return;}
-        if(!confirm('Deze video afkeuren en verwijderen uit de map?'))return;
-        const file=s.file;
-        try{await fetch('/api/candidate/delete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({file})});}catch(e){}
-        plan.data.candidates=(plan.data.candidates||[]).filter(c=>c.file!==file);
-        (plan.data.slots||[]).forEach(ss=>{if(ss.file===file){ss.file=null;ss.url=null;ss.type=null;ss.typeName=null;}});
-        $('#planMsg').textContent='Afgekeurd en verwijderd.';renderPlan();
-      };
-      row.appendChild(cell);
-    });
-    tbl.appendChild(row);
+  const wrap=document.createElement('div');wrap.className='planflex';
+  langs.forEach(lang=>{
+    const col=document.createElement('div');col.className='plancol';
+    const head=document.createElement('div');head.className='plancol-head';
+    head.innerHTML=`<span>${PLANLBL[lang]||lang}</span><button class="planadd" title="Post toevoegen">+ post</button>`;
+    col.appendChild(head);
+    // posts van deze taal, in slot-volgorde; elke post z'n eigen kaart met de echte index
+    slots.forEach((s,i)=>{if(s.lang!==lang)return;col.appendChild(planCardFor(s,i));});
+    head.querySelector('.planadd').onclick=()=>{
+      plan.data.slots=plan.data.slots||[];
+      plan.data.slots.push({time:'12:00',lang,file:null,url:null,type:null,typeName:null,platforms:[],status:'concept'});
+      renderPlan();
+    };
+    wrap.appendChild(col);
   });
-  g.appendChild(tbl);
+  g.appendChild(wrap);
 }
-async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan en klik Akkoord.';}
-async function savePlan(){const slots=(plan.data.slots||[]).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,platforms:Array.isArray(s.platforms)?s.platforms:[],status:(s.status==='geplaatst'||s.status==='deels')?s.status:'gepland'}));$('#planMsg').textContent='Opslaan…';try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.filter(s=>s.file).length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}}
+async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan, voeg toe of haal weg, en klik Akkoord.';}
+async function savePlan(){
+  const slots=(plan.data.slots||[]).filter(s=>s.file).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,platforms:Array.isArray(s.platforms)?s.platforms:[],status:(s.status==='geplaatst'||s.status==='deels')?s.status:'gepland'}));
+  $('#planMsg').textContent='Opslaan…';
+  try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}
+}
 $('#planPropose').onclick=proposePlan;
 $('#planSave').onclick=savePlan;
 $('#planPrevWk').onclick=()=>shiftWeek(-1);

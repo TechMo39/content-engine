@@ -70,14 +70,12 @@ const TYPE_MAX_SEC = {
   droste: 60,   // oneindige inzoom: duur wordt gesnapt op hele tunnel-cycli (naadloze loop)
 };
 
-// r2Put + imgBase ook los doorgeven: WhatsApp-export zet de mp4 op R2 (permanente /img/-URL),
-// niet via de tijdelijke publicUrlFor (die wist na het posten weer).
-const social = buildSocial({ ROOT, publicUrlFor, r2Put, imgBase: IMG_BASE });
+const social = buildSocial({ ROOT, publicUrlFor });
 const socialStore = makeSocialStore(OUT);
 
 // ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
 const PLAN_FILE = path.join(OUT, ".plan.json");
-const PLAN_TIMES = ["10:00", "16:00", "20:00"];
+const PLAN_TIMES = ["11:00", "19:00"];
 const PLAN_LANGS = ["nl", "en", "fr"];
 const planToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });   // Europese dag
 async function readPlan() { try { return JSON.parse(await fs.readFile(PLAN_FILE, "utf8")); } catch { return {}; } }
@@ -604,11 +602,9 @@ const server = http.createServer(async (req, res) => {
       log(`▶ social: ${bd.platform} ${lang.toUpperCase()} ← ${bd.file}`);
       try {
         const r = await p.upload(path.resolve(OUT, bd.file), meta, lang, log);
-        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "posted", postId: r.postId || "", url: r.url || "", caption: r.caption || "", at: Date.now() });
+        const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() });
         log(`✓ social: ${bd.platform} ${lang.toUpperCase()} geplaatst — ${r.url || r.postId || ""}`);
-        // WhatsApp = export (geen echte post): geef de vlag + publieke URL + caption mee zodat de
-        // UI een QR/link + kopieerbare tekst kan tonen i.p.v. "geplaatst".
-        json(res, { ok: true, post: rec, whatsapp: !!r.whatsapp, url: r.url || "", caption: r.caption || "" });
+        json(res, { ok: true, post: rec });
       } catch (e) {
         const rec = await socialStore.set(bd.file, bd.platform, lang, { status: "failed", error: e.message });
         log(`✗ social: ${bd.platform} ${lang.toUpperCase()} — ${e.message}`);
