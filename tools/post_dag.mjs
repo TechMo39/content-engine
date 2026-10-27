@@ -28,9 +28,15 @@ const DOEN = process.argv.includes("--doen");
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 const nu = () => new Date().toLocaleTimeString("nl-NL");
 const log = (s) => console.log(`[${nu()}] ${s}`);
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+// ALLES op Europe/Amsterdam (zoals de planner + engine), anders mixen we tijdzones door elkaar
+// en klopt "vandaag"/"due" rond middernacht niet. (todayStr gebruikte UTC, nowMin lokale tijd.)
+const AMS = "Europe/Amsterdam";
+const todayStr = () => new Date().toLocaleDateString("en-CA", { timeZone: AMS });   // YYYY-MM-DD, Amsterdam
+const dateStrOffset = (dagen) => { const d = new Date(); d.setDate(d.getDate() - dagen); return d.toLocaleDateString("en-CA", { timeZone: AMS }); };
+const nowMin = () => { const s = new Date().toLocaleTimeString("en-GB", { timeZone: AMS, hour12: false }); const m = /^(\d{1,2}):(\d{2})/.exec(s); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
 const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
+// INHAAL: hoeveel dagen terug nog gemiste gepland-posts oppakken (laptop was uit / laat goedgekeurd).
+const INHAAL_DAGEN = 2;
 
 // --- engine-beheer (zelfde patroon als render_dag/tot_plaatjes) ---
 let onzeEngine = null;
@@ -77,9 +83,24 @@ function postJson(p, body) {
   const date = todayStr();
   // Plan rechtstreeks van schijf -> we starten de engine NIET als er niks due is.
   let planAll = {}; try { planAll = JSON.parse(await fs.promises.readFile(PLAN_FILE, "utf8")); } catch {}
-  const slots = (planAll[date] && planAll[date].slots) || [];
-  const due = slots.filter((s) => s.file && s.status === "gepland" && toMin(s.time) <= nowMin());
-  log(`plan ${date}: ${slots.length} slots, ${due.length} due nu` + (DOEN ? "" : "  [DROOG]"));
+  // DUE = gepland + nog niet gepost + tijd voorbij. Vandaag telt een slot pas als tijd <= nu;
+  // EERDERE dagen (tot INHAAL_DAGEN terug) tellen ALTIJD (die tijd is sowieso voorbij) -> gemiste
+  // posts (laptop was uit, of laat goedgekeurd rond middernacht) worden alsnog ingehaald. De store
+  // blokkeert dubbel posten, dus een al-gepost slot kan hier geen tweede keer uit.
+  const dagen = [];
+  for (let i = INHAAL_DAGEN; i >= 1; i--) dagen.push(dateStrOffset(i));   // oudste eerst
+  dagen.push(date);                                                       // dan vandaag
+  const nowM = nowMin();
+  const due = [];
+  for (const d of dagen) {
+    const slots = (planAll[d] && planAll[d].slots) || [];
+    for (const s of slots) {
+      if (!s.file || s.status !== "gepland") continue;
+      if (d === date && toMin(s.time) > nowM) continue;   // vandaag: alleen als de tijd al voorbij is
+      due.push({ s, d });                                  // onthoud bij welke dag dit slot hoort
+    }
+  }
+  log(`plan: ${due.length} due (vandaag + ${INHAAL_DAGEN} dag(en) inhaal)` + (DOEN ? "" : "  [DROOG]"));
   if (!due.length) { log("niets te posten; engine niet gestart."); process.exit(0); }
 
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
@@ -88,7 +109,7 @@ function postJson(p, body) {
   for (const a of (chan.accounts || [])) if (a.connected) (connected[a.lang] = connected[a.lang] || []).push(a.platform);
 
   let gepost = 0, mislukt = 0;
-  for (const s of due) {
+  for (const { s, d } of due) {
     let plats = connected[s.lang] || [];
     // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab).
     plats = plats.filter((p) => p !== "whatsapp");
@@ -98,7 +119,7 @@ function postJson(p, body) {
     if (!plats.length) { log(`⚠ ${s.time} ${s.lang.toUpperCase()}: geen gekoppeld/gekozen kanaal, overslaan.`); continue; }
     let okAny = false, errAny = false;
     for (const platform of plats) {
-      const label = `${s.time} ${s.lang.toUpperCase()} → ${platform}`;
+      const label = `${d === date ? "" : d + " "}${s.time} ${s.lang.toUpperCase()} → ${platform}${d === date ? "" : " (inhaal)"}`;
       if (!DOEN) { log("(droog) zou posten: " + label + "  (" + (s.typeName || s.type) + ")"); okAny = true; continue; }
       let cap = { title: "", description: "", tags: [] };
       try { cap = await getJson(`/api/social/suggest?platform=${encodeURIComponent(platform)}&type=${encodeURIComponent(s.type || "")}&lang=${encodeURIComponent(s.lang)}&name=`); } catch {}
@@ -121,8 +142,8 @@ function postJson(p, body) {
     }
   }
 
-  // Status terugschrijven in het plan (dubbel posten is sowieso geblokkeerd in de store).
-  if (DOEN) { planAll[date] = { slots }; try { await fs.promises.writeFile(PLAN_FILE, JSON.stringify(planAll, null, 2)); } catch {} }
+  // Status terugschrijven in het plan (alle dagen; de slot-objecten zijn in planAll bijgewerkt).
+  if (DOEN) { try { await fs.promises.writeFile(PLAN_FILE, JSON.stringify(planAll, null, 2)); } catch {} }
   log(`KLAAR — ${gepost} slot(s) (deels) gepost, ${mislukt} met fouten.`);
   stopOnzeEngine();
   process.exit(0);
