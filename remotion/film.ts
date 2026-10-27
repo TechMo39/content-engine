@@ -1,4 +1,3 @@
-// Tegel-canvas animatie-engine (kern, data-gedreven zodat alles door Remotion
 // inputProps past). Eén bron van waarheid; de standalone renderer compileert dit
 // bestand ook. Geen DOM nodig.
 
@@ -24,6 +23,34 @@ export const GLAZE_FAMILIES: Record<string, string[]> = {
   // naast zwart en crème. Botsende, pakkende kleuren (zoals de meerkleurige configurator-modus).
   bont:       ["#1e5fb0", "#167e7e", "#1a8f4e", "#6f9f3c", "#e5a81c", "#e07b1a", "#c0452e", "#9c3b63", "#e0928c", "#232528", "#5a93c0", "#ece3cf"],
   feest:      ["#2b4f9c", "#0f8a86", "#2f9b57", "#d8a51e", "#d96a1c", "#b83a2e", "#7a3b70", "#d98a86", "#1d6f6b", "#20242a", "#8fb0d6", "#efe7d4"],
+
+  // ---- FRIS & WESTERS (27 okt): lichtere, vrolijke Europese paletten i.p.v. de donkere
+  // Marokkaanse juweeltinten. Luchtig, met zachte neutralen zodat het ademt. ----
+  // TONAAL (één kleur, vijf frisse tinten, donker -> licht -> crème):
+  roze:       ["#a85a6e", "#c87d90", "#e3a3b2", "#f2c6d0", "#f8e8ec"],
+  koraal:     ["#c25742", "#e07a5f", "#f29a80", "#f8bfa8", "#fbe6da"],
+  okergeel:   ["#b08a24", "#d8ae3c", "#ecc962", "#f4dd93", "#f8efcf"],
+  turkoois:   ["#1a8a84", "#2bb0a8", "#5fcac2", "#9aded8", "#e2f2ef"],
+  violet:     ["#6a4f9c", "#8a72bc", "#ab96d6", "#c9bbe6", "#ece5f5"],
+  // COMBINATIES (meerkleurig, fris/vrolijk, naam = de twee hoofdkleuren + een lichte neutraal):
+  mosterd_marine:  ["#27486e", "#3a6a9c", "#e0b23e", "#edca68", "#d87f4c", "#f3ecda"],
+  koraal_petrol:   ["#1a7e84", "#2ba3a8", "#ee7a5c", "#f6a386", "#bfe0dc", "#f6e7dc"],
+  middellandse:    ["#2a8ec4", "#56b0da", "#e07a4a", "#eaa968", "#9aac56", "#f4eeda"],
+  smaragd_goud:    ["#1a7a5c", "#34a47e", "#6fc4a2", "#d4af3e", "#eccf6a", "#f2ecd6"],
+  bordeaux_blush:  ["#8a3346", "#b4536a", "#d6859a", "#eeb2c0", "#f6dde3", "#f2e6e3"],
+  indigo_oranje:   ["#3a4098", "#5c62bc", "#8f94d6", "#ea8338", "#f3ac68", "#f3ecdb"],
+  salie_terracotta:["#7a8a54", "#9db070", "#c2d19a", "#cf744e", "#e8a07c", "#f2ecdc"],
+  oudroze_bos:     ["#2f6e52", "#4e9070", "#cf9aa2", "#e8bcc2", "#f2ddda", "#86a888"],
+  lila_salie:      ["#8574ac", "#a593c8", "#cabce0", "#9bb072", "#c2cf9c", "#f2eede"],
+  perzik_pruim:    ["#7a3a62", "#a85684", "#f2a67e", "#f8c7a6", "#df93b0", "#f6e6da"],
+  mint_koraal:     ["#34a482", "#64c4a4", "#a8ded0", "#ee7a5c", "#f6a386", "#f4ece2"],
+  oker_petrol:     ["#1a7e84", "#2ba3a8", "#dcac36", "#ecc866", "#7fc4bf", "#f2ecd8"],
+  jade_robijn:     ["#1a7e62", "#34a47e", "#7fc8ac", "#b43850", "#d46074", "#f2e8e2"],
+  saffier_amber:   ["#27509c", "#4a74c0", "#8298d8", "#dca032", "#edc062", "#f2ecdc"],
+  aubergine_mint:  ["#5c3a62", "#845a8a", "#ab84ac", "#34a482", "#86d0b6", "#f0e8ee"],
+  kaneel_hemels:   ["#a85a36", "#c87e52", "#e3a376", "#4aa3d4", "#8fcae6", "#f4e8dc"],
+  framboos_olijf:  ["#9c2a50", "#c24e70", "#e083a0", "#7a8a3e", "#a6b46a", "#f2e8dc"],
+  inkt_citrus:     ["#2a303a", "#4a5462", "#7a8694", "#d6cc36", "#e6e068", "#eef0dc"],
 };
 export const BLANK = "#ffffff";   // kaal = wit (niet bruin); 3D-reliëf komt van de glazuurlaag
 export const PLUM = "#2a2335";
@@ -465,3 +492,4 @@ export function buildGlaze(parsed: Parsed, colors: string[]): string {
   out += svg.slice(cur);
   return out;
 }
+
