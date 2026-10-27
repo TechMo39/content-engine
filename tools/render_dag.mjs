@@ -77,6 +77,17 @@ const TYPES_ARG = String(arg("types", "")).trim();
 const FORMAT = arg("format", "9:16");
 const DUUR = Number(arg("duur", "48")) || 48;   // doel-lengte in seconden; per type gesnapt op hele cycli (rond 45-50s)
 const AANTAL = Number(arg("aantal", "4")) || 4;   // aantal video's PER TAAL (willekeurige types); 0/leeg niet, default 4
+const INHAAL = heeft("inhaal");   // vangnet-modus: alleen renderen als vandaag nog geen geslaagde render was
+
+// Is er vandaag (Amsterdam-tijd) al een GESLAAGDE render in de marker? Leest de inhoud (niet de
+// bestandsdatum), zodat een handmatige render van gisteravond niet ten onrechte als vandaag telt.
+async function alGerenderdVandaag() {
+  const amsDatum = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  let txt = ""; try { txt = await fs.promises.readFile(MARKER, "utf8"); } catch { return false; }
+  // een geslaagde regel begint met de datum van vandaag en bevat " N ok" met N >= 1
+  const re = new RegExp("^" + amsDatum.replace(/[-]/g, "\\-") + "\\b.* ([1-9][0-9]*) ok\\b", "m");
+  return re.test(txt);
+}
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 const nu = () => new Date().toLocaleTimeString("nl-NL");
 const log = (s) => console.log(`[${nu()}] ${s}`);
@@ -199,6 +210,13 @@ function renderEen(template, lang) {
 
 (async function main() {
   await fs.promises.mkdir(OUT_LOG_DIR, { recursive: true }).catch(() => {});
+  // INHAAL-MODUS: alleen draaien als er vandaag nog geen geslaagde render was. Zo niet -> stoppen,
+  // zonder de engine te starten (de .bat hoeft dus zelf niets te checken; geen PowerShell nodig).
+  if (INHAAL && await alGerenderdVandaag()) {
+    log("INHAAL: er is vandaag al geslaagd gerenderd. Niets te doen.");
+    process.exit(0);
+  }
+  if (INHAAL) log("INHAAL: geen geslaagde render vandaag -> nu alsnog renderen.");
   await sweepArchief();    // eerst opruimen: ongebruikte oude kandidaten naar out/archief/
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
   await volgEngineLog();   // vanaf nu stroomt de engine-log mee
@@ -229,7 +247,10 @@ function renderEen(template, lang) {
     }
   }
 
-  const samenvatting = `${new Date().toISOString()}  klaar: ${ok} ok, ${fail} mislukt (talen ${TALEN.join("/")}, ${totaal} video's)`;
+  // datum in Amsterdam-tijd (consistent met poster + planner); de inhaal-taak checkt deze regel.
+  const amsDatum = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const amsTijd = new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Amsterdam", hour12: false });
+  const samenvatting = `${amsDatum} ${amsTijd}  klaar: ${ok} ok, ${fail} mislukt (talen ${TALEN.join("/")}, ${totaal} video's)`;
   log("ALLES KLAAR -> " + ok + " ok, " + fail + " mislukt");
   if (DOEN) { try { await fs.promises.appendFile(MARKER, samenvatting + "\n"); } catch (_) {} }
 
