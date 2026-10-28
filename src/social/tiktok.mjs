@@ -150,9 +150,12 @@ export function makeTikTok({ ROOT, suggest } = {}) {
   async function authStatus(lang) {
     const tok = await readToken(lang);
     if (!tok || !tok.refresh_token) return { connected: false, who: "" };
-    // probeer de gebruikersnaam op te halen (bewijs dat het token werkt)
+    // EERLIJKE STATUS (zoals YouTube): een dood refresh-token -> "niet gekoppeld" tonen zodat de
+    // Koppel-knop terugkomt, i.p.v. vals groen. Lukt het access-token niet -> token dood.
+    let at;
+    try { at = await accessToken(lang); }
+    catch { return { connected: false, who: "", expired: true }; }
     try {
-      const at = await accessToken(lang);
       const r = await fetch(`${API}/user/info/?fields=open_id,display_name`, { headers: { authorization: "Bearer " + at } });
       const j = await r.json();
       const name = j && j.data && j.data.user && j.data.user.display_name;
@@ -273,3 +276,4 @@ export function makeTikTok({ ROOT, suggest } = {}) {
     completeLogin,
   };
 }
+
