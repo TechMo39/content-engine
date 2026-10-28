@@ -2288,18 +2288,31 @@ export function makeBrand({ ROOT, config }) {
   // uitkomst teruggeeft. Geeft "" als de download of het inladen faalt (de caller gooit dan netjes).
   async function fetchImageAsUri(url, tagName) {
     if (!url || !/^https?:/.test(url)) return "";
+    // Vaste map in de content-engine-folder (before/ of after/), zodat Mo zelf kan zien wat er
+    // binnenkwam. Vaste bestandsnaam = overschrijft elke dag, nooit een "(1)"-dubbel.
+    const folder = (tagName === "before" || tagName === "after") ? tagName : "fetched";
+    const dir = path.resolve(ROOT, folder);
     try {
       const r = await fetch(url);
       if (!r.ok) return "";
       const buf = Buffer.from(await r.arrayBuffer());
       if (!buf.length) return "";
-      let ext = (url.split(/[?#]/)[0].split(".").pop() || "png").toLowerCase();
-      if (!/^(png|jpe?g|webp|gif)$/.test(ext)) ext = "png";
-      const tmp = path.join(os.tmpdir(), "totvn-" + (tagName || "img") + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext);
-      await fs.writeFile(tmp, buf);
-      const uri = await loadImageFile(tmp);   // lokaal bestand -> data-URI (resvg tekent dit wél)
-      try { await fs.unlink(tmp); } catch {}
-      return uri;
+      await fs.mkdir(dir, { recursive: true });
+      // 1) RUWE download bewaren (vaste naam). Puur om te kunnen inspecteren wat de site gaf.
+      let ext = (url.split(/[?#]/)[0].split(".").pop() || "img").toLowerCase();
+      if (!/^[a-z0-9]{2,5}$/.test(ext)) ext = "img";
+      const rawPath = path.join(dir, "source." + ext);
+      await fs.writeFile(rawPath, buf);
+      // 2) NORMALISEREN via ffmpeg naar een SCHONE 8-bit PNG. Dit is DE fix: de URL eindigt op .png
+      // maar de bytes zijn vaak JPEG/JFIF. Met een png-label tekent resvg een LEEG vakje (geen fout).
+      // ffmpeg decodeert elk echt beeldformaat en schrijft een png die resvg gegarandeerd tekent.
+      // Faalt ffmpeg (de bytes zijn geen echt beeld, bv. een HTML-foutpagina), dan geven we ""
+      // terug en gooit de caller een DUIDELIJKE fout i.p.v. een stille lege video.
+      const pngPath = path.join(dir, "image.png");
+      try { await fs.unlink(pngPath); } catch {}
+      const ff = spawnSync(FFMPEG || "ffmpeg", ["-v", "error", "-y", "-i", rawPath, "-pix_fmt", "rgba", pngPath], { windowsHide: true });
+      if (ff.status !== 0) return "";
+      return await loadImageFile(pngPath);   // schone png -> correcte data:image/png;base64 (resvg tekent dit)
     } catch { return ""; }
   }
 
