@@ -2336,51 +2336,70 @@ export function makeBrand({ ROOT, config }) {
     const x = Math.round((W - w) / 2), y = Math.round(H * 0.52 - h / 2), rr = Math.max(8, w * 0.03);
     const frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
     const clip = `<clipPath id="vnc"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`;
-    // een beeld in het kader, met een lichte push-in (zoom z) voor leven
-    const imgLayer = (uri, z) => {
-      if (!uri) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#241a3a"/>`;
+    // BACKING achter het kader: zachte verticale verloop, zodat het ontwerp dat HEEL getoond wordt
+    // (meet laat randen vrij) op een nette premium ondergrond staat i.p.v. een leeg vlak.
+    const backing = `<defs><linearGradient id="vngrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c2142"/><stop offset="1" stop-color="#1b1230"/></linearGradient></defs>`
+      + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="url(#vngrad)"/>`;
+    // AFTER (echte foto) = kader VULLEN (slice) met een zachte push-in: geeft leven aan een foto.
+    const imgFill = (uri, z) => {
+      if (!uri) return "";
       const iw = w * z, ih = h * z, ix = x - (iw - w) / 2, iy = y - (ih - h) / 2;
       return `<image href="${uri}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice"/>`;
     };
-    // tijdlijn: BEFORE tonen -> korte transitie (flits) naar AFTER -> AFTER vasthouden + naam
-    const Tbefore = durSec * 0.34, Ttrans = Math.min(0.9, durSec * 0.10);
+    // BEFORE (plat ontwerp) = HEEL tonen (meet, geen crop, geen inzoom). Je zoomt niet in op iets
+    // dat je juist helemaal wil laten zien. Gecentreerd in het kader.
+    const imgWhole = (uri) => uri ? `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>` : "";
+
+    // TIJDLIJN (strak voor retentie): seconde-1 hook (open loop) -> korte tease op het ontwerp met
+    // oplopende spanning -> FLITS-knip -> de echte foto als payoff, vastgehouden + CTA. Before kort,
+    // after is de beloning dus die krijgt de meeste tijd.
+    const Tbefore = durSec * 0.30, Ttrans = Math.min(0.6, durSec * 0.07);
     const Tafter0 = Tbefore + Ttrans;
-    // labels NL/EN/FR (kort, op het beeld): BEFORE = "ontwerp", AFTER = "echt"
     const LBL = {
       before: { nl: "Het ontwerp", en: "The design", fr: "Le design" }[lang],
-      after: { nl: "Echt, aan de muur", en: "Real, on the wall", fr: "Réel, au mur" }[lang],
+      after: { nl: "Van ontwerp naar echt", en: "From design to real", fr: "Du design au réel" }[lang],
     };
-    const kick = { nl: "Van ontwerp naar echt", en: "From design to real", fr: "Du design au réel" }[lang];
+    // marketing-copy NL/EN/FR
+    const hook = { nl: "Wacht tot je dit écht ziet", en: "Wait till you see this for real", fr: "Attends de le voir en vrai" }[lang];
     const openLine = { nl: "Zo zou het eruitzien…", en: "Here's how it would look…", fr: "Voici le rendu…" }[lang];
+    const payoff = { nl: "Echt. Aan de muur.", en: "Real. On the wall.", fr: "Réel. Au mur." }[lang];
+    const cta = { nl: "Met jouw naam → taleoftiles.com", en: "With your name → taleoftiles.com", fr: "Avec ton nom → taleoftiles.com" }[lang];
 
     function sceneAt(fr) {
       const t = fr / FPS;
-      let inner = clip, overlay = "";
+      let inner = clip + backing, overlay = "";
       if (t < Tafter0) {
-        // BEFORE (plat ontwerp), zacht inzoomend; naar het eind van before een flits die de knip dekt
-        const zb = 1.02 + 0.05 * smooth(Math.min(1, t / Tbefore));
-        inner += `<g clip-path="url(#vnc)">${imgLayer(beforeUri || afterUri, zb)}${glazeSvg(x, y, w, h, "vnb")}</g>`;
+        // BEFORE: het HELE ontwerp, geen inzoom. Subtiele interrupt-puls (pan + flits) zodat het leeft.
+        const ir = interruptAt(t, { amp: 0.04, beat: 2.6, start: 0.4, until: Tbefore });
+        inner += `<g clip-path="url(#vnc)"><g transform="translate(${(w * ir.panx).toFixed(1)} ${(h * ir.pany).toFixed(1)})">${imgWhole(beforeUri || afterUri)}</g>${glazeSvg(x, y, w, h, "vnb")}</g>`;
         inner += frame;
-        const knip = t > Tbefore ? smooth((t - Tbefore) / Ttrans) : 0;
+        // oplopende spanning: naar het eind van before een opbouwende flits die de knip aankondigt
+        const knip = t > Tbefore - 0.5 ? smooth((t - (Tbefore - 0.5)) / (0.5 + Ttrans)) : ir.flash;
         if (knip > 0.01) inner += flashSweep(x, y, w, h, knip, "vnk");
-        // open-loop regel bovenop het ontwerp (woord-synced), plus klein hoek-label
-        const op = t < Tbefore * 0.75 ? Math.min(1, t / 0.4) : 1 - smooth((t - Tbefore * 0.75) / (Tbefore * 0.25 + Ttrans));
-        if (op > 0.01) overlay += captionOverlay(openLine, LBL.before, W, H, op, "lower", Math.min(1, t / 0.9));
+        // seconde-1 hook bovenin (groot, scroll-stopper), dan open-loop regel onderin
+        const hop = t < 1.6 ? (t < 0.3 ? t / 0.3 : (t > 1.2 ? 1 - smooth((t - 1.2) / 0.4) : 1)) : 0;
+        if (hop > 0.01) overlay += hookOverlay(hook, W, H, hop);
+        const op = t > 1.3 ? (t < Tbefore - 0.3 ? Math.min(1, (t - 1.3) / 0.4) : 1 - smooth((t - (Tbefore - 0.3)) / (0.3 + Ttrans))) : 0;
+        if (op > 0.01) overlay += captionOverlay(openLine, LBL.before, W, H, op, "lower", Math.min(1, (t - 1.3) / 0.9));
       } else {
-        // AFTER (echte foto), langzame push-in; naam graveert; kicker-regel
-        const ta = t - Tafter0, zf = 1.0 + 0.08 * smooth(Math.min(1, ta / (durSec - Tafter0)));
-        inner += `<g clip-path="url(#vnc)">${imgLayer(afterUri, zf)}${glazeSvg(x, y, w, h, "vna")}</g>`;
+        // AFTER: de echte foto als payoff, zachte push-in + interrupt-pulsen zodat het leeft.
+        const ta = t - Tafter0, afterDur = Math.max(0.1, durSec - Tafter0);
+        const ir = interruptAt(ta, { amp: 0.045, beat: 2.7, start: 0.5, until: afterDur });
+        const zf = (1.0 + 0.07 * smooth(Math.min(1, ta / afterDur))) * ir.z;
+        inner += `<g clip-path="url(#vnc)"><g transform="translate(${(w * ir.panx).toFixed(1)} ${(h * ir.pany).toFixed(1)})">${imgFill(afterUri, zf)}</g>${glazeSvg(x, y, w, h, "vna")}</g>`;
         inner += frame;
-        // naamplaat BOVENIN het beeld (payoff), ruim boven de onderregel -> botst nooit met de caption
-        if (name) {
-          const np = plateColours(film.GLAZE_FAMILIES.terracotta || film.PAL);
-          const op = Math.max(0, Math.min(1, (ta - 0.3) / 0.8));
-          if (op > 0.01) { const cyN = y + h * 0.22 + (1 - smooth(op)) * 8; overlay += `<g opacity="${op.toFixed(3)}">${platePlace(name, np, x + w / 2, cyN, Math.round(h * 0.12), w * 0.8)}</g>`; }
+        if (ir.flash > 0.01) inner += flashSweep(x, y, w, h, ir.flash, "vnaf");
+        // GEEN naamplaat: de naam staat al op de echte foto (zou dubbel zijn).
+        // payoff-regel eerst; in de tweede helft wisselt hij naar de CTA (open loop sluiten + actie).
+        const half = afterDur * 0.55, te = durSec - t;
+        if (ta < half) {
+          const op = ta < 0.5 ? smooth(ta / 0.5) : (ta > half - 0.4 ? 1 - smooth((ta - (half - 0.4)) / 0.4) : 1);
+          if (op > 0.01) overlay += captionOverlay(payoff, LBL.after, W, H, op, "lower", Math.min(1, ta / 0.8));
+        } else {
+          const tb = ta - half;
+          const op = tb < 0.4 ? smooth(tb / 0.4) : (te < 0.5 ? smooth(te / 0.5) : 1);
+          if (op > 0.01) overlay += captionOverlay(cta, LBL.after, W, H, op, "lower", Math.min(1, tb / 0.8));
         }
-        // slot-regel ONDERIN (de normale onderband), los van de naamplaat bovenin. Faded aan het eind.
-        const te = durSec - t;
-        const op = ta < 0.6 ? smooth(ta / 0.6) : (te < 0.6 ? smooth(te / 0.6) : 1);
-        if (op > 0.01) overlay += captionOverlay(LBL.after, kick, W, H, op, "lower", Math.min(1, ta / 0.9));
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
