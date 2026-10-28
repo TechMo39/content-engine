@@ -201,6 +201,66 @@ async function renderMailStill(name, style) {
 }
 function enqueueMail(name, style) { const p = mailChain.then(() => renderMailStill(name, style)); mailChain = p.catch(() => {}); return p; }
 
+// ================= CARROUSEL (swipebare IG/FB foto-post) — EIGEN SPOOR, los van de video-planner =================
+// Een carrousel is GEEN video. Hij leeft volledig apart in out/carrousel/ en raakt de video-
+// planner/poster NIET aan. Per taal: 2 beelden (ontwerp + echte foto, van het dagelijkse
+// before/after-paar van de site) + een manifest met de post-status per kanaal. Flow in de UI:
+// "Maak carrousel" -> beelden verschijnen ter GOEDKEURING -> per taal 1 knop "Post naar IG+FB".
+// Pinterest pikt de Engelse IG-post daarna zelf op (niks voor te bouwen).
+const CAROUSEL_DIR = path.resolve(OUT, "carrousel");
+async function readCarManifest(lang) {
+  try { return JSON.parse(await fs.readFile(path.join(CAROUSEL_DIR, lang + ".json"), "utf8")); } catch { return null; }
+}
+async function writeCarManifest(lang, data) {
+  await fs.mkdir(CAROUSEL_DIR, { recursive: true });
+  await fs.writeFile(path.join(CAROUSEL_DIR, lang + ".json"), JSON.stringify(data, null, 2));
+}
+// Genereer de 2 beelden voor één taal via de merk-module (makeCarouselScenes), rastert ze naar
+// jpg in out/carrousel/, en schrijft/ververst het manifest (post-status blijft behouden als die
+// er al was en het nog hetzelfde ontwerp is). Serialiseert via renderLock (gedeelde generator).
+async function makeCarousel(lang) {
+  const brand = reg.byId["taleoftiles"];
+  if (!brand || !brand.makeCarouselScenes) throw new Error("merk taleoftiles kent geen carrousel");
+  lang = ["en", "fr"].includes(lang) ? lang : "nl";
+  await fs.mkdir(CAROUSEL_DIR, { recursive: true });
+  const built = await renderLock(() => brand.makeCarouselScenes({ opts: { lang }, log }));
+  const scenes = built.scenes || [];
+  if (scenes.length < 2) throw new Error("carrousel: minder dan 2 beelden");
+  const caption = (built.caption || "").trim();
+  const slug = slugify(caption || "carrousel");
+  const images = [];
+  for (let i = 0; i < scenes.length; i++) {
+    const png = new Resvg(scenes[i], { fitTo: { mode: "width", value: built.W || 1080 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
+    const tmp = path.join(os.tmpdir(), "totcar-" + Date.now() + "-" + i + ".png");
+    await fs.writeFile(tmp, png);
+    const jpg = `${lang}-${slug}-${i + 1}.jpg`;
+    spawnSync(ffmpegPath, ["-y", "-v", "error", "-i", tmp, "-q:v", "3", path.join(CAROUSEL_DIR, jpg)], { stdio: "ignore", windowsHide: true });
+    try { await fs.unlink(tmp); } catch {}
+    images.push(jpg);
+  }
+  // nieuw ontwerp -> post-status resetten; zelfde ontwerp -> bestaande status bewaren
+  const prev = await readCarManifest(lang);
+  const posts = (prev && prev.slug === slug) ? (prev.posts || {}) : {};
+  const man = { lang, slug, caption, images, posts, created: Date.now() };
+  await writeCarManifest(lang, man);
+  log(`✓ carrousel ${lang.toUpperCase()}: ${images.length} beelden (${caption || "zonder naam"})`);
+  return man;
+}
+// Post één taal-carrousel naar één kanaal (instagram|facebook) via het platform z'n uploadCarousel.
+async function postCarousel(lang, platform) {
+  const man = await readCarManifest(lang);
+  if (!man || !(man.images || []).length) throw new Error("geen carrousel voor " + lang.toUpperCase());
+  const p = social.platById[platform];
+  if (!p || typeof p.uploadCarousel !== "function") throw new Error(platform + " kan geen carrousel posten");
+  const imgs = man.images.map((im) => path.join(CAROUSEL_DIR, im));
+  const meta = { title: man.caption || "", description: (p.suggest ? (p.suggest({ type: "insitu", lang, name: man.caption }).description || "") : "") };
+  const r = await p.uploadCarousel(imgs, meta, lang, log);
+  man.posts = man.posts || {};
+  man.posts[platform] = { status: "posted", postId: r.postId || "", url: r.url || "", at: Date.now() };
+  await writeCarManifest(lang, man);
+  return r;
+}
+
 // ---- BIBLIOTHEEK-helpers: metadata uit de bestandsnaam halen (<merk>-<type>[-en][-naam]-MMDD-HHMMSS.mp4) ----
 const BRAND_IDS = reg.brands.map((b) => b.id).sort((a, b) => b.length - a.length);   // langste eerst (prefix-match)
 const BRAND_NAME = Object.fromEntries(reg.brands.map((b) => [b.id, b.name]));
@@ -447,6 +507,50 @@ const server = http.createServer(async (req, res) => {
       json(res, { items });
       return;
     }
+    // ---- CARROUSEL-endpoints (eigen spoor, raken de video-planner/poster NIET) ----
+    // Serveer de carrousel-beelden (out/carrousel/<file>) voor de preview in de UI.
+    if (u.pathname.startsWith("/carrousel/")) {
+      const f = path.resolve(CAROUSEL_DIR, decodeURIComponent(u.pathname.slice("/carrousel/".length)));
+      if (!f.startsWith(CAROUSEL_DIR)) { res.writeHead(403); res.end("nee"); return; }
+      if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" }); res.end(await fs.readFile(f)); return; }
+      res.writeHead(404); res.end("nope"); return;
+    }
+    // Overzicht: per taal het klaarstaande paar + post-status (voor de goedkeur-tab).
+    if (u.pathname === "/api/carousel/list" && req.method === "GET") {
+      const out = {};
+      for (const lang of ["nl", "en", "fr"]) {
+        const m = await readCarManifest(lang);
+        out[lang] = m ? { caption: m.caption, images: (m.images || []).map((im) => "/carrousel/" + encodeURIComponent(im)), posts: m.posts || {}, created: m.created } : null;
+      }
+      json(res, { langs: ["nl", "en", "fr"], items: out });
+      return;
+    }
+    // Maak de carrousel voor één taal (of alle drie met {langs:["nl","en","fr"]}).
+    if (u.pathname === "/api/carousel/make" && req.method === "POST") {
+      const bd = await readBody(req);
+      const langs = Array.isArray(bd.langs) && bd.langs.length ? bd.langs : [bd.lang || "nl"];
+      const items = {};
+      for (const lang of langs) {
+        try { const m = await makeCarousel(lang); items[lang] = { caption: m.caption, images: m.images.map((im) => "/carrousel/" + encodeURIComponent(im)), posts: m.posts || {} }; }
+        catch (e) { items[lang] = { error: e.message }; log(`✗ carrousel ${lang}: ${e.message}`); }
+      }
+      json(res, { items });
+      return;
+    }
+    // Post één taal-carrousel naar de gekozen kanalen (default IG+FB). Menselijke poort: dit
+    // gebeurt pas als de gebruiker op de knop drukt (na goedkeuring).
+    if (u.pathname === "/api/carousel/post" && req.method === "POST") {
+      const bd = await readBody(req);
+      const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
+      const platforms = Array.isArray(bd.platforms) && bd.platforms.length ? bd.platforms : ["instagram", "facebook"];
+      const results = {};
+      for (const platform of platforms) {
+        try { const r = await postCarousel(lang, platform); results[platform] = { ok: true, url: r.url || "" }; log(`✓ carrousel ${lang.toUpperCase()} → ${platform}`); }
+        catch (e) { results[platform] = { ok: false, error: e.message }; log(`✗ carrousel ${lang.toUpperCase()} → ${platform}: ${e.message}`); }
+      }
+      json(res, { results });
+      return;
+    }
     if (u.pathname === "/api/render" && req.method === "POST") {
       const bd = await readBody(req);
       if (!reg.byId[bd.brand]) { json(res, { error: "onbekend merk" }, 400); return; }
@@ -623,4 +727,5 @@ server.listen(PORT, () => {
   if (process.env.STUDIO_NO_OPEN) return;
   try { const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]]; spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref(); } catch {}
 });
+
 
