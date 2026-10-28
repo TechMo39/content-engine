@@ -78,6 +78,8 @@ const FORMAT = arg("format", "9:16");
 const DUUR = Number(arg("duur", "48")) || 48;   // doel-lengte in seconden; per type gesnapt op hele cycli (rond 45-50s)
 const AANTAL = Number(arg("aantal", "4")) || 4;   // aantal video's PER TAAL (willekeurige types); 0/leeg niet, default 4
 const INHAAL = heeft("inhaal");   // vangnet-modus: alleen renderen als vandaag nog geen geslaagde render was
+const CARROUSEL = heeft("carrousel");   // na de render ook de foto-carrousel (NL/EN/FR) maken, voor de ochtendketen
+const GEENMARKER = heeft("geenmarker"); // deze run NIET in de nacht-render-marker schrijven (zodat de 08:00-inhaal niet denkt dat de nacht al draaide)
 
 // Is er vandaag (Amsterdam-tijd) al een GESLAAGDE render in de marker? Leest de inhoud (niet de
 // bestandsdatum), zodat een handmatige render van gisteravond niet ten onrechte als vandaag telt.
@@ -208,6 +210,42 @@ function renderEen(template, lang) {
   });
 }
 
+// OCHTEND-GUARD: staat er een VERS before/after-paar van VANDAAG op de site? De showcase maakt elke
+// ochtend een bestand site/examples/<JJJJMMDD>-<naam>.png; items[0] is het nieuwste. We checken of de
+// datum in die naam de datum van vandaag (Amsterdam) is. Zo niet -> nog geen vers paar -> overslaan,
+// zodat de ochtendketen nooit de video/carrousel van gisteren opnieuw maakt.
+async function versPaarVandaag() {
+  const amsDatum = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).replace(/-/g, "");   // JJJJMMDD
+  try {
+    const r = await fetch("https://taleoftiles.com/api/photo-examples", { headers: { accept: "application/json" } });
+    if (!r.ok) return false;
+    const j = await r.json();
+    const url = ((j.items || [])[0] || {}).url || "";
+    return url.includes(amsDatum);
+  } catch { return false; }
+}
+
+// Carrousel (foto-post before/after) laten bouwen door de engine, NL/EN/FR in één keer. Genereert
+// alleen (posten gebeurt pas op de knop na goedkeuring). Zelfde engine, zelfde http-weg als renderEen.
+function maakCarrousel(langs) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ langs });
+    const req = http.request(
+      { host: "127.0.0.1", port: 4600, path: "/api/carousel/make", method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) } },
+      (res) => {
+        let data = "";
+        res.on("data", (d) => (data += d));
+        res.on("end", () => {
+          if (res.statusCode !== 200) return reject(new Error("/api/carousel/make gaf " + res.statusCode + (data ? " - " + data.slice(0, 200) : "")));
+          try { resolve(JSON.parse(data)); } catch { resolve(data); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(body); req.end();
+  });
+}
+
 (async function main() {
   await fs.promises.mkdir(OUT_LOG_DIR, { recursive: true }).catch(() => {});
   // INHAAL-MODUS: alleen draaien als er vandaag nog geen geslaagde render was. Zo niet -> stoppen,
@@ -217,6 +255,11 @@ function renderEen(template, lang) {
     process.exit(0);
   }
   if (INHAAL) log("INHAAL: geen geslaagde render vandaag -> nu alsnog renderen.");
+  // OCHTENDKETEN-GUARD: alleen doorgaan als er echt een vers before/after-paar van vandaag is.
+  if (CARROUSEL) {
+    if (!(await versPaarVandaag())) { log("OCHTEND: nog geen vers before/after-paar van vandaag op de site -> overslaan (niets gerenderd)."); process.exit(0); }
+    log("OCHTEND: vers paar van vandaag gevonden -> voor&na-video + carrousel maken.");
+  }
   await sweepArchief();    // eerst opruimen: ongebruikte oude kandidaten naar out/archief/
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
   await volgEngineLog();   // vanaf nu stroomt de engine-log mee
@@ -252,7 +295,16 @@ function renderEen(template, lang) {
   const amsTijd = new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Amsterdam", hour12: false });
   const samenvatting = `${amsDatum} ${amsTijd}  klaar: ${ok} ok, ${fail} mislukt (talen ${TALEN.join("/")}, ${totaal} video's)`;
   log("ALLES KLAAR -> " + ok + " ok, " + fail + " mislukt");
-  if (DOEN) { try { await fs.promises.appendFile(MARKER, samenvatting + "\n"); } catch (_) {} }
+  // Marker alleen schrijven voor de ECHTE nacht/inhaal-render. Een ad-hoc ochtendrun (voor&na +
+  // carrousel) draait met --geenmarker, zodat de 08:00-inhaaltaak niet denkt dat de nacht al liep.
+  if (DOEN && !GEENMARKER) { try { await fs.promises.appendFile(MARKER, samenvatting + "\n"); } catch (_) {} }
+
+  // OCHTENDKETEN: na de video's ook de foto-carrousel maken (NL/EN/FR). Engine draait hier nog.
+  if (DOEN && CARROUSEL) {
+    log("carrousel maken voor: " + TALEN.join(", ") + " …");
+    try { const r = await maakCarrousel(TALEN); log("✓ carrousel klaar -> " + JSON.stringify(r).slice(0, 300)); }
+    catch (e) { log("✗ carrousel MISLUKT: " + (e && e.message || e)); }
+  }
 
   stopOnzeEngine();
 
