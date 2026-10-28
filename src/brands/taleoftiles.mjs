@@ -814,6 +814,7 @@ export function makeBrand({ ROOT, config }) {
     { id: "cadeau", name: "Cadeau (uitpakken → onthullen)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 10: verkoop/BOFU, cadeau-reveal
     { id: "intro", name: "Intro / uitleg (wat · hoe · waar)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 11: opbouw + kleurwissel + muur -> uitlegvideo
     { id: "zoom", name: "Oneindige inzoom", music: ["calm", "lofi", "upbeat"], defaults: {} },  // type 12: inzoomen op 1 tegel -> daarin het volgende patroon -> oneindige loop.
+    { id: "voorna", name: "Voor & na (digitaal → echt)", music: ["calm", "oriental", "spanish"], defaults: {} },  // type 13: dagelijks before/after-paar van de site: plat ontwerp -> echte zellige aan de muur
   ];
 
   // Kies automatisch een track uit de categorieën van een template. Val terug op
@@ -2254,7 +2255,104 @@ export function makeBrand({ ROOT, config }) {
     if (rf.code !== 0) throw new Error("afwerking (chrome+captions+muziek) faalde: " + (rf.err || "").trim().split("\n").pop());
     return { prebuilt: finalPath, music: "", lang, cleanup: work };
   }
+  // VOOR & NA (type 13): het dagelijkse before/after-paar van de site. BEFORE = het platte
+  // digitale ontwerp, AFTER = de echte zellige in een setting (Flux-foto). De website maakt elke
+  // ochtend 1 paar; wij LEZEN alleen de publieke url's (geen login, geen .env), de engine raakt de
+  // site niet aan. Verhaal: "zo zou het eruitzien" -> "zo ziet het er ECHT uit". Payoff/open-loop:
+  // de kijker wil de echte versie zien. Transformatie digitaal -> echt met een flits op de knip.
+  //
+  // Paar ophalen: GET /api/photo-examples -> {items:[{url,caption,...}]}, nieuwste eerst.
+  //   AFTER  = SITE + items[0].url        (…/site/examples/<naam>.png)
+  //   BEFORE = AFTER met "site/examples/" -> "site/designs/"
+  //   naam   = items[0].caption
+  // opts.beforeUrl/afterUrl/caption mogen dit overschrijven (handig voor testen zonder netwerk).
+  async function fetchExamplePair(opts = {}) {
+    if (opts.afterUrl && opts.beforeUrl) return { after: opts.afterUrl, before: opts.beforeUrl, caption: opts.caption || "" };
+    const base = SITE;   // https://taleoftiles.com
+    let item = null;
+    try {
+      const r = await fetch(base + "/api/photo-examples", { headers: { accept: "application/json" } });
+      if (r.ok) { const j = await r.json(); item = (j.items || [])[0] || null; }
+    } catch {}
+    if (!item || !item.url) return null;
+    const after = /^https?:/.test(item.url) ? item.url : base + item.url;
+    const before = after.replace("site/examples/", "site/designs/");
+    return { after, before, caption: item.caption || "" };
+  }
+
+  async function makeVoorNaRender({ opts = {}, format = "9:16", log = () => {} }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const durSec = playDur(opts, 7, 16);
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const autoMusic = await pickMusic(["calm", "oriental", "spanish"]);
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
+    const pair = await fetchExamplePair(opts);
+    if (!pair) throw new Error("voor&na: geen before/after-paar van de site (draait de site + /api/photo-examples?)");
+    // beide PNG's als data-URI (loadLogo fetcht een http-url -> data-URI, met cache). "" = mislukt.
+    const beforeUri = await loadLogo(pair.before);
+    const afterUri = await loadLogo(pair.after);
+    if (!afterUri) throw new Error("voor&na: AFTER-foto niet op te halen: " + pair.after);
+    const name = (pair.caption || opts.name || "").trim();
+
+    // beeld-rechthoek (groot, staand kader met gouden lijst, zoals de andere panelen)
+    const h = Math.round(H * 0.62), w = Math.round(h * 0.72);
+    const x = Math.round((W - w) / 2), y = Math.round(H * 0.52 - h / 2), rr = Math.max(8, w * 0.03);
+    const frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
+    const clip = `<clipPath id="vnc"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`;
+    // een beeld in het kader, met een lichte push-in (zoom z) voor leven
+    const imgLayer = (uri, z) => {
+      if (!uri) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#241a3a"/>`;
+      const iw = w * z, ih = h * z, ix = x - (iw - w) / 2, iy = y - (ih - h) / 2;
+      return `<image href="${uri}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice"/>`;
+    };
+    // tijdlijn: BEFORE tonen -> korte transitie (flits) naar AFTER -> AFTER vasthouden + naam
+    const Tbefore = durSec * 0.34, Ttrans = Math.min(0.9, durSec * 0.10);
+    const Tafter0 = Tbefore + Ttrans;
+    // labels NL/EN/FR (kort, op het beeld): BEFORE = "ontwerp", AFTER = "echt"
+    const LBL = {
+      before: { nl: "Het ontwerp", en: "The design", fr: "Le design" }[lang],
+      after: { nl: "Echt, aan de muur", en: "Real, on the wall", fr: "Réel, au mur" }[lang],
+    };
+    const kick = { nl: "Van ontwerp naar echt", en: "From design to real", fr: "Du design au réel" }[lang];
+    const openLine = { nl: "Zo zou het eruitzien…", en: "Here's how it would look…", fr: "Voici le rendu…" }[lang];
+
+    function sceneAt(fr) {
+      const t = fr / FPS;
+      let inner = clip, overlay = "";
+      if (t < Tafter0) {
+        // BEFORE (plat ontwerp), zacht inzoomend; naar het eind van before een flits die de knip dekt
+        const zb = 1.02 + 0.05 * smooth(Math.min(1, t / Tbefore));
+        inner += `<g clip-path="url(#vnc)">${imgLayer(beforeUri || afterUri, zb)}${glazeSvg(x, y, w, h, "vnb")}</g>`;
+        inner += frame;
+        const knip = t > Tbefore ? smooth((t - Tbefore) / Ttrans) : 0;
+        if (knip > 0.01) inner += flashSweep(x, y, w, h, knip, "vnk");
+        // open-loop regel bovenop het ontwerp (woord-synced), plus klein hoek-label
+        const op = t < Tbefore * 0.75 ? Math.min(1, t / 0.4) : 1 - smooth((t - Tbefore * 0.75) / (Tbefore * 0.25 + Ttrans));
+        if (op > 0.01) overlay += captionOverlay(openLine, LBL.before, W, H, op, "lower", Math.min(1, t / 0.9));
+      } else {
+        // AFTER (echte foto), langzame push-in; naam graveert; kicker-regel
+        const ta = t - Tafter0, zf = 1.0 + 0.08 * smooth(Math.min(1, ta / (durSec - Tafter0)));
+        inner += `<g clip-path="url(#vnc)">${imgLayer(afterUri, zf)}${glazeSvg(x, y, w, h, "vna")}</g>`;
+        inner += frame;
+        // naamplaat op het echte beeld (payoff), verschijnt net na de knip
+        if (name) {
+          const np = plateColours(film.GLAZE_FAMILIES.terracotta || film.PAL);
+          const op = Math.max(0, Math.min(1, (ta - 0.3) / 0.8));
+          if (op > 0.01) { const cyN = y + h * 0.80 + (1 - smooth(op)) * 8; overlay += `<g opacity="${op.toFixed(3)}">${platePlace(name, np, x + w / 2, cyN, Math.round(h * 0.12), w * 0.8)}</g>`; }
+        }
+        // slot-regel: "echt, aan de muur" (woord-synced), faded aan het eind
+        const te = durSec - t;
+        const op = ta < 0.6 ? smooth(ta / 0.6) : (te < 0.6 ? smooth(te / 0.6) : 1);
+        if (op > 0.01) overlay += captionOverlay(LBL.after, kick, W, H, op, "lower", Math.min(1, ta / 0.9));
+      }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    }
+    return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
+    if (templateId === "voorna") return await makeVoorNaRender({ opts, format, log });
     if (templateId === "zoom") return await makeZoomRender({ opts, format, log });
     if (templateId === "intro") return await makeIntroRender({ opts, format });
     if (templateId === "walkthrough") return await makeWalkthroughRender({ opts, format, log });
