@@ -226,7 +226,48 @@ function wrap2(txt, maxLen) {
 // Rotatie-helper: kiest willekeurig één variant uit een taal-array, zodat elke render net
 // iets anders zegt. Valt terug op NL als een taal ontbreekt.
 function RVlang(sets, lang) { const a = (sets && sets[lang]) || (sets && sets.nl) || [""]; return a[Math.floor(Math.random() * a.length)]; }
-function captionOverlay(main, kicker, W, H, op, pos = "lower") {
+// WORD-SYNCED CAPTIES: tekenen de hoofdregel woord-voor-woord i.p.v. in één blok. Elk woord
+// "plopt" in (fade + heel lichte schaal-pop) net iets na het vorige. Houdt de ogen op de tekst
+// (retentie) zonder de rustige premium-look te breken. wordK 0..1 = hoe ver de reveal is; de
+// kicker + het goudlijntje blijven staan (die horen bij de hele regel), alleen de woorden lopen.
+// Geeft de <text>-regels terug (zelfde plek/berekening als het blok-pad), zodat de layout gelijk is.
+function wordsReveal(line, cx, baseY, fs, lh, fill, wordK) {
+  const words = String(line).split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  if (wordK == null) {
+    // geen word-sync -> gewone hele regel (ongewijzigd gedrag)
+    return `<text x="${cx}" y="${baseY.toFixed(0)}" font-family="${SERIF}" font-weight="500" font-size="${fs}" letter-spacing="${(fs * 0.015).toFixed(1)}" fill="${fill}">${escapeXml(line)}</text>`;
+  }
+  // woorden naast elkaar uitlijnen, gecentreerd. Breedte per woord geschat op tekenaantal
+  // (monospace-benadering met de letter-spacing erbij); goed genoeg voor een nette centrering.
+  const sp = fs * 0.30;                 // spatie-breedte
+  const cw = fs * 0.52;                 // geschatte tekenbreedte
+  const wWidth = (w) => w.length * cw;
+  const total = words.reduce((a, w) => a + wWidth(w), 0) + sp * (words.length - 1);
+  let x = cx - total / 2;
+  const n = words.length;
+  // elk woord krijgt een eigen venster; het laatste woord is klaar op wordK=1
+  const perStep = 1 / n;
+  let out = `<g text-anchor="start">`;
+  for (let i = 0; i < n; i++) {
+    const w = words[i], ww = wWidth(w);
+    const s0 = i * perStep;
+    const prog = Math.max(0, Math.min(1, (wordK - s0) / (perStep * 0.85)));
+    const sm = prog * prog * (3 - 2 * prog);
+    const wop = sm;                       // 0 -> 1 fade
+    const sc = 0.86 + 0.14 * sm;           // kleine pop
+    const wx = x + ww / 2;                 // middelpunt woord voor de schaal
+    if (wop > 0.01) {
+      out += `<g opacity="${wop.toFixed(3)}" transform="translate(${wx.toFixed(1)} ${baseY.toFixed(1)}) scale(${sc.toFixed(3)}) translate(${(-wx).toFixed(1)} ${(-baseY).toFixed(1)})">`
+        + `<text x="${wx.toFixed(1)}" y="${baseY.toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="500" font-size="${fs}" letter-spacing="${(fs * 0.015).toFixed(1)}" fill="${fill}">${escapeXml(w)}</text></g>`;
+    }
+    x += ww + sp;
+  }
+  out += `</g>`;
+  return out;
+}
+// wordK (optioneel, laatste arg): zet word-synced reveal aan voor de hoofdregel. Weglaten = blok.
+function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null) {
   if (!main || op <= 0.01) return "";
   const O = Math.max(0, Math.min(1, op));
   const lines = wrap2(main, 24);
@@ -261,9 +302,13 @@ function captionOverlay(main, kicker, W, H, op, pos = "lower") {
     out += `<rect x="${(W / 2 - rw / 2).toFixed(0)}" y="${y.toFixed(0)}" width="${rw}" height="1.4" fill="#d6b35a" opacity="0.8"/>`;
     y += 10;
   }
+  // word-sync alleen bij één regel (hooks/CTA's); meerdere regels -> gewoon blok (ongewijzigd).
+  const useWords = wordK != null && lines.length === 1;
   lines.forEach((l, i) => {
     y += lh;
-    out += `<text x="${W / 2}" y="${(y - lh * 0.28).toFixed(0)}" font-family="${SERIF}" font-weight="500" font-size="${fs}" letter-spacing="${(fs * 0.015).toFixed(1)}" fill="#f6efe0">${escapeXml(l)}</text>`;
+    const by = y - lh * 0.28;
+    if (useWords) out += wordsReveal(l, W / 2, by, fs, lh, "#f6efe0", wordK);
+    else out += `<text x="${W / 2}" y="${by.toFixed(0)}" font-family="${SERIF}" font-weight="500" font-size="${fs}" letter-spacing="${(fs * 0.015).toFixed(1)}" fill="#f6efe0">${escapeXml(l)}</text>`;
   });
   out += `</g>`;
   return out;
@@ -288,6 +333,46 @@ function hookOverlay(txt, W, H, op) {
   lines.forEach((l, i) => { const yy = (y0 + i * lh).toFixed(0); out += `<text x="${W / 2}" y="${yy}" text-anchor="middle" font-family="DejaVu Serif,serif" font-weight="700" font-size="${fs}" letter-spacing="${(fs * 0.02).toFixed(1)}" fill="#f4ecdc">${escapeXml(l)}</text>`; });
   out += `</g>`;
   return out;
+}
+
+// PATTERN-INTERRUPTS (retentie): een onafgebroken, rustig stuk beeld is de grootste reden dat
+// kijkers wegscrollen (de "dode zone"). Deze helper geeft, voor een moment t, een korte puls die
+// de beweging onderbreekt: om de ~beat seconden een zoom-punch (even dichterbij en terug), met
+// afwisselend een kleine hoek/pan-sprong en een zachte lichtflits. Puur reken-werk op de bestaande
+// camera (z/pan) + een flits-overlay; raakt resvg niet (de resvg-regel blijft heel).
+//   amp = hoe sterk (0.05 premium-subtiel .. 0.16 stevig voor raad-games/USP)
+//   beat = seconden tussen pulsen (2.4 .. 3.0 volgens de research: elke ~2,5-3s iets laten gebeuren)
+// Geeft { z, panx, pany, flash } terug. z vermenigvuldig je met je eigen zoom; panx/pany tel je bij
+// je eigen pan op (fractie van het paneel); flash 0..1 teken je als korte witte veeg over het paneel.
+function interruptAt(t, { amp = 0.08, beat = 2.6, start = 0, until = 1e9 } = {}) {
+  if (t < start || t > until) return { z: 1, panx: 0, pany: 0, flash: 0 };
+  const since = t - start;
+  const idx = Math.floor(since / beat);        // welke puls
+  const local = since - idx * beat;            // tijd binnen deze beat
+  const PUNCH = Math.min(0.5, beat * 0.22);    // hoe lang de punch duurt (kort!)
+  // puls-vorm: 0 -> 1 -> 0 over PUNCH seconden (sin-boog), daarna rust tot de volgende beat
+  let pulse = 0;
+  if (local < PUNCH) { const p = local / PUNCH; pulse = Math.sin(p * Math.PI); }
+  // elke beat een ander karakter zodat het niet mechanisch wordt:
+  //   0: pure zoom-punch   1: zoom + hoek-nudge rechts   2: zoom + flits   3: zoom + hoek-nudge links
+  const kind = idx % 4;
+  const z = 1 + amp * pulse * (kind === 2 ? 0.7 : 1);          // bij een flits iets minder zoom
+  const nudge = amp * 0.6 * pulse;
+  const panx = kind === 1 ? nudge : kind === 3 ? -nudge : 0;
+  const pany = kind === 1 || kind === 3 ? nudge * 0.4 : 0;
+  const flash = kind === 2 ? pulse * 0.5 : 0;
+  return { z, panx, pany, flash };
+}
+// Korte diagonale lichtveeg over een paneel-rechthoek (de "flits" van een interrupt). sfx = uniek
+// id zodat gradient-id's niet botsen. k = sterkte 0..1.
+function flashSweep(x, y, w, h, k, sfx) {
+  if (k <= 0.01) return "";
+  const id = "flx" + sfx, bw = w * 0.9, cx = x + w / 2 - bw / 2 + (w * 0.2);
+  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0">`
+    + `<stop offset="0" stop-color="#fff7ea" stop-opacity="0"/>`
+    + `<stop offset="0.5" stop-color="#fff7ea" stop-opacity="${(0.55 * k).toFixed(3)}"/>`
+    + `<stop offset="1" stop-color="#fff7ea" stop-opacity="0"/></linearGradient></defs>`
+    + `<rect x="${cx.toFixed(0)}" y="${(y - h * 0.2).toFixed(0)}" width="${bw.toFixed(0)}" height="${(h * 1.4).toFixed(0)}" fill="url(#${id})" transform="rotate(16 ${(cx + bw / 2).toFixed(0)} ${(y + h / 2).toFixed(0)})"/>`;
 }
 
 // ---- de merk-module zelf ----
@@ -873,11 +958,18 @@ export function makeBrand({ ROOT, config }) {
         // 0..HOLD: vol vasthouden; HOLD..HOOK: leegkleuren (fill achteruit afgespeeld)
         const dk = t < HOLD ? 1 : 1 - smooth((t - HOLD) / (HOOK - HOLD));   // 1=vol -> 0=leeg
         const cols = film.flowColorsAt(P0.parsed, { palette: P0.palArr, durSec: 1, buildSec: 1, buildStart: 0, popSec: 0.05 }, dk);
-        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.06 * (1 - dk), { x: 0, y: 0 });
+        // STERKERE hook: grotere zoom-punch (was 0.06 -> 0.13), zodat het eindbeeld letterlijk
+        // naar je toe komt in seconde 1 -> harder pattern-interrupt voor de scrollende kijker.
+        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.13 * (1 - dk), { x: 0, y: 0 });
+        // FLITS op de knip: net voordat het leeg is trekt een witte veeg over -> markeert de
+        // overgang van "resultaat" naar "opbouw" als een echte cut (anders was 'ie onzichtbaar).
+        const r0 = rectFor(P0.aspect);
+        const knip = dk < 0.35 ? (1 - dk / 0.35) : 0;
+        if (knip > 0.01) innerH += flashSweep(r0.x, r0.y, r0.w, r0.h, knip * 0.6, "hk");
         let overlayH = "";
         if (name && t < HOLD + (HOOK - HOLD) * 0.5) {
-          const r = rectFor(P0.aspect), op = t < HOLD ? 1 : 1 - smooth((t - HOLD) / ((HOOK - HOLD) * 0.5));
-          if (op > 0.01) overlayH += `<g opacity="${op.toFixed(3)}">${platePlace(name, P0.np, r.x + r.w / 2, r.y + r.h / 2, Math.round(r.h * 0.17), r.w * 0.9)}</g>`;
+          const op = t < HOLD ? 1 : 1 - smooth((t - HOLD) / ((HOOK - HOLD) * 0.5));
+          if (op > 0.01) overlayH += `<g opacity="${op.toFixed(3)}">${platePlace(name, P0.np, r0.x + r0.w / 2, r0.y + r0.h / 2, Math.round(r0.h * 0.17), r0.w * 0.9)}</g>`;
         }
         return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
       }
@@ -893,7 +985,13 @@ export function makeBrand({ ROOT, config }) {
       let z = 1 + 0.14 * (1 - smooth(fillK));
       if (tl > Tfill) z = 1 + 0.025 * (0.5 - 0.5 * Math.cos(((tl - Tfill) / Math.max(0.1, Tseg - Tfill)) * Math.PI * 2));
       const pan = { x: 0.010 * Math.sin(t * 0.5 + seg * 1.7), y: 0.008 * Math.cos(t * 0.38 + seg) };
+      // PATTERN-INTERRUPTS: breek de lange inkleur-dode-zone elke ~2,6s met een zachte zoom-punch
+      // + hoek-nudge (subtiel, satisfying blijft hypnotisch). Loopt alleen tijdens het vullen; de
+      // payoff-hold aan het eind van elk segment laat ik met rust.
+      const ir = interruptAt(tEff, { amp: 0.07, beat: 2.6, start: 0.6, until: seg * Tseg + Tfill });
+      z *= ir.z; pan.x += ir.panx; pan.y += ir.pany;
       inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp, z, pan);
+      if (ir.flash > 0.01) { const rF = rectFor(P.aspect); inner += flashSweep(rF.x, rF.y, rF.w, rF.h, ir.flash, "si" + seg); }
       // PAYOFF: zodra het bord vol is trekt een zachte lichtveeg over het glazuur -> het "landt"
       if (tl > Tfill) {
         const r = rectFor(P.aspect), rr = Math.max(6, r.w * 0.03);
@@ -919,7 +1017,9 @@ export function makeBrand({ ROOT, config }) {
         for (let i = 0; i < n; i++) {
           const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0;
           if (tEff >= s0 && tEff < s1) { if (tEff < s0 + fade) bo = smooth((tEff - s0) / fade); else if (tEff > s1 - fade) bo = 1 - smooth((tEff - (s1 - fade)) / fade); else bo = 1; }
-          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower");
+          // word-synced: woorden ploppen in over de eerste ~55% van het slot, houden daarna vast
+          const wordK = Math.max(0, Math.min(1, (tEff - s0) / (slot * 0.55)));
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK);
         }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
@@ -993,7 +1093,7 @@ export function makeBrand({ ROOT, config }) {
         for (let j = 0; j < 3; j++) { const r = { x: Math.round(cxs[j] - mw / 2), y: Math.round(cy - mh / 2), w: mw, h: mh }; inner += `<g opacity="${k.toFixed(3)}">${drawCW(finals[j], r, "cwm" + j)}</g>`; const rad = Math.round(mw * 0.17); overlay += badge(["A", "B", "C"][j], r.x + r.w - rad * 1.05, r.y + rad * 1.05, rad, k); }
       }
       const pollOp = t > Tb ? Math.min(1, (t - Tb) / 0.5) : 0;
-      if (pollOp > 0.01) overlay += captionOverlay(poll, pollKick, W, H, pollOp, "lower");
+      if (pollOp > 0.01) overlay += captionOverlay(poll, pollKick, W, H, pollOp, "lower", Math.max(0, Math.min(1, (t - Tb) / 0.9)));
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -1034,7 +1134,7 @@ export function makeBrand({ ROOT, config }) {
       // subtiele vignette voor diepte
       overlay += `<defs><radialGradient id="mvig" cx="50%" cy="48%" r="72%"><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="0.5"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#mvig)"/>`;
       // één rustige regel in het begin, dan vrij beeld
-      if (t < 3.2) { const op = t < 2.2 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.2) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower"); }
+      if (t < 3.2) { const op = t < 2.2 ? Math.min(1, t / 0.5) : 1 - smooth((t - 2.2) / 1.0); if (op > 0.01) overlay += captionOverlay(line, null, W, H, op, "lower", Math.min(1, t / 0.9)); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -1089,7 +1189,8 @@ export function makeBrand({ ROOT, config }) {
         for (let i = 0; i < n; i++) {
           const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0;
           if (t >= s0 && t < s1) { if (t < s0 + fade) bo = smooth((t - s0) / fade); else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade); else bo = 1; }
-          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower");
+          const wordK = Math.max(0, Math.min(1, (t - s0) / (slot * 0.55)));
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK);
         }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
@@ -1197,7 +1298,7 @@ export function makeBrand({ ROOT, config }) {
         for (let j = 0; j < 3; j++) innerH += drawPanel(prep[j].parsed, prep[j].finalCols, slotRect(j, prep[j].aspect), "th" + j, true);
         let overlayH = "";
         const op = tAbs < THOOK * 0.6 ? 1 : 1 - smooth((tAbs - THOOK * 0.6) / (THOOK * 0.4));
-        if (op > 0.01) overlayH += captionOverlay(openTxt, null, W, H, op, "lower");
+        if (op > 0.01) overlayH += captionOverlay(openTxt, null, W, H, op, "lower", Math.min(1, tAbs / (THOOK * 0.5)));
         return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
       }
       const t = tAbs - THOOK;
@@ -1233,9 +1334,9 @@ export function makeBrand({ ROOT, config }) {
       if (wallK > 0.003) overlay += `<g opacity="${wallK.toFixed(3)}">${insituComposite(Pa)}</g>`;
       // OPENING: onderregel (niet "top" -> botste op het logo). Zet de opzet neer.
       const openKick = name || "Tale of Tiles";
-      if (a === 0 && f < 0.20) { const op = (f < 0.12 ? Math.min(1, f / 0.05) : 1 - smooth((f - 0.12) / 0.08)); if (op > 0.01) overlay += captionOverlay(openTxt, openKick, W, H, op, "lower"); }
+      if (a === 0 && f < 0.20) { const op = (f < 0.12 ? Math.min(1, f / 0.05) : 1 - smooth((f - 0.12) / 0.08)); if (op > 0.01) overlay += captionOverlay(openTxt, openKick, W, H, op, "lower", Math.min(1, f / 0.1)); }
       // SLOT: CTA op het laatste bord -> engagement + "maak 'm zelf (mooier)"
-      if (a === 2 && f > 0.42) { const op = (f < 0.52 ? smooth((f - 0.42) / 0.10) : (f > 0.86 ? 1 - smooth((f - 0.86) / 0.1) : 1)); if (op > 0.01) overlay += captionOverlay(ctaMain, ctaKick, W, H, op, "lower"); }
+      if (a === 2 && f > 0.42) { const op = (f < 0.52 ? smooth((f - 0.42) / 0.10) : (f > 0.86 ? 1 - smooth((f - 0.86) / 0.1) : 1)); if (op > 0.01) overlay += captionOverlay(ctaMain, ctaKick, W, H, op, "lower", Math.max(0, Math.min(1, (f - 0.42) / 0.14))); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -1373,11 +1474,13 @@ export function makeBrand({ ROOT, config }) {
       const mos = film.buildSvg(parsed, cols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(parsed, cols).replace(/<svg\b[^>]*>/i, wrap);
       let inner = `<clipPath id="gz"><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}"/></clipPath><g clip-path="url(#gz)">${mos}${glazeSvg(px, py, w, h, "gz")}</g><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       let overlay = "";
-      // INTRO-uitleg tijdens de stilstand; daarna de "stop zodra je 't herkent"-regel.
-      if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower"); }
-      else if (k < 0.72) { const op = k > 0.60 ? 1 - smooth((k - 0.60) / 0.12) : Math.min(1, (t - Tintro) / 0.5); overlay += captionOverlay(line, kick, W, H, op, "lower"); }
+      // INTRO-uitleg tijdens de stilstand; daarna de "stop zodra je 't herkent"-regel. Deze
+      // suspense-regels word-syncen (open loop, houdt vast), het ANTWOORD blijft een blok.
+      if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower", Math.min(1, t / 0.9)); }
+      else if (k < 0.72) { const op = k > 0.60 ? 1 - smooth((k - 0.60) / 0.12) : Math.min(1, (t - Tintro) / 0.5); overlay += captionOverlay(line, kick, W, H, op, "lower", Math.max(0, Math.min(1, (t - Tintro) / 0.9))); }
       // HET ANTWOORD: alleen vanaf 'gemiddeld' (bij 'makkelijk' te voor de hand liggend/kinderachtig),
-      // subtiel en premium zodra het beeld vol is onthuld.
+      // subtiel en premium zodra het beeld vol is onthuld. BLOK (geen word-sync) -> de payoff komt
+      // als één woord in beeld, niet letter-voor-letter verklapt.
       if (gimg && level && level !== "makkelijk" && k > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
         const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `Réponse : ${word}` }[lang];
@@ -1453,9 +1556,9 @@ export function makeBrand({ ROOT, config }) {
         + `<g clip-path="url(#rv)">${underMosaic}${mosaic}</g>`
         + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
       let overlay = "";
-      if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower"); }
-      else if (p < 0.72) { const op = p > 0.60 ? 1 - smooth((p - 0.60) / 0.12) : Math.min(1, (t - Tintro) / 0.5); overlay += captionOverlay(line, kick, W, H, op, "lower"); }
-      // ANTWOORD vanaf 'gemiddeld' (niet bij makkelijk), zodra het beeld vol onthuld is
+      if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower", Math.min(1, t / 0.9)); }
+      else if (p < 0.72) { const op = p > 0.60 ? 1 - smooth((p - 0.60) / 0.12) : Math.min(1, (t - Tintro) / 0.5); overlay += captionOverlay(line, kick, W, H, op, "lower", Math.max(0, Math.min(1, (t - Tintro) / 0.9))); }
+      // ANTWOORD vanaf 'gemiddeld' (niet bij makkelijk), zodra het beeld vol onthuld is (BLOK, geen word-sync)
       if (gimg && level && level !== "makkelijk" && p > 0.86) {
         const word = gimg.id.split("/").pop().replace(/\.(png|jpe?g|webp)$/i, "").replace(/-/g, " ");
         const ans = { nl: `Het is een ${word}`, en: `It's a ${word}`, fr: `Réponse : ${word}` }[lang];
@@ -1529,7 +1632,7 @@ export function makeBrand({ ROOT, config }) {
       }
       if (storyBeats.length) {
         const tA = 0.5, tB = durSec - 0.5, n = storyBeats.length, slot = (tB - tA) / n, fade = Math.min(0.6, slot * 0.28);
-        for (let i = 0; i < n; i++) { const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0; if (t >= s0 && t < s1) { if (t < s0 + fade) bo = smooth((t - s0) / fade); else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade); else bo = 1; } if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower"); }
+        for (let i = 0; i < n; i++) { const s0 = tA + i * slot, s1 = s0 + slot; let bo = 0; if (t >= s0 && t < s1) { if (t < s0 + fade) bo = smooth((t - s0) / fade); else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade); else bo = 1; } const wordK = Math.max(0, Math.min(1, (t - s0) / (slot * 0.55))); if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK); }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
@@ -1660,13 +1763,17 @@ export function makeBrand({ ROOT, config }) {
 
     function sceneAt(frame) {
       const tAbs = frame / FPS;
-      // HOOK: eindcadeau aan de muur, kort, met een witte flits-uit die overgaat in het ingepakte
-      // cadeau. Daarna loopt de echte tijdlijn (t) vanaf 0.
+      // HOOK (cadeau = VERRASSING): NIET het eindresultaat tonen (dat verklapt het uitpakken).
+      // We openen juist op het INGEPAKTE cadeau met een kleine anticipatie-wiebel + de haak-vraag
+      // -> "een cadeau... wat zit erin?" -> open loop, de kijker blijft voor de onthulling.
       if (tAbs < CHOOK) {
-        let innerH = wallScene(mk1 || mk2, fullCols, "h");
-        const fop = tAbs > CHOOK * 0.55 ? smooth((tAbs - CHOOK * 0.55) / (CHOOK * 0.45)) : 0;
-        if (fop > 0.01) innerH += `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff8ec" opacity="${(fop * 0.9).toFixed(3)}"/>`;
-        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: "", logoUri: branding.logoUri });
+        const wob = Math.sin(tAbs / CHOOK * Math.PI * 3) * 0.012;   // zachte spannings-wiebel
+        let innerH = `<clipPath id="cpc"><rect x="${px}" y="${py}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
+          + `<g transform="translate(${(wob * W).toFixed(1)} 0)">${wrapOverlay(1)}</g>`;
+        let overlayH = "";
+        const op = tAbs < CHOOK * 0.7 ? Math.min(1, tAbs / 0.3) : 1 - smooth((tAbs - CHOOK * 0.7) / (CHOOK * 0.3));
+        if (op > 0.01) overlayH += captionOverlay(hook, { nl: "Het cadeau", en: "The gift", fr: "Le cadeau" }[lang], W, H, op, "lower", Math.min(1, tAbs / 0.8));
+        return composeChrome({ branding, W, H, panel: null, innerField: innerH, overlay: overlayH, logoUri: branding.logoUri });
       }
       const t = tAbs - CHOOK;
       const cols = (t < T1) ? BLANKS
@@ -1691,9 +1798,9 @@ export function makeBrand({ ROOT, config }) {
       }
       let overlay = "";
       // captions: haak -> onthulregel -> CTA (CTA valt op het muurbeeld)
-      if (t < T1 + 0.3) { const op = t < 0.6 ? Math.min(1, t / 0.6) : (t > T1 - 0.5 ? 1 - smooth((t - (T1 - 0.5)) / 0.8) : 1); if (op > 0.01) overlay += captionOverlay(hook, { nl: "Het cadeau", en: "The gift", fr: "Le cadeau" }[lang], W, H, op, "lower"); }
-      else if (t < Tb) { const op = t < T1 + Du + 0.3 ? smooth((t - (T1 + Du)) / 0.6) : (t > Tb - 0.6 ? 1 - smooth((t - (Tb - 0.6)) / 0.6) : 1); if (op > 0.01) overlay += captionOverlay(revealLine, null, W, H, op, "lower"); }
-      else { const op = t < Tb + Wd + 0.3 ? smooth((t - (Tb + Wd * 0.3)) / 0.6) : 1; if (op > 0.01) overlay += captionOverlay(cta, "Tale of Tiles", W, H, op, "lower"); }
+      if (t < T1 + 0.3) { const op = t < 0.6 ? Math.min(1, t / 0.6) : (t > T1 - 0.5 ? 1 - smooth((t - (T1 - 0.5)) / 0.8) : 1); if (op > 0.01) overlay += captionOverlay(hook, { nl: "Het cadeau", en: "The gift", fr: "Le cadeau" }[lang], W, H, op, "lower", Math.min(1, t / 0.9)); }
+      else if (t < Tb) { const op = t < T1 + Du + 0.3 ? smooth((t - (T1 + Du)) / 0.6) : (t > Tb - 0.6 ? 1 - smooth((t - (Tb - 0.6)) / 0.6) : 1); if (op > 0.01) overlay += captionOverlay(revealLine, null, W, H, op, "lower", Math.max(0, Math.min(1, (t - (T1 + Du)) / 0.9))); }
+      else { const op = t < Tb + Wd + 0.3 ? smooth((t - (Tb + Wd * 0.3)) / 0.6) : 1; if (op > 0.01) overlay += captionOverlay(cta, "Tale of Tiles", W, H, op, "lower", Math.max(0, Math.min(1, (t - Tb) / 0.9))); }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
@@ -1869,7 +1976,8 @@ export function makeBrand({ ROOT, config }) {
       const cap = (txt, kick, a0, a1) => {
         const fade = Math.min(0.6, (a1 - a0) * 0.22); let o = 0;
         if (t >= a0 && t < a1) { if (t < a0 + fade) o = smooth((t - a0) / fade); else if (t > a1 - fade) o = 1 - smooth((t - (a1 - fade)) / fade); else o = 1; }
-        return o > 0.01 ? captionOverlay(txt, kick, W, H, o, "lower") : "";
+        const wordK = Math.max(0, Math.min(1, (t - a0) / ((a1 - a0) * 0.45)));
+        return o > 0.01 ? captionOverlay(txt, kick, W, H, o, "lower", wordK) : "";
       };
       overlay += cap(capWAT, kickWAT, 0.4, T1 + (T2 - T1) * 0.15);
       overlay += cap(capHOE, kickHOE, T1 + (T2 - T1) * 0.18, T2 + (T3 - T2) * 0.10);
@@ -2399,7 +2507,15 @@ export function makeBrand({ ROOT, config }) {
         ? film.cycleColorsAt(parsed, { palettes: cyclePals, durSec, speed: tempoMul }, t)
         : (isFlow ? film.flowColorsAt(parsed, { palette: flowPal, durSec, buildSec: Tb, buildStart, speed: tempoMul }, t) : film.colorsAt(parsed, story, t));
       if (tailK > 0) colors = colors.map((c) => _mix(c, film.BLANK, tailK));
-      const vw = pw / zMos, vh = ph / zMos, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
+      // PATTERN-INTERRUPT (alleen in-situ, zeer subtiel -> premium): breek de lange opbouw-op-de-muur
+      // elke ~2,8s met een heel zachte zoom-punch, zodat het beeld in die dode zone niet stilstaat.
+      // Alleen tijdens het actieve inkleuren; de rustige hold/outro + sfeer blijven ongemoeid.
+      let zMosI = zMos;
+      if (insitu && !isCycle) {
+        const ir = interruptAt(t, { amp: 0.05, beat: 2.8, start: buildStart + 0.4, until: buildStart + Tb });
+        zMosI = zMos * ir.z;
+      }
+      const vw = pw / zMosI, vh = ph / zMosI, vx = (pw - vw) / 2, vy = (ph - vh) / 2;
       const wrapB = `<svg x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}" preserveAspectRatio="xMidYMid slice">`;
       const mosaic = film.buildSvg(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB)
         + film.buildGlaze(parsed, colors).replace(/<svg\b[^>]*>/i, wrapB);   // + per-tegel glazuur-reliëf
@@ -2480,7 +2596,8 @@ export function makeBrand({ ROOT, config }) {
             else if (t > s1 - fade) bo = 1 - smooth((t - (s1 - fade)) / fade);
             else bo = 1;
           }
-          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, storyPos);
+          const wordK = Math.max(0, Math.min(1, (t - s0) / (slot * 0.5)));
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, storyPos, wordK);
         }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
