@@ -2427,9 +2427,13 @@ export function makeBrand({ ROOT, config }) {
     const x = Math.round((W - w) / 2), y = Math.round(H * 0.48 - h / 2), rr = Math.max(8, w * 0.03);
     const clip = (id) => `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`;
     const frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="3"/>`;
-    const img = (uri) => uri
-      ? `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`
-      : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#241a3a"/>`;
+    // zelfde regel als de video: BEFORE (plat ontwerp) HEEL tonen (meet, geen crop/zoom), AFTER
+    // (echte foto) kader VULLEN (slice). Achtergrond = zacht verloop zodat de vrije randen bij het
+    // hele ontwerp er premium uitzien i.p.v. een leeg vlak.
+    const backing = `<defs><linearGradient id="cargrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c2142"/><stop offset="1" stop-color="#1b1230"/></linearGradient></defs>`
+      + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="url(#cargrad)"/>`;
+    const imgFill = (uri) => uri ? `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>` : "";
+    const imgWhole = (uri) => uri ? `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>` : "";
     // meertalige tekst (zelfde stem als de video's)
     const T = {
       before: { kick: { nl: "Het ontwerp", en: "The design", fr: "Le design" }[lang],
@@ -2437,17 +2441,16 @@ export function makeBrand({ ROOT, config }) {
       after:  { kick: { nl: "Van ontwerp naar echt", en: "From design to real", fr: "Du design au réel" }[lang],
                 line: { nl: "Echt, met de hand gelegd.", en: "Real, laid by hand.", fr: "Réel, posé à la main." }[lang] },
     };
-    // scene 1: ontwerp + open-loop (captionOverlay met wordK=1 -> alle woorden staan, stilstaand beeld)
+    // scene 1: HEEL ontwerp (niet ingezoomd) + open-loop-regel
     const s1 = (() => {
-      let inner = clip("c1") + `<g clip-path="url(#c1)">${img(beforeUri || afterUri)}${glazeSvg(x, y, w, h, "c1g")}</g>` + frame;
+      let inner = clip("c1") + backing + `<g clip-path="url(#c1)">${imgWhole(beforeUri || afterUri)}${glazeSvg(x, y, w, h, "c1g")}</g>` + frame;
       const overlay = captionOverlay(T.before.line, T.before.kick, W, H, 1, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     })();
-    // scene 2: echte foto + payoff-regel + naamplaat
+    // scene 2: echte foto + payoff-regel. GEEN naamplaat: de naam staat al op de echte foto (dubbel zou lelijk zijn).
     const s2 = (() => {
-      let inner = clip("c2") + `<g clip-path="url(#c2)">${img(afterUri)}${glazeSvg(x, y, w, h, "c2g")}</g>` + frame;
-      let overlay = captionOverlay(T.after.line, T.after.kick, W, H, 1, "lower");
-      if (name) { const np = plateColours(film.GLAZE_FAMILIES.terracotta || film.PAL); overlay = `<g>${platePlace(name, np, x + w / 2, y + h * 0.22, Math.round(h * 0.11), w * 0.8)}</g>` + overlay; }
+      let inner = clip("c2") + backing + `<g clip-path="url(#c2)">${imgFill(afterUri)}${glazeSvg(x, y, w, h, "c2g")}</g>` + frame;
+      const overlay = captionOverlay(T.after.line, T.after.kick, W, H, 1, "lower");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     })();
     return { scenes: [s1, s2], caption: name, W, H, lang };
