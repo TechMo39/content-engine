@@ -113,6 +113,9 @@ function postJson(p, body) {
     let plats = connected[s.lang] || [];
     // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab).
     plats = plats.filter((p) => p !== "whatsapp");
+    // CARROUSEL (foto-post): alleen Instagram en Facebook kunnen dit. YouTube/TikTok overslaan.
+    const isCarousel = /\.carrousel\.json$/i.test(s.file || "");
+    if (isCarousel) plats = plats.filter((p) => p === "instagram" || p === "facebook");
     // PER-PLATFORM KEUZE: heeft dit slot een platform-selectie, dan alleen die (en alleen de
     // gekoppelde ervan). Leeg/afwezig = alle gekoppelde kanalen van de taal (oud gedrag).
     if (Array.isArray(s.platforms) && s.platforms.length) plats = plats.filter((p) => s.platforms.includes(p));
@@ -129,15 +132,26 @@ function postJson(p, body) {
       else if (r.status === 409) { log("• al eerder geplaatst: " + label); okAny = true; }
       else { log("✗ mislukt: " + label + " — " + ((r.json && r.json.error) || r.status)); errAny = true; }
     }
-    s.status = okAny && !errAny ? "geplaatst" : (okAny ? "deels" : "mislukt");
+    // PER-KANAAL INHAAL: faalde één kanaal, dan laten we het slot op "gepland" staan zodat de
+    // VOLGENDE ronde het opnieuw probeert. De al-geslaagde kanalen worden dan door de server
+    // geweigerd met 409 ("al geplaatst") -> geen dubbele post. Pas als ALLE gekozen kanalen
+    // gelukt zijn, zetten we het slot op "geplaatst" en verhuizen we het bestand. Zo blijft een
+    // gefaald kanaal (bv. een YouTube-token dat net dood was) nooit meer achter.
+    s.status = errAny ? "gepland" : (okAny ? "geplaatst" : "gepland");
     if (okAny) gepost++; if (errAny) mislukt++;
-    // GEPOST -> verplaats de mp4 naar out/geplaatst/ (nooit meer kwijt, en uit de kandidaat-pool).
-    if (DOEN && okAny) {
+    // Verplaatsen naar out/geplaatst/ ALLEEN als alles gelukt is (geen fouten). Anders laten we het
+    // bestand staan zodat de volgende ronde de gefaalde kanalen alsnog kan posten.
+    // Bij een CARROUSEL verhuizen ook de losse beelden mee, niet alleen het manifest.
+    if (DOEN && okAny && !errAny) {
       try {
         const geplaatstDir = path.join(ENGINE_DIR, "out", "geplaatst");
         await fs.promises.mkdir(geplaatstDir, { recursive: true });
         const src = path.join(ENGINE_DIR, "out", s.file);
-        if (fs.existsSync(src)) { await fs.promises.rename(src, path.join(geplaatstDir, s.file)); s.url = "/out/geplaatst/" + encodeURIComponent(s.file); log("  → verplaatst naar out/geplaatst/"); }
+        if (isCarousel && fs.existsSync(src)) {
+          let man = {}; try { man = JSON.parse(fs.readFileSync(src, "utf8")); } catch {}
+          for (const im of (man.images || [])) { const is = path.join(ENGINE_DIR, "out", im); if (fs.existsSync(is)) await fs.promises.rename(is, path.join(geplaatstDir, im)).catch(() => {}); }
+          await fs.promises.rename(src, path.join(geplaatstDir, s.file)); s.url = "/out/geplaatst/" + encodeURIComponent(s.file); log("  → carrousel verplaatst naar out/geplaatst/");
+        } else if (fs.existsSync(src)) { await fs.promises.rename(src, path.join(geplaatstDir, s.file)); s.url = "/out/geplaatst/" + encodeURIComponent(s.file); log("  → verplaatst naar out/geplaatst/"); }
       } catch (e) { log("  (kon niet verplaatsen: " + (e.message || e) + ")"); }
     }
   }
@@ -148,4 +162,5 @@ function postJson(p, body) {
   stopOnzeEngine();
   process.exit(0);
 })().catch((e) => { console.error("post_dag faalde:", e && e.message || e); process.exit(1); });
+
 

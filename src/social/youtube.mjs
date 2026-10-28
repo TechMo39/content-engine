@@ -203,9 +203,16 @@ export function makePlatform({ ROOT } = {}) {
   async function authStatus(lang) {
     const tok = await readToken(lang);
     if (!tok || !tok.refresh_token) return { connected: false, who: "" };
-    // probeer de kanaalnaam op te halen (bewijs dat het token werkt)
+    // EERLIJKE STATUS: een refresh-token kan DOOD zijn (verlopen/ingetrokken -> invalid_grant).
+    // Dan moet de UI "niet gekoppeld" tonen zodat de Koppel-knop terugkomt, i.p.v. vals groen
+    // "gekoppeld" (dan kon je niet opnieuw koppelen zonder het secrets-bestand te wissen).
+    // We bewijzen dat het token WERKT door een access-token te halen; lukt dat niet -> niet gekoppeld.
+    let at;
+    try { at = await accessToken(lang); }
+    catch { return { connected: false, who: "", expired: true }; }   // token dood -> toon als los te koppelen
+    // token werkt; de kanaalnaam ophalen is mooi-meegenomen, maar een mislukte naam-ophaal mag de
+    // status niet op dood zetten (het token is immers wél geldig).
     try {
-      const at = await accessToken(lang);
       const r = await fetch(`${API}/channels?part=snippet&mine=true`, { headers: { authorization: "Bearer " + at } });
       const j = await r.json();
       const ch = j.items && j.items[0];
@@ -259,3 +266,4 @@ export function makePlatform({ ROOT } = {}) {
     suggest, startLogin, authStatus, upload, stats,
   };
 }
+
