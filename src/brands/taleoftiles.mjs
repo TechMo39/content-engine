@@ -238,10 +238,11 @@ function wordsReveal(line, cx, baseY, fs, lh, fill, wordK) {
     // geen word-sync -> gewone hele regel (ongewijzigd gedrag)
     return `<text x="${cx}" y="${baseY.toFixed(0)}" font-family="${SERIF}" font-weight="500" font-size="${fs}" letter-spacing="${(fs * 0.015).toFixed(1)}" fill="${fill}">${escapeXml(line)}</text>`;
   }
-  // woorden naast elkaar uitlijnen, gecentreerd. Breedte per woord geschat op tekenaantal
-  // (monospace-benadering met de letter-spacing erbij); goed genoeg voor een nette centrering.
-  const sp = fs * 0.30;                 // spatie-breedte
-  const cw = fs * 0.52;                 // geschatte tekenbreedte
+  // woorden naast elkaar uitlijnen, gecentreerd. Breedte per woord RUIM geschat (serif is breder
+  // dan 0.52/teken -> woorden botsten "Zozou het"). Ruimer schatten + een duidelijke woordspatie
+  // zodat woorden NOOIT overlappen; iets los staan is prima, overlappen niet.
+  const sp = fs * 0.42;                 // spatie-breedte tussen woorden
+  const cw = fs * 0.62;                 // geschatte tekenbreedte (ruimer voor serif)
   const wWidth = (w) => w.length * cw;
   const total = words.reduce((a, w) => a + wWidth(w), 0) + sp * (words.length - 1);
   let x = cx - total / 2;
@@ -2280,6 +2281,28 @@ export function makeBrand({ ROOT, config }) {
     return { after, before, caption: item.caption || "" };
   }
 
+  // DOWNLOAD een publieke beeld-URL naar een ECHT tijdelijk bestand en geef het als data-URI terug
+  // via loadImageFile (dezelfde weg die ALLE werkende types gebruiken). Dit vervangt het lenen van
+  // loadLogo (dat voor één vast logo is + een URL-cache die een eerdere mislukte ophaal onthield ->
+  // leeg kader). Elke download krijgt een UNIEKE bestandsnaam, zodat de cache nooit een oude lege
+  // uitkomst teruggeeft. Geeft "" als de download of het inladen faalt (de caller gooit dan netjes).
+  async function fetchImageAsUri(url, tagName) {
+    if (!url || !/^https?:/.test(url)) return "";
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return "";
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (!buf.length) return "";
+      let ext = (url.split(/[?#]/)[0].split(".").pop() || "png").toLowerCase();
+      if (!/^(png|jpe?g|webp|gif)$/.test(ext)) ext = "png";
+      const tmp = path.join(os.tmpdir(), "totvn-" + (tagName || "img") + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext);
+      await fs.writeFile(tmp, buf);
+      const uri = await loadImageFile(tmp);   // lokaal bestand -> data-URI (resvg tekent dit wél)
+      try { await fs.unlink(tmp); } catch {}
+      return uri;
+    } catch { return ""; }
+  }
+
   async function makeVoorNaRender({ opts = {}, format = "9:16", log = () => {} }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
@@ -2289,9 +2312,9 @@ export function makeBrand({ ROOT, config }) {
     const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
     const pair = await fetchExamplePair(opts);
     if (!pair) throw new Error("voor&na: geen before/after-paar van de site (draait de site + /api/photo-examples?)");
-    // beide PNG's als data-URI (loadLogo fetcht een http-url -> data-URI, met cache). "" = mislukt.
-    const beforeUri = await loadLogo(pair.before);
-    const afterUri = await loadLogo(pair.after);
+    // beide PNG's DOWNLOADEN naar een bestand en inladen (zoals alle werkende types). "" = mislukt.
+    const beforeUri = await fetchImageAsUri(pair.before, "before");
+    const afterUri = await fetchImageAsUri(pair.after, "after");
     if (!afterUri) throw new Error("voor&na: AFTER-foto niet op te halen: " + pair.after);
     const name = (pair.caption || opts.name || "").trim();
 
@@ -2335,13 +2358,13 @@ export function makeBrand({ ROOT, config }) {
         const ta = t - Tafter0, zf = 1.0 + 0.08 * smooth(Math.min(1, ta / (durSec - Tafter0)));
         inner += `<g clip-path="url(#vnc)">${imgLayer(afterUri, zf)}${glazeSvg(x, y, w, h, "vna")}</g>`;
         inner += frame;
-        // naamplaat op het echte beeld (payoff), verschijnt net na de knip
+        // naamplaat BOVENIN het beeld (payoff), ruim boven de onderregel -> botst nooit met de caption
         if (name) {
           const np = plateColours(film.GLAZE_FAMILIES.terracotta || film.PAL);
           const op = Math.max(0, Math.min(1, (ta - 0.3) / 0.8));
-          if (op > 0.01) { const cyN = y + h * 0.80 + (1 - smooth(op)) * 8; overlay += `<g opacity="${op.toFixed(3)}">${platePlace(name, np, x + w / 2, cyN, Math.round(h * 0.12), w * 0.8)}</g>`; }
+          if (op > 0.01) { const cyN = y + h * 0.22 + (1 - smooth(op)) * 8; overlay += `<g opacity="${op.toFixed(3)}">${platePlace(name, np, x + w / 2, cyN, Math.round(h * 0.12), w * 0.8)}</g>`; }
         }
-        // slot-regel: "echt, aan de muur" (woord-synced), faded aan het eind
+        // slot-regel ONDERIN (de normale onderband), los van de naamplaat bovenin. Faded aan het eind.
         const te = durSec - t;
         const op = ta < 0.6 ? smooth(ta / 0.6) : (te < 0.6 ? smooth(te / 0.6) : 1);
         if (op > 0.01) overlay += captionOverlay(LBL.after, kick, W, H, op, "lower", Math.min(1, ta / 0.9));
@@ -2349,6 +2372,53 @@ export function makeBrand({ ROOT, config }) {
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
     }
     return { W, H, FPS, SS, durSec, sceneAt, music: autoMusic, clicks: [] };
+  }
+
+  // CARROUSEL (swipebare Instagram/Facebook-post, GEEN video): twee STILSTAANDE beelden van het
+  // dagelijkse before/after-paar. Beeld 1 = het platte ontwerp ("zo zou het eruitzien"), beeld 2
+  // = de echte zellige aan de muur ("zo ziet het er echt uit"). Zelfde marketing-wijsheid als de
+  // video's: meertalige tekst op het beeld (open-loop op #1, payoff + naam op #2). Geeft de twee
+  // SVG-scenes terug; engine.mjs rastert ze naar PNG en post ze als carrousel. Elk beeld is 4:5
+  // (1080x1350, de beste staande Instagram-verhouding) en consistent zodat IG niet rommelig croppt.
+  async function makeCarouselScenes({ opts = {}, log = () => {} }) {
+    const W = 1080, H = 1350;   // 4:5, carrousel-items moeten dezelfde verhouding hebben
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const lang = ["en", "fr"].includes(opts.lang) ? opts.lang : "nl"; branding.lang = lang;
+    const pair = await fetchExamplePair(opts);
+    if (!pair) throw new Error("carrousel: geen before/after-paar van de site");
+    const beforeUri = await fetchImageAsUri(pair.before, "before");
+    const afterUri = await fetchImageAsUri(pair.after, "after");
+    if (!afterUri) throw new Error("carrousel: AFTER-foto niet op te halen: " + pair.after);
+    const name = (pair.caption || opts.name || "").trim();
+    // beeld-kader (groot, staand, gouden lijst)
+    const h = Math.round(H * 0.70), w = Math.round(h * 0.78);
+    const x = Math.round((W - w) / 2), y = Math.round(H * 0.48 - h / 2), rr = Math.max(8, w * 0.03);
+    const clip = (id) => `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`;
+    const frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="3"/>`;
+    const img = (uri) => uri
+      ? `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`
+      : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#241a3a"/>`;
+    // meertalige tekst (zelfde stem als de video's)
+    const T = {
+      before: { kick: { nl: "Het ontwerp", en: "The design", fr: "Le design" }[lang],
+                line: { nl: "Zo zou het eruitzien…", en: "Here's how it would look…", fr: "Voici le rendu…" }[lang] },
+      after:  { kick: { nl: "Van ontwerp naar echt", en: "From design to real", fr: "Du design au réel" }[lang],
+                line: { nl: "Echt, met de hand gelegd.", en: "Real, laid by hand.", fr: "Réel, posé à la main." }[lang] },
+    };
+    // scene 1: ontwerp + open-loop (captionOverlay met wordK=1 -> alle woorden staan, stilstaand beeld)
+    const s1 = (() => {
+      let inner = clip("c1") + `<g clip-path="url(#c1)">${img(beforeUri || afterUri)}${glazeSvg(x, y, w, h, "c1g")}</g>` + frame;
+      const overlay = captionOverlay(T.before.line, T.before.kick, W, H, 1, "lower");
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    })();
+    // scene 2: echte foto + payoff-regel + naamplaat
+    const s2 = (() => {
+      let inner = clip("c2") + `<g clip-path="url(#c2)">${img(afterUri)}${glazeSvg(x, y, w, h, "c2g")}</g>` + frame;
+      let overlay = captionOverlay(T.after.line, T.after.kick, W, H, 1, "lower");
+      if (name) { const np = plateColours(film.GLAZE_FAMILIES.terracotta || film.PAL); overlay = `<g>${platePlace(name, np, x + w / 2, y + h * 0.22, Math.round(h * 0.11), w * 0.8)}</g>` + overlay; }
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
+    })();
+    return { scenes: [s1, s2], caption: name, W, H, lang };
   }
 
   async function makeRender({ subjectId, templateId, opts = {}, format = "9:16", log }) {
@@ -2712,7 +2782,7 @@ export function makeBrand({ ROOT, config }) {
 
   return {
     id: "taleoftiles", name: "Tale of Tiles", branding,
-    init, listSubjects, listImages, listMockups, listSfeer, templates, makeRender, thumbSvg,
+    init, listSubjects, listImages, listMockups, listSfeer, templates, makeRender, makeCarouselScenes, thumbSvg,
     options: ["palette", "duration", "reveal", "tempo", "name", "image", "bookend"],
   };
 }
