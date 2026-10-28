@@ -264,7 +264,12 @@ function maakCarrousel(langs) {
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
   await volgEngineLog();   // vanaf nu stroomt de engine-log mee
 
-  const alleTypes = TYPES_ARG ? TYPES_ARG.split(",").map((s) => s.trim()).filter(Boolean) : await haalTypes();
+  // Types met een EIGEN dagelijkse stap horen NIET in de willekeurige nacht-pool (anders dubbel
+  // gemaakt én ze pakken een plek af van de andere types). voorna heeft zijn eigen ochtendketen.
+  // Uitzondering: als je ze expliciet opvraagt met --types, render je ze gewoon (zoals de ochtendstap doet).
+  const EIGEN_SPOOR = ["voorna"];
+  let alleTypes = TYPES_ARG ? TYPES_ARG.split(",").map((s) => s.trim()).filter(Boolean) : await haalTypes();
+  if (!TYPES_ARG) alleTypes = alleTypes.filter((t) => !EIGEN_SPOOR.includes(t));
   if (!alleTypes.length) { console.error("Geen types gevonden. Stop."); process.exit(1); }
   // OOGST: per taal AANTAL video's, met WILLEKEURIGE types (elke nacht andere keuze -> variatie
   // zonder alle types te maken). --types blijft leidend als het gegeven is (handmatige test):
