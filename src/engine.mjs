@@ -14,6 +14,7 @@ import { makeSocialStore } from "./social/store.mjs";
 import { loadEnv } from "./social/env.mjs";
 import { r2Put, r2Delete } from "./social/r2.mjs";
 import { renderToMp4 } from "./core/renderer.mjs";
+import { overlayAudio } from "./core/audio-overlay.mjs";
 import { Resvg } from "@resvg/resvg-js";
 import ffmpegPath from "ffmpeg-static";
 
@@ -347,6 +348,12 @@ async function runOne(job) {
   const music = job.music ? path.resolve(ROOT, config.audioDir, job.music) : (render.music || "");
   if (music) log(`♪ muziek: ${path.basename(music)}${job.music ? "" : " (automatisch)"}`);
   const r = await renderToMp4({ render, music, outDir: OUT, log, namePrefix: brand.id });
+  // AUDIO-OVERLAY (additief): alleen als de render extra sporen meelevert (bv. Umma stem/SFX).
+  // Tegel-/mailrenders geven geen render.audio mee, dus die worden hier nooit geraakt.
+  if (render.audio && Array.isArray(render.audio.tracks) && render.audio.tracks.length) {
+    try { await overlayAudio({ mp4: r.outPath, tracks: render.audio.tracks, hasBaseAudio: !!music, log }); }
+    catch (e) { log("audio-overlay overgeslagen: " + e.message); }
+  }
   const nice = base + ".mp4";
   try { await fs.rename(r.outPath, path.resolve(OUT, nice)); log(`✓ klaar: /out/${nice}`); return { url: "/out/" + nice }; }
   catch { log(`✓ klaar: /out/${r.outName}`); return { url: "/out/" + r.outName }; }
@@ -356,6 +363,8 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
+    // TWEEDE STUDIO — Umma United scène-editor (eigen pagina, los van de tegel-studio).
+    if (u.pathname === "/umma") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/umma.html"))); return; }
     if (u.pathname.startsWith("/out/")) {
       const f = path.resolve(OUT, decodeURIComponent(u.pathname.slice(5)));
       if (!f.startsWith(OUT)) { res.writeHead(403); res.end("nee"); return; }   // geen pad-uitbraak
@@ -432,6 +441,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
+    // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
+    if (u.pathname === "/api/umma-upload" && req.method === "POST") {
+      const bd = await readBody(req);
+      const safe = String(bd.name || "clip").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 50);
+      const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
+      if (!b64) { json(res, { error: "geen audio ontvangen" }, 400); return; }
+      const dir = path.resolve(ROOT, "assets/ummaunited/audio"); await fs.mkdir(dir, { recursive: true });
+      const fname = Date.now() + "-" + (/\.(mp3|wav|m4a|aac|ogg)$/i.test(safe) ? safe : safe + ".mp3");
+      await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
+      json(res, { path: "assets/ummaunited/audio/" + fname });
+      return;
+    }
     if (u.pathname === "/api/images") {
       const b = reg.byId[u.searchParams.get("brand")];
       const pool = u.searchParams.get("pool") || "images";   // images | mockups | sfeer
