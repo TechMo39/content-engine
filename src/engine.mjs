@@ -379,7 +379,24 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/plan" && req.method === "GET") {
       const date = u.searchParams.get("date") || planToday();
       const plan = await readPlan();
-      json(res, { date, times: PLAN_TIMES, langs: PLAN_LANGS, slots: (plan[date] && plan[date].slots) || [], candidates: await planCandidates(), accounts: social.listAccounts() });
+      const slots = (plan[date] && plan[date].slots) || [];
+      // LIVE post-status per slot uit het sociale logboek (PUUR LEZEN): welke kanalen van dit
+      // bestand+taal zijn echt geplaatst (posted) of mislukt (failed). Zo kan de Planning een
+      // waarschuwing tonen zonder iets aan de render/mail/poster te veranderen.
+      for (const s of slots) {
+        if (!s || !s.file) continue;
+        try {
+          const recs = await socialStore.forFile(s.file);
+          const posted = [], failed = [];
+          for (const r of Object.values(recs)) {
+            if (!r || (r.lang || "nl") !== (s.lang || "nl")) continue;
+            if (r.status === "posted") posted.push(r.platform);
+            else if (r.status === "failed") failed.push(r.platform);
+          }
+          s.live = { posted, failed };
+        } catch {}
+      }
+      json(res, { date, times: PLAN_TIMES, langs: PLAN_LANGS, slots, candidates: await planCandidates(), accounts: social.listAccounts() });
       return;
     }
     if (u.pathname === "/api/plan/propose" && req.method === "POST") {
@@ -454,6 +471,21 @@ const server = http.createServer(async (req, res) => {
       json(res, { path: "assets/ummaunited/audio/" + fname });
       return;
     }
+    // UMMA — live voorbeeld: rendert ÉÉN frame (midden in de gekozen scène) als PNG, zodat de
+    // studio toont wat je maakt terwijl je bouwt. Geen video, dus snel. Alleen voor Umma.
+    if (u.pathname === "/api/umma-preview" && req.method === "POST") {
+      const bd = await readBody(req);
+      const brand = reg.byId["ummaunited"];
+      if (!brand) { json(res, { error: "umma niet geladen" }, 400); return; }
+      try {
+        const render = await brand.makeRender({ subjectId: null, templateId: "kaart", opts: bd.opts || {}, format: bd.format || "9:16", log: () => {} });
+        const i = Math.max(0, Math.min((render.scenesCount || 1) - 1, Number(bd.scene) || 0));
+        const frame = render.previewFrameFor ? render.previewFrameFor(i) : 0;
+        const svg = render.sceneAt(frame);
+        const png = new Resvg(svg, { fitTo: { mode: "width", value: 420 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
+        res.writeHead(200, { "content-type": "image/png", "cache-control": "no-cache" }); res.end(png); return;
+      } catch (e) { json(res, { error: e.message }, 500); return; }
+    }
     if (u.pathname === "/api/images") {
       const b = reg.byId[u.searchParams.get("brand")];
       const pool = u.searchParams.get("pool") || "images";   // images | mockups | sfeer
@@ -486,9 +518,28 @@ const server = http.createServer(async (req, res) => {
           });
         }
       } catch {}
-      // 2) mail-stills: BEWUST NIET meer inladen in de Bibliotheek. Mo gebruikt ze niet, en de
-      // netwerk-call naar de worker + een img per still bij elke laadbeurt belastten de weergave.
-      // De mailarm zelf (R2-upload) blijft volledig ongemoeid; alleen het TONEN hier is uit.
+      // 2) mail-stills: uit R2 (niet meer de lokale map), via het worker-endpoint.
+      try {
+        const resp = await fetch("https://taleoftiles.com/api/mail-stills");
+        if (resp.ok) {
+          for (const o of await resp.json()) {
+            const file = String(o.key).replace(/^mail-stills\//, "");
+            if (!/\.(jpe?g|png|webp)$/i.test(file)) continue;
+            const bust = o.uploaded ? "?t=" + Date.parse(o.uploaded) : "";
+            items.push({
+              kind: "still",
+              url: "https://taleoftiles.com/img/" + o.key + bust,
+              file,
+              brand: "taleoftiles", brandName: BRAND_NAME["taleoftiles"] || "Tale of Tiles",
+              type: "mailstill", typeName: "Mail-still",
+              name: titleCase(file.replace(/\.(jpe?g|png|webp)$/i, "").replace(/-/g, " ")),
+              lang: "", date: null,
+              kb: Math.round((o.size || 0) / 1024),
+              mtime: o.uploaded ? Date.parse(o.uploaded) : 0,
+            });
+          }
+        }
+      } catch {}
       items.sort((a, b) => b.mtime - a.mtime);
       json(res, { items, brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) });
       return;
