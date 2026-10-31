@@ -132,12 +132,17 @@ function postJson(p, body) {
       else if (r.status === 409) { log("• al eerder geplaatst: " + label); okAny = true; }
       else { log("✗ mislukt: " + label + " — " + ((r.json && r.json.error) || r.status)); errAny = true; }
     }
-    // PER-KANAAL INHAAL: faalde één kanaal, dan laten we het slot op "gepland" staan zodat de
-    // VOLGENDE ronde het opnieuw probeert. De al-geslaagde kanalen worden dan door de server
-    // geweigerd met 409 ("al geplaatst") -> geen dubbele post. Pas als ALLE gekozen kanalen
-    // gelukt zijn, zetten we het slot op "geplaatst" en verhuizen we het bestand. Zo blijft een
-    // gefaald kanaal (bv. een YouTube-token dat net dood was) nooit meer achter.
-    s.status = errAny ? "gepland" : (okAny ? "geplaatst" : "gepland");
+    // STATUS NA EEN RONDE:
+    //  - alles gelukt            -> "geplaatst" (bestand verhuist naar out/geplaatst/)
+    //  - een poging ECHT gefaald -> "mislukt": NIET elke 15 min opnieuw proberen. Een harde fout
+    //      (bv. Facebook "bevestig je identiteit", of een dood token) lukt bij herhalen tóch niet;
+    //      die bleef eindeloos hangen én onzichtbaar. Nu stopt 'ie na één poging en toont de
+    //      Planning de waarschuwing, zodat jij 'm kunt repareren. Al-geslaagde kanalen van hetzelfde
+    //      slot blijven geplaatst (de store weigert ze met 409), dus herstellen geeft geen dubbele post.
+    //  - niets gelukt, niets gefaald (geen kanaal geprobeerd) -> "gepland" laten (inhaal blijft).
+    // LET OP: dit raakt de INHAAL niet. Een gemiste post (laptop uit) is nooit geprobeerd -> errAny
+    // is dan false -> status blijft "gepland" -> wordt gewoon ingehaald zodra de laptop aan is.
+    s.status = errAny ? "mislukt" : (okAny ? "geplaatst" : "gepland");
     if (okAny) gepost++; if (errAny) mislukt++;
     // Verplaatsen naar out/geplaatst/ ALLEEN als alles gelukt is (geen fouten). Anders laten we het
     // bestand staan zodat de volgende ronde de gefaalde kanalen alsnog kan posten.
