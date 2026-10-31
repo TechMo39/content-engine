@@ -528,7 +528,8 @@ function planCardFor(slot,idx){
   // LIVE status uit het logboek (door de server meegegeven): welke kanalen mislukten/lukten.
   const liveFailed=(slot.live&&slot.live.failed)||[];
   const livePosted=(slot.live&&slot.live.posted)||[];
-  const warnHtml=liveFailed.length?`<div class="planwarn">⚠ mislukt op ${liveFailed.map(esc).join(', ')} — check de Socials-tab en post opnieuw</div>`:'';
+  const slotMislukt=slot.status==='mislukt';
+  const warnHtml=(liveFailed.length||slotMislukt)?`<div class="planwarn">⚠ ${liveFailed.length?('mislukt op '+liveFailed.map(esc).join(', ')):'posten mislukt'} — check de Socials-tab en post opnieuw</div>`:'';
   if(slot.status==='geplaatst'||slot.status==='deels'){
     cell.classList.add('plancell-posted');
     const lbl=slot.status==='deels'?'Deels gepost':'Gepost';
