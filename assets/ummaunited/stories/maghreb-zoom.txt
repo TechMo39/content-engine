@@ -1,0 +1,11 @@
+# Voorbeeld dat de zoom toont: wereld -> Maghreb.
+title: The Maghreb never bent
+view: world
+
+group maghreb = Morocco, Algeria, Tunisia, Libya, Mauritania
+group colonizer = France, Spain, Italy
+
+scene 1800 | Free. Muslim. Ours. | fill: maghreb=orange | view: mena | dur: 2.6
+scene 1912 | They drew borders and called it theirs. | fill: maghreb=orange | rule: maghreb=ruler | view: maghreb | dur: 3.0
+scene 1962 | The flags came down. We stayed. | fill: maghreb=orange | view: maghreb | dur: 2.8
+scene Today | Still here. Still ours. | fill: maghreb=orange | view: maghreb | dur: 2.6

@@ -79,6 +79,84 @@ function lerpCol(a, b, t) {
   return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
 }
 
+// ---------------------------------------------------------------- verhaal-script
+// Een verhaal is een leesbaar tekstbestand (assets/ummaunited/stories/<naam>.txt).
+// Landen schrijf je op NAAM (of ISO-nummer). Format:
+//   title: ...
+//   view: belt            (basis-blik; regionaam of x,y,w,h)
+//   group belt = Marokko, Algerije, Indonesië, ...
+//   scene 1700 | Europe rules. The faith stays. | fill: belt=orange | rule: belt=ruler | view: belt | dur: 3.0
+// fill = identiteit (wie de mensen zijn), rule = heerser (waas eroverheen). Kleuren:
+// orange red ruler green blue blue2 cream  (of een eigen #hexcode).
+const COLORS = {
+  orange: COL.orange, red: COL.red, ruler: COL.ruler, green: COL.green,
+  blue: COL.blue, blue2: COL.blue2, cream: COL.cream, mute: COL.mute, navy: COL.navy, land: COL.land,
+};
+// losse schrijfwijzen -> officiële naam in de kaart-asset
+const ALIASES = {
+  uae: "United Arab Emirates", emirates: "United Arab Emirates", saudi: "Saudi Arabia", ksa: "Saudi Arabia",
+  bosnia: "Bosnia and Herz.", turkiye: "Turkey", "türkiye": "Turkey", usa: "United States of America",
+  uk: "United Kingdom", "s. sudan": "S. Sudan",
+};
+function resolveColor(tok) {
+  tok = String(tok).trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(tok)) return tok;
+  return COLORS[tok.toLowerCase()] || null;
+}
+function parseViewToken(str) {
+  const parts = String(str).split(",").map((s) => s.trim());
+  if (parts.length === 4 && parts.every((p) => /^-?\d+(\.\d+)?$/.test(p))) return parts.map(Number);
+  return String(str).trim(); // regionaam
+}
+// text -> { title, mapView, groups, scenes, warnings }. name2id = { landnaam(lowercase): isoId }.
+function parseStory(text, name2id) {
+  const resolveId = (tok) => {
+    tok = String(tok).trim(); if (!tok) return null;
+    if (/^\d+$/.test(tok)) return tok;                       // ruwe ISO-id
+    const key = tok.toLowerCase();
+    if (name2id[key]) return name2id[key];
+    const al = ALIASES[key]; if (al && name2id[al.toLowerCase()]) return name2id[al.toLowerCase()];
+    return null;
+  };
+  const out = { title: "", mapView: null, groups: {}, scenes: [], warnings: [] };
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (/^title\s*:/i.test(line)) { out.title = line.replace(/^title\s*:/i, "").trim(); continue; }
+    if (/^view\s*:/i.test(line)) { out.mapView = resolveView(parseViewToken(line.replace(/^view\s*:/i, "").trim())); continue; }
+    let m = line.match(/^group\s+([^=]+)=(.*)$/i);
+    if (m) {
+      const gname = m[1].trim(), ids = [];
+      for (const part of m[2].split(",")) {
+        const id = resolveId(part);
+        if (id) ids.push(id); else if (part.trim()) out.warnings.push("land niet gevonden: " + part.trim());
+      }
+      out.groups[gname] = ids; continue;
+    }
+    if (/^scene\s+/i.test(line)) {
+      const segs = line.replace(/^scene\s+/i, "").split("|").map((s) => s.trim());
+      const sc = { year: segs[0] || "", text: segs[1] || "", fills: {}, rule: {}, dur: 2.6 };
+      for (let k = 2; k < segs.length; k++) {
+        const seg = segs[k], ci = seg.indexOf(":"); if (ci < 0) continue;
+        const key = seg.slice(0, ci).trim().toLowerCase(), val = seg.slice(ci + 1).trim();
+        if (key === "fill" || key === "rule") {
+          for (const pair of val.split(";")) {
+            const eq = pair.indexOf("="); if (eq < 0) continue;
+            const g = pair.slice(0, eq).trim(), c = resolveColor(pair.slice(eq + 1));
+            if (!out.groups[g]) out.warnings.push("scene gebruikt onbekende groep: " + g);
+            if (c) (key === "fill" ? sc.fills : sc.rule)[g] = c; else out.warnings.push("kleur onbekend: " + pair.trim());
+          }
+        } else if (key === "view") {
+          const v = resolveView(parseViewToken(val)); if (v) sc.view = parseViewToken(val); else out.warnings.push("view onbekend: " + val);
+        } else if (key === "dur") { const d = parseFloat(val); if (d > 0) sc.dur = d; }
+      }
+      out.scenes.push(sc); continue;
+    }
+    out.warnings.push("regel genegeerd: " + line);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- gedeelde chrome
 function kader(W, H) {
   const m = Math.round(W * 0.035), r = Math.round(W * 0.04);
@@ -139,17 +217,36 @@ export function makeBrand({ ROOT = "." } = {}) {
     name: "Umma United", footer: "UMMA UNITED",
     bg: COL.ink, bg2: COL.navy2, gold: COL.orange, cream: COL.cream, plate: COL.navy,
   };
-  let MAP = null; // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
+  let MAP = null;        // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
+  let NAME2ID = {};      // landnaam(lowercase) -> isoId, uit de kaart-asset
+  let STORIES = {};      // verhaal-id (titel/bestandsnaam) -> geparseerd verhaal
 
   async function init() {
     try {
       const raw = await fs.readFile(path.resolve(ROOT, "assets/ummaunited/worldmap.json"), "utf8");
       MAP = JSON.parse(raw);
     } catch { MAP = null; }
+    // naam -> id tabel bouwen zodat verhalen landen op naam mogen schrijven
+    NAME2ID = {};
+    if (MAP && MAP.names) for (const [id, nm] of Object.entries(MAP.names)) { if (id && id !== "undefined") NAME2ID[String(nm).toLowerCase()] = id; }
+    // verhalen inladen uit assets/ummaunited/stories/*.txt (of .story)
+    STORIES = {};
+    try {
+      const dir = path.resolve(ROOT, "assets/ummaunited/stories");
+      for (const f of await fs.readdir(dir)) {
+        if (!/\.(txt|story)$/i.test(f)) continue;
+        const text = await fs.readFile(path.join(dir, f), "utf8");
+        const parsed = parseStory(text, NAME2ID);
+        const id = parsed.title || f.replace(/\.(txt|story)$/i, "");
+        STORIES[id] = parsed;
+      }
+    } catch { /* geen stories-map = alleen het demo-verhaal */ }
   }
 
   async function listSubjects() {
-    return [{ id: "Religie: verspreiding en standhouden" }, { id: "Belasting: hun systeem vs het onze" }];
+    const ids = Object.keys(STORIES);
+    if (ids.length) return ids.map((id) => ({ id }));
+    return [{ id: "Demo: Rome -> 2026" }];   // altijd iets te kiezen; valt terug op het ingebouwde demo-verhaal
   }
 
   const templates = [
@@ -178,15 +275,18 @@ export function makeBrand({ ROOT = "." } = {}) {
     };
   }
 
-  async function makeKaartRender({ opts = {}, format = "9:16" }) {
+  async function makeKaartRender({ subjectId, opts = {}, format = "9:16" }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const SS = 2, FPS = 24;
+    // gekozen verhaal uit de studio (subjectId) -> anders het ingebouwde demo-verhaal
+    const picked = (subjectId && STORIES[subjectId] && STORIES[subjectId].scenes.length) ? STORIES[subjectId] : null;
+    const dem = demoStory();
     const story = {
-      mapView: opts.mapView || demoStory().mapView,
-      groups: opts.groups || demoStory().groups,
-      scenes: opts.scenes || demoStory().scenes,
+      mapView: opts.mapView || (picked && picked.mapView) || dem.mapView,
+      groups: opts.groups || (picked && picked.groups) || dem.groups,
+      scenes: opts.scenes || (picked && picked.scenes) || dem.scenes,
     };
-    const title = opts.title || "They never conquered our faith";
+    const title = opts.title || (picked && picked.title) || "They never conquered our faith";
     // scene-tijden
     const durs = story.scenes.map((s) => Number(s.dur) || 2.6);
     const mapEnd = durs.reduce((a, b) => a + b, 0);      // kaart speelt tot hier
@@ -205,7 +305,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       return { sc, offX: (W - dW) / 2 - view[0] * sc, offY: bandTop + (availH - dH) / 2 - view[1] * sc };
     }
     // basis-view: opts.region ("sea") of opts.mapView (bbox), anders het verhaal zijn mapView.
-    const baseView = resolveView(opts.region) || resolveView(opts.mapView) || story.mapView;
+    const baseView = resolveView(opts.region) || resolveView(opts.mapView) || resolveView(story.mapView) || dem.mapView;
     // per scene: eigen view (regionaam of bbox) of de basis. Camera east tussen scene-views.
     const sceneViews = story.scenes.map((s) => resolveView(s.view) || baseView);
 
@@ -280,20 +380,25 @@ export function makeBrand({ ROOT = "." } = {}) {
       const ctaOp = tRaw > mapEnd ? clamp01((tRaw - mapEnd) / 0.5) : 0;
       const fade = (1 - ctaOp).toFixed(2);
 
+      // titel: verschijnt bij de opening als statement, faadt dan weg zodat de kaart ademruimte krijgt
+      let titleOp = clamp01(t / 0.4);
+      if (t > 2.8) titleOp = clamp01((3.4 - t) / 0.6);
+      titleOp *= (1 - ctaOp);
+
       const inner = mapG + `<g opacity="${fade}">${bar}</g>`;
-      const ovl = kader(W, H) + titel(title, W, H) + onderschrift(capTxt, W, H, capOp * (1 - ctaOp)) + ctaFoldout(W, H, ctaOp);
+      const ovl = kader(W, H) + titel(title, W, H, titleOp) + onderschrift(capTxt, W, H, capOp * (1 - ctaOp)) + ctaFoldout(W, H, ctaOp);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
-    // hook-first grijpt een SCHONE 2026-payoff (vóór de CTA)
-    const hookAt = Math.max(0, (mapEnd - 0.5) / total);
-    return { W, H, FPS, SS, durSec: total, sceneAt, hookAt };
+    // GEEN hook-first: bij een kaart-door-de-tijd is de reis naar het eind de payoff,
+    // die geef je niet weg aan het begin. (De hook-machine in de kern blijft dus uit.)
+    return { W, H, FPS, SS, durSec: total, sceneAt };
   }
 
-  async function makeRender({ opts = {}, format = "9:16" }) {
+  async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
     const type = opts.type || opts.template || "kaart";
     switch (type) {
-      case "kaart": return makeKaartRender({ opts, format });
-      default: return makeKaartRender({ opts, format });
+      case "kaart": return makeKaartRender({ subjectId, opts, format });
+      default: return makeKaartRender({ subjectId, opts, format });
     }
   }
 
