@@ -41,6 +41,7 @@
   .gcard.sel .ghd .gn{background:var(--orange);color:#1a1200}
   .ghd .gyr{font-weight:700;font-size:13px;flex:0 0 auto}
   .ghd .gtx{flex:1;color:var(--cream);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ghd .gtech{flex:0 0 auto;font-size:11px;color:var(--orange);border:1px solid var(--orange);border-radius:20px;padding:2px 9px}
   .ghd .gdur{color:var(--mute);font-size:12px;flex:0 0 auto}
   .ghd .gau{color:var(--orange);font-size:12px}
   .gmeta{padding:0 12px 10px 44px;font-size:12px;color:var(--mute)}
@@ -122,6 +123,9 @@ const ALIASES = {uae:"United Arab Emirates",emirates:"United Arab Emirates",saud
 const REGIONS = ["belt","world","mena","maghreb","arabia","levant","turkey","iberia","westafrica","hornafrica","southasia","sea","europe","centralasia"];
 const COLORS = {orange:"#ff7a2f",red:"#c0392b",ruler:"#5fb6d8",green:"#2aa84a",blue:"#2756a0",cream:"#f5efe1"};
 const COLKEYS = Object.keys(COLORS);
+// TECHNIEKEN = de manieren om een scène uit te beelden. Deze lijst groeit; nu alleen de kaart.
+const TECHNIEKEN = [{id:"kaart", name:"Kaart door de tijd"}];
+const TECHNAAM = (id)=> (TECHNIEKEN.find(t=>t.id===id)||TECHNIEKEN[0]).name;
 
 // het script begint LEEG — het geraamte vul ik (Claude) via "Importeer script".
 const state = { title:"", baseview:"belt", format:"9:16", music:"", open:-1, groups:[], scenes:[] };
@@ -174,9 +178,10 @@ function renderSkeleton(){
     const au=(s.voice||s.sfx)?'<span class="gau">♪</span>':'';
     const open=i===state.open?' open':'';
     return `<div class="gcard${open}${i===state.open?' sel':''}">
-      <div class="ghd" onclick="toggleCard(${i})"><span class="gn">${i+1}</span><span class="gyr">${esc(s.year||'—')}</span><span class="gtx">${esc(s.text||'(geen tekst)')}</span>${au}<span class="gdur">${s.dur}s</span><span class="btn x" title="tweak">✎</span></div>
+      <div class="ghd" onclick="toggleCard(${i})"><span class="gn">${i+1}</span><span class="gyr">${esc(s.year||'—')}</span><span class="gtx">${esc(s.text||'(geen tekst)')}</span>${au}<span class="gtech">${esc(TECHNAAM(s.technique||'kaart'))}</span><span class="gdur">${s.dur}s</span><span class="btn x" title="tweak">✎</span></div>
       <div class="gmeta">${mapDesc(s)}</div>
       <div class="gedit">
+        <div class="fld"><label>Techniek (hoe deze scène wordt uitgebeeld)</label><select onchange="state.scenes[${i}].technique=this.value;renderSkeleton()">${TECHNIEKEN.map(t=>'<option value="'+t.id+'"'+((s.technique||'kaart')===t.id?' selected':'')+'>'+t.name+'</option>').join('')}</select></div>
         <div class="two">
           <div class="fld"><label>Jaar / label</label><input type="text" value="${esc(s.year)}" oninput="state.scenes[${i}].year=this.value;renderSkeleton()"></div>
           <div class="two"><div class="fld"><label>Zoom</label><select onchange="state.scenes[${i}].view=this.value;renderSkeleton()">${REGIONS.map(r=>opt(r,s.view||state.baseview)).join('')}</select></div><div class="fld"><label>Duur</label><input type="number" step="0.1" value="${s.dur}" oninput="state.scenes[${i}].dur=parseFloat(this.value)||2.6;renderSkeleton()"></div></div>
@@ -221,12 +226,13 @@ function parseScript(text){
     if(m){out.groups.push({name:m[1].trim(),countries:m[2].trim()});continue;}
     if(/^scene\s+/i.test(line)){
       const segs=line.replace(/^scene\s+/i,'').split('|').map(s=>s.trim());
-      const sc={year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:2.6};
+      const sc={technique:'kaart',year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:2.6};
       for(let k=2;k<segs.length;k++){const seg=segs[k];const ci=seg.indexOf(':');if(ci<0)continue;
         const key=seg.slice(0,ci).trim().toLowerCase();const val=seg.slice(ci+1).trim();
         if(key==='fill'||key==='rule'){for(const pr of val.split(';')){const eq=pr.indexOf('=');if(eq<0)continue;const g=pr.slice(0,eq).trim();const c=pr.slice(eq+1).trim();if(g&&c)(key==='fill'?sc.fills:sc.rule).push({g,c});}}
         else if(key==='view')sc.view=val;
         else if(key==='dur'){const d=parseFloat(val);if(d>0)sc.dur=d;}
+        else if(key==='techniek'||key==='technique'){ if(TECHNIEKEN.some(t=>t.id===val))sc.technique=val; }
       }
       out.scenes.push(sc);
     }
@@ -252,7 +258,7 @@ function buildOpts(warn){
   const groups={};
   for(const g of state.groups){ if(!g.name)continue; const ids=[]; for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()+' (groep '+g.name+')'); } groups[g.name]=ids; }
   const scenes=state.scenes.map(s=>{ const fills={},rule={}; for(const p of s.fills){if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c];} for(const p of s.rule){if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c];}
-    const o={year:s.year,text:s.text,fills,rule,view:s.view,dur:s.dur}; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; return o; });
+    const o={technique:s.technique||'kaart',year:s.year,text:s.text,fills,rule,view:s.view,dur:s.dur}; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; return o; });
   return {title:state.title, mapView:state.baseview, groups, scenes};
 }
 async function doRender(){
