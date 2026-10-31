@@ -9,101 +9,110 @@
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-  /* ---------- header ---------- */
-  header{display:flex;align-items:center;gap:16px;padding:12px 22px;background:var(--navy);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap}
+  header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--navy);border-bottom:1px solid var(--line);flex:0 0 auto}
   header .brand{font-family:Georgia,serif;font-size:19px;white-space:nowrap}
   header .brand .d{color:var(--orange)}
-  header .f{display:flex;flex-direction:column;gap:2px}
-  header .f.grow{flex:1 1 180px;min-width:150px}
-  header label{font-size:10px;letter-spacing:.5px;color:var(--mute)}
-  header input,header select{background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;width:100%}
-  header .sp{flex:1}
+  .sp{flex:1}
   .btn{background:var(--navy2);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;font-family:inherit;font-size:13px}
   .btn:hover{border-color:var(--orange)}
-  .btn.o{background:var(--orange);color:#1a1200;border-color:var(--orange);font-weight:700;padding:10px 22px}
+  .btn.o{background:var(--orange);color:#1a1200;border-color:var(--orange);font-weight:700;padding:10px 20px}
   .btn.sm{padding:4px 9px;font-size:12px}
   .btn.x{padding:2px 8px;color:var(--mute);border-color:transparent;background:transparent}
   .btn.x:hover{color:var(--orange)}
   .stat{font-size:12px;color:var(--mute);min-width:60px;text-align:right}
-  /* ---------- groups panel (uitklap) ---------- */
-  #groupsPanel{background:var(--ink);border-bottom:1px solid var(--line);padding:0 22px;max-height:0;overflow:hidden;transition:max-height .2s,padding .2s;flex:0 0 auto}
-  #groupsPanel.open{max-height:50vh;overflow:auto;padding:14px 22px}
-  #groupsPanel h3{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:0 0 10px}
-  .grp{display:flex;gap:8px;margin-bottom:8px;align-items:flex-end}
-  .grp .f{flex:1;display:flex;flex-direction:column;gap:3px}
-  .grp .f.nm{flex:0 0 140px}
-  .grp label{font-size:10px;color:var(--mute)}
-  .grp input{background:var(--navy);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;width:100%}
-  /* ---------- strip (storyboard) ---------- */
-  .strip{display:flex;gap:10px;padding:12px 22px;background:var(--navy);border-bottom:1px solid var(--line);overflow-x:auto;flex:0 0 auto;align-items:stretch}
-  .scard{flex:0 0 150px;background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;position:relative}
-  .scard.sel{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset}
-  .scard .n{width:22px;height:22px;border-radius:50%;background:var(--navy2);color:var(--cream);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
-  .scard.sel .n{background:var(--orange);color:#1a1200}
-  .scard .yr{font-weight:700;font-size:13px;margin:6px 0 2px}
-  .scard .tx{font-size:11.5px;color:var(--mute);line-height:1.3;height:30px;overflow:hidden}
-  .scard .au{position:absolute;top:9px;right:9px;font-size:11px;color:var(--orange)}
-  .addcard{flex:0 0 54px;border:1px dashed var(--line);border-radius:10px;background:transparent;color:var(--mute);font-size:24px;cursor:pointer}
-  .addcard:hover{border-color:var(--orange);color:var(--orange)}
-  /* ---------- main ---------- */
-  .main{flex:1;display:grid;grid-template-columns:1fr 380px;min-height:0}
-  .editor{padding:20px 24px;overflow:auto}
-  .rail{background:var(--ink);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-  .rail .pv{padding:16px}
-  .rail video{width:100%;border-radius:10px;background:#000}
-  .rail .ph{aspect-ratio:9/16;max-height:300px;margin:0 auto;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12.5px;text-align:center;padding:20px}
-  .rail h3{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:4px 16px 8px}
-  #log{flex:1;margin:0 16px 16px;background:#05080f;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#bcd;white-space:pre-wrap;min-height:120px}
-  /* editor fields */
-  .ehd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-  .ehd .big{font-size:17px;font-weight:700}
-  .ehd .sp{flex:1}
-  .fld{margin-bottom:16px}
-  .fld>label{display:block;font-size:11px;letter-spacing:.5px;color:var(--mute);margin-bottom:5px}
-  .fld input[type=text],.fld textarea,.fld select,.fld input[type=number]{width:100%;background:var(--navy);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit}
-  .fld textarea{min-height:70px;resize:vertical;line-height:1.5;font-size:15px}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .three{display:grid;grid-template-columns:1fr 1fr 130px;gap:14px}
+  .cols{flex:1;display:grid;grid-template-columns:400px 1fr;min-height:0}
+  .col{padding:18px 20px;overflow:auto;min-height:0}
+  .colL{background:var(--ink);border-right:1px solid var(--line)}
+  h2{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:0 0 4px}
+  .sub{color:var(--mute);font-size:12px;margin:0 0 16px}
+  .fld{margin-bottom:14px}
+  .fld>label{display:block;font-size:11px;letter-spacing:.3px;color:var(--mute);margin-bottom:5px}
+  .fld input[type=text],.fld textarea,.fld select,.fld input[type=number]{width:100%;background:var(--navy);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit}
+  .fld textarea{resize:vertical;line-height:1.5}
+  .files .frow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px;color:var(--mute)}
+  .ask{background:var(--navy);border:1px dashed var(--orange);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--cream);margin-bottom:12px}
+  .ask b{color:var(--orange)}
+  /* geraamte */
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  .gcard{background:var(--navy);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+  .gcard.sel{border-color:var(--orange)}
+  .ghd{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}
+  .ghd .gn{width:22px;height:22px;border-radius:50%;background:var(--navy2);color:var(--cream);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .gcard.sel .ghd .gn{background:var(--orange);color:#1a1200}
+  .ghd .gyr{font-weight:700;font-size:13px;flex:0 0 auto}
+  .ghd .gtx{flex:1;color:var(--cream);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ghd .gdur{color:var(--mute);font-size:12px;flex:0 0 auto}
+  .ghd .gau{color:var(--orange);font-size:12px}
+  .gmeta{padding:0 12px 10px 44px;font-size:12px;color:var(--mute)}
+  .gmeta .sw{width:10px;height:10px;border-radius:2px;display:inline-block;vertical-align:-1px;margin:0 3px 0 7px}
+  .gedit{padding:12px 14px;border-top:1px solid var(--line);display:none}
+  .gcard.open .gedit{display:block}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .mini{display:flex;gap:7px;align-items:center;margin:6px 0}
   .mini select{flex:1;background:var(--navy);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:7px;font-family:inherit;font-size:13px}
-  .lyr{background:var(--navy);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .lyr{background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px}
   .lyr .cap{font-size:11px;color:var(--mute);margin-bottom:4px}
   .fileline{font-size:12px;color:var(--mute);margin-top:4px}
   .fileline b{color:var(--orange);font-weight:600}
-  .fld input[type=file]{font-size:12px;color:var(--mute)}
-  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:4px}
+  #log{background:#05080f;border:1px solid var(--line);border-radius:8px;padding:10px;height:120px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#bcd;white-space:pre-wrap;margin-top:14px}
+  .empty{color:var(--mute);font-size:13px;border:1px dashed var(--line);border-radius:10px;padding:26px;text-align:center}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:center;justify-content:center}
+  .modal .box{background:var(--navy);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(780px,92vw)}
+  .modal textarea{width:100%;height:340px;background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5}
   a{color:var(--ruler)}
-  @media(max-width:860px){.main{grid-template-columns:1fr}.rail{border-left:none;border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>
 <header>
   <button class="btn sm" onclick="location.href='/'" title="terug naar Tale of Tiles">‹ Tiles</button>
   <div class="brand">Umma United <span class="d">·</span> Studio</div>
-  <div class="f grow"><label>Titel (bovenin beeld)</label><input type="text" id="title"></div>
-  <div class="f" style="flex:0 0 130px"><label>Basis-zoom</label><select id="baseview"></select></div>
-  <div class="f" style="flex:0 0 150px"><label>Muziek (bodem)</label><select id="music"></select></div>
-  <div class="f" style="flex:0 0 120px"><label>Formaat</label><select id="format"><option>9:16</option><option>1:1</option><option>16:9</option></select></div>
-  <button class="btn" id="grpToggle" onclick="toggleGroups()">Groepen</button>
   <div class="sp"></div>
   <span class="stat" id="stat"></span>
-  <button class="btn o" onclick="doRender()">Render</button>
+  <button class="btn o" onclick="doRender()">Render video</button>
 </header>
 
-<div id="groupsPanel">
-  <h3>Groepen &mdash; landen op naam (gedeeld over alle scènes)</h3>
-  <div id="groups"></div>
-  <button class="btn sm" onclick="addGroup()">+ groep</button>
+<div class="cols">
+  <!-- ================= 1 · INPUT (het formulier) ================= -->
+  <div class="col colL">
+    <h2>1 · Input</h2>
+    <div class="sub">Vertel wat je wil uitbeelden. De rest doe ik.</div>
+    <div class="fld"><label>Wat wil je uitbeelden?</label><textarea id="in_portray" rows="5" placeholder="Vertel het verhaal in je eigen woorden…"></textarea></div>
+    <div class="fld"><label>Kern (optioneel — het punt)</label><input type="text" id="in_kern"></div>
+    <div class="fld"><label>Contrast / munitie (optioneel)</label><input type="text" id="in_contrast"></div>
+    <div class="fld"><label>Gebied (optioneel — anders kies ik)</label><input type="text" id="in_gebied"></div>
+    <div class="fld"><label>Lengte &amp; toon (optioneel)</label><input type="text" id="in_toon" placeholder="bv. short, spicy"></div>
+    <button class="btn o" style="width:100%" onclick="copyInput()">Kopieer input voor Claude</button>
+
+    <h2 style="margin-top:22px">Aan te leveren</h2>
+    <div class="sub">Alleen wat ik je vraag. Muziek kies je hier; stem/SFX per scène staan in het script rechts.</div>
+    <div class="fld"><label>Muziek (bodem)</label><select id="music"></select></div>
+    <div id="log"></div>
+  </div>
+
+  <!-- ================= 2 · SCRIPT (het geraamte) ================= -->
+  <div class="col">
+    <h2>2 · Script (het geraamte)</h2>
+    <div class="sub">Dit komt erin, scène voor scène. Door mij ingevuld; jij reviewt en levert de gevraagde audio aan.</div>
+    <div class="toolbar">
+      <button class="btn o" onclick="openImport()">Importeer script</button>
+      <button class="btn sm" onclick="toggleGroups()">Groepen</button>
+      <span class="sp"></span>
+      <span class="fileline" id="totaal"></span>
+    </div>
+    <div id="groupsPanel" style="display:none;background:var(--navy);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px"></div>
+    <div id="skeleton"></div>
+  </div>
 </div>
 
-<div class="strip" id="strip"></div>
-
-<div class="main">
-  <div class="editor" id="editor"></div>
-  <div class="rail">
-    <div class="pv" id="player"><div class="ph">Je video verschijnt hier na het renderen.</div></div>
-    <h3>Log</h3>
-    <div id="log"></div>
+<div class="modal" id="importModal">
+  <div class="box">
+    <h2>Script importeren</h2>
+    <div class="sub">Plak het script dat ik je gaf. Alle scènes, groepen, kleuren en zoom vullen zich.</div>
+    <textarea id="importTxt" spellcheck="false" placeholder="title: ...&#10;view: belt&#10;group belt = Morocco, Algeria, ...&#10;scene 1700 | Europe took the land, but the faith stayed. | fill: belt=orange | rule: belt=ruler | view: belt | dur: 5"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button class="btn" onclick="closeImport()">Annuleer</button>
+      <button class="btn o" onclick="applyImport()">Laad script</button>
+    </div>
   </div>
 </div>
 
@@ -114,170 +123,157 @@ const REGIONS = ["belt","world","mena","maghreb","arabia","levant","turkey","ibe
 const COLORS = {orange:"#ff7a2f",red:"#c0392b",ruler:"#5fb6d8",green:"#2aa84a",blue:"#2756a0",cream:"#f5efe1"};
 const COLKEYS = Object.keys(COLORS);
 
-const state = {
-  title:"They never conquered our faith", baseview:"belt", format:"9:16", music:"", selected:0,
-  groups:[
-    {name:"rome", countries:"Italy, Spain, Portugal, France, Greece, Turkey, Egypt, Libya, Tunisia, Algeria, Morocco, Syria, Israel, Lebanon"},
-    {name:"islam", countries:"Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Spain, Turkmenistan, Uzbekistan, Pakistan, Kazakhstan, Jordan, Palestine"},
-    {name:"belt", countries:"Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Turkey, Pakistan, Afghanistan, Kazakhstan, Indonesia, Malaysia, Bangladesh, Mali, Niger, Mauritania, Somalia, Sudan, Senegal"}
-  ],
-  scenes:[
-    {year:"117 AD", text:"Rome rules. Become Roman.", fills:[{g:"rome",c:"red"}], rule:[{g:"rome",c:"red"}], view:"belt", dur:2.6},
-    {year:"750 AD", text:"Islam spreads, by choice", fills:[{g:"islam",c:"orange"}], rule:[{g:"islam",c:"orange"}], view:"belt", dur:2.8},
-    {year:"1700", text:"Europe rules. The faith stays.", fills:[{g:"belt",c:"orange"}], rule:[{g:"belt",c:"ruler"}], view:"belt", dur:3.0},
-    {year:"2026", text:"From Morocco to Indonesia: still ours", fills:[{g:"belt",c:"orange"}], rule:[], view:"belt", dur:2.8}
-  ]
-};
+// het script begint LEEG — het geraamte vul ik (Claude) via "Importeer script".
+const state = { title:"", baseview:"belt", format:"9:16", music:"", open:-1, groups:[], scenes:[] };
 
 const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s==null?'':s).replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function opt(v,sel){return '<option'+(v===sel?' selected':'')+'>'+v+'</option>';}
 function groupNames(){return state.groups.map(g=>g.name).filter(Boolean);}
-
-function fillHeader(){
-  $('#title').value=state.title;
-  $('#baseview').innerHTML=REGIONS.map(r=>opt(r,state.baseview)).join('');
-  $('#format').value=state.format;
-  $('#title').oninput=e=>state.title=e.target.value;
-  $('#baseview').onchange=e=>state.baseview=e.target.value;
-  $('#format').onchange=e=>state.format=e.target.value;
-}
-function toggleGroups(){ $('#groupsPanel').classList.toggle('open'); }
-
-function renderGroups(){
-  const el=$('#groups'); el.innerHTML='';
-  state.groups.forEach((g,i)=>{
-    const d=document.createElement('div'); d.className='grp';
-    d.innerHTML=`<div class="f nm"><label>groepnaam</label><input type="text" value="${esc(g.name)}" oninput="state.groups[${i}].name=this.value;renderStrip();renderEditor()"></div>
-      <div class="f"><label>landen (komma)</label><input type="text" value="${esc(g.countries)}" oninput="state.groups[${i}].countries=this.value"></div>
-      <button class="btn x" onclick="state.groups.splice(${i},1);renderGroups();renderEditor()">verwijder</button>`;
-    el.appendChild(d);
-  });
-}
-function addGroup(){state.groups.push({name:"",countries:""});renderGroups();}
-
-function renderStrip(){
-  const el=$('#strip'); el.innerHTML='';
-  state.scenes.forEach((s,i)=>{
-    const d=document.createElement('div'); d.className='scard'+(i===state.selected?' sel':'');
-    const au = (s.voice||s.sfx) ? '<span class="au">♪</span>' : '';
-    d.innerHTML=`<div class="n">${i+1}</div>${au}<div class="yr">${esc(s.year||'—')}</div><div class="tx">${esc((s.text||'').slice(0,46))}</div>`;
-    d.onclick=()=>{state.selected=i;renderStrip();renderEditor();};
-    el.appendChild(d);
-  });
-  const add=document.createElement('div'); add.className='addcard'; add.textContent='+'; add.title='scène toevoegen';
-  add.onclick=addScene; el.appendChild(add);
-}
-function addScene(){ state.scenes.push({year:"",text:"",fills:[],rule:[],view:state.baseview,dur:2.6}); state.selected=state.scenes.length-1; renderStrip(); renderEditor(); }
-function moveScene(dir){ const i=state.selected,j=i+dir; if(j<0||j>=state.scenes.length)return; const a=state.scenes;[a[i],a[j]]=[a[j],a[i]];state.selected=j;renderStrip();renderEditor(); }
-function delScene(){ state.scenes.splice(state.selected,1); if(!state.scenes.length)addScene(); state.selected=Math.max(0,state.selected-1); renderStrip(); renderEditor(); }
-
-function pairRows(arr,key){
-  const gn=groupNames();
-  let h=arr.map((p,j)=>`<div class="mini">
-     <select onchange="state.scenes[state.selected].${key}[${j}].g=this.value;renderStrip()">${gn.map(n=>opt(n,p.g)).join('')}</select>
-     <span style="color:var(--mute)">=</span>
-     <select onchange="state.scenes[state.selected].${key}[${j}].c=this.value">${COLKEYS.map(c=>opt(c,p.c)).join('')}</select>
-     <button class="btn x" onclick="state.scenes[state.selected].${key}.splice(${j},1);renderEditor()">✕</button></div>`).join('');
-  h+=`<button class="btn sm" onclick="state.scenes[state.selected].${key}.push({g:'${gn[0]||''}',c:'${key==='rule'?'ruler':'orange'}'});renderEditor()">+ ${key==='fills'?'land/kleur':'heerser'}</button>`;
-  return h;
-}
-function renderEditor(){
-  const el=$('#editor'); const i=state.selected; const s=state.scenes[i];
-  if(!s){el.innerHTML='';return;}
-  el.innerHTML=`
-    <div class="ehd"><span class="big">Scène ${i+1}</span>
-      <div class="sp"></div>
-      <button class="btn sm" onclick="moveScene(-1)">▲ eerder</button>
-      <button class="btn sm" onclick="moveScene(1)">▼ later</button>
-      <button class="btn x" onclick="delScene()">verwijder</button>
-    </div>
-    <div class="two">
-      <div class="fld"><label>Jaar / label (bovenin tijdbalk)</label><input type="text" value="${esc(s.year)}" oninput="state.scenes[${i}].year=this.value;renderStrip()"></div>
-      <div class="three" style="grid-template-columns:1fr 130px">
-        <div class="fld"><label>Zoom (deze scène)</label><select onchange="state.scenes[${i}].view=this.value">${REGIONS.map(r=>opt(r,s.view||state.baseview)).join('')}</select></div>
-        <div class="fld"><label>Duur (sec)</label><input type="number" step="0.1" value="${s.dur}" oninput="state.scenes[${i}].dur=parseFloat(this.value)||2.6"></div>
-      </div>
-    </div>
-    <div class="fld"><label>Tekst op scherm</label><textarea oninput="state.scenes[${i}].text=this.value;renderStrip()">${esc(s.text)}</textarea></div>
-    <div class="two">
-      <div class="lyr"><div class="cap">Identiteit (vulkleur — wie de mensen zijn)</div>${pairRows(s.fills,'fills')}</div>
-      <div class="lyr"><div class="cap">Heerser (waas eroverheen — wie regeert)</div>${pairRows(s.rule,'rule')}</div>
-    </div>
-    <div class="two" style="margin-top:16px">
-      <div class="fld"><label>Stem (import — zet de duur automatisch)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'voice')"><div class="fileline" id="au-voice-${i}">${s.voice?('<b>✓ '+esc(s.voice.split('/').pop())+'</b> · <a href="#" onclick="clearAudio('+i+',&#39;voice&#39;);return false">wis</a>'):'geen'}</div></div>
-      <div class="fld"><label>SFX (import — speelt bij scène-start)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'sfx')"><div class="fileline" id="au-sfx-${i}">${s.sfx?('<b>✓ '+esc(s.sfx.split('/').pop())+'</b> · <a href="#" onclick="clearAudio('+i+',&#39;sfx&#39;);return false">wis</a>'):'geen'}</div></div>
-    </div>
-    <div class="fileline" style="margin-top:14px">kleuren: <span class="swatch" style="background:#ff7a2f"></span>orange (ons) <span class="swatch" style="background:#c0392b"></span>red <span class="swatch" style="background:#5fb6d8"></span>ruler (heerser) <span class="swatch" style="background:#2aa84a"></span>green <span class="swatch" style="background:#2756a0"></span>blue <span class="swatch" style="background:#f5efe1"></span>cream</div>
-  `;
-}
-
-function resolveCountry(tok){
-  tok=tok.trim(); if(!tok)return null;
-  if(/^\d+$/.test(tok))return tok;
-  if(COUNTRIES[tok])return COUNTRIES[tok];
-  const hit=Object.keys(COUNTRIES).find(n=>n.toLowerCase()===tok.toLowerCase());
-  if(hit)return COUNTRIES[hit];
-  const al=ALIASES[tok.toLowerCase()]; if(al&&COUNTRIES[al])return COUNTRIES[al];
-  return null;
-}
-function buildOpts(warn){
-  const groups={};
-  for(const g of state.groups){ if(!g.name)continue; const ids=[];
-    for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()+' (groep '+g.name+')'); }
-    groups[g.name]=ids;
-  }
-  const scenes=state.scenes.map(s=>{
-    const fills={},rule={};
-    for(const p of s.fills){ if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c]; }
-    for(const p of s.rule){ if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c]; }
-    const o={year:s.year, text:s.text, fills, rule, view:s.view, dur:s.dur};
-    if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx;
-    return o;
-  });
-  return {title:state.title, mapView:state.baseview, groups, scenes};
-}
 function logLine(t){const l=$('#log');l.textContent+=t+"\n";l.scrollTop=l.scrollHeight;}
 
+// ---------- input ----------
+function copyInput(){
+  const t=`VERHAAL: ${$('#in_portray').value.trim()}
+KERN: ${$('#in_kern').value.trim()}
+CONTRAST: ${$('#in_contrast').value.trim()}
+GEBIED: ${$('#in_gebied').value.trim()}
+LENGTE/TOON: ${$('#in_toon').value.trim()}`;
+  navigator.clipboard.writeText(t).then(()=>logLine('✓ input gekopieerd — plak het bij Claude in de chat.'),()=>logLine('kopiëren mislukte; selecteer de tekst handmatig.'));
+}
+
+// ---------- groepen (komen uit het script; zelden handmatig) ----------
+function toggleGroups(){ const p=$('#groupsPanel'); p.style.display = p.style.display==='none'?'block':'none'; renderGroups(); }
+function renderGroups(){
+  const el=$('#groupsPanel'); if(el.style.display==='none')return;
+  el.innerHTML='<div class="sub" style="margin-bottom:8px">Landgroepen (uit het script). Landen op naam.</div>'+
+    state.groups.map((g,i)=>`<div class="mini"><input style="flex:0 0 130px;background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:7px" value="${esc(g.name)}" oninput="state.groups[${i}].name=this.value;renderSkeleton()"><input style="flex:1;background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:7px" value="${esc(g.countries)}" oninput="state.groups[${i}].countries=this.value"><button class="btn x" onclick="state.groups.splice(${i},1);renderGroups();renderSkeleton()">✕</button></div>`).join('')+
+    '<button class="btn sm" onclick="state.groups.push({name:\'\',countries:\'\'});renderGroups()">+ groep</button>';
+}
+
+// ---------- geraamte (het script, leesbaar + uitklap om te tweaken) ----------
+function mapDesc(s){
+  const col=(arr)=>arr.map(p=>`${esc(p.g)}<span class="sw" style="background:${COLORS[p.c]||'#888'}"></span>${esc(p.c)}`).join(', ');
+  const parts=[];
+  if(s.fills&&s.fills.length)parts.push('identiteit: '+col(s.fills));
+  if(s.rule&&s.rule.length)parts.push('heerser: '+col(s.rule));
+  parts.push('zoom: '+esc(s.view||state.baseview));
+  return parts.join(' &nbsp;·&nbsp; ');
+}
+function pairRows(arr,idx,key){
+  const gn=groupNames();
+  let h=arr.map((p,j)=>`<div class="mini"><select onchange="state.scenes[${idx}].${key}[${j}].g=this.value;renderSkeleton()">${gn.map(n=>opt(n,p.g)).join('')}</select><span style="color:var(--mute)">=</span><select onchange="state.scenes[${idx}].${key}[${j}].c=this.value;renderSkeleton()">${COLKEYS.map(c=>opt(c,p.c)).join('')}</select><button class="btn x" onclick="state.scenes[${idx}].${key}.splice(${j},1);renderSkeleton()">✕</button></div>`).join('');
+  h+=`<button class="btn sm" onclick="state.scenes[${idx}].${key}.push({g:'${gn[0]||''}',c:'${key==='rule'?'ruler':'orange'}'});renderSkeleton()">+</button>`;
+  return h;
+}
+function renderSkeleton(){
+  const el=$('#skeleton');
+  $('#totaal').textContent = state.scenes.length ? (state.scenes.length+' scènes · ~'+state.scenes.reduce((a,s)=>a+(Number(s.dur)||2.6),0).toFixed(0)+'s + CTA') : '';
+  if(!state.scenes.length){ el.innerHTML='<div class="empty">Nog geen script. Vertel Claude wat je wil uitbeelden (links), dan geeft Claude je een script dat je hier via <b>Importeer script</b> laadt.</div>'; return; }
+  el.innerHTML=state.scenes.map((s,i)=>{
+    const au=(s.voice||s.sfx)?'<span class="gau">♪</span>':'';
+    const open=i===state.open?' open':'';
+    return `<div class="gcard${open}${i===state.open?' sel':''}">
+      <div class="ghd" onclick="toggleCard(${i})"><span class="gn">${i+1}</span><span class="gyr">${esc(s.year||'—')}</span><span class="gtx">${esc(s.text||'(geen tekst)')}</span>${au}<span class="gdur">${s.dur}s</span><span class="btn x" title="tweak">✎</span></div>
+      <div class="gmeta">${mapDesc(s)}</div>
+      <div class="gedit">
+        <div class="two">
+          <div class="fld"><label>Jaar / label</label><input type="text" value="${esc(s.year)}" oninput="state.scenes[${i}].year=this.value;renderSkeleton()"></div>
+          <div class="two"><div class="fld"><label>Zoom</label><select onchange="state.scenes[${i}].view=this.value;renderSkeleton()">${REGIONS.map(r=>opt(r,s.view||state.baseview)).join('')}</select></div><div class="fld"><label>Duur</label><input type="number" step="0.1" value="${s.dur}" oninput="state.scenes[${i}].dur=parseFloat(this.value)||2.6;renderSkeleton()"></div></div>
+        </div>
+        <div class="fld"><label>Tekst op scherm</label><textarea rows="2" oninput="state.scenes[${i}].text=this.value;renderSkeleton()">${esc(s.text)}</textarea></div>
+        <div class="two">
+          <div class="lyr"><div class="cap">Identiteit</div>${pairRows(s.fills,i,'fills')}</div>
+          <div class="lyr"><div class="cap">Heerser</div>${pairRows(s.rule,i,'rule')}</div>
+        </div>
+        <div class="two" style="margin-top:10px">
+          <div class="fld"><label>Stem (import — zet de duur)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'voice')"><div class="fileline" id="au-voice-${i}">${s.voice?('<b>✓ '+esc(s.voice.split('/').pop())+'</b> · <a href="#" onclick="clearAudio('+i+',&#39;voice&#39;);return false">wis</a>'):'geen'}</div></div>
+          <div class="fld"><label>SFX (import)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'sfx')"><div class="fileline" id="au-sfx-${i}">${s.sfx?('<b>✓ '+esc(s.sfx.split('/').pop())+'</b> · <a href="#" onclick="clearAudio('+i+',&#39;sfx&#39;);return false">wis</a>'):'geen'}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleCard(i){ state.open = state.open===i ? -1 : i; renderSkeleton(); }
+
+// ---------- audio per scène (wat Mo aanlevert) ----------
 async function uploadAudio(input, idx, kind){
   const f=input.files&&input.files[0]; if(!f)return;
   const dataB64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
-  if(kind==='voice'){
-    const dur=await new Promise((res)=>{const a=new Audio();a.onloadedmetadata=()=>res(a.duration);a.onerror=()=>res(null);a.src=dataB64;});
-    if(dur&&isFinite(dur)){ state.scenes[idx].dur=Math.max(0.5,Math.round(dur*10)/10); }
-  }
+  if(kind==='voice'){ const dur=await new Promise((res)=>{const a=new Audio();a.onloadedmetadata=()=>res(a.duration);a.onerror=()=>res(null);a.src=dataB64;}); if(dur&&isFinite(dur))state.scenes[idx].dur=Math.max(0.5,Math.round(dur*10)/10); }
   logLine('upload '+kind+': '+f.name+' ...');
-  try{
-    const r=await fetch('/api/umma-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64})});
+  try{ const r=await fetch('/api/umma-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64})});
     const d=await r.json();
-    if(d.path){ state.scenes[idx][kind]=d.path; logLine('✓ '+kind+' opgeslagen'+(kind==='voice'?' (duur '+state.scenes[idx].dur+'s)':'')); renderStrip(); renderEditor(); }
+    if(d.path){ state.scenes[idx][kind]=d.path; logLine('✓ '+kind+' opgeslagen'); state.open=idx; renderSkeleton(); }
     else logLine('✗ upload fout: '+(d.error||'onbekend'));
   }catch(e){ logLine('✗ upload netwerkfout: '+e.message); }
 }
-function clearAudio(idx,kind){ delete state.scenes[idx][kind]; renderStrip(); renderEditor(); }
+function clearAudio(idx,kind){ delete state.scenes[idx][kind]; renderSkeleton(); }
 
-async function loadMusic(){
-  try{const r=await fetch('/api/music');const d=await r.json();
-    $('#music').innerHTML='<option value="">(geen)</option>'+(d.files||[]).map(f=>'<option>'+f+'</option>').join('');
-    $('#music').onchange=e=>state.music=e.target.value;
-  }catch{ $('#music').innerHTML='<option value="">(geen)</option>'; }
+// ---------- script importeren (Claude's output erin) ----------
+function parseScript(text){
+  const out={title:null,view:null,groups:[],scenes:[]};
+  for(const raw of String(text).split(/\r?\n/)){
+    const line=raw.trim(); if(!line||line.startsWith('#'))continue;
+    if(/^title\s*:/i.test(line)){out.title=line.replace(/^title\s*:/i,'').trim();continue;}
+    if(/^view\s*:/i.test(line)){out.view=line.replace(/^view\s*:/i,'').trim();continue;}
+    const m=line.match(/^group\s+([^=]+)=(.*)$/i);
+    if(m){out.groups.push({name:m[1].trim(),countries:m[2].trim()});continue;}
+    if(/^scene\s+/i.test(line)){
+      const segs=line.replace(/^scene\s+/i,'').split('|').map(s=>s.trim());
+      const sc={year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:2.6};
+      for(let k=2;k<segs.length;k++){const seg=segs[k];const ci=seg.indexOf(':');if(ci<0)continue;
+        const key=seg.slice(0,ci).trim().toLowerCase();const val=seg.slice(ci+1).trim();
+        if(key==='fill'||key==='rule'){for(const pr of val.split(';')){const eq=pr.indexOf('=');if(eq<0)continue;const g=pr.slice(0,eq).trim();const c=pr.slice(eq+1).trim();if(g&&c)(key==='fill'?sc.fills:sc.rule).push({g,c});}}
+        else if(key==='view')sc.view=val;
+        else if(key==='dur'){const d=parseFloat(val);if(d>0)sc.dur=d;}
+      }
+      out.scenes.push(sc);
+    }
+  }
+  return out;
 }
-function connectLog(){ try{const es=new EventSource('/api/log');es.onmessage=(e)=>{try{logLine(JSON.parse(e.data))}catch{logLine(e.data)}};}catch{} }
+function openImport(){ $('#importModal').style.display='flex'; }
+function closeImport(){ $('#importModal').style.display='none'; }
+function applyImport(){
+  const p=parseScript($('#importTxt').value);
+  if(p.title!=null)state.title=p.title;
+  if(p.view)state.baseview=p.view;
+  state.groups=p.groups; state.scenes=p.scenes; state.open=-1;
+  closeImport(); renderGroups(); renderSkeleton();
+  logLine('✓ script geladen: '+p.scenes.length+' scènes, '+p.groups.length+' groepen');
+}
+
+// ---------- render ----------
+function resolveCountry(tok){ tok=tok.trim(); if(!tok)return null; if(/^\d+$/.test(tok))return tok; if(COUNTRIES[tok])return COUNTRIES[tok];
+  const hit=Object.keys(COUNTRIES).find(n=>n.toLowerCase()===tok.toLowerCase()); if(hit)return COUNTRIES[hit];
+  const al=ALIASES[tok.toLowerCase()]; if(al&&COUNTRIES[al])return COUNTRIES[al]; return null; }
+function buildOpts(warn){
+  const groups={};
+  for(const g of state.groups){ if(!g.name)continue; const ids=[]; for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()+' (groep '+g.name+')'); } groups[g.name]=ids; }
+  const scenes=state.scenes.map(s=>{ const fills={},rule={}; for(const p of s.fills){if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c];} for(const p of s.rule){if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c];}
+    const o={year:s.year,text:s.text,fills,rule,view:s.view,dur:s.dur}; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; return o; });
+  return {title:state.title, mapView:state.baseview, groups, scenes};
+}
 async function doRender(){
+  if(!state.scenes.length){ logLine('geen script — laad eerst een script via Importeer script.'); return; }
   const warnings=[]; const opts=buildOpts(w=>warnings.push(w));
-  $('#log').textContent=''; warnings.forEach(w=>logLine('LET OP: '+w));
+  warnings.forEach(w=>logLine('LET OP: '+w));
   logLine('▶ render gestart...'); $('#stat').textContent='rendert...';
-  try{
-    const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({brand:'ummaunited',template:'kaart',format:state.format,music:state.music||'',opts})});
+  try{ const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'ummaunited',template:'kaart',format:state.format,music:state.music||'',opts})});
     const d=await r.json();
     if(d.error){logLine('✗ fout: '+d.error);$('#stat').textContent='fout';return;}
-    logLine('✓ klaar: '+d.url);$('#stat').textContent='klaar';
-    $('#player').innerHTML='<video src="'+d.url+'" controls autoplay loop></video>';
+    logLine('✓ klaar: '+d.url+' — staat in je Bibliotheek.');$('#stat').textContent='klaar';
   }catch(e){logLine('✗ netwerkfout: '+e.message);$('#stat').textContent='fout';}
 }
 
-fillHeader(); renderGroups(); renderStrip(); renderEditor(); loadMusic(); connectLog();
+async function loadMusic(){ try{const r=await fetch('/api/music');const d=await r.json();
+  $('#music').innerHTML='<option value="">(geen)</option>'+(d.files||[]).map(f=>'<option>'+f+'</option>').join('');
+  $('#music').onchange=e=>state.music=e.target.value;
+}catch{ $('#music').innerHTML='<option value="">(geen)</option>'; } }
+function connectLog(){ try{const es=new EventSource('/api/log');es.onmessage=(e)=>{try{logLine(JSON.parse(e.data))}catch{logLine(e.data)}};}catch{} }
+
+renderSkeleton(); loadMusic(); connectLog();
 </script>
 </body>
 </html>
