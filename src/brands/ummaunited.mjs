@@ -309,6 +309,14 @@ export function makeBrand({ ROOT = "." } = {}) {
     // per scene: eigen view (regionaam of bbox) of de basis. Camera east tussen scene-views.
     const sceneViews = story.scenes.map((s) => resolveView(s.view) || baseView);
 
+    // --- beweging (stap 2): per land een lengtegraad-proxy voor de VEEG-overgangen ---
+    const xById = {};
+    if (MAP) for (const [id, d] of Object.entries(MAP.countries)) { const m = /M\s*(-?\d+(?:\.\d+)?)/.exec(d); xById[id] = m ? parseFloat(m[1]) : 1000; }
+    const SWEEP = 0.9, STAGGER = 0.55;                 // veeg-duur + hoeveel links eerder gaat dan rechts
+    const reveal = (p, frac) => sm(clamp01(p * (1 + STAGGER) - frac * STAGGER)); // links->rechts onthullen
+    // lichte doorlopende push zodat het beeld nooit doodstil staat
+    const pushView = (v, f) => { const cx = v[0] + v[2] / 2, cy = v[1] + v[3] / 2, w = v[2] * (1 - f), h = v[3] * (1 - f); return [cx - w / 2, cy - h / 2, w, h]; };
+
     // land -> kleur in een laag (fills=identiteit, rule=heerser) in een gegeven scene
     function layerColor(scene, id, key) {
       let c = null;
@@ -333,29 +341,39 @@ export function makeBrand({ ROOT = "." } = {}) {
       let blend = 0;
       if (next !== i && t > endOfI - TRANS) blend = sm((t - (endOfI - TRANS)) / TRANS);
 
-      // camera voor dit frame: east van scene i naar scene next (zoom volgt de morph)
-      const view = interpView(sceneViews[i], sceneViews[next], blend);
+      // camera voor dit frame: east van scene i naar scene next + lichte doorlopende push
+      const drift = 0.045 * sm(clamp01(t / mapEnd));
+      const view = pushView(interpView(sceneViews[i], sceneViews[next], blend), drift);
       const { sc: scale, offX, offY } = cameraFor(view);
       const strokeRuler = (3.4 / scale).toFixed(2); // ~3.4px rand op scherm, los van zoom
+      const prevI = Math.max(0, i - 1);
+      const pIn = (t - starts[i]) / SWEEP;  // scene-entree-voortgang voor de veeg
 
-      // kaart tekenen: LAAG 1 = identiteit (vulling)
+      // kaart tekenen: LAAG 1 = identiteit (vulling), LAAG 2 = heerser (waas) — beide vegen in/uit
       let paths = "", rulerPaths = "";
       if (MAP) {
         for (const [id, d] of Object.entries(MAP.countries)) {
-          const ca = layerColor(story.scenes[i], id, "fills");
-          const cb = layerColor(story.scenes[next], id, "fills");
+          const frac = clamp01((xById[id] - view[0]) / view[2]); // links=0, rechts=1 binnen het beeld
+          // -- identiteit --
+          const fi = layerColor(story.scenes[i], id, "fills");
+          const fp = i > 0 ? layerColor(story.scenes[prevI], id, "fills") : null;
+          const fn = layerColor(story.scenes[next], id, "fills");
           let fill;
-          if (ca == null && cb == null) fill = COL.land;
-          else { const from = ca || COL.land, to = cb || COL.land; fill = blend > 0 ? lerpCol(from, to, blend) : from; }
+          if (fi) fill = fp ? fi : lerpCol(COL.land, fi, reveal(pIn, frac)); // nieuw? veeg in vanuit land
+          else fill = COL.land;
+          if (blend > 0 && fn !== fi) fill = lerpCol(fi || COL.land, fn || COL.land, reveal(blend, frac));
           paths += `<path d="${d}" fill="${fill}" stroke="${COL.landEdge}" stroke-width="0.6"/>`;
-          // LAAG 2 = heerser (markering eroverheen): dikke gekleurde rand, fade met blend
-          const ra = layerColor(story.scenes[i], id, "rule");
-          const rb = layerColor(story.scenes[next], id, "rule");
-          const oA = ra ? 1 : 0, oB = rb ? 1 : 0;
-          const rop = oA + (oB - oA) * blend;
+          // -- heerser (waas eroverheen) --
+          const ri = layerColor(story.scenes[i], id, "rule");
+          const rp = i > 0 ? layerColor(story.scenes[prevI], id, "rule") : null;
+          const rn = layerColor(story.scenes[next], id, "rule");
+          let rop = 0, rc = COL.ruler;
+          if (ri) { rc = ri; rop = rp ? 1 : reveal(pIn, frac); }       // nieuw? veeg in
+          if (blend > 0) {
+            if (ri && !rn) rop *= (1 - reveal(blend, frac));            // vertrekt? veeg uit
+            else if (!ri && rn) { rc = rn; rop = Math.max(rop, reveal(blend, frac)); }
+          }
           if (rop > 0.02) {
-            const rc = ra || rb || COL.ruler;
-            // koele waas over het gebied (oranje blijft eronder zichtbaar) + dikke rand
             rulerPaths += `<path d="${d}" fill="${rc}" fill-opacity="${(0.42 * rop).toFixed(2)}" stroke="${rc}" stroke-width="${strokeRuler}" stroke-opacity="${(0.9 * rop).toFixed(2)}" stroke-linejoin="round"/>`;
           }
         }
@@ -371,10 +389,14 @@ export function makeBrand({ ROOT = "." } = {}) {
         + `<rect x="${tbX}" y="${tbY}" width="${(tbW * prog).toFixed(1)}" height="6" rx="3" fill="${COL.orange}"/>`
         + `<circle cx="${(tbX + tbW * prog).toFixed(1)}" cy="${tbY + 3}" r="8" fill="${COL.orange}"/>`;
       const showIdx = blend > 0.5 ? next : i;
-      bar += `<text x="${W / 2}" y="${tbY - 14}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.06)}" fill="${COL.cream}">${escapeXml(story.scenes[showIdx].year)}</text>`;
+      const sStart = starts[showIdx], sEnd = sStart + durs[showIdx];
+      // jaartal schuift net omhoog + crossfade in plaats van hard poppen
+      const yIn = clamp01((t - sStart) / 0.35), ySlide = ((1 - sm(yIn)) * 12).toFixed(1);
+      bar += `<g opacity="${yIn.toFixed(2)}" transform="translate(0 ${ySlide})"><text x="${W / 2}" y="${tbY - 14}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.06)}" fill="${COL.cream}">${escapeXml(story.scenes[showIdx].year)}</text></g>`;
 
       const capTxt = story.scenes[showIdx].text || "";
-      const capOp = clamp01((t - starts[showIdx]) / 0.5);
+      // onderschrift faadt in EN uit (niet alleen in), zodat scènes niet hakkerig wisselen
+      const capOp = clamp01((t - sStart) / 0.4) * clamp01((sEnd - t) / 0.35);
 
       // CTA-laag vouwt in tijdens de laatste fase (na mapEnd); tijdbalk + onderschrift faden weg
       const ctaOp = tRaw > mapEnd ? clamp01((tRaw - mapEnd) / 0.5) : 0;
@@ -389,9 +411,17 @@ export function makeBrand({ ROOT = "." } = {}) {
       const ovl = kader(W, H) + titel(title, W, H, titleOp) + onderschrift(capTxt, W, H, capOp * (1 - ctaOp)) + ctaFoldout(W, H, ctaOp);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
+    // AUDIO (stap 3): per scène een optioneel stem- en/of SFX-spoor, op het startmoment van de scène.
+    // De kern legt deze via de audio-overlay over de muziekbodem (alleen als er sporen zijn).
+    const tracks = [];
+    story.scenes.forEach((s, i) => {
+      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.0 : s.voiceGain });
+      if (s && s.sfx) tracks.push({ file: path.resolve(ROOT, s.sfx), atSec: starts[i], gain: s.sfxGain == null ? 0.8 : s.sfxGain });
+    });
+
     // GEEN hook-first: bij een kaart-door-de-tijd is de reis naar het eind de payoff,
     // die geef je niet weg aan het begin. (De hook-machine in de kern blijft dus uit.)
-    return { W, H, FPS, SS, durSec: total, sceneAt };
+    return { W, H, FPS, SS, durSec: total, sceneAt, audio: tracks.length ? { tracks } : undefined };
   }
 
   async function makeRender({ subjectId, opts = {}, format = "9:16" }) {

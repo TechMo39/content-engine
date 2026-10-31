@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umma United Studio</title>
+<style>
+  :root{--ink:#0d1427;--navy:#111a33;--navy2:#1b2748;--cream:#f5efe1;--orange:#ff7a2f;--mute:#9fb6d8;--green:#2aa84a;--ruler:#5fb6d8;--red:#c0392b;--line:#22304f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--navy);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .top h1{font-family:Georgia,serif;font-size:20px;margin:0}
+  .top .dot{color:var(--orange)}
+  .layout{display:grid;grid-template-columns:1fr 360px;gap:0;min-height:calc(100vh - 53px)}
+  .col{padding:18px 20px}
+  .col.right{background:#0b1120;border-left:1px solid var(--line);position:sticky;top:53px;height:calc(100vh - 53px);overflow:auto}
+  h2{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:20px 0 10px}
+  h2:first-child{margin-top:0}
+  label{display:block;font-size:11px;color:var(--mute);letter-spacing:.5px;margin:0 0 4px}
+  input,select,textarea,button{font-family:inherit;font-size:13px}
+  input[type=text],input[type=number],select,textarea{width:100%;background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+  textarea{resize:vertical;min-height:46px;line-height:1.4}
+  .rowflex{display:flex;gap:8px}
+  .rowflex>*{flex:1}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--navy2);border:1px solid var(--line);border-radius:7px;padding:5px 9px;margin:3px 4px 0 0;font-size:12px}
+  .btn{background:var(--navy2);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:8px 12px;cursor:pointer}
+  .btn:hover{border-color:var(--orange)}
+  .btn.o{background:var(--orange);color:#1a1200;border-color:var(--orange);font-weight:700}
+  .btn.sm{padding:4px 8px;font-size:12px}
+  .btn.x{padding:2px 8px;color:var(--mute)}
+  .card{background:var(--navy);border:1px solid var(--line);border-radius:10px;padding:12px;margin:0 0 12px}
+  .card .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .card .hd .num{width:24px;height:24px;border-radius:50%;background:var(--orange);color:#1a1200;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:12px}
+  .card .hd .sp{flex:1}
+  .mini{display:flex;gap:6px;align-items:center;margin:5px 0}
+  .mini select{flex:1}
+  .mini .rm{flex:0 0 auto}
+  .hint{color:var(--mute);font-size:11.5px;margin:4px 0 0}
+  .legend{font-size:11.5px;color:var(--mute);background:var(--navy);border:1px dashed var(--line);border-radius:7px;padding:8px 10px;margin-top:8px}
+  video{width:100%;border-radius:10px;background:#000;margin-top:10px}
+  #log{background:#05080f;border:1px solid var(--line);border-radius:8px;padding:10px;height:200px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#bcd;white-space:pre-wrap;margin-top:10px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Umma United <span class="dot">&middot;</span> Studio</h1>
+  <span class="hint">tweede studio, los van Tale of Tiles</span>
+  <div style="flex:1"></div>
+  <span class="hint" id="stat"></span>
+</div>
+
+<div class="layout">
+  <div class="col">
+    <h2>Video</h2>
+    <div class="rowflex">
+      <div style="flex:2"><label>Titel (bovenin beeld)</label><input type="text" id="title"></div>
+      <div><label>Basis-zoom</label><select id="baseview"></select></div>
+      <div><label>Formaat</label><select id="format"><option>9:16</option><option>1:1</option><option>16:9</option></select></div>
+    </div>
+    <div class="rowflex" style="margin-top:8px">
+      <div><label>Muziek (bodem)</label><select id="music"></select></div>
+    </div>
+
+    <h2>Groepen (landen op naam)</h2>
+    <div id="groups"></div>
+    <button class="btn sm" onclick="addGroup()">+ groep</button>
+    <div class="legend" id="grouplegend"></div>
+
+    <h2>Scènes</h2>
+    <div id="scenes"></div>
+    <button class="btn sm" onclick="addScene()">+ scène</button>
+    <div class="legend">kleuren: <span class="swatch" style="background:#ff7a2f"></span>orange (ons) &nbsp; <span class="swatch" style="background:#c0392b"></span>red &nbsp; <span class="swatch" style="background:#5fb6d8"></span>ruler (heerser) &nbsp; <span class="swatch" style="background:#2aa84a"></span>green &nbsp; <span class="swatch" style="background:#2756a0"></span>blue &nbsp; <span class="swatch" style="background:#f5efe1"></span>cream</div>
+  </div>
+
+  <div class="col right">
+    <button class="btn o" style="width:100%;padding:12px" onclick="doRender()">Renderen</button>
+    <div id="player"></div>
+    <h2 style="margin-top:16px">Log</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+const COUNTRIES = {"Bulgaria":"100","Myanmar":"104","Burundi":"108","Belarus":"112","Cambodia":"116","Cameroon":"120","Canada":"124","Central African Rep.":"140","Sri Lanka":"144","Chad":"148","Chile":"152","China":"156","Taiwan":"158","Colombia":"170","Congo":"178","Dem. Rep. Congo":"180","Costa Rica":"188","Croatia":"191","Cuba":"192","Cyprus":"196","Czechia":"203","Benin":"204","Denmark":"208","Dominican Rep.":"214","Ecuador":"218","El Salvador":"222","Eq. Guinea":"226","Ethiopia":"231","Eritrea":"232","Estonia":"233","Falkland Is.":"238","Fiji":"242","Finland":"246","France":"250","Fr. S. Antarctic Lands":"260","Djibouti":"262","Gabon":"266","Georgia":"268","Gambia":"270","Palestine":"275","Germany":"276","Ghana":"288","Greece":"300","Greenland":"304","Guatemala":"320","Guinea":"324","Guyana":"328","Haiti":"332","Honduras":"340","Hungary":"348","Iceland":"352","India":"356","Indonesia":"360","Iran":"364","Iraq":"368","Ireland":"372","Israel":"376","Italy":"380","Côte d'Ivoire":"384","Jamaica":"388","Japan":"392","Kazakhstan":"398","Jordan":"400","Kenya":"404","North Korea":"408","South Korea":"410","Kuwait":"414","Kyrgyzstan":"417","Laos":"418","Lebanon":"422","Lesotho":"426","Latvia":"428","Liberia":"430","Libya":"434","Lithuania":"440","Luxembourg":"442","Madagascar":"450","Malawi":"454","Malaysia":"458","Mali":"466","Mauritania":"478","Mexico":"484","Mongolia":"496","Moldova":"498","Montenegro":"499","Morocco":"504","Mozambique":"508","Oman":"512","Namibia":"516","Nepal":"524","Netherlands":"528","New Caledonia":"540","Vanuatu":"548","New Zealand":"554","Nicaragua":"558","Niger":"562","Nigeria":"566","Norway":"578","Pakistan":"586","Panama":"591","Papua New Guinea":"598","Paraguay":"600","Peru":"604","Philippines":"608","Poland":"616","Portugal":"620","Guinea-Bissau":"624","Timor-Leste":"626","Puerto Rico":"630","Qatar":"634","Romania":"642","Russia":"643","Rwanda":"646","Saudi Arabia":"682","Senegal":"686","Serbia":"688","Sierra Leone":"694","Slovakia":"703","Vietnam":"704","Slovenia":"705","Somalia":"706","South Africa":"710","Zimbabwe":"716","Spain":"724","S. Sudan":"728","Sudan":"729","W. Sahara":"732","Suriname":"740","eSwatini":"748","Sweden":"752","Switzerland":"756","Syria":"760","Tajikistan":"762","Thailand":"764","Togo":"768","Trinidad and Tobago":"780","United Arab Emirates":"784","Tunisia":"788","Turkey":"792","Turkmenistan":"795","Uganda":"800","Ukraine":"804","Macedonia":"807","Egypt":"818","United Kingdom":"826","Tanzania":"834","United States of America":"840","Burkina Faso":"854","Uruguay":"858","Uzbekistan":"860","Venezuela":"862","Yemen":"887","Zambia":"894","Argentina":"032","Bahamas":"044","Brazil":"076","Bolivia":"068","Belize":"084","Botswana":"072","Angola":"024","Algeria":"012","Bangladesh":"050","Bhutan":"064","Afghanistan":"004","Armenia":"051","Austria":"040","Albania":"008","Belgium":"056","Solomon Is.":"090","Australia":"036","Azerbaijan":"031","Brunei":"096","Antarctica":"010","Bosnia and Herz.":"070"};
+const ALIASES = {uae:"United Arab Emirates",emirates:"United Arab Emirates",saudi:"Saudi Arabia",ksa:"Saudi Arabia",bosnia:"Bosnia and Herz.",turkiye:"Turkey","türkiye":"Turkey",usa:"United States of America",uk:"United Kingdom"};
+const REGIONS = ["belt","world","mena","maghreb","arabia","levant","turkey","iberia","westafrica","hornafrica","southasia","sea","europe","centralasia"];
+const COLORS = {orange:"#ff7a2f",red:"#c0392b",ruler:"#5fb6d8",green:"#2aa84a",blue:"#2756a0",cream:"#f5efe1"};
+const COLKEYS = Object.keys(COLORS);
+
+// --- startstaat: het demo-verhaal, zodat je meteen iets ziet en kunt aanpassen ---
+const state = {
+  title:"They never conquered our faith", baseview:"belt", format:"9:16", music:"",
+  groups:[
+    {name:"rome", countries:"Italy, Spain, Portugal, France, Greece, Turkey, Egypt, Libya, Tunisia, Algeria, Morocco, Syria, Israel, Lebanon"},
+    {name:"islam", countries:"Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Spain, Turkmenistan, Uzbekistan, Pakistan, Kazakhstan, Jordan, Palestine"},
+    {name:"belt", countries:"Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Turkey, Pakistan, Afghanistan, Kazakhstan, Indonesia, Malaysia, Bangladesh, Mali, Niger, Mauritania, Somalia, Sudan, Senegal"}
+  ],
+  scenes:[
+    {year:"117 AD", text:"Rome rules. Become Roman.", fills:[{g:"rome",c:"red"}], rule:[{g:"rome",c:"red"}], view:"belt", dur:2.6},
+    {year:"750 AD", text:"Islam spreads, by choice", fills:[{g:"islam",c:"orange"}], rule:[{g:"islam",c:"orange"}], view:"belt", dur:2.8},
+    {year:"1700", text:"Europe rules. The faith stays.", fills:[{g:"belt",c:"orange"}], rule:[{g:"belt",c:"ruler"}], view:"belt", dur:3.0},
+    {year:"2026", text:"From Morocco to Indonesia: still ours", fills:[{g:"belt",c:"orange"}], rule:[], view:"belt", dur:2.8}
+  ]
+};
+
+const $=(s)=>document.querySelector(s);
+function opt(v,sel){return '<option'+(v===sel?' selected':'')+'>'+v+'</option>';}
+
+function fillStatics(){
+  $('#title').value=state.title;
+  $('#baseview').innerHTML=REGIONS.map(r=>opt(r,state.baseview)).join('');
+  $('#format').value=state.format;
+  $('#title').oninput=e=>state.title=e.target.value;
+  $('#baseview').onchange=e=>state.baseview=e.target.value;
+  $('#format').onchange=e=>state.format=e.target.value;
+}
+function groupNames(){return state.groups.map(g=>g.name).filter(Boolean);}
+
+function renderGroups(){
+  const el=$('#groups'); el.innerHTML='';
+  state.groups.forEach((g,i)=>{
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<div class="rowflex"><div style="flex:0 0 120px"><label>groepnaam</label><input type="text" value="${g.name}" oninput="state.groups[${i}].name=this.value;refreshLegends()"></div>
+      <div><label>landen (komma)</label><input type="text" value="${g.countries.replace(/"/g,'&quot;')}" oninput="state.groups[${i}].countries=this.value"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button class="btn x" onclick="state.groups.splice(${i},1);renderGroups();renderScenes();refreshLegends()">verwijder</button></div></div>`;
+    el.appendChild(d);
+  });
+}
+function addGroup(){state.groups.push({name:"",countries:""});renderGroups();refreshLegends();}
+
+function pairRows(arr,scIdx,key){
+  const gn=groupNames();
+  let h=arr.map((p,j)=>`<div class="mini">
+     <select onchange="state.scenes[${scIdx}].${key}[${j}].g=this.value">${gn.map(n=>opt(n,p.g)).join('')}</select>
+     <span style="color:var(--mute)">=</span>
+     <select onchange="state.scenes[${scIdx}].${key}[${j}].c=this.value">${COLKEYS.map(c=>opt(c,p.c)).join('')}</select>
+     <button class="btn x rm" onclick="state.scenes[${scIdx}].${key}.splice(${j},1);renderScenes()">x</button></div>`).join('');
+  h+=`<button class="btn sm" onclick="state.scenes[${scIdx}].${key}.push({g:'${gn[0]||''}',c:'${key==='rule'?'ruler':'orange'}'});renderScenes()">+ ${key==='fills'?'identiteit':'heerser'}</button>`;
+  return h;
+}
+function renderScenes(){
+  const el=$('#scenes'); el.innerHTML='';
+  state.scenes.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<div class="hd"><div class="num">${i+1}</div>
+        <input type="text" style="flex:0 0 100px" value="${s.year||''}" placeholder="jaar/label" oninput="state.scenes[${i}].year=this.value">
+        <div class="sp"></div>
+        <button class="btn x" onclick="moveScene(${i},-1)">&#9650;</button>
+        <button class="btn x" onclick="moveScene(${i},1)">&#9660;</button>
+        <button class="btn x" onclick="state.scenes.splice(${i},1);renderScenes()">verwijder</button></div>
+      <label>tekst op scherm</label><textarea oninput="state.scenes[${i}].text=this.value">${(s.text||'').replace(/</g,'&lt;')}</textarea>
+      <div class="rowflex" style="margin-top:8px">
+        <div><label>identiteit (vulling)</label>${pairRows(s.fills,i,'fills')}</div>
+        <div><label>heerser (waas)</label>${pairRows(s.rule,i,'rule')}</div>
+      </div>
+      <div class="rowflex" style="margin-top:8px">
+        <div><label>zoom (deze scène)</label><select onchange="state.scenes[${i}].view=this.value">${REGIONS.map(r=>opt(r,s.view||state.baseview)).join('')}</select></div>
+        <div style="flex:0 0 120px"><label>duur (sec)</label><input type="number" step="0.1" value="${s.dur}" oninput="state.scenes[${i}].dur=parseFloat(this.value)||2.6"></div>
+      </div>
+      <div class="rowflex" style="margin-top:8px">
+        <div><label>stem (import &mdash; zet de duur automatisch)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'voice')"><div class="hint" id="au-voice-${i}">${s.voice?('&#10003; '+s.voice.split('/').pop()+' &middot; <a href="#" onclick="clearAudio('+i+',&#39;voice&#39;);return false">wis</a>'):'geen'}</div></div>
+        <div><label>SFX (import &mdash; speelt bij scène-start)</label><input type="file" accept="audio/*" onchange="uploadAudio(this,${i},'sfx')"><div class="hint" id="au-sfx-${i}">${s.sfx?('&#10003; '+s.sfx.split('/').pop()+' &middot; <a href="#" onclick="clearAudio('+i+',&#39;sfx&#39;);return false">wis</a>'):'geen'}</div></div>
+      </div>`;
+    el.appendChild(d);
+  });
+}
+function addScene(){const v=state.baseview;state.scenes.push({year:"",text:"",fills:[],rule:[],view:v,dur:2.6});renderScenes();}
+function moveScene(i,dir){const j=i+dir;if(j<0||j>=state.scenes.length)return;const a=state.scenes;[a[i],a[j]]=[a[j],a[i]];renderScenes();}
+
+function refreshLegends(){
+  $('#grouplegend').innerHTML='beschikbare groepen: '+(groupNames().join(', ')||'(nog geen)');
+}
+
+function resolveCountry(tok){
+  tok=tok.trim(); if(!tok)return null;
+  if(/^\d+$/.test(tok))return tok;
+  if(COUNTRIES[tok])return COUNTRIES[tok];
+  const hit=Object.keys(COUNTRIES).find(n=>n.toLowerCase()===tok.toLowerCase());
+  if(hit)return COUNTRIES[hit];
+  const al=ALIASES[tok.toLowerCase()]; if(al&&COUNTRIES[al])return COUNTRIES[al];
+  return null;
+}
+function buildOpts(warn){
+  const groups={};
+  for(const g of state.groups){ if(!g.name)continue; const ids=[];
+    for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()+' (groep '+g.name+')'); }
+    groups[g.name]=ids;
+  }
+  const scenes=state.scenes.map(s=>{
+    const fills={},rule={};
+    for(const p of s.fills){ if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c]; }
+    for(const p of s.rule){ if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c]; }
+    const o={year:s.year, text:s.text, fills, rule, view:s.view, dur:s.dur};
+    if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx;
+    return o;
+  });
+  return {title:state.title, mapView:state.baseview, groups, scenes};
+}
+
+function logLine(t){const l=$('#log');l.textContent+=t+"\n";l.scrollTop=l.scrollHeight;}
+
+// stem/SFX per scène uploaden; stem zet ook meteen de duur van de scène
+async function uploadAudio(input, idx, kind){
+  const f=input.files&&input.files[0]; if(!f)return;
+  const dataB64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
+  if(kind==='voice'){
+    const dur=await new Promise((res)=>{const a=new Audio();a.onloadedmetadata=()=>res(a.duration);a.onerror=()=>res(null);a.src=dataB64;});
+    if(dur&&isFinite(dur)){ state.scenes[idx].dur=Math.max(0.5,Math.round(dur*10)/10); }
+  }
+  logLine('upload '+kind+': '+f.name+' ...');
+  try{
+    const r=await fetch('/api/umma-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64})});
+    const d=await r.json();
+    if(d.path){ state.scenes[idx][kind]=d.path; logLine('✓ '+kind+' opgeslagen'+(kind==='voice'?' (duur '+state.scenes[idx].dur+'s)':'')); renderScenes(); }
+    else logLine('✗ upload fout: '+(d.error||'onbekend'));
+  }catch(e){ logLine('✗ upload netwerkfout: '+e.message); }
+}
+function clearAudio(idx,kind){ delete state.scenes[idx][kind]; renderScenes(); }
+
+async function loadMusic(){
+  try{const r=await fetch('/api/music');const d=await r.json();
+    $('#music').innerHTML='<option value="">(geen)</option>'+(d.files||[]).map(f=>'<option>'+f+'</option>').join('');
+  }catch{ $('#music').innerHTML='<option value="">(geen)</option>'; }
+}
+function connectLog(){
+  try{const es=new EventSource('/api/log');es.onmessage=(e)=>{try{logLine(JSON.parse(e.data))}catch{logLine(e.data)}};}catch{}
+}
+async function doRender(){
+  const warnings=[]; const opts=buildOpts(w=>warnings.push(w));
+  $('#log').textContent=''; warnings.forEach(w=>logLine('LET OP: '+w));
+  logLine('▶ render gestart...');
+  $('#stat').textContent='rendert...';
+  try{
+    const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({brand:'ummaunited',template:'kaart',format:state.format,music:state.music||$('#music').value||'',opts})});
+    const d=await r.json();
+    if(d.error){logLine('✗ fout: '+d.error);$('#stat').textContent='fout';return;}
+    logLine('✓ klaar: '+d.url);$('#stat').textContent='klaar';
+    $('#player').innerHTML='<video src="'+d.url+'" controls autoplay loop></video>';
+  }catch(e){logLine('✗ netwerkfout: '+e.message);$('#stat').textContent='fout';}
+}
+
+fillStatics(); renderGroups(); renderScenes(); refreshLegends(); loadMusic(); connectLog();
+</script>
+</body>
+</html>
