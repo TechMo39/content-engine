@@ -1,0 +1,13 @@
+# Verhaal: Rome -> 2026 (idee 1). Landen op naam; de engine lost ze op.
+title: They never conquered our faith
+view: belt
+
+group rome = Italy, Spain, Portugal, France, Greece, Turkey, Egypt, Libya, Tunisia, Algeria, Morocco, Syria, Israel, Lebanon, Croatia, Slovenia, Bosnia and Herz., Albania
+group islam = Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Israel, Lebanon, Spain, Turkmenistan, Uzbekistan, Tajikistan, Pakistan, Armenia, Azerbaijan, Kazakhstan, Jordan, Palestine
+group belt = Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Syria, Lebanon, Turkey, Turkmenistan, Uzbekistan, Tajikistan, Pakistan, Afghanistan, Kazakhstan, Kyrgyzstan, Indonesia, Malaysia, Bangladesh, Burkina Faso, Mali, Niger, Mauritania, Somalia, Sudan, Chad, Senegal
+
+# scene JAAR | tekst | fill: groep=kleur | rule: groep=kleur | view: regio | dur: sec
+scene 117 AD | Rome rules. Become Roman. | fill: rome=red | rule: rome=red | dur: 2.6
+scene 750 AD | Islam spreads, by choice | fill: islam=orange | rule: islam=orange | dur: 2.8
+scene 1700 | Europe rules. The faith stays. | fill: belt=orange | rule: belt=ruler | dur: 3.0
+scene 2026 | From Morocco to Indonesia: still ours | fill: belt=orange | dur: 2.8
