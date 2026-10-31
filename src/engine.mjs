@@ -486,28 +486,9 @@ const server = http.createServer(async (req, res) => {
           });
         }
       } catch {}
-      // 2) mail-stills: uit R2 (niet meer de lokale map), via het worker-endpoint.
-      try {
-        const resp = await fetch("https://taleoftiles.com/api/mail-stills");
-        if (resp.ok) {
-          for (const o of await resp.json()) {
-            const file = String(o.key).replace(/^mail-stills\//, "");
-            if (!/\.(jpe?g|png|webp)$/i.test(file)) continue;
-            const bust = o.uploaded ? "?t=" + Date.parse(o.uploaded) : "";
-            items.push({
-              kind: "still",
-              url: "https://taleoftiles.com/img/" + o.key + bust,
-              file,
-              brand: "taleoftiles", brandName: BRAND_NAME["taleoftiles"] || "Tale of Tiles",
-              type: "mailstill", typeName: "Mail-still",
-              name: titleCase(file.replace(/\.(jpe?g|png|webp)$/i, "").replace(/-/g, " ")),
-              lang: "", date: null,
-              kb: Math.round((o.size || 0) / 1024),
-              mtime: o.uploaded ? Date.parse(o.uploaded) : 0,
-            });
-          }
-        }
-      } catch {}
+      // 2) mail-stills: BEWUST NIET meer inladen in de Bibliotheek. Mo gebruikt ze niet, en de
+      // netwerk-call naar de worker + een img per still bij elke laadbeurt belastten de weergave.
+      // De mailarm zelf (R2-upload) blijft volledig ongemoeid; alleen het TONEN hier is uit.
       items.sort((a, b) => b.mtime - a.mtime);
       json(res, { items, brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) });
       return;
