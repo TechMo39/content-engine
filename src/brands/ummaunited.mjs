@@ -1,444 +1,304 @@
-// MERK-MODULE: Umma United — faceless YouTube-kanaal (geschiedenis/trots, humor).
-// Totaal ander beeld dan Tale of Tiles: geen tegels, maar getekende vormen, kaarten,
-// tijdlijnen, tellers, iconen en tekst. Bewijst dat de KERN generiek is: hetzelfde
-// render-systeem, een compleet ander merk.
+// MERK-MODULE: Umma United — faceless YouTube-kanaal (moslim van nu, trots/humor).
+// Parallel aan Tale of Tiles; raakt de kern en de tegel-logica NIET aan.
 //
-// 10 video-types (skelet, bedoeld om per type verder uit te bouwen):
-//   split      Split-screen tegenstelling (twee werelden, zelfde moment)
-//   zoomin     Uitvergroting (klein detail opent zich tot een verhaal)
-//   raadsel    Wie-ben-ik (aanwijzingen -> onthulling)
-//   mythe      Tegenwerping (bekende claim -> stuk voor stuk afgebroken)
-//   dagin      Tijdcapsule (een dag van toen, uur voor uur)
-//   ranglijst  Ranglijst (top 5 die opbouwt naar nr 1)
-//   oorsprong  Oorsprong (ding van nu -> waar het begon)
-//   brief      Brief / ooggetuige (één stem vertelt wat hij ziet)
-//   watals     Wat-als (scharnierpunt -> twee takken)
-//   reis       Kaart-reis (route tekent zich, stip/schip beweegt)
+// TYPE 1 — "kaart" (de kaart-door-de-tijd):
+//   Een wereldkaart met een tijdbalk; een WAARDE PER GEBIED verandert of houdt stand
+//   terwijl de tijd vordert. De getoonde laag voer je in (geloof, belasting, ...), dat
+//   maakt het format oneindig. Jouw stem komt er later onder.
 //
-// Alles deterministisch, resvg-veilig (platte vormen, geen geneste/ingezoomde SVG),
-// geen AI. Jouw stem komt er later onder (aparte bouwstap); de timing hier is nu op
-// de klok, zodat elk type NU al rendert en te beoordelen is.
+// Alles deterministisch, resvg-veilig: platte landvormen (uit assets/ummaunited/worldmap.json),
+// herkleurd per frame, group-transform om het kaartvenster in het 9:16-beeld te zetten.
+// Geen geneste/ingezoomde SVG naar resvg.
+import fs from "node:fs/promises";
+import path from "node:path";
 import { composeChrome, FORMATS, escapeXml } from "../core/renderer.mjs";
 
 // ---------------------------------------------------------------- huisstijl
 const COL = {
-  navy: "#111a33", navy2: "#1b2748", ink: "#0d1427",
+  ink: "#0d1427", navy: "#111a33", navy2: "#1b2748",
   cream: "#f5efe1", orange: "#ff7a2f", red: "#c0392b",
-  blue: "#2756a0", blue2: "#3f7fd0", mute: "#9fb6d8",
+  blue: "#2756a0", blue2: "#3f7fd0", green: "#2aa84a", mute: "#9fb6d8",
+  land: "#26324f", landEdge: "#0d1427",
+  ruler: "#5fb6d8", // koloniale heerser-markering (koel staal-cyaan, hoog contrast met oranje)
 };
 const SANS = "DejaVu Sans,sans-serif";
 const SERIF = "DejaVu Serif,serif";
-
-// makkelijke easing
-const sm = (p) => { p = Math.max(0, Math.min(1, p)); return p * p * (3 - 2 * p); };
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const sm = (p) => { p = clamp01(p); return p * p * (3 - 2 * p); };
 
-// ---------------------------------------------------------------- iconen-bibliotheek
-// Platte vormen, opgebouwd uit path/polygon/rect/circle. Gecentreerd rond (cx,cy),
-// grootte s. Kleur via fill. Dit is het begin van de herbruikbare icoon-set.
-function icoKoepel(cx, cy, s, fill) {
-  const w = s, h = s * 0.9;
-  return `<path d="M ${cx - w / 2} ${cy + h / 2} L ${cx - w / 2} ${cy} `
-    + `C ${cx - w / 2} ${cy - h * 0.8}, ${cx + w / 2} ${cy - h * 0.8}, ${cx + w / 2} ${cy} `
-    + `L ${cx + w / 2} ${cy + h / 2} Z" fill="${fill}"/>`
-    + `<rect x="${cx - 2}" y="${cy - h * 0.95}" width="4" height="${h * 0.3}" fill="${fill}"/>`;
+// ---------------------------------------------------------------- camera / regio's
+// De kaart is equirectangular op een 2000x1000-basis. Een "view" is [x,y,w,h] in die
+// basis: het venster dat in beeld komt. Kleiner venster = verder ingezoomd.
+function lonLat(lon, lat) { return [(lon + 180) / 360 * 2000, (90 - lat) / 180 * 1000]; }
+function box(lonMin, latMin, lonMax, latMax, pad = 0) {
+  const nw = lonLat(lonMin, latMax), se = lonLat(lonMax, latMin);
+  let x = nw[0], y = nw[1], w = se[0] - nw[0], h = se[1] - nw[1];
+  x -= w * pad; y -= h * pad; w *= 1 + 2 * pad; h *= 1 + 2 * pad;
+  return [x, y, w, h];
 }
-function icoBoek(cx, cy, s, fill) {
-  const w = s, h = s * 0.72;
-  return `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="3" fill="${fill}"/>`
-    + `<rect x="${cx - 1.5}" y="${cy - h / 2}" width="3" height="${h}" fill="${COL.ink}"/>`;
+// Benoemde gebieden — "zoom in op elk gebied naar keuze" zonder coördinaten te hoeven weten.
+const REGIONS = {
+  world: [0, 0, 2000, 1000],
+  belt: [455, 150, 1360, 470],          // de gordel (MENA -> Zuidoost-Azië), standaard
+  mena: box(-15, 10, 62, 42, 0.04),
+  maghreb: box(-18, 19, 13, 38, 0.06),
+  arabia: box(32, 11, 60, 33, 0.05),
+  levant: box(33, 29, 43, 38, 0.08),
+  turkey: box(25, 35, 45, 43, 0.08),
+  iberia: box(-10, 35, 5, 44, 0.08),    // Andalusië
+  westafrica: box(-18, 4, 16, 25, 0.05),
+  hornafrica: box(32, -2, 52, 18, 0.06),
+  southasia: box(60, 6, 92, 37, 0.04),
+  sea: box(92, -11, 142, 22, 0.04),     // Zuidoost-Azië (Indonesië/Maleisië)
+  europe: box(-12, 35, 45, 60, 0.04),
+  centralasia: box(46, 35, 80, 52, 0.05),
+};
+// view resolven uit een regionaam ("sea") of een expliciete bbox ([x,y,w,h]).
+function resolveView(v) {
+  if (!v) return null;
+  if (Array.isArray(v) && v.length === 4) return v.map(Number);
+  if (typeof v === "string" && REGIONS[v]) return REGIONS[v].slice();
+  return null;
 }
-function icoBoog(cx, cy, s, fill) {
-  const w = s * 0.8, h = s;
-  return `<path d="M ${cx - w / 2} ${cy + h / 2} L ${cx - w / 2} ${cy - h * 0.1} `
-    + `C ${cx - w / 2} ${cy - h * 0.7}, ${cx + w / 2} ${cy - h * 0.7}, ${cx + w / 2} ${cy - h * 0.1} `
-    + `L ${cx + w / 2} ${cy + h / 2} L ${cx + w * 0.3} ${cy + h / 2} L ${cx + w * 0.3} ${cy} `
-    + `C ${cx + w * 0.3} ${cy - h * 0.35}, ${cx - w * 0.3} ${cy - h * 0.35}, ${cx - w * 0.3} ${cy} `
-    + `L ${cx - w * 0.3} ${cy + h / 2} Z" fill="${fill}"/>`;
+// soepel tussen twee views: centrum lineair, grootte geometrisch -> voelt als echte zoom.
+function interpView(a, b, t) {
+  if (!b || t <= 0) return a;
+  if (t >= 1) return b;
+  const e = sm(t);
+  const acx = a[0] + a[2] / 2, acy = a[1] + a[3] / 2, bcx = b[0] + b[2] / 2, bcy = b[1] + b[3] / 2;
+  const cx = acx + (bcx - acx) * e, cy = acy + (bcy - acy) * e;
+  const w = a[2] * Math.pow(b[2] / a[2], e), h = a[3] * Math.pow(b[3] / a[3], e);
+  return [cx - w / 2, cy - h / 2, w, h];
 }
-function icoStar8(cx, cy, R, fill) {
-  const r = R * 0.42, p = [];
-  for (let i = 0; i < 16; i++) { const a = Math.PI / 8 * i - Math.PI / 2, rad = i % 2 ? r : R; p.push((cx + rad * Math.cos(a)).toFixed(1) + "," + (cy + rad * Math.sin(a)).toFixed(1)); }
-  return `<polygon points="${p.join(" ")}" fill="${fill}"/>`;
-}
-function icoPen(cx, cy, s, fill) {
-  return `<path d="M ${cx - s * 0.4} ${cy + s * 0.4} L ${cx + s * 0.3} ${cy - s * 0.3} L ${cx + s * 0.45} ${cy - s * 0.15} L ${cx - s * 0.25} ${cy + s * 0.55} Z" fill="${fill}"/>`
-    + `<polygon points="${cx - s * 0.4},${cy + s * 0.4} ${cx - s * 0.25},${cy + s * 0.55} ${cx - s * 0.48},${cy + s * 0.58}" fill="${COL.ink}"/>`;
-}
-function icoHut(cx, cy, s, fill) {
-  const w = s, h = s * 0.6;
-  return `<rect x="${cx - w / 2}" y="${cy - h * 0.1}" width="${w}" height="${h}" fill="${fill}"/>`
-    + `<polygon points="${cx - w * 0.6},${cy - h * 0.1} ${cx},${cy - h * 0.8} ${cx + w * 0.6},${cy - h * 0.1}" fill="${fill}"/>`;
-}
-function icoKandelaar(cx, cy, s, fill) {
-  return `<rect x="${cx - 2}" y="${cy - s * 0.4}" width="4" height="${s * 0.8}" fill="${fill}"/>`
-    + `<ellipse cx="${cx}" cy="${cy - s * 0.5}" rx="4" ry="7" fill="${COL.orange}"/>`;
-}
-// icoon kiezen op naam (voor de configurator later)
-function ico(name, cx, cy, s, fill) {
-  switch (name) {
-    case "koepel": return icoKoepel(cx, cy, s, fill);
-    case "boek": return icoBoek(cx, cy, s, fill);
-    case "boog": return icoBoog(cx, cy, s, fill);
-    case "ster": return icoStar8(cx, cy, s * 0.6, fill);
-    case "pen": return icoPen(cx, cy, s, fill);
-    case "hut": return icoHut(cx, cy, s, fill);
-    case "kaars": return icoKandelaar(cx, cy, s, fill);
-    default: return `<circle cx="${cx}" cy="${cy}" r="${s * 0.4}" fill="${fill}"/>`;
-  }
+
+// kleur-interpolatie
+function hex(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function lerpCol(a, b, t) {
+  const A = hex(a), B = hex(b);
+  const r = Math.round(A[0] + (B[0] - A[0]) * t), g = Math.round(A[1] + (B[1] - A[1]) * t), bl = Math.round(A[2] + (B[2] - A[2]) * t);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
 }
 
 // ---------------------------------------------------------------- gedeelde chrome
-// Het KADER (fotoboek-rand) in de merkkleur: op ELKE video, de vaste handtekening.
 function kader(W, H) {
   const m = Math.round(W * 0.035), r = Math.round(W * 0.04);
-  return `<rect x="${m}" y="${m}" width="${W - 2 * m}" height="${H - 2 * m}" rx="${r}" `
-    + `fill="none" stroke="${COL.orange}" stroke-width="${Math.round(W * 0.012)}"/>`
-    + `<rect x="${m + 7}" y="${m + 7}" width="${W - 2 * m - 14}" height="${H - 2 * m - 14}" rx="${r - 5}" `
-    + `fill="none" stroke="${COL.cream}" stroke-width="2" opacity="0.5"/>`;
+  return `<rect x="${m}" y="${m}" width="${W - 2 * m}" height="${H - 2 * m}" rx="${r}" fill="none" stroke="${COL.orange}" stroke-width="${Math.round(W * 0.012)}"/>`
+    + `<rect x="${m + 7}" y="${m + 7}" width="${W - 2 * m - 14}" height="${H - 2 * m - 14}" rx="${r - 5}" fill="none" stroke="${COL.cream}" stroke-width="2" opacity="0.45"/>`;
 }
-// grote titel bovenin
+// lettergrootte die binnen maxW past (ruwe breedte-schatting per teken)
+function fitFs(txt, baseFs, maxW, perChar = 0.56) {
+  const need = String(txt).length * baseFs * perChar;
+  return need <= maxW ? baseFs : Math.max(10, Math.floor(baseFs * maxW / need));
+}
 function titel(txt, W, H, op = 1) {
   if (!txt) return "";
-  const fs = Math.round(W * 0.07);
-  return `<text x="${W / 2}" y="${H * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="700" `
-    + `font-size="${fs}" fill="${COL.cream}" opacity="${op.toFixed(2)}">${escapeXml(txt)}</text>`;
+  const fs2 = fitFs(txt, Math.round(W * 0.058), W * 0.86, 0.6);
+  return `<text x="${W / 2}" y="${H * 0.125}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fs2}" fill="${COL.cream}" opacity="${op.toFixed(2)}">${escapeXml(txt)}</text>`;
 }
-// onderschrift (één regel, komt op; later vervangen we de klok-timing door jouw stem)
 function onderschrift(txt, W, H, op = 1) {
   if (!txt) return "";
-  const fs = Math.round(W * 0.052);
-  const y = Math.round(H * 0.86);
-  const bw = Math.min(W * 0.86, fs * String(txt).length * 0.62);
+  const fs2 = fitFs(txt, Math.round(W * 0.05), W * 0.80, 0.56), y = Math.round(H * 0.84);
+  const bw = Math.min(W * 0.88, fs2 * String(txt).length * 0.58);
   return `<g opacity="${op.toFixed(2)}">`
-    + `<rect x="${W / 2 - bw / 2 - 18}" y="${y - fs}" width="${bw + 36}" height="${fs * 1.7}" rx="${fs}" fill="#000000" opacity="0.30"/>`
-    + `<text x="${W / 2}" y="${y + fs * 0.3}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${fs}" fill="${COL.cream}">${escapeXml(txt)}</text></g>`;
+    + `<rect x="${W / 2 - bw / 2 - 16}" y="${y - fs2}" width="${bw + 32}" height="${fs2 * 1.7}" rx="${fs2}" fill="#000000" opacity="0.34"/>`
+    + `<text x="${W / 2}" y="${y + fs2 * 0.3}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${fs2}" fill="${COL.cream}">${escapeXml(txt)}</text></g>`;
 }
 
-export function makeBrand() {
+// ---------------------------------------------------------------- CTA-identiteitslaag
+// Vaste merk-fold-out (abonnee-motor). Vouwt in op het emotionele hoogtepunt (eind).
+// Herbruikbaar over ELK type. op = 0..1 (schuift omhoog + fade).
+function ctaFoldout(W, H, op) {
+  if (op <= 0.01) return "";
+  const e = sm(op);
+  const panelH = H * 0.26, panelW = W * 0.84;
+  const x = (W - panelW) / 2;
+  const yRest = H * 0.52;                  // eindpositie
+  const y = yRest + (1 - e) * H * 0.2;     // schuift omhoog in
+  const r = Math.round(W * 0.05);
+  const fs1 = Math.round(W * 0.05), fs2 = Math.round(W * 0.044);
+  let g = `<g opacity="${e.toFixed(2)}">`;
+  // scrim over het hele beeld zodat de CTA de schone focus is
+  g += `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.ink}" opacity="${(0.45 * e).toFixed(2)}"/>`;
+  // donker paneel met oranje rand
+  g += `<rect x="${x}" y="${y}" width="${panelW}" height="${panelH}" rx="${r}" fill="${COL.ink}" opacity="0.98"/>`;
+  g += `<rect x="${x}" y="${y}" width="${panelW}" height="${panelH}" rx="${r}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`;
+  // regel 1: wie we zijn
+  g += `<text x="${W / 2}" y="${y + panelH * 0.30}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fs1}" fill="${COL.cream}">We are Umma United.</text>`;
+  // regel 2: de missie-CTA
+  g += `<text x="${W / 2}" y="${y + panelH * 0.52}" text-anchor="middle" font-family="${SANS}" font-size="${fs2}" fill="${COL.mute}">Subscribe so we can go deeper.</text>`;
+  // subscribe-chip (oranje pil)
+  const chipW = W * 0.4, chipH = panelH * 0.26, cx = (W - chipW) / 2, cy = y + panelH * 0.64;
+  g += `<rect x="${cx}" y="${cy}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="${COL.orange}"/>`;
+  g += `<text x="${W / 2}" y="${cy + chipH * 0.70}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(chipH * 0.5)}" fill="${COL.ink}">SUBSCRIBE</text>`;
+  g += `</g>`;
+  return g;
+}
+
+export function makeBrand({ ROOT = "." } = {}) {
   const branding = {
     name: "Umma United", footer: "UMMA UNITED",
     bg: COL.ink, bg2: COL.navy2, gold: COL.orange, cream: COL.cream, plate: COL.navy,
   };
+  let MAP = null; // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
 
-  async function init() {}
+  async function init() {
+    try {
+      const raw = await fs.readFile(path.resolve(ROOT, "assets/ummaunited/worldmap.json"), "utf8");
+      MAP = JSON.parse(raw);
+    } catch { MAP = null; }
+  }
+
   async function listSubjects() {
-    // "onderwerpen" zijn hier losse ideeën; het echte script komt via opts.
-    return [{ id: "Córdoba 1000" }, { id: "Het Huis der Wijsheid" }, { id: "Al-Zahrawi" }].map((s) => ({ id: s.id }));
+    return [{ id: "Religie: verspreiding en standhouden" }, { id: "Belasting: hun systeem vs het onze" }];
   }
 
   const templates = [
-    { id: "split", name: "Split-screen tegenstelling", music: ["calm", "oriental"], defaults: {} },
-    { id: "zoomin", name: "Uitvergroting (detail opent)", music: ["calm", "lofi"], defaults: {} },
-    { id: "raadsel", name: "Wie-ben-ik (raadspel)", music: ["upbeat", "lofi"], defaults: {} },
-    { id: "mythe", name: "Tegenwerping (claim afbreken)", music: ["upbeat", "calm"], defaults: {} },
-    { id: "dagin", name: "Tijdcapsule (dag van toen)", music: ["calm", "oriental"], defaults: {} },
-    { id: "ranglijst", name: "Ranglijst (top 5)", music: ["upbeat", "lofi"], defaults: {} },
-    { id: "oorsprong", name: "Oorsprong (van nu naar begin)", music: ["calm", "oriental"], defaults: {} },
-    { id: "brief", name: "Brief / ooggetuige", music: ["calm", "oriental"], defaults: {} },
-    { id: "watals", name: "Wat-als (twee takken)", music: ["calm", "lofi"], defaults: {} },
-    { id: "reis", name: "Kaart-reis (route)", music: ["calm", "oriental"], defaults: {} },
+    { id: "kaart", name: "Kaart door de tijd", music: ["oriental", "calm"], defaults: {} },
   ];
 
-  // taal-helper voor de default-teksten
-  function L(opts, nl, en, fr) { const l = opts.lang; return l === "en" ? en : l === "fr" ? fr : nl; }
-
-  // ============================================================= 1. SPLIT
-  async function makeSplit({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 9;
-    const title = opts.title || L(opts, "Zelfde jaar. Twee werelden.", "Same year. Two worlds.", "Même année. Deux mondes.");
-    const sub = opts.caption || L(opts, "Europa, jaar 1000", "Europe, year 1000", "Europe, an 1000");
-    const leftIcons = (opts.left || "hut,kaars").split(",").map((s) => s.trim()).filter(Boolean);
-    const rightIcons = (opts.right || "boog,boek,ster").split(",").map((s) => s.trim()).filter(Boolean);
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01((t - 0.4) / 1.6);
-      const half = W / 2;
-      let f = "";
-      // linker helft (donker)
-      f += `<rect x="0" y="0" width="${half}" height="${H}" fill="#0a1020" opacity="0.0"/>`;
-      // rechter helft (warm)
-      f += `<rect x="${half}" y="0" width="${half}" height="${H}" fill="#241a10" opacity="${(0.0 + 0.25 * sm(p)).toFixed(2)}"/>`;
-      // deellijn
-      f += `<rect x="${half - 2}" y="${H * 0.2}" width="4" height="${H * 0.55}" fill="${COL.orange}" opacity="0.8"/>`;
-      // iconen links (verschijnen eerst), rechts (verschijnen na)
-      const cyBase = H * 0.5;
-      leftIcons.forEach((nm, i) => { const op = clamp01((t - 0.6 - i * 0.3) / 0.5); f += `<g opacity="${op.toFixed(2)}">${ico(nm, half * 0.5, cyBase - 40 + i * 90, W * 0.16, COL.mute)}</g>`; });
-      rightIcons.forEach((nm, i) => { const op = clamp01((t - 1.8 - i * 0.35) / 0.5); f += `<g opacity="${op.toFixed(2)}">${ico(nm, half + half * 0.5, cyBase - 90 + i * 90, W * 0.16, COL.orange)}</g>`; });
-      const ovl = kader(W, H) + titel(title, W, H) + onderschrift(sub, W, H, clamp01((t - 0.2) / 0.6));
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt, hookAt: 0.9 };
+  // ---- demo-verhaal (idee 1), zodat het type standalone rendert ----
+  function demoStory() {
+    const med = ["380", "724", "620", "250", "300", "792", "818", "434", "788", "012", "504", "760", "376", "422", "191", "705", "070", "008"];
+    const islam = ["504", "012", "788", "434", "818", "682", "368", "364", "760", "376", "422", "724", "795", "860", "762", "586", "051", "031", "398", "400", "275"];
+    const belt2026 = ["504", "012", "788", "434", "818", "682", "368", "364", "760", "422", "792", "795", "860", "762", "586", "004", "795", "398", "417", "360", "458", "050", "854", "466", "562", "478", "706", "729", "148", "686"];
+    return {
+      mapView: [455, 150, 1360, 470],
+      groups: {
+        rome: med,
+        islam: islam,
+        belt: belt2026,
+      },
+      scenes: [
+        // fills = IDENTITEIT (wie de mensen zijn); rule = HEERSER (wie regeert, markering eroverheen)
+        { year: "117 AD", text: "Rome rules. Become Roman.", fills: { rome: COL.red }, rule: { rome: COL.red }, dur: 2.6 },
+        { year: "750 AD", text: "Islam spreads, by choice", fills: { islam: COL.orange }, rule: { islam: COL.orange }, dur: 2.8 },
+        { year: "1700", text: "Europe rules. The faith stays.", fills: { belt: COL.orange }, rule: { belt: COL.ruler }, dur: 3.0 },
+        { year: "2026", text: "From Morocco to Indonesia: still ours", fills: { belt: COL.orange }, rule: {}, dur: 2.8 },
+      ],
+    };
   }
 
-  // ============================================================= 2. ZOOMIN
-  async function makeZoomin({ opts = {}, format = "9:16" }) {
+  async function makeKaartRender({ opts = {}, format = "9:16" }) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 8;
-    const title = opts.title || L(opts, "Kijk eens beter.", "Look closer.", "Regarde mieux.");
-    const detail = opts.icon || "ster";
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01(t / durSec);
-      // één detail dat groeit (scale op een <g> — veilig, geen geneste svg)
-      const scale = 1 + sm(p) * 6;
-      const cx = W / 2, cy = H * 0.5;
-      let f = `<g transform="translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})">`;
-      f += ico(detail, cx, cy, W * 0.12, COL.orange);
-      f += `</g>`;
-      // na de helft: het "nieuwe" dat zich opent (tekst/vorm die opdoemt)
-      const rev = clamp01((t - durSec * 0.55) / (durSec * 0.3));
-      if (rev > 0) f += `<g opacity="${rev.toFixed(2)}">${icoBoek(cx, cy, W * 0.4, COL.cream)}</g>`;
-      const ovl = kader(W, H) + titel(title, W, H, clamp01((0.8 - p) / 0.3)) + onderschrift(opts.caption || "", W, H, rev);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
+    const SS = 2, FPS = 24;
+    const story = {
+      mapView: opts.mapView || demoStory().mapView,
+      groups: opts.groups || demoStory().groups,
+      scenes: opts.scenes || demoStory().scenes,
+    };
+    const title = opts.title || "They never conquered our faith";
+    // scene-tijden
+    const durs = story.scenes.map((s) => Number(s.dur) || 2.6);
+    const mapEnd = durs.reduce((a, b) => a + b, 0);      // kaart speelt tot hier
+    const CTA_DUR = 2.8;                                  // daarna de CTA-fold-out erover
+    const total = mapEnd + CTA_DUR;
+    const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
+    const TRANS = 0.7; // morph-duur aan het eind van elke scene
 
-  // ============================================================= 3. RAADSEL
-  async function makeRaadsel({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 10;
-    const clues = (opts.clues || L(opts,
-      "Hij leefde rond het jaar 1000|Hij schreef 30 boeken|Chirurgen gebruiken zijn werk nog steeds",
-      "He lived around the year 1000|He wrote 30 books|Surgeons still use his work today",
-      "Il vécut vers l'an 1000|Il écrivit 30 livres|Les chirurgiens utilisent encore son travail")).split("|");
-    const answer = opts.answer || "Al-Zahrawi";
+    // kaart-venster -> beeld (de camera). availW/availH/bandTop staan vast;
+    // de view kan per scene verschillen en east soepel in -> echte zoom.
+    const bandTop = H * 0.20, bandBot = H * 0.78;
+    const availW = W * 0.92, availH = bandBot - bandTop;
+    function cameraFor(view) {
+      const sc = Math.min(availW / view[2], availH / view[3]);
+      const dW = view[2] * sc, dH = view[3] * sc;
+      return { sc, offX: (W - dW) / 2 - view[0] * sc, offY: bandTop + (availH - dH) / 2 - view[1] * sc };
+    }
+    // basis-view: opts.region ("sea") of opts.mapView (bbox), anders het verhaal zijn mapView.
+    const baseView = resolveView(opts.region) || resolveView(opts.mapView) || story.mapView;
+    // per scene: eigen view (regionaam of bbox) of de basis. Camera east tussen scene-views.
+    const sceneViews = story.scenes.map((s) => resolveView(s.view) || baseView);
+
+    // land -> kleur in een laag (fills=identiteit, rule=heerser) in een gegeven scene
+    function layerColor(scene, id, key) {
+      let c = null;
+      for (const [grp, col] of Object.entries(scene[key] || {})) {
+        const ids = story.groups[grp] || [];
+        if (ids.includes(id)) c = col;
+      }
+      return c;
+    }
+
+    function sceneIndexAt(t) {
+      for (let i = story.scenes.length - 1; i >= 0; i--) if (t >= starts[i]) return i;
+      return 0;
+    }
     function sceneAt(frame) {
-      const t = frame / FPS;
-      let f = "";
-      const per = (durSec - 2.5) / clues.length;
-      clues.forEach((c, i) => {
-        const t0 = 0.5 + i * per, op = clamp01((t - t0) / 0.5) * clamp01((durSec - 2.0 - t) / 0.6 + 1);
-        if (op > 0.01) {
-          const y = H * 0.3 + i * H * 0.12, fs = Math.round(W * 0.05);
-          f += `<g opacity="${Math.min(1, op).toFixed(2)}"><rect x="${W * 0.1}" y="${y - fs}" width="${W * 0.8}" height="${fs * 2.0}" rx="12" fill="${COL.navy2}"/>`
-            + `<text x="${W / 2}" y="${y + fs * 0.35}" text-anchor="middle" font-family="${SANS}" font-size="${fs}" fill="${COL.cream}">${escapeXml(c)}</text></g>`;
+      const tRaw = frame / FPS;
+      // kaart bevriest op het eind; de CTA speelt daarna eroverheen
+      const t = Math.min(mapEnd - 0.001, tRaw);
+      const i = sceneIndexAt(t);
+      const next = Math.min(story.scenes.length - 1, i + 1);
+      const endOfI = starts[i] + durs[i];
+      let blend = 0;
+      if (next !== i && t > endOfI - TRANS) blend = sm((t - (endOfI - TRANS)) / TRANS);
+
+      // camera voor dit frame: east van scene i naar scene next (zoom volgt de morph)
+      const view = interpView(sceneViews[i], sceneViews[next], blend);
+      const { sc: scale, offX, offY } = cameraFor(view);
+      const strokeRuler = (3.4 / scale).toFixed(2); // ~3.4px rand op scherm, los van zoom
+
+      // kaart tekenen: LAAG 1 = identiteit (vulling)
+      let paths = "", rulerPaths = "";
+      if (MAP) {
+        for (const [id, d] of Object.entries(MAP.countries)) {
+          const ca = layerColor(story.scenes[i], id, "fills");
+          const cb = layerColor(story.scenes[next], id, "fills");
+          let fill;
+          if (ca == null && cb == null) fill = COL.land;
+          else { const from = ca || COL.land, to = cb || COL.land; fill = blend > 0 ? lerpCol(from, to, blend) : from; }
+          paths += `<path d="${d}" fill="${fill}" stroke="${COL.landEdge}" stroke-width="0.6"/>`;
+          // LAAG 2 = heerser (markering eroverheen): dikke gekleurde rand, fade met blend
+          const ra = layerColor(story.scenes[i], id, "rule");
+          const rb = layerColor(story.scenes[next], id, "rule");
+          const oA = ra ? 1 : 0, oB = rb ? 1 : 0;
+          const rop = oA + (oB - oA) * blend;
+          if (rop > 0.02) {
+            const rc = ra || rb || COL.ruler;
+            // koele waas over het gebied (oranje blijft eronder zichtbaar) + dikke rand
+            rulerPaths += `<path d="${d}" fill="${rc}" fill-opacity="${(0.42 * rop).toFixed(2)}" stroke="${rc}" stroke-width="${strokeRuler}" stroke-opacity="${(0.9 * rop).toFixed(2)}" stroke-linejoin="round"/>`;
+          }
         }
-      });
-      // onthulling
-      const rev = clamp01((t - (durSec - 1.8)) / 0.8);
-      let f2 = f;
-      if (rev > 0.01) {
-        f2 = `<g opacity="${rev.toFixed(2)}">${icoStar8(W / 2, H * 0.4, W * 0.18, COL.orange)}`
-          + `<text x="${W / 2}" y="${H * 0.62}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${Math.round(W * 0.09)}" fill="${COL.cream}">${escapeXml(answer)}</text></g>`;
+      } else {
+        paths = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="${COL.cream}" font-family="${SANS}" font-size="20">kaart-asset ontbreekt</text>`;
       }
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Wie ben ik?", "Who am I?", "Qui suis-je?"), W, H, clamp01((durSec - 1.8 - t) / 0.5));
-      return composeChrome({ branding, W, H, panel: null, innerField: f2, overlay: ovl, logoUri: "" });
+      const mapG = `<g transform="translate(${offX.toFixed(2)} ${offY.toFixed(2)}) scale(${scale.toFixed(4)})">${paths}${rulerPaths}</g>`;
+
+      // tijdbalk onderaan (loopt over de kaart-fase; vol tijdens CTA)
+      const tbY = H * 0.80, tbX = W * 0.1, tbW = W * 0.8;
+      const prog = clamp01(t / mapEnd);
+      let bar = `<rect x="${tbX}" y="${tbY}" width="${tbW}" height="6" rx="3" fill="${COL.navy2}"/>`
+        + `<rect x="${tbX}" y="${tbY}" width="${(tbW * prog).toFixed(1)}" height="6" rx="3" fill="${COL.orange}"/>`
+        + `<circle cx="${(tbX + tbW * prog).toFixed(1)}" cy="${tbY + 3}" r="8" fill="${COL.orange}"/>`;
+      const showIdx = blend > 0.5 ? next : i;
+      bar += `<text x="${W / 2}" y="${tbY - 14}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.06)}" fill="${COL.cream}">${escapeXml(story.scenes[showIdx].year)}</text>`;
+
+      const capTxt = story.scenes[showIdx].text || "";
+      const capOp = clamp01((t - starts[showIdx]) / 0.5);
+
+      // CTA-laag vouwt in tijdens de laatste fase (na mapEnd); tijdbalk + onderschrift faden weg
+      const ctaOp = tRaw > mapEnd ? clamp01((tRaw - mapEnd) / 0.5) : 0;
+      const fade = (1 - ctaOp).toFixed(2);
+
+      const inner = mapG + `<g opacity="${fade}">${bar}</g>`;
+      const ovl = kader(W, H) + titel(title, W, H) + onderschrift(capTxt, W, H, capOp * (1 - ctaOp)) + ctaFoldout(W, H, ctaOp);
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
-    return { W, H, FPS, SS, durSec, sceneAt };
+    // hook-first grijpt een SCHONE 2026-payoff (vóór de CTA)
+    const hookAt = Math.max(0, (mapEnd - 0.5) / total);
+    return { W, H, FPS, SS, durSec: total, sceneAt, hookAt };
   }
 
-  // ============================================================= 4. MYTHE
-  async function makeMythe({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 8;
-    const claim = opts.claim || L(opts, "“De donkere middeleeuwen”", "“The Dark Ages”", "“Les âges sombres”");
-    const truth = opts.truth || L(opts, "In Córdoba brandden de straatlantaarns.", "In Córdoba the streetlamps were lit.", "À Cordoue, les lampadaires brillaient.");
-    function sceneAt(frame) {
-      const t = frame / FPS;
-      const fs = Math.round(W * 0.075);
-      let f = `<text x="${W / 2}" y="${H * 0.4}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fs}" fill="${COL.cream}">${escapeXml(claim)}</text>`;
-      // doorstreep na 2s
-      const strike = clamp01((t - 2.0) / 0.6);
-      if (strike > 0) f += `<rect x="${W * 0.15}" y="${H * 0.4 - fs * 0.25}" width="${W * 0.7 * strike}" height="6" fill="${COL.red}"/>`;
-      // waarheid onderaan
-      const rev = clamp01((t - 2.8) / 0.8);
-      if (rev > 0) f += onderschrift(truth, W, H, rev);
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Wat ze je niet vertelden", "What they never told you", "Ce qu'on ne t'a pas dit"), W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 5. DAGIN (tijdcapsule)
-  async function makeDagin({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 10;
-    const stops = (opts.items || "kaars,boek,boog,ster").split(",").map((s) => s.trim()).filter(Boolean);
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01(t / durSec);
-      const cx = W / 2, cy = H * 0.42, R = W * 0.26;
-      let f = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${COL.navy2}" stroke-width="10"/>`;
-      // wijzer draait
-      const a = -Math.PI / 2 + p * 2 * Math.PI;
-      f += `<line x1="${cx}" y1="${cy}" x2="${(cx + R * 0.8 * Math.cos(a)).toFixed(1)}" y2="${(cy + R * 0.8 * Math.sin(a)).toFixed(1)}" stroke="${COL.orange}" stroke-width="6" stroke-linecap="round"/>`;
-      f += `<circle cx="${cx}" cy="${cy}" r="8" fill="${COL.orange}"/>`;
-      // iconen per "uur" verschijnen rond de klok
-      stops.forEach((nm, i) => {
-        const ta = -Math.PI / 2 + (i / stops.length) * 2 * Math.PI;
-        const op = clamp01((p - i / stops.length) / 0.08);
-        f += `<g opacity="${op.toFixed(2)}">${ico(nm, cx + R * 1.15 * Math.cos(ta), cy + R * 1.15 * Math.sin(ta), W * 0.1, COL.cream)}</g>`;
-      });
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Een dag in Córdoba, jaar 1000", "A day in Córdoba, year 1000", "Un jour à Cordoue, an 1000"), W, H, 1) + onderschrift(opts.caption || "", W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 6. RANGLIJST
-  async function makeRanglijst({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 10;
-    // items: "label:waarde" per item, grootste = nr 1
-    const raw = (opts.items || "Baghdad:1200|Córdoba:1000|Caïro:800|Fez:600|Damascus:500").split("|");
-    const items = raw.map((s) => { const [lab, v] = s.split(":"); return { lab: (lab || "").trim(), v: Number(v) || 0 }; });
-    const maxV = Math.max(1, ...items.map((x) => x.v));
-    function sceneAt(frame) {
-      const t = frame / FPS;
-      let f = "";
-      const top = H * 0.26, bh = H * 0.09, gap = H * 0.025;
-      items.forEach((it, i) => {
-        const t0 = 0.4 + i * 0.5, gp = sm(clamp01((t - t0) / 0.9));
-        const y = top + i * (bh + gap);
-        const bw = (W * 0.76) * (it.v / maxV) * gp;
-        f += `<rect x="${W * 0.12}" y="${y}" width="${W * 0.76}" height="${bh}" rx="10" fill="${COL.navy2}"/>`;
-        f += `<rect x="${W * 0.12}" y="${y}" width="${bw.toFixed(1)}" height="${bh}" rx="10" fill="${i === 0 ? COL.orange : COL.blue2}"/>`;
-        f += `<text x="${W * 0.14}" y="${y + bh * 0.66}" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.045)}" fill="${COL.cream}">${escapeXml(it.lab)}</text>`;
-        const shown = Math.round(it.v * gp);
-        f += `<text x="${W * 0.86}" y="${y + bh * 0.66}" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.045)}" fill="${COL.cream}">${shown}</text>`;
-      });
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Grootste steden, jaar 1000", "Biggest cities, year 1000", "Plus grandes villes, an 1000"), W, H, 1) + onderschrift(opts.caption || "", W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 7. OORSPRONG
-  async function makeOorsprong({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 8;
-    const nu = opts.now || L(opts, "Het ziekenhuis", "The hospital", "L'hôpital");
-    const toen = opts.then || L(opts, "Bimaristan, Baghdad, 805", "Bimaristan, Baghdad, 805", "Bimaristan, Bagdad, 805");
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01(t / durSec);
-      const cx = W / 2, cy = H * 0.45;
-      // fase 1: modern ding; fase 2: terug naar het begin (crossfade op opacity)
-      const op1 = clamp01((0.5 - p) / 0.2 + 1) * clamp01((0.55 - p) / 0.15);
-      const op2 = clamp01((p - 0.5) / 0.15);
-      let f = `<g opacity="${clamp01(1 - op2).toFixed(2)}">${icoBoek(cx, cy, W * 0.3, COL.mute)}`
-        + `<text x="${cx}" y="${H * 0.66}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${Math.round(W * 0.07)}" fill="${COL.cream}">${escapeXml(nu)}</text></g>`;
-      f += `<g opacity="${op2.toFixed(2)}">${icoKoepel(cx, cy, W * 0.34, COL.orange)}`
-        + `<text x="${cx}" y="${H * 0.66}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${Math.round(W * 0.06)}" fill="${COL.cream}">${escapeXml(toen)}</text></g>`;
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Waar het begon", "Where it began", "Où tout a commencé"), W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 8. BRIEF
-  async function makeBrief({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 10;
-    const lines = (opts.lines || L(opts,
-      "Ik liep door de markt van Baghdad.|Honderd talen, duizend geuren.|En overal: boeken.",
-      "I walked through the market of Baghdad.|A hundred tongues, a thousand scents.|And everywhere: books.",
-      "J'ai traversé le marché de Bagdad.|Cent langues, mille parfums.|Et partout: des livres.")).split("|");
-    function sceneAt(frame) {
-      const t = frame / FPS;
-      // perkament-vlak
-      let f = `<rect x="${W * 0.1}" y="${H * 0.26}" width="${W * 0.8}" height="${H * 0.46}" rx="14" fill="${COL.navy2}" opacity="0.6"/>`;
-      const per = (durSec - 1.5) / lines.length;
-      lines.forEach((ln, i) => {
-        const op = clamp01((t - (0.6 + i * per)) / 0.6);
-        if (op > 0.01) {
-          const y = H * 0.36 + i * H * 0.1, fs = Math.round(W * 0.052);
-          f += `<text x="${W / 2}" y="${y}" text-anchor="middle" font-family="${SERIF}" font-style="italic" font-size="${fs}" fill="${COL.cream}" opacity="${op.toFixed(2)}">${escapeXml(ln)}</text>`;
-        }
-      });
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Een reiziger schreef...", "A traveler wrote...", "Un voyageur écrivit..."), W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 9. WATALS
-  async function makeWatals({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 9;
-    const brA = opts.branchA || L(opts, "Wat we verloren", "What we lost", "Ce qu'on a perdu");
-    const brB = opts.branchB || L(opts, "Wat had kunnen zijn", "What could have been", "Ce qui aurait pu être");
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01((t - 0.5) / 2.0);
-      const x0 = W / 2, y0 = H * 0.28, yf = H * 0.55;
-      let f = `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${yf}" stroke="${COL.cream}" stroke-width="5"/>`;
-      // twee takken groeien
-      const ax = x0 - W * 0.3 * sm(p), bx = x0 + W * 0.3 * sm(p), by = yf + H * 0.18 * sm(p);
-      f += `<line x1="${x0}" y1="${yf}" x2="${ax.toFixed(1)}" y2="${by.toFixed(1)}" stroke="${COL.red}" stroke-width="5"/>`;
-      f += `<line x1="${x0}" y1="${yf}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="${COL.orange}" stroke-width="5"/>`;
-      const opT = clamp01((t - 2.2) / 0.8);
-      if (opT > 0) {
-        const fs = Math.round(W * 0.045);
-        f += `<text x="${ax.toFixed(1)}" y="${(by + 40).toFixed(1)}" text-anchor="middle" font-family="${SANS}" font-size="${fs}" fill="${COL.cream}" opacity="${opT.toFixed(2)}">${escapeXml(brA)}</text>`;
-        f += `<text x="${bx.toFixed(1)}" y="${(by + 40).toFixed(1)}" text-anchor="middle" font-family="${SANS}" font-size="${fs}" fill="${COL.cream}" opacity="${opT.toFixed(2)}">${escapeXml(brB)}</text>`;
-      }
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "Wat als...", "What if...", "Et si..."), W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // ============================================================= 10. REIS
-  async function makeReis({ opts = {}, format = "9:16" }) {
-    const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const SS = 2, FPS = 24, durSec = Number(opts.durationSec) || 9;
-    // route-punten genormaliseerd (0..1) binnen het kaart-vlak
-    const pts = (opts.route || "0.2,0.3|0.5,0.45|0.8,0.65").split("|").map((s) => { const [x, y] = s.split(",").map(Number); return { x, y }; });
-    const from = opts.from || "Córdoba", to = opts.to || "Baghdad";
-    function sceneAt(frame) {
-      const t = frame / FPS, p = clamp01((t - 0.5) / (durSec - 2.0));
-      const mx = W * 0.1, my = H * 0.24, mw = W * 0.8, mh = H * 0.5;
-      // kaart-vlak
-      let f = `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="14" fill="${COL.blue}" opacity="0.25"/>`;
-      const P = pts.map((pt) => ({ x: mx + pt.x * mw, y: my + pt.y * mh }));
-      // route als path, progressief getekend (benader met segmenten)
-      let drawn = "";
-      const total = P.length - 1;
-      const prog = p * total;
-      for (let i = 0; i < total; i++) {
-        const seg = clamp01(prog - i);
-        if (seg <= 0) break;
-        const a = P[i], b = P[i + 1];
-        const ex = a.x + (b.x - a.x) * seg, ey = a.y + (b.y - a.y) * seg;
-        drawn += `${i === 0 ? `M ${a.x} ${a.y}` : ""} L ${ex.toFixed(1)} ${ey.toFixed(1)} `;
-      }
-      if (drawn) f += `<path d="${drawn}" fill="none" stroke="${COL.orange}" stroke-width="5" stroke-dasharray="2 10" stroke-linecap="round"/>`;
-      // bewegende stip (het "schip")
-      const idx = Math.min(total - 1, Math.floor(prog)), seg = clamp01(prog - idx);
-      const a = P[idx] || P[0], b = P[idx + 1] || P[0];
-      const sx = a.x + (b.x - a.x) * seg, sy = a.y + (b.y - a.y) * seg;
-      f += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="10" fill="${COL.cream}"/>`;
-      // begin/eind labels
-      f += `<text x="${P[0].x}" y="${P[0].y - 16}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.04)}" fill="${COL.cream}">${escapeXml(from)}</text>`;
-      f += `<text x="${P[P.length - 1].x}" y="${P[P.length - 1].y + 32}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.04)}" fill="${COL.cream}">${escapeXml(to)}</text>`;
-      const ovl = kader(W, H) + titel(opts.title || L(opts, "De route van kennis", "The road of knowledge", "La route du savoir"), W, H, 1) + onderschrift(opts.caption || "", W, H, 1);
-      return composeChrome({ branding, W, H, panel: null, innerField: f, overlay: ovl, logoUri: "" });
-    }
-    return { W, H, FPS, SS, durSec, sceneAt };
-  }
-
-  // -------------------------------------------------------------- dispatch
-  async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
-    const type = opts.type || opts.template || "split";
-    const o = { ...opts };
+  async function makeRender({ opts = {}, format = "9:16" }) {
+    const type = opts.type || opts.template || "kaart";
     switch (type) {
-      case "split": return makeSplit({ opts: o, format });
-      case "zoomin": return makeZoomin({ opts: o, format });
-      case "raadsel": return makeRaadsel({ opts: o, format });
-      case "mythe": return makeMythe({ opts: o, format });
-      case "dagin": return makeDagin({ opts: o, format });
-      case "ranglijst": return makeRanglijst({ opts: o, format });
-      case "oorsprong": return makeOorsprong({ opts: o, format });
-      case "brief": return makeBrief({ opts: o, format });
-      case "watals": return makeWatals({ opts: o, format });
-      case "reis": return makeReis({ opts: o, format });
-      default: return makeSplit({ opts: o, format });
+      case "kaart": return makeKaartRender({ opts, format });
+      default: return makeKaartRender({ opts, format });
     }
   }
 
   return {
     id: "ummaunited", name: "Umma United", branding, init, listSubjects, templates, makeRender,
-    options: ["type", "title", "caption", "lang", "durationSec",
-      "left", "right", "icon", "clues", "answer", "claim", "truth",
-      "items", "now", "then", "lines", "branchA", "branchB", "route", "from", "to"],
+    options: ["type", "title", "durationSec", "mapView", "groups", "scenes"],
   };
 }
