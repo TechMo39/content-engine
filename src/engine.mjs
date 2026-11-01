@@ -471,6 +471,30 @@ const server = http.createServer(async (req, res) => {
       json(res, { path: "assets/ummaunited/audio/" + fname });
       return;
     }
+    // UMMA — nieuwste klaarstaande import-script teruggeven, zodat de studio bij openen vanzelf
+    // de scènes toont (geen plakken). Zoekt in assets/ummaunited/voice/<verhaal>/<stem>/_import-*.txt,
+    // pakt het meest recent gewijzigde. Puur lezen, raakt niets aan.
+    if (u.pathname === "/api/umma-latest-script" && req.method === "GET") {
+      try {
+        const base = path.resolve(ROOT, "assets/ummaunited/voice");
+        let best = null;
+        for (const story of await fs.readdir(base).catch(() => [])) {
+          const sdir = path.join(base, story);
+          for (const voice of await fs.readdir(sdir).catch(() => [])) {
+            const vdir = path.join(sdir, voice);
+            for (const f of await fs.readdir(vdir).catch(() => [])) {
+              if (!/^_import-.*\.txt$/i.test(f)) continue;
+              const fp = path.join(vdir, f);
+              let st; try { st = await fs.stat(fp); } catch { continue; }
+              if (!best || st.mtimeMs > best.mtime) best = { path: fp, mtime: st.mtimeMs, name: story + "/" + voice + "/" + f };
+            }
+          }
+        }
+        if (!best) { json(res, { text: null }); return; }
+        json(res, { text: await fs.readFile(best.path, "utf8"), name: best.name });
+      } catch (e) { json(res, { text: null, error: e.message }); }
+      return;
+    }
     // UMMA — live voorbeeld: rendert ÉÉN frame (midden in de gekozen scène) als PNG, zodat de
     // studio toont wat je maakt terwijl je bouwt. Geen video, dus snel. Alleen voor Umma.
     if (u.pathname === "/api/umma-preview" && req.method === "POST") {
