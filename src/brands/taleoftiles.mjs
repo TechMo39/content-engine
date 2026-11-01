@@ -581,6 +581,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Dit hangt er over tien jaar nog." }, { k: "Echt glazuur", t: "Kleur die niet verbleekt." }, { t: "Met de hand gelegd." }],
         [{ t: "Niet zomaar een bordje." }, { t: "Een klein kunstwerk met jouw naam." }, { k: "Tale of Tiles", t: "Voor aan je muur." }],
         [{ t: "Hoe zou dit staan bij jou thuis?" }, { k: "Tale of Tiles", t: "Handgemaakt, in jouw stijl." }, { t: "Een naam om trots op te zijn." }],
+        [{ k: "Welkom", t: "Sinds 2026 maken wij dit, met de hand." }, { t: "Jouw naam, in echt glazuur aan je muur." }, { t: "Volg ons en maak die van jou op taleoftiles.com." }],
+        [{ t: "Mooi aan je muur hoeft niet duur." }, { k: "Tale of Tiles", t: "Toegankelijke kunst, met jouw naam." }, { t: "Kom langs op taleoftiles.com." }],
+        [{ t: "Fijn dat je kijkt." }, { k: "Welkom", t: "Jouw naam verdient meer dan plastic." }, { t: "Volg ons voor meer naamborden." }],
       ],
       en: [
         [{ k: "Tale of Tiles", t: "Your name, made by hand." }, { t: "In real glaze, colour that stays." }, { t: "A painting for your wall." }],
@@ -593,6 +596,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "This will still be there in ten years." }, { k: "Real glaze", t: "Colour that won't fade." }, { t: "Laid by hand." }],
         [{ t: "Not just a sign." }, { t: "A small work of art with your name." }, { k: "Tale of Tiles", t: "For your wall." }],
         [{ t: "How would this look in your home?" }, { k: "Tale of Tiles", t: "Handmade, in your style." }],
+        [{ k: "Welcome", t: "We started this in 2026, by hand." }, { t: "Your name, in real glaze on your wall." }, { t: "Follow us and make yours at taleoftiles.com." }],
+        [{ t: "Beautiful on your wall needn't be pricey." }, { k: "Tale of Tiles", t: "Accessible art, with your name." }, { t: "Come see at taleoftiles.com." }],
+        [{ t: "Glad you're here." }, { k: "Welcome", t: "Your name deserves more than plastic." }, { t: "Follow us for more nameplates." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Votre nom, fait main." }, { t: "En véritable émail, une couleur qui dure." }, { t: "Un tableau pour votre mur." }],
@@ -602,6 +608,8 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "La première chose qu'on voit à votre porte." }, { k: "Tale of Tiles", t: "Un nom en mosaïque posée à la main." }],
         [{ t: "Dans dix ans, il sera toujours là." }, { k: "Véritable émail", t: "Une couleur qui ne pâlit pas." }],
         [{ t: "Comment serait-il chez vous ?" }, { k: "Tale of Tiles", t: "Fait main, à votre style." }],
+        [{ k: "Bienvenue", t: "Depuis 2026, nous créons ceci à la main." }, { t: "Votre nom, en véritable émail sur votre mur." }, { t: "Suivez-nous et créez le vôtre sur taleoftiles.com." }],
+        [{ t: "Le beau au mur ne doit pas être cher." }, { k: "Tale of Tiles", t: "De l'art accessible, à votre nom." }, { t: "Venez voir sur taleoftiles.com." }],
       ],
     },
     sfeer: {   // ERFGOED + AMBACHT: eeuwenoud ambacht uit Fès -> vandaag, met jouw naam.
@@ -618,6 +626,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Geduld dat je terugziet in elk stukje." }, { k: "Fès", t: "Niets gaat hier snel." }, { t: "En dat is precies de bedoeling." }],
         [{ t: "Een maalem (meester) leerde dit van zijn vader." }, { t: "Die weer van de zijne." }, { k: "Tale of Tiles", t: "Dat ambacht, in jouw naam." }],
         [{ t: "Wat met de hand gemaakt is, voel je." }, { k: "Tale of Tiles", t: "Geen twee panelen gelijk." }],
+        [{ k: "Welkom", t: "In ons atelier in Tetouan." }, { t: "Een eeuwenoud ambacht, sinds 2026 voor jou." }, { t: "Volg ons en kom kijken op taleoftiles.com." }],
+        [{ t: "Klei, vuur, geduld, en liefde." }, { k: "Tale of Tiles", t: "Oud ambacht, toegankelijk gemaakt." }, { t: "Jouw naam erin, op taleoftiles.com." }],
+        [{ t: "Fijn dat je even meekijkt." }, { k: "Fès naar nu", t: "Wij houden dit ambacht levend." }, { t: "Volg ons voor meer." }],
       ],
       en: [
         [{ k: "Fès", t: "A thousand-year craft." }, { t: "Every tile cut and glazed by hand." }, { t: "No two pieces alike." }],
@@ -628,6 +639,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Light falls differently on real glaze." }, { t: "That's the depth a print can't fake." }, { k: "Tale of Tiles", t: "Alive, tactile." }],
         [{ t: "A master learned this from his father." }, { t: "Who learned it from his." }, { k: "Tale of Tiles", t: "That craft, in your name." }],
         [{ t: "No two hands lay it the same." }, { t: "So no panel is ever alike." }, { k: "Fès", t: "By hand, piece by piece." }],
+        [{ k: "Welcome", t: "Into our studio in Tetouan." }, { t: "An age-old craft, for you since 2026." }, { t: "Follow us and come see at taleoftiles.com." }],
+        [{ t: "Clay, fire, patience, and love." }, { k: "Tale of Tiles", t: "Old craft, made accessible." }, { t: "Your name in it, at taleoftiles.com." }],
+        [{ t: "Glad you stopped by." }, { k: "Fès to now", t: "We keep this craft alive." }, { t: "Follow us for more." }],
       ],
       fr: [
         [{ k: "Fès", t: "Un art millénaire." }, { t: "Chaque carreau taillé et émaillé à la main." }, { t: "Aucun identique." }],
@@ -635,6 +649,8 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Art ancestral des palais de Fès." }, { k: "Aujourd'hui", t: "Sous une nouvelle forme." }, { t: "Avec votre nom." }],
         [{ t: "La lumière joue sur l'émail véritable." }, { t: "Cette profondeur, une impression ne l'a pas." }, { k: "Tale of Tiles", t: "Vivant." }],
         [{ t: "Aucune main ne pose pareil." }, { t: "Aucun panneau n'est identique." }, { k: "Fès", t: "À la main, pièce par pièce." }],
+        [{ k: "Bienvenue", t: "Dans notre atelier à Tétouan." }, { t: "Un art ancestral, pour vous depuis 2026." }, { t: "Suivez-nous, venez voir sur taleoftiles.com." }],
+        [{ t: "Argile, feu, patience, et amour." }, { k: "Tale of Tiles", t: "Art ancien, rendu accessible." }, { t: "Votre nom, sur taleoftiles.com." }],
       ],
     },
     satisfying: {   // OPNIEUW TOT LEVEN: je ziet het ontstaan. Captions volgen het inkleuren.
@@ -651,6 +667,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Kijk tot het einde." }, { k: "Tale of Tiles", t: "Dan staat je naam er." }, { t: "In handgelegd mozaïek." }],
         [{ t: "Zo ontstaat iets dat blijft." }, { k: "Met de hand", t: "In echt glazuur." }, { t: "Een naam om te houden." }],
         [{ t: "Rustig, stukje voor stukje." }, { t: "Zoals het al eeuwen gaat." }, { k: "Tale of Tiles", t: "Nu met jouw naam." }],
+        [{ k: "Welkom", t: "Kijk mee hoe jouw naam ontstaat." }, { t: "Sinds 2026, met de hand, tegel voor tegel." }, { t: "Volg ons en maak die van jou op taleoftiles.com." }],
+        [{ t: "Van los stukje tot jouw naam." }, { k: "Tale of Tiles", t: "Mooi hoeft niet duur te zijn." }, { t: "Ontwerp 'm op taleoftiles.com." }],
+        [{ t: "Blijf kijken tot je naam er staat." }, { k: "Welkom", t: "Dit maken wij, met liefde." }, { t: "Volg ons voor meer." }],
       ],
       en: [
         [{ t: "Watch it come together." }, { k: "Tale of Tiles", t: "Tile by tile, by hand." }, { t: "Until your name appears." }],
@@ -661,6 +680,9 @@ export function makeBrand({ ROOT, config }) {
         [{ k: "Fès", t: "From palace walls…" }, { t: "…to your wall today." }, { t: "Built up piece by piece." }],
         [{ t: "Stay till the end." }, { k: "Tale of Tiles", t: "Then your name is there." }, { t: "In hand-laid mosaic." }],
         [{ t: "From loose piece to work of art." }, { k: "Fès", t: "A living craft." }, { t: "With your name in it." }],
+        [{ k: "Welcome", t: "Watch your name come to life." }, { t: "Since 2026, by hand, tile by tile." }, { t: "Follow us and make yours at taleoftiles.com." }],
+        [{ t: "From a loose piece to your name." }, { k: "Tale of Tiles", t: "Beautiful needn't be pricey." }, { t: "Design it at taleoftiles.com." }],
+        [{ t: "Stay till your name appears." }, { k: "Welcome", t: "This is what we make, with love." }, { t: "Follow us for more." }],
       ],
       fr: [
         [{ t: "Regardez-le prendre forme." }, { k: "Tale of Tiles", t: "Carreau par carreau, à la main." }, { t: "Jusqu'à votre nom." }],
@@ -668,6 +690,8 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Commencez avec rien…" }, { k: "Tale of Tiles", t: "…finissez avec une œuvre." }],
         [{ t: "Ni machine, ni impression." }, { t: "Des mains, carreau par carreau." }, { k: "Tale of Tiles", t: "Ça se ressent." }],
         [{ k: "Fès", t: "Des murs des palais…" }, { t: "…à votre mur d'aujourd'hui." }, { t: "Pièce par pièce." }],
+        [{ k: "Bienvenue", t: "Regardez votre nom prendre vie." }, { t: "Depuis 2026, à la main, carreau par carreau." }, { t: "Suivez-nous et créez le vôtre sur taleoftiles.com." }],
+        [{ t: "D'une pièce éparse à votre nom." }, { k: "Tale of Tiles", t: "Le beau ne doit pas être cher." }, { t: "Composez-le sur taleoftiles.com." }],
       ],
     },
     geentwee: {   // UNIEK + keuze: elk ontwerp anders. Captions bij de flitsende ontwerpen.
@@ -682,6 +706,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Stop zodra je jouw favoriet ziet." }, { k: "Tale of Tiles", t: "Welke is het?" }, { t: "Zeg het in de comments." }],
         [{ t: "Blauw, terracotta of bont?" }, { t: "Dezelfde naam, telkens anders." }, { k: "Tale of Tiles", t: "Jij kiest." }],
         [{ t: "Eén ding is zeker:" }, { t: "de jouwe bestaat maar één keer." }, { k: "Tale of Tiles", t: "Met de hand gelegd." }],
+        [{ k: "Welkom", t: "Elk paneel uniek, net als jouw naam." }, { t: "Sinds 2026, oneindig veel ontwerpen." }, { t: "Volg ons en ontwerp die van jou op taleoftiles.com." }],
+        [{ t: "Honderd namen, honderd kunstwerken." }, { k: "Tale of Tiles", t: "De jouwe bestaat maar één keer." }, { t: "Maak 'm op taleoftiles.com." }],
+        [{ t: "Zoiets persoonlijks hoeft niet duur." }, { k: "Welkom", t: "Jouw unieke naam, toegankelijk." }, { t: "Volg ons voor meer." }],
       ],
       en: [
         [{ k: "Tale of Tiles", t: "One name, endless designs." }, { t: "Each by hand, never two alike." }, { t: "Which would you pick?" }],
@@ -691,6 +718,9 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "No two alike, just like your name." }, { k: "Tale of Tiles", t: "Each laid by hand." }],
         [{ t: "Stop when you see your favourite." }, { k: "Tale of Tiles", t: "Which one is it?" }, { t: "Tell us below." }],
         [{ t: "Blue, terracotta or bold?" }, { t: "Same name, every time different." }, { k: "Tale of Tiles", t: "You choose." }],
+        [{ k: "Welcome", t: "Every panel unique, just like your name." }, { t: "Since 2026, endless designs." }, { t: "Follow us and design yours at taleoftiles.com." }],
+        [{ t: "A hundred names, a hundred artworks." }, { k: "Tale of Tiles", t: "Yours exists only once." }, { t: "Make it at taleoftiles.com." }],
+        [{ t: "Something this personal needn't be pricey." }, { k: "Welcome", t: "Your one-of-a-kind name, accessible." }, { t: "Follow us for more." }],
       ],
       fr: [
         [{ k: "Tale of Tiles", t: "Un nom, une infinité de designs." }, { t: "Fait main, jamais deux pareils." }],
@@ -698,6 +728,8 @@ export function makeBrand({ ROOT, config }) {
         [{ t: "Aucun pareil, comme votre nom." }, { k: "Tale of Tiles", t: "Chacun posé à la main." }],
         [{ t: "Arrêtez quand vous voyez le vôtre." }, { k: "Tale of Tiles", t: "Lequel est-ce ?" }],
         [{ t: "Bleu, terre cuite ou coloré ?" }, { t: "Même nom, toujours différent." }, { k: "Tale of Tiles", t: "À vous." }],
+        [{ k: "Bienvenue", t: "Chaque panneau unique, comme votre nom." }, { t: "Depuis 2026, une infinité de designs." }, { t: "Suivez-nous et créez le vôtre sur taleoftiles.com." }],
+        [{ t: "Cent noms, cent oeuvres." }, { k: "Tale of Tiles", t: "Le vôtre n'existe qu'une fois." }, { t: "Créez-le sur taleoftiles.com." }],
       ],
     },
   };
