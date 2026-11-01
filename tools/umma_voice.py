@@ -19,138 +19,145 @@ VOICES = {
 }
 
 # Toon-presets: length-scale (tempo, hoger=trager), sentence-silence (pauze na zin), noise-scale (variatie)
+# STRAKKER tempo dan eerst (de video werd 4 min; pauzes waren te lang). Nu vlotter, past bij een short.
 TONE = {
-    "rustig": dict(length=1.12, sil=0.55, noise=0.80),   # verhalend, neutraal
-    "nadruk": dict(length=1.30, sil=0.80, noise=0.75),   # zwaar statement, traag + nadrukkelijk
-    "warm":   dict(length=1.35, sil=0.95, noise=0.82),   # payoff, langzaam, lange pauzes, gevoel
-    "hook":   dict(length=1.18, sil=0.70, noise=0.80),   # opening, iets gezet maar pakkend
+    "rustig": dict(length=1.0,  sil=0.35, noise=0.80),   # verhalend, vlot
+    "nadruk": dict(length=1.1,  sil=0.45, noise=0.75),   # statement, iets gezet
+    "warm":   dict(length=1.12, sil=0.5,  noise=0.82),   # payoff, met gevoel maar niet sloom
+    "hook":   dict(length=1.0,  sil=0.4,  noise=0.80),   # opening, pakkend
 }
 
 # Het script "sword" (idee 1), per scene: nummer, toon, on-screen-tekst, en de VOICE-zin.
 # De voice-zin is wat ingesproken wordt; de on-screen-tekst is de korte zin in beeld.
+# TWEE DELEN. Knip op de natuurlijke breuk: deel 1 = HOE de islam opkwam (zonder dwang),
+# eindigt op een cliffhanger die de grote test opzet (500 jaar kolonisatie). Deel 2 = de TEST,
+# en dat het standhield (Indonesië 300 jaar, Bosnië, Spanje, payoff, CTA).
+# SCRIPT v2 — scherper, trots, DIRECT tot de moslim-kijker (iedereen mag meekijken). Korte rake
+# zinnen, pakkende haak, geen neutraal-documentaire-toon. Per scene: nr, toon, ON-SCREEN kernzin
+# (groot in beeld bij statement/mythe), en de VOICE-zin (ook de ondertitel die meeloopt).
 STORIES = {
-  "sword": {
-    "title": "Spread by the sword?",
+  "sword1": {
+    "title": "Spread by the sword? (1)",
     "scenes": [
-      (1,  "hook",   "Spread by the sword? Look who's pointing.",
-           "Today you'll hear it everywhere. Islam was spread by the sword. Convert, or die. It's become the accusation of our time. But more often than not, the one pointing the finger is the one who's guilty of it."),
-      (2,  "nadruk", "Rome. This is what forcing a faith looks like.",
-           "If you want to see a faith truly forced on people, look at Rome. For centuries, Rome and Byzantium ruled North Africa, Syria and Egypt. Christianity, imposed from above. Hold on to another belief, and you were taxed harder, shut out, or persecuted. That is what forcing a religion actually looks like."),
-      (3,  "rustig", "Forced faith dies with the power behind it.",
-           "And those same lands today? That imposed Christianity is almost gone. Because what you force with power disappears the moment the power does."),
-      (4,  "nadruk", "It couldn't even hold on at home.",
-           "And here's the irony. Look at Western Europe itself, the very heart of that empire. Islam barely ever ruled there. And yet today, most of it has walked away from religion altogether. The faith Rome forced on the world couldn't even hold on at home."),
-      (5,  "rustig", "The locals chose it. Over generations.",
-           "Islam spread differently. It didn't grow because Arabs moved in and replaced everyone. The armies passed through, but it was the local people themselves, the Egyptians, the Berbers, the Persians, who chose it, generation after generation, by their own will."),
-      (6,  "rustig", "Indonesia. No army. Just trade.",
-           "And nowhere proves it like Indonesia. No Muslim army ever set foot there. It became the largest Muslim country on earth through one thing. Trade. Merchants came to do business, the locals saw how they lived and how they kept their word, and adopted the faith entirely on their own."),
-      (7,  "nadruk", "500 years of colonisation. No one converted.",
-           "Then came Europe. Five hundred years of colonisation, over nearly the whole Muslim world. Christian armies, Christian schools, real power. And it converted almost no one."),
-      (8,  "nadruk", "300 years of Dutch rule. Still Muslim.",
-           "Take Indonesia again. The Dutch ruled it for three hundred years. Three centuries of colonial power. And they changed nothing. A people who became Muslim with no ruler forcing them, stayed Muslim under three hundred years of rule that tried."),
-      (9,  "warm",   "Bosnia. Alone, surrounded, still here.",
-           "Or Bosnia. Alone in Europe, far from any Muslim land, surrounded for centuries, through wars that tried to erase them. And still, today, Muslim. Respect to our Bosnian brothers."),
-      (10, "rustig", "Spain: the faith left only when the people were forced out.",
-           "There's only one place Islam truly disappeared. Spain. But not because people changed their minds. Muslims there were given three choices. Convert, leave, or die. They weren't persuaded, they were driven out. The faith only left when the people were forced to. Which proves the whole point. Where the people stayed, Islam stayed."),
-      (11, "warm",   "You can't rewrite the truth.",
-           "So when someone tells you this faith was forced on the world, remember. An accusation often turns out to be the exact opposite of the truth. You can rewrite the story. You cannot rewrite the truth. Rulers changed. Empires fell. Your people stayed. And that is something to be proud of."),
-      (12, "warm",   "Umma United — know your history.",
-           "Follow Umma United. Know your history, and you know yourself."),
+      (1,  "hook",   "They say we spread Islam by the sword.",
+           "They told you Islam was spread by the sword. You've heard it so often you almost believe it. So let's talk about who actually used the sword."),
+      (2,  "nadruk", "Rome forced its faith. At the point of a blade.",
+           "Rome ruled North Africa, Syria, Egypt. Christianity, forced from above. Believe something else, and you were taxed, shut out, or killed. That is what the sword really looks like."),
+      (3,  "rustig", "And today? That faith is almost gone there.",
+           "Look at those same lands now. That forced Christianity? Almost gone. Because what you take by force, you lose the moment the force is gone."),
+      (4,  "nadruk", "It couldn't even survive in Europe itself.",
+           "And the heart of that empire, Europe itself? Today most of it has walked away from religion completely. The faith Rome forced on the world couldn't even survive at home."),
+      (5,  "rustig", "Islam didn't need an army. People chose it.",
+           "Islam spread differently. Not by replacing people, but by convincing them. The Egyptians, the Berbers, the Persians, they chose it themselves, generation after generation."),
+      (6,  "rustig", "Indonesia: the biggest Muslim nation. No army ever came.",
+           "Indonesia proves it. No Muslim army ever set foot there. It became the largest Muslim country on earth through trade. People saw how the merchants lived, and chose their faith freely."),
+      (7,  "warm",   "Then came the real test. Part 2.",
+           "So it grew without the sword. But then came the real test. Five hundred years of foreign power, built to break us. Did we bend? Part two."),
     ],
-    # Landen-groepen (Engelse namen; de engine kent ze via de kaart-asset + aliassen).
-    "groups": [
-      "group rome = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Greece, Italy, Spain",
-      "group europe_west = France, Spain, Italy, Portugal, Germany, Netherlands, Belgium",
-      "group belt = Morocco, Algeria, Tunisia, Libya, Egypt, Saudi Arabia, Iraq, Iran, Pakistan, Bangladesh, Malaysia, Indonesia, Turkey, Syria, Jordan, Afghanistan, Uzbekistan",
-      "group indonesia = Indonesia",
-      "group bosnia = Bosnia and Herz.",
-      "group spain = Spain",
-    ],
-    # Per scene: de TECHNIEK (mythe/kaart/statement) + die techniek z'n velden.
-    # - mythe (scène 1): de leugen -> doorgestreept -> waarheid eronder (truth:).
-    # - kaart (geo-scènes): fill/rule/view op de wereldkaart.
-    # - statement (payoff/CTA): grote kernzin, woord-voor-woord.
-    # Technieken GEMENGD: beeld (historische foto + zoom) waar een plek/sfeer telt, kaart waar
-    # geografie de klap draagt, statement voor de payoffs, mythe voor de hook. SFX op de kantels.
-    "map": [
-      (1,  "Islam was spread by the sword.",                                  ["tech: mythe", "truth: Look who's really pointing.", "sfx: assets/ummaunited/sfx/sfx-zwaard.mp3"]),
-      (2,  "Rome. This is what forcing a faith looks like.",                  ["tech: beeld", "img: beeld-rome.jpg", "sfx: assets/ummaunited/sfx/sfx-boom.mp3"]),
-      (3,  "Forced faith dies with the power behind it.",                     ["tech: kaart", "rule: rome=cream", "view: mena"]),
-      (4,  "It couldn't even hold on at home.",                               ["tech: kaart", "fill: europe_west=cream", "view: europe"]),
-      (5,  "The locals chose it. Over generations.",                          ["tech: beeld", "img: beeld-kaart.jpg"]),
-      (6,  "Indonesia. No army. Just trade.",                                 ["tech: beeld", "img: beeld-indonesie.jpg"]),
-      (7,  "500 years of colonisation. No one converted.",                    ["tech: beeld", "img: beeld-kolonisatie.jpg", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
-      (8,  "300 years of Dutch rule. Still Muslim.",                          ["tech: kaart", "fill: indonesia=orange", "rule: indonesia=ruler", "view: sea"]),
-      (9,  "Bosnia. Alone, surrounded, still here.",                          ["tech: beeld", "img: beeld-bosnie.jpg"]),
-      (10, "Spain: the faith left only when the people were forced out.",     ["tech: beeld", "img: beeld-spanje.jpg"]),
-      (11, "You can't rewrite the truth.",                                    ["tech: statement", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
-      (12, "Umma United — know your history.",                                ["tech: statement"]),
+  },
+  "sword2": {
+    "title": "Spread by the sword? (2)",
+    "scenes": [
+      (1,  "nadruk", "500 years of colonisation. Almost no one converted.",
+           "Then came Europe. Five hundred years of colonial rule over almost the whole Muslim world. Their armies, their schools, their power. And still, almost no one converted."),
+      (2,  "nadruk", "300 years of Dutch rule. Indonesia stayed Muslim.",
+           "The Dutch ruled Indonesia for three hundred years. Three centuries of power. And they changed nothing. A people who chose Islam freely, kept it under the rule that tried to take it."),
+      (3,  "warm",   "Bosnia stood alone. And never let go.",
+           "Bosnia. Alone in Europe, surrounded for centuries, through wars meant to erase them. And still, today, Muslim. Respect to our Bosnian brothers."),
+      (4,  "rustig", "Spain is the proof. The people were driven out.",
+           "Only one place lost Islam. Spain. Not because minds changed, but because Muslims were given three choices. Convert, leave, or die. They weren't persuaded. They were driven out. Where the people stayed, Islam stayed."),
+      (5,  "warm",   "You can rewrite the story. Not the truth.",
+           "So when they tell you your faith was forced on the world, remember. The accuser is usually the guilty one. You can rewrite the story. You cannot rewrite the truth. And your people never broke."),
+      (6,  "warm",   "Be proud. This is who you are.",
+           "Rulers came and went. Your people stayed. Be proud of that. Follow Umma United, and know who you are."),
     ],
   },
 }
+# Gedeelde landgroepen voor beide delen.
+_GROUPS = [
+  "group rome = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Greece, Italy, Spain",
+  "group europe_west = France, Spain, Italy, Portugal, Germany, Netherlands, Belgium",
+  "group indonesia = Indonesia",
+  "group bosnia = Bosnia and Herz.",
+  "group spain = Spain",
+]
+STORIES["sword1"]["groups"] = _GROUPS
+STORIES["sword2"]["groups"] = _GROUPS
+# Choreografie per deel (scene-nr binnen DAT deel). Technieken gemengd, SFX op de kantels.
+STORIES["sword1"]["map"] = [
+  (1, "Islam was spread by the sword.",                   ["tech: mythe", "truth: Look who's really pointing.", "sfx: assets/ummaunited/sfx/sfx-zwaard.mp3"]),
+  (2, "Rome. This is what forcing a faith looks like.",   ["tech: beeld", "img: beeld-rome.jpg", "sfx: assets/ummaunited/sfx/sfx-boom.mp3"]),
+  (3, "Forced faith dies with the power behind it.",      ["tech: kaart", "rule: rome=cream", "view: mena"]),
+  (4, "It couldn't even hold on at home.",                ["tech: kaart", "fill: europe_west=cream", "view: europe"]),
+  (5, "The locals chose it. Over generations.",           ["tech: beeld", "img: beeld-kaart.jpg"]),
+  (6, "Indonesia. No army. Just trade.",                  ["tech: beeld", "img: beeld-indonesie.jpg"]),
+  (7, "Then came the greatest test. Part 2.",             ["tech: statement", "kick: Part 2", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
+]
+STORIES["sword2"]["map"] = [
+  (1, "500 years of colonisation. No one converted.",                ["tech: beeld", "img: beeld-kolonisatie.jpg", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
+  (2, "300 years of Dutch rule. Still Muslim.",                      ["tech: kaart", "fill: indonesia=orange", "rule: indonesia=ruler", "view: sea"]),
+  (3, "Bosnia. Alone, surrounded, still here.",                      ["tech: beeld", "img: beeld-bosnie.jpg"]),
+  (4, "Spain: the faith left only when the people were forced out.", ["tech: beeld", "img: beeld-spanje.jpg"]),
+  (5, "You can't rewrite the truth.",                                ["tech: statement", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
+  (6, "Umma United — know your history.",                            ["tech: statement"]),
+]
+
+def build_story(story_id, voice, root, only=0):
+    story = STORIES[story_id]
+    model = VOICES[voice]
+    subprocess.run([sys.executable, "-m", "piper.download_voices", model],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    outdir = os.path.join(root, "assets", "ummaunited", "voice", story_id, voice)
+    os.makedirs(outdir, exist_ok=True)
+    made = []
+    for num, tone, screen, voiceline in story["scenes"]:
+        if only and num != only:
+            continue
+        t = TONE[tone]
+        wav = os.path.join(outdir, f"{num:02d}.wav")
+        cmd = [sys.executable, "-m", "piper", "-m", model,
+               "--length-scale", str(t["length"]), "--sentence-silence", str(t["sil"]),
+               "--noise-scale", str(t["noise"]), "-f", wav]
+        p = subprocess.run(cmd, input=voiceline.encode("utf-8"), stderr=subprocess.PIPE)
+        if p.returncode != 0:
+            print(f"  scene {num}: FOUT\n", p.stderr.decode(errors="ignore")[-400:]); continue
+        made.append((num, wav)); print(f"  scene {num:02d} [{tone}] -> {wav}")
+    if not only:
+        lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
+        by = {num: wav for num, wav in made}
+        # volle gesproken zin per scene-nr (voor de ondertitel die meeloopt met de stem)
+        caption_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
+        for num, screen, mapspec in story["map"]:
+            parts = [f"scene {num}", screen] + list(mapspec)
+            if caption_by.get(num):
+                parts.append("caption: " + caption_by[num])
+            if by.get(num):
+                parts.append("voice: " + os.path.relpath(by[num], root).replace("\\", "/"))
+            lines.append(" | ".join(parts))
+        imp = os.path.join(outdir, f"_import-{voice}.txt")
+        with open(imp, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print("  import-script:", imp)
+    print(f"  klaar: {len(made)} fragment(en)")
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", required=True, help="verhaal-id, bv. sword")
-    ap.add_argument("--voice", default="beide", choices=list(VOICES.keys()) + ["beide"],
-                    help="man, vrouw, of beide (default: beide — zet allebei klaar om later te kiezen)")
+    ap.add_argument("--story", default="all", help="sword1, sword2, of all (default: beide delen)")
+    ap.add_argument("--voice", default="beide", choices=list(VOICES.keys()) + ["beide"])
     ap.add_argument("--only", type=int, default=0, help="alleen scene-nummer N opnieuw maken")
     ap.add_argument("--root", default=".", help="content-engine root")
     args = ap.parse_args()
 
-    story = STORIES.get(args.story)
-    if not story:
-        print("onbekend verhaal:", args.story); sys.exit(1)
-
+    stories = ["sword1", "sword2"] if args.story == "all" else [args.story]
+    for sid in stories:
+        if sid not in STORIES:
+            print("onbekend verhaal:", sid); continue
     voices = list(VOICES.keys()) if args.voice == "beide" else [args.voice]
-
-    for voice in voices:
-        model = VOICES[voice]
-        print(f"\n=== STEM: {voice} ({model}) ===")
-        # Stem zelf ophalen als die nog niet op de machine staat (geen handwerk voor de gebruiker).
-        subprocess.run([sys.executable, "-m", "piper.download_voices", model],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Elke stem in z'n EIGEN submap, zodat man en vrouw naast elkaar blijven staan en je
-        # later in de content engine per filmpje kunt kiezen welke je gebruikt.
-        outdir = os.path.join(args.root, "assets", "ummaunited", "voice", args.story, voice)
-        os.makedirs(outdir, exist_ok=True)
-
-        made = []
-        for num, tone, screen, voiceline in story["scenes"]:
-            if args.only and num != args.only:
-                continue
-            t = TONE[tone]
-            wav = os.path.join(outdir, f"{num:02d}.wav")
-            cmd = [sys.executable, "-m", "piper", "-m", model,
-                   "--length-scale", str(t["length"]),
-                   "--sentence-silence", str(t["sil"]),
-                   "--noise-scale", str(t["noise"]),
-                   "-f", wav]
-            p = subprocess.run(cmd, input=voiceline.encode("utf-8"),
-                               stderr=subprocess.PIPE)
-            if p.returncode != 0:
-                print(f"scene {num}: FOUT\n", p.stderr.decode(errors="ignore")[-400:]); continue
-            made.append((num, tone, screen, wav))
-            print(f"scene {num:02d} [{tone}] -> {wav}")
-
-        # import-script per stem: stem + KAART-choreografie samen, klaar om in de studio te plakken.
-        if not args.only:
-            lines = [f"title: {story['title']}", "view: belt"]
-            lines += story.get("groups", [])
-            made_by_num = {num: wav for num, tone, screen, wav in made}
-            for num, screen, mapspec in story["map"]:
-                wav = made_by_num.get(num)
-                parts = [f"scene {num}", screen]
-                parts += mapspec            # fill/rule/view per scene
-                if wav:
-                    rel = os.path.relpath(wav, args.root).replace("\\", "/")
-                    parts.append(f"voice: {rel}")
-                lines.append(" | ".join(parts))
-            imp = os.path.join(outdir, f"_import-{voice}.txt")
-            with open(imp, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-            print("import-script:", imp)
-        print(f"klaar: {len(made)} fragment(en), stem = {voice}")
+    for sid in stories:
+        if sid not in STORIES: continue
+        for voice in voices:
+            print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) ===")
+            build_story(sid, voice, args.root, args.only)
 
 if __name__ == "__main__":
     main()

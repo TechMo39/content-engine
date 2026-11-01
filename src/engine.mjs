@@ -458,6 +458,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    // UMMA — muziek UITSLUITEND uit de eigen map assets/ummaunited/muziek/ (gescheiden van Tale of Tiles).
+    if (u.pathname === "/api/umma-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/umma-upload" && req.method === "POST") {
