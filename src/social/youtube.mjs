@@ -120,9 +120,10 @@ export function suggest({ type, lang, name, seed, recent } = {}) {
   // in hetzelfde ritme lopen (anders zou je steeds dezelfde subset zien).
   const postCount = usedTitles.length;
   const tagOffset = (recent ? postCount * 5 : Math.abs(sd)) + 2;
-  const typed = pickTags(pool, tagOffset, 4 + (postCount % 2));   // 4 of 5 niche type-tags, wisselend
-  const reach = pickTags(reachPool, tagOffset + 3, 2);            // 2 brede bereik-tags, wisselend
+  const typed = pickTags(pool, tagOffset, 3 + (postCount % 2));   // 3 of 4 niche type-tags, wisselend
+  const reach = pickTags(reachPool, tagOffset + 3, 1);            // 1 brede bereik-tag, wisselend
   // Volgorde: merk eerst (herkenning), dan niche (koopintentie), dan breed (ontdekking).
+  // Totaal gericht op ~7-9 (binnen de 2026-Reels-aanbeveling 5-10): te veel brede tags is ruis.
   const all = [...new Set([...brand, ...typed, ...reach])];
   const hashline = "#Shorts " + all.map((x) => "#" + x.replace(/[^\p{L}\p{N}]/gu, "")).join(" ");
   // beschrijving: de kern-zin (keyword-rijk, wat de zoek-/aanbevelingsfunctie leest) bovenaan,
