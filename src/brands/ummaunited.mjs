@@ -29,6 +29,22 @@ async function wavDuration(absPath) {
   } catch { return 0; }
 }
 
+// Beeld inladen als data-URI (jpg/png/webp), met cache. Zodat resvg het in de SVG kan tekenen.
+// Faalt netjes (lege string) als het bestand ontbreekt.
+const _imgCache = new Map();
+async function loadImageURI(absPath) {
+  if (_imgCache.has(absPath)) return _imgCache.get(absPath);
+  let uri = "";
+  try {
+    const buf = await fs.readFile(absPath);
+    const ext = absPath.toLowerCase().split(".").pop();
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    uri = `data:${mime};base64,${buf.toString("base64")}`;
+  } catch { uri = ""; }
+  _imgCache.set(absPath, uri);
+  return uri;
+}
+
 // ---------------------------------------------------------------- huisstijl
 const COL = {
   ink: "#0d1427", navy: "#111a33", navy2: "#1b2748",
@@ -172,6 +188,7 @@ function parseStory(text, name2id) {
         else if (key === "tech") { sc.tech = val.toLowerCase(); }   // welke techniek beeldt deze scène uit
         else if (key === "truth") { sc.truth = val; }               // mythe-techniek: de waarheid onder de leugen
         else if (key === "kick") { sc.kick = val; }                 // kleine onderregel/kicker
+        else if (key === "img") { sc.img = val; }                   // beeld-techniek: bestandsnaam in assets/ummaunited/beeld/
       }
       out.scenes.push(sc); continue;
     }
@@ -566,8 +583,41 @@ export function makeBrand({ ROOT = "." } = {}) {
     return g;
   }
 
+  // -- TECHNIEK: beeld (historische foto op de achtergrond + langzame zoom "Ken Burns" +
+  // donkere gradient onderaan zodat de tekst leesbaar is + de kernzin eroverheen). scene.imgURI
+  // wordt vooraf ingeladen (zie makeComposedRender). Geen beeld -> valt terug op het sterrenveld.
+  function techBeeld({ W, H, p, scene }) {
+    const uri = scene.imgURI || "";
+    let g;
+    if (uri) {
+      // Ken Burns: langzaam inzoomen (1.08 -> 1.00) + lichte pan, zodat het beeld leeft.
+      const z = 1.14 - 0.12 * sm(p);
+      const iw = W * z, ih = H * z;
+      const ox = (W - iw) / 2 - (W * 0.03) * (0.5 - p);   // subtiele pan
+      const oy = (H - ih) / 2;
+      g = `<image href="${uri}" x="${ox.toFixed(1)}" y="${oy.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="xMidYMid slice"/>`;
+      // donkere wasem over het geheel + sterkere gradient onderaan voor de tekst
+      g += `<rect width="${W}" height="${H}" fill="${COL.ink}" opacity="0.28"/>`;
+      g += `<defs><linearGradient id="bshade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.45" stop-color="${COL.ink}" stop-opacity="0"/><stop offset="1" stop-color="${COL.ink}" stop-opacity="0.92"/></linearGradient></defs>`;
+      g += `<rect width="${W}" height="${H}" fill="url(#bshade)"/>`;
+    } else {
+      g = bgField(W, H, 23);
+    }
+    // de kernzin onderaan, woord-voor-woord, groot en leesbaar op de donkere onderrand
+    const txt = scene.text || "";
+    if (txt) {
+      const fs = fitFs(txt, Math.round(W * 0.075), W * 0.84, 0.56);
+      g += wordReveal(txt, W / 2, H * 0.80, fs, COL.cream, clamp01(p / 0.6));
+    }
+    if (scene.kick) {
+      const ko = clamp01((p - 0.4) / 0.3);
+      g += `<text x="${W / 2}" y="${H * 0.87}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.042)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+    }
+    return g;
+  }
+
   // techniek-register: naam -> fn
-  const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart };
+  const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart, beeld: techBeeld };
 
   // COMPOSITIE-render: scènes met gemengde technieken -> één video.
   async function makeComposedRender({ subjectId, opts = {}, format = "9:16" }) {
@@ -579,12 +629,14 @@ export function makeBrand({ ROOT = "." } = {}) {
     const title = opts.title || (picked && picked.title) || "Umma United";
 
     // duur per scène: stem stuurt (wav-lengte + marge), anders dur of 3s.
+    // en: beeld-scènes hun foto vooraf inladen als data-URI (zodat sceneAt synchroon kan tekenen).
     const VOICE_PAD = 0.5;
     const durs = [];
     for (const s of scenes) {
       let d = Number(s.dur) || 3.0;
       if (s && s.voice) { const wl = await wavDuration(path.resolve(ROOT, s.voice)); if (wl > 0) d = wl + VOICE_PAD; }
       durs.push(d);
+      if (s && s.img) { s.imgURI = await loadImageURI(path.resolve(ROOT, "assets/ummaunited/beeld", s.img)); }
     }
     const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
     const total = acc;
@@ -616,7 +668,12 @@ export function makeBrand({ ROOT = "." } = {}) {
   }
 
   async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
-    const type = opts.type || opts.template || "kaart";
+    let type = opts.type || opts.template || "kaart";
+    // AUTOMATISCH: als het gekozen verhaal (of opts) scènes met een `tech`-veld bevat, gebruik
+    // de compositie — zo hoeft de studio geen aparte "mix"-keuze te hebben; Importeer + Render volstaat.
+    const picked = subjectId && STORIES[subjectId] ? STORIES[subjectId] : null;
+    const sc = opts.scenes || (picked && picked.scenes) || [];
+    if (type === "kaart" && sc.some((s) => s && s.tech)) type = "mix";
     switch (type) {
       case "kaart": return makeKaartRender({ subjectId, opts, format });
       case "mix":
