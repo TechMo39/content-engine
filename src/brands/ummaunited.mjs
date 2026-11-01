@@ -189,6 +189,7 @@ function parseStory(text, name2id) {
         else if (key === "truth") { sc.truth = val; }               // mythe-techniek: de waarheid onder de leugen
         else if (key === "kick") { sc.kick = val; }                 // kleine onderregel/kicker
         else if (key === "img") { sc.img = val; }                   // beeld-techniek: bestandsnaam in assets/ummaunited/beeld/
+        else if (key === "caption") { sc.caption = val; }           // de VOLLE gesproken zin -> ondertitel die meeloopt met de stem
       }
       out.scenes.push(sc); continue;
     }
@@ -215,7 +216,8 @@ function titel(txt, W, H, op = 1) {
 }
 function onderschrift(txt, W, H, op = 1) {
   if (!txt) return "";
-  const fs2 = fitFs(txt, Math.round(W * 0.05), W * 0.80, 0.56), y = Math.round(H * 0.84);
+  // BOVENIN (de onderrand is voor de meelopende ondertitel, zodat die twee nooit botsen).
+  const fs2 = fitFs(txt, Math.round(W * 0.05), W * 0.80, 0.56), y = Math.round(H * 0.235);
   const bw = Math.min(W * 0.88, fs2 * String(txt).length * 0.58);
   return `<g opacity="${op.toFixed(2)}">`
     + `<rect x="${W / 2 - bw / 2 - 16}" y="${y - fs2}" width="${bw + 32}" height="${fs2 * 1.7}" rx="${fs2}" fill="#000000" opacity="0.34"/>`
@@ -260,6 +262,7 @@ export function makeBrand({ ROOT = "." } = {}) {
   let MAP = null;        // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
   let NAME2ID = {};      // landnaam(lowercase) -> isoId, uit de kaart-asset
   let STORIES = {};      // verhaal-id (titel/bestandsnaam) -> geparseerd verhaal
+  let LOGO_URI = "";     // het echte ronde embleem (assets/ummaunited/brand/logo.png) als data-URI
 
   async function init() {
     try {
@@ -281,6 +284,8 @@ export function makeBrand({ ROOT = "." } = {}) {
         STORIES[id] = parsed;
       }
     } catch { /* geen stories-map = alleen het demo-verhaal */ }
+    // het echte logo inladen (data-URI), voor de chrome i.p.v. platte tekst
+    LOGO_URI = await loadImageURI(path.resolve(ROOT, "assets/ummaunited/brand/logo.png"));
   }
 
   async function listSubjects() {
@@ -603,17 +608,87 @@ export function makeBrand({ ROOT = "." } = {}) {
     } else {
       g = bgField(W, H, 23);
     }
-    // de kernzin onderaan, woord-voor-woord, groot en leesbaar op de donkere onderrand
+    // de korte kernzin in de BOVENSTE helft (de onderrand is nu voor de meelopende ondertitel).
+    // Boven een donkere band zodat het leesbaar blijft op het beeld.
     const txt = scene.text || "";
     if (txt) {
-      const fs = fitFs(txt, Math.round(W * 0.075), W * 0.84, 0.56);
-      g += wordReveal(txt, W / 2, H * 0.80, fs, COL.cream, clamp01(p / 0.6));
+      const fs = fitFs(txt, Math.round(W * 0.066), W * 0.84, 0.56);
+      g += `<defs><linearGradient id="btop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${COL.ink}" stop-opacity="0.85"/><stop offset="1" stop-color="${COL.ink}" stop-opacity="0"/></linearGradient></defs>`;
+      g += `<rect x="0" y="${(H * 0.11).toFixed(0)}" width="${W}" height="${(H * 0.22).toFixed(0)}" fill="url(#btop)"/>`;
+      g += wordReveal(txt, W / 2, H * 0.22, fs, COL.cream, clamp01(p / 0.6));
     }
     if (scene.kick) {
       const ko = clamp01((p - 0.4) / 0.3);
-      g += `<text x="${W / 2}" y="${H * 0.87}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.042)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+      g += `<text x="${W / 2}" y="${H * 0.29}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.042)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
     }
     return g;
+  }
+
+  // -- CHROME: het echte logo-embleem bovenin (klein, met de merknaam eronder). Op elke scène.
+  function logoChrome(W, H) {
+    if (!LOGO_URI) {
+      // fallback: platte tekst als het logo-bestand ontbreekt
+      return `<text x="${W / 2}" y="${H * 0.075}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${Math.round(W * 0.04)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
+    }
+    const sz = Math.round(W * 0.14);
+    return `<image href="${LOGO_URI}" x="${(W - sz) / 2}" y="${H * 0.035}" width="${sz}" height="${sz}" preserveAspectRatio="xMidYMid meet"/>`;
+  }
+  // -- ONDERTITEL: de VOLLE gesproken zin onderaan, woord-voor-woord mee met de scène (karaoke-
+  // stijl). Op een donkere balk zodat het altijd leesbaar is, ongeacht het beeld eronder.
+  function ondertitelMee(caption, W, H, p) {
+    const txt = String(caption || "").trim();
+    if (!txt) return "";
+    const words = txt.split(/\s+/);
+    const fs = Math.round(W * 0.044), lh = fs * 1.3;
+    // Breedte-fit: schat tekenbreedte (~0.56*fs per teken) en vul regels tot ~86% van W.
+    const maxLineW = W * 0.86, charW = fs * 0.56;
+    const lines = []; let cur = [];
+    const lineWidth = (arr) => arr.join(" ").length * charW;
+    for (const w of words) {
+      if (cur.length && lineWidth([...cur, w]) > maxLineW) { lines.push(cur); cur = [w]; }
+      else cur.push(w);
+    }
+    if (cur.length) lines.push(cur);
+    // Toon maximaal een venster van 3 regels rond de "actieve" regel (anders wordt het een muur tekst).
+    const activeIdx = Math.min(words.length - 1, Math.floor(clamp01(p) * words.length));
+    // bepaal in welke regel het actieve woord zit
+    let acc = 0, activeLine = 0;
+    for (let li = 0; li < lines.length; li++) { if (activeIdx < acc + lines[li].length) { activeLine = li; break; } acc += lines[li].length; }
+    const WIN = 3;
+    let from = Math.max(0, activeLine - 1);
+    let to = Math.min(lines.length, from + WIN);
+    from = Math.max(0, to - WIN);
+    const shown = lines.slice(from, to);
+    const totalH = shown.length * lh;
+    const yTop = H * 0.885 - totalH;
+    let g = `<rect x="${W * 0.05}" y="${(yTop - fs * 0.8).toFixed(0)}" width="${W * 0.90}" height="${(totalH + fs * 1.0).toFixed(0)}" rx="${fs * 0.55}" fill="#000000" opacity="0.6"/>`;
+    // globale woord-index bij begin van de getoonde regels
+    let wi = 0; for (let li = 0; li < from; li++) wi += lines[li].length;
+    shown.forEach((ln, li) => {
+      const y = yTop + li * lh + fs;
+      let tspans = "";
+      ln.forEach((w) => {
+        const on = wi <= activeIdx;
+        tspans += `<tspan fill="${on ? COL.cream : COL.mute}" fill-opacity="${on ? 1 : 0.5}">${escapeXml(w)}</tspan><tspan> </tspan>`;
+        wi++;
+      });
+      g += `<text x="${W / 2}" y="${y.toFixed(0)}" text-anchor="middle" xml:space="preserve" font-family="${SANS}" font-weight="700" font-size="${fs}">${tspans}</text>`;
+    });
+    return g;
+  }
+
+  // -- OUTRO: korte missie-regel onder de CTA (alleen de laatste scène). Vertelt in 1 adem waar
+  // Umma United voor staat, zodat de allereerste video het kanaal meteen plaatst.
+  function missieRegel(W, H, op) {
+    if (op <= 0.01) return "";
+    const l1 = "UMMA UNITED";
+    const l2 = "Our history. Our pride. Our present.";
+    const fs1 = Math.round(W * 0.052), fs2 = Math.round(W * 0.040);
+    const y = H * 0.135;
+    return `<g opacity="${op.toFixed(2)}">`
+      + `<text x="${W / 2}" y="${y}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${fs1}" letter-spacing="3" fill="${COL.orange}">${l1}</text>`
+      + `<text x="${W / 2}" y="${(y + fs1 * 1.15).toFixed(0)}" text-anchor="middle" font-family="${SANS}" font-weight="600" font-size="${fs2}" fill="${COL.cream}">${escapeXml(l2)}</text>`
+      + `</g>`;
   }
 
   // techniek-register: naam -> fn
@@ -651,20 +726,54 @@ export function makeBrand({ ROOT = "." } = {}) {
       const techName = s.tech || "statement";
       const fn = TECHS[techName] || techStatement;
       const inner = fn({ W, H, p, scene: s, groups });
-      // kader + merk op elke scène; CTA-fold-out op de laatste scène
+      // kader altijd. Logo ALLEEN in de intro (scène 1) en de outro (laatste scène), niet ertussen.
+      // Ondertitel loopt mee met de stem. CTA + missie-regel vouwen open op de laatste scène.
+      const isFirst = i === 0;
       const isLast = i === scenes.length - 1;
+      // Logo ALLEEN in de intro (scène 1). De outro draagt de wordmark "UMMA UNITED" al via de
+      // missie-regel, dus daar geen los logo (zou botsen en dubbelop zijn).
+      const showLogo = isFirst;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
-      const ovl = kader(W, H) + (ctaOp > 0.01 ? ctaFoldout(W, H, ctaOp) : "");
+      // PATTERN-INTERRUPT: korte visuele reset op elke scène-overgang (behalve de eerste) — een
+      // snelle flits in de eerste ~0.12 van de scène. Houdt het oog wakker, zoals de short-form
+      // retentie-techniek wil (reset elke paar seconden).
+      const flashDur = 0.12;
+      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
+      const ovl = flash + kader(W, H)
+        + (showLogo ? logoChrome(W, H) : "")
+        + ondertitelMee(s.caption, W, H, p)
+        + (ctaOp > 0.01 ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
 
-    // audio: stem + SFX per scène op het startmoment
+    // audio: stem (BOVEN de muziek) + SFX per scène op het startmoment.
+    // voiceGain 1.6 default zodat het gesprokene duidelijk boven de achtergrondmuziek uitkomt.
     const tracks = [];
     scenes.forEach((s, i) => {
-      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.0 : s.voiceGain });
-      if (s && s.sfx) tracks.push({ file: path.resolve(ROOT, s.sfx), atSec: starts[i], gain: s.sfxGain == null ? 0.8 : s.sfxGain });
+      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.6 : s.voiceGain });
+      if (s && s.sfx) tracks.push({ file: path.resolve(ROOT, s.sfx), atSec: starts[i], gain: s.sfxGain == null ? 0.5 : s.sfxGain });
     });
-    return { W, H, FPS, SS, durSec: total, sceneAt, audio: tracks.length ? { tracks } : undefined };
+
+    // MUZIEK — STRIKT GESCHEIDEN van Tale of Tiles. Umma leest UITSLUITEND uit zijn eigen map
+    // assets/ummaunited/muziek/ (nooit uit assets/audio/, waar Tale of Tiles zit). Zo kan onze
+    // muziek nooit in een Tale of Tiles-filmpje belanden, en andersom ook niet.
+    // Kies de LANGSTE track, zodat de muziek niet korter is dan de video (anders kapt -shortest af).
+    let music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
+    return { W, H, FPS, SS, durSec: total, sceneAt, music, audio: tracks.length ? { tracks } : undefined };
+  }
+
+  // Kies uit assets/ummaunited/muziek/ de langste track (>= videolengte als dat kan).
+  async function pickUmmaMusic(minSec = 0) {
+    const dir = path.resolve(ROOT, "assets/ummaunited/muziek");
+    let files = [];
+    try { files = (await fs.readdir(dir)).filter((f) => /\.(mp3|wav|m4a|aac|ogg)$/i.test(f)); } catch { return ""; }
+    if (!files.length) return "";
+    // sorteer op bestandsgrootte (proxy voor lengte): grootste eerst -> langste track
+    const withSize = [];
+    for (const f of files) { try { const st = await fs.stat(path.join(dir, f)); withSize.push([f, st.size]); } catch {} }
+    withSize.sort((a, b) => b[1] - a[1]);
+    return withSize.length ? path.resolve(dir, withSize[0][0]) : "";
   }
 
   async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
