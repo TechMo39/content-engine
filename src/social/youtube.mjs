@@ -41,6 +41,20 @@ const BASE_TAGS = {
   en: ["zellige", "mosaic", "handmade", "taleoftiles"],
   fr: ["zellige", "mosaïque", "faitmain", "taleoftiles"],
 };
+// BEREIK-tags: breed, veel-gezocht, voor ontdekking (naast de niche type-tags die koopintentie
+// dragen). 2026-mix: een paar brede + een paar niche verslaat een hoop generieke. We nemen er
+// per post 2 wisselend uit, zodat elke video breed EN gericht is zonder tag-spam.
+const REACH_TAGS = {
+  nl: ["interieur", "wonen", "marokko", "diy", "homedecor", "ambacht", "satisfying", "cadeau"],
+  en: ["interior", "homedecor", "morocco", "diy", "decor", "craft", "satisfying", "gift"],
+  fr: ["interieur", "deco", "maroc", "diy", "homedecor", "artisanat", "satisfaisant", "cadeau"],
+};
+// Korte volg-aansporing onder de post (reach = ook terugkerende kijkers). Wisselt licht per post.
+const FOLLOW_LINE = {
+  nl: ["Volg ons voor meer en ontwerp die van jou op taleoftiles.com", "Meer zien? Volg ons. Maak je eigen naambord op taleoftiles.com"],
+  en: ["Follow us for more and design yours at taleoftiles.com", "Want more? Follow along. Make your own at taleoftiles.com"],
+  fr: ["Suivez-nous pour plus et créez le vôtre sur taleoftiles.com", "Envie de plus ? Suivez-nous. Composez le vôtre sur taleoftiles.com"],
+};
 // kleine deterministische keuze zodat per video een stabiele (maar verschillende) variant valt
 function pick(arr, seed) { if (!arr || !arr.length) return ""; return arr[Math.abs(seed) % arr.length]; }
 function seedOf(s) { let h = 0; s = String(s || ""); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
@@ -94,21 +108,27 @@ export function suggest({ type, lang, name, seed, recent } = {}) {
   if (name) title = `${name} · ${title}`;
   // beschrijving: idem, los van de titel-keuze
   const body = pickFresh((DESCS[t] && DESCS[t][lg]) || DESCS[t].nl, usedDescs, sd + 1);
-  // hashtags: #Shorts + vaste merk-tags + een WISSELENDE greep uit de type-pool, zodat de
-  // hashtags per post verschillen i.p.v. elke keer dezelfde drie. De greep rouleert met de seed
-  // (een ander startpunt in de pool per video) en varieert ook licht in aantal (3 of 4).
+  // hashtags (2026-mix): #Shorts + vaste merk-tags + een paar BREDE bereik-tags (ontdekking) +
+  // een WISSELENDE greep NICHE type-tags (koopintentie). Niet veel generieke, maar een gerichte
+  // mix. Alles wisselt per post via dezelfde anti-herhaling-schuif als eerst.
   const brand = BASE_TAGS[lg] || BASE_TAGS.nl;
   const pool = (TYPE_TAG_POOL[t] && TYPE_TAG_POOL[t][lg]) || [];
+  const reachPool = REACH_TAGS[lg] || REACH_TAGS.nl;
   // De greep SCHUIFT op met het aantal al-geposte video's van dit type+taal (uit recent), zodat
   // opeenvolgende posts telkens verderop in de pool beginnen -> echt wisselende hashtags. Zonder
   // recent valt het terug op de seed. Een priemstap (×5) voorkomt dat het aantal en de poollengte
   // in hetzelfde ritme lopen (anders zou je steeds dezelfde subset zien).
   const postCount = usedTitles.length;
   const tagOffset = (recent ? postCount * 5 : Math.abs(sd)) + 2;
-  const typed = pickTags(pool, tagOffset, 3 + (postCount % 2));   // 3 of 4 type-tags, wisselend
-  const all = [...new Set([...brand, ...typed])];
+  const typed = pickTags(pool, tagOffset, 4 + (postCount % 2));   // 4 of 5 niche type-tags, wisselend
+  const reach = pickTags(reachPool, tagOffset + 3, 2);            // 2 brede bereik-tags, wisselend
+  // Volgorde: merk eerst (herkenning), dan niche (koopintentie), dan breed (ontdekking).
+  const all = [...new Set([...brand, ...typed, ...reach])];
   const hashline = "#Shorts " + all.map((x) => "#" + x.replace(/[^\p{L}\p{N}]/gu, "")).join(" ");
-  const description = body + "\n\n" + hashline;
+  // beschrijving: de kern-zin (keyword-rijk, wat de zoek-/aanbevelingsfunctie leest) bovenaan,
+  // dan een korte volg + site-aansporing, dan pas de hashtags. Zo staat het belangrijkste vooraan.
+  const follow = pickFresh(FOLLOW_LINE[lg] || FOLLOW_LINE.nl, usedDescs, sd + 2);
+  const description = body + "\n\n" + follow + "\n\n" + hashline;
   return { title: title.slice(0, 100), description, tags: all };
 }
 
