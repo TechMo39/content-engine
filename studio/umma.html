@@ -71,10 +71,12 @@
   <div class="brand">Umma United <span class="d">·</span> Studio</div>
   <span class="ttl" id="ttl"></span>
   <div class="sp"></div>
-  <button class="btn sm" onclick="openImport()">Script laden</button>
-  <select class="btn sm" id="music" style="max-width:170px"><option value="">muziek: (geen)</option></select>
+  <select class="btn sm" id="deel" style="max-width:200px" onchange="switchDeel()"><option>deel laden…</option></select>
+  <button class="btn sm" onclick="openImport()">Plak script</button>
+  <select class="btn sm" id="music" style="max-width:160px"><option value="">muziek: (geen)</option></select>
   <span class="stat" id="stat"></span>
-  <button class="btn o" onclick="doRender()">Render video</button>
+  <button class="btn" onclick="doRender()">Render dit deel</button>
+  <button class="btn o" onclick="renderAll()">Render alle delen</button>
 </header>
 
 <div class="cols">
@@ -289,10 +291,44 @@ async function loadMusic(){ try{const r=await fetch('/api/music');const d=await 
   $('#music').onchange=e=>state.music=e.target.value;
 }catch{} }
 function connectLog(){ try{const es=new EventSource('/api/log');es.onmessage=(e)=>{try{logLine(JSON.parse(e.data))}catch{logLine(e.data)}};}catch{} }
-// als er een klaarstaand import-script is, laad het meteen (zodat je direct je scènes ziet)
-async function autoload(){ try{const r=await fetch('/api/umma-latest-script'); if(!r.ok)return; const d=await r.json(); if(d&&d.text){loadParsed(parseScript(d.text)); logLine('script automatisch geladen uit '+(d.name||'bestand'));}}catch{} }
+// alle klaarstaande delen ophalen -> de deel-kiezer vullen -> het eerste laden
+let ALLDEELS = [];
+async function loadDeels(){
+  try{
+    const r=await fetch('/api/umma-scripts'); const d=await r.json();
+    ALLDEELS = d.items||[];
+    const sel=document.getElementById('deel');
+    if(!ALLDEELS.length){ sel.innerHTML='<option>geen delen klaar</option>'; return; }
+    sel.innerHTML=ALLDEELS.map((it,i)=>`<option value="${i}">${esc(it.title)} · ${esc(it.voice)}</option>`).join('');
+    sel.value='0'; switchDeel();
+  }catch{ document.getElementById('deel').innerHTML='<option>geen delen</option>'; }
+}
+function switchDeel(){
+  const i=+document.getElementById('deel').value; const it=ALLDEELS[i]; if(!it)return;
+  loadParsed(parseScript(it.text));
+  logLine('geladen: '+it.title+' ('+it.voice+')');
+}
+// RENDER ALLE DELEN: zet elk deel achter elkaar in de render-wachtrij (de engine werkt ze één
+// voor één af). Je hoeft dus niet per deel te laden en te drukken.
+async function renderAll(){
+  if(!ALLDEELS.length){ logLine('geen delen om te renderen.'); return; }
+  logLine('▶ alle '+ALLDEELS.length+' delen in de wachtrij...'); $('#stat').textContent='rendert alles...';
+  for(const it of ALLDEELS){
+    const p=parseScript(it.text);
+    // tijdelijke state opbouwen voor buildOpts
+    const save={groups:state.groups,scenes:state.scenes};
+    state.groups=p.groups; state.scenes=p.scenes;
+    const opts=buildOpts(()=>{});
+    state.groups=save.groups; state.scenes=save.scenes;
+    try{ await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'ummaunited',format:state.format,music:state.music||'',opts})});
+      logLine('✓ '+it.title+' ('+it.voice+') klaar'); }
+    catch(e){ logLine('✗ '+it.title+': '+e.message); }
+  }
+  $('#stat').textContent='alles klaar';
+  logLine('■ alle delen gerenderd — staan in je Bibliotheek.');
+}
 
-renderList(); renderInspector(); loadMusic(); connectLog(); autoload();
+renderList(); renderInspector(); loadMusic(); connectLog(); loadDeels();
 </script>
 </body>
 </html>

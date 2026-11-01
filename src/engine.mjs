@@ -495,6 +495,29 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { json(res, { text: null, error: e.message }); }
       return;
     }
+    // UMMA — ALLE klaarstaande import-scripts als lijst (voor "render alle delen"). Per deel+stem
+    // één item met id (verhaal/stem), titel en de scripttekst. De studio kan ze zo achter elkaar
+    // in de render-wachtrij zetten (de engine-wachtrij verwerkt ze één voor één).
+    if (u.pathname === "/api/umma-scripts" && req.method === "GET") {
+      const items = [];
+      try {
+        const base = path.resolve(ROOT, "assets/ummaunited/voice");
+        for (const story of (await fs.readdir(base).catch(() => [])).sort()) {
+          const sdir = path.join(base, story);
+          for (const voice of (await fs.readdir(sdir).catch(() => [])).sort()) {
+            const vdir = path.join(sdir, voice);
+            for (const f of await fs.readdir(vdir).catch(() => [])) {
+              if (!/^_import-.*\.txt$/i.test(f)) continue;
+              let text = ""; try { text = await fs.readFile(path.join(vdir, f), "utf8"); } catch { continue; }
+              const titleLine = (text.split("\n").find((l) => /^title\s*:/i.test(l)) || "").replace(/^title\s*:/i, "").trim();
+              items.push({ id: story + "/" + voice, story, voice, title: titleLine || story, text });
+            }
+          }
+        }
+      } catch {}
+      json(res, { items });
+      return;
+    }
     // UMMA — live voorbeeld: rendert ÉÉN frame (midden in de gekozen scène) als PNG, zodat de
     // studio toont wat je maakt terwijl je bouwt. Geen video, dus snel. Alleen voor Umma.
     if (u.pathname === "/api/umma-preview" && req.method === "POST") {
