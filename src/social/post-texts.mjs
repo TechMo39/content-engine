@@ -272,6 +272,8 @@ export const TITLES = {
       "Dezelfde letters, drie stemmingen",
       "Eén paneel, eindeloze mogelijkheden",
       "Stem mee: A, B of C",
+      "Welke kies jij?",
+      "Eén naam, jij kiest de look",
     ],
     en: [
       "One name, three styles",
@@ -294,6 +296,8 @@ export const TITLES = {
       "Same letters, three moods",
       "One panel, endless options",
       "Vote: A, B or C",
+      "Which would you pick?",
+      "One name, your look",
     ],
     fr: [
       "Un nom, trois styles",
@@ -316,6 +320,8 @@ export const TITLES = {
       "Mêmes lettres, trois ambiances",
       "Un panneau, mille possibilités",
       "Votez : A, B ou C",
+      "Lequel choisissez-vous ?",
+      "Un nom, votre look",
     ],
   },
   colorway: {
@@ -340,6 +346,8 @@ export const TITLES = {
       "Geen twee kleuren precies gelijk",
       "Welke zou jij kiezen?",
       "Stem in de comments",
+      "Welke kleur ben jij?",
+      "Kies je lievelingskleur",
     ],
     en: [
       "Which colour fits you?",
@@ -362,6 +370,8 @@ export const TITLES = {
       "No two colours exactly alike",
       "Which would you choose?",
       "Vote in the comments",
+      "Which colour are you?",
+      "Pick your favourite",
     ],
     fr: [
       "Quelle couleur vous ressemble ?",
@@ -384,6 +394,8 @@ export const TITLES = {
       "Aucune couleur tout à fait pareille",
       "Laquelle choisiriez-vous ?",
       "Votez en commentaire",
+      "Quelle couleur êtes-vous ?",
+      "Choisissez votre couleur",
     ],
   },
   geentwee: {
@@ -408,10 +420,11 @@ export const TITLES = {
       "Geen printje, een origineel",
       "Van alle panelen bestaat jouw er één",
       "Welke wordt die van jou?",
-      "Welke wordt die van jou?",
       "Volg ons en ontwerp de jouwe",
       "Sinds 2026, oneindig veel ontwerpen",
       "Jouw unieke naam, toegankelijk gemaakt",
+      "Welke kleur ben jij?",
+      "Kies je lievelingskleur",
     ],
     en: [
       "No two alike",
@@ -434,10 +447,11 @@ export const TITLES = {
       "Not a print, an original",
       "Of all panels, yours is one",
       "Which one becomes yours?",
-      "Which one becomes yours?",
       "Follow us and design your own",
       "Since 2026, endless designs",
       "Your one-of-a-kind name, made accessible",
+      "Which colour are you?",
+      "Pick your favourite",
     ],
     fr: [
       "Aucun identique",
@@ -464,6 +478,8 @@ export const TITLES = {
       "Suivez-nous et créez le vôtre",
       "Depuis 2026, une infinité de designs",
       "Votre nom unique, rendu accessible",
+      "Quelle couleur êtes-vous ?",
+      "Choisissez votre couleur",
     ],
   },
   walkthrough: {
@@ -488,6 +504,8 @@ export const TITLES = {
       "Maak het helemaal van jezelf",
       "Begin met een leeg paneel",
       "Jouw naam, zo op de muur",
+      "Ontwerp 'm zelf, zo leuk",
+      "Maak die van jou",
     ],
     en: [
       "Design your panel",
@@ -510,6 +528,8 @@ export const TITLES = {
       "Make it entirely your own",
       "Start from a blank panel",
       "Your name, straight to the wall",
+      "Design your own, it's fun",
+      "Make yours",
     ],
     fr: [
       "Composez votre panneau",
@@ -532,6 +552,8 @@ export const TITLES = {
       "Rendez-le entièrement vôtre",
       "Partez d'un panneau vierge",
       "Votre nom, droit au mur",
+      "Créez le vôtre, c'est chouette",
+      "Faites le vôtre",
     ],
   },
   stopzodra: {
@@ -556,6 +578,8 @@ export const TITLES = {
       "De details die je normaal mist",
       "Kijk goed, straks zie je het",
       "Een klein spel voor je oog",
+      "Raad je 'm?",
+      "Stop als je 't ziet",
     ],
     en: [
       "Pause when you recognise it",
@@ -578,6 +602,8 @@ export const TITLES = {
       "The details you usually miss",
       "Look closely, you'll see it",
       "A little game for your eye",
+      "Can you guess?",
+      "Pause when you see it",
     ],
     fr: [
       "Arrête quand tu reconnais",
@@ -600,6 +626,8 @@ export const TITLES = {
       "Les détails qu'on manque souvent",
       "Regardez bien, vous le verrez",
       "Un petit jeu pour votre œil",
+      "Vous devinez ?",
+      "Pause si vous voyez",
     ],
   },
   onthul: {
@@ -624,6 +652,8 @@ export const TITLES = {
       "Elke tegel een stukje van het geheel",
       "Geduld, het komt",
       "Het geheim onder het patroon",
+      "Wat zit eronder?",
+      "Zo meteen onthuld",
     ],
     en: [
       "Guess what's underneath",
@@ -646,6 +676,8 @@ export const TITLES = {
       "Every tile a piece of the whole",
       "Patience, it's coming",
       "The secret under the pattern",
+      "What's underneath?",
+      "Revealed in a sec",
     ],
     fr: [
       "Devinez ce qui se cache",
@@ -668,6 +700,8 @@ export const TITLES = {
       "Chaque carreau une pièce du tout",
       "Patience, ça vient",
       "Le secret sous le motif",
+      "Qu'y a-t-il dessous ?",
+      "Révélé dans un instant",
     ],
   },
   cadeau: {
@@ -692,6 +726,8 @@ export const TITLES = {
       "Voor de zaak die net opent",
       "Een cadeau dat ze nooit weggeven",
       "Verras een ondernemer echt",
+      "Een cadeau dat ze onthouden",
+      "Geef iets persoonlijks",
     ],
     en: [
       "A gift that lasts",
@@ -714,6 +750,8 @@ export const TITLES = {
       "For the business that's just opening",
       "A gift they'll never give away",
       "Truly surprise a business owner",
+      "A gift they'll remember",
+      "Give something personal",
     ],
     fr: [
       "Un cadeau qui dure",
@@ -736,6 +774,8 @@ export const TITLES = {
       "Pour l'affaire qui vient d'ouvrir",
       "Un cadeau qu'on ne redonne jamais",
       "Surprenez vraiment un entrepreneur",
+      "Un cadeau mémorable",
+      "Offrez du personnel",
     ],
   },
   intro: {
@@ -760,6 +800,8 @@ export const TITLES = {
       "Kunst die je huurcontract overleeft",
       "Maak kennis met jouw paneel",
       "Oud ambacht, nieuw gezicht",
+      "Welkom bij ons atelier",
+      "Leuk je te ontmoeten",
     ],
     en: [
       "This is Tale of Tiles",
@@ -782,6 +824,8 @@ export const TITLES = {
       "Art that outlives your lease",
       "Meet your panel",
       "Old craft, new face",
+      "Welcome to our studio",
+      "Lovely to meet you",
     ],
     fr: [
       "Voici Tale of Tiles",
@@ -804,6 +848,8 @@ export const TITLES = {
       "L'art qui survit à votre bail",
       "Découvrez votre panneau",
       "Art ancien, nouveau visage",
+      "Bienvenue dans notre atelier",
+      "Enchantés",
     ],
   },
   droste: {
@@ -823,6 +869,8 @@ export const TITLES = {
       "Het stopt nooit",
       "Hypnotiserend handwerk",
       "Steeds dieper in de zellige",
+      "Even wegdromen",
+      "Blijf maar kijken",
     ],
     en: [
       "Endless pattern, endless craft",
@@ -840,6 +888,8 @@ export const TITLES = {
       "It never ends",
       "Hypnotic handwork",
       "Deeper and deeper into zellige",
+      "Drift away a moment",
+      "Just keep watching",
     ],
     fr: [
       "Motif infini, artisanat infini",
@@ -857,6 +907,8 @@ export const TITLES = {
       "Ça ne finit jamais",
       "Un fait main hypnotique",
       "De plus en plus profond dans le zellige",
+      "Laissez-vous porter",
+      "Continuez à regarder",
     ],
   },
 };
@@ -878,6 +930,10 @@ export const DESCS = {
       "Elk stukje apart gesneden en gelegd. Daarom lijkt geen enkel paneel op het andere.",
       "Welkom. Wij zijn in 2026 begonnen met iets simpels: van een ambacht van eeuwen oud iets persoonlijks maken, met jouw naam erin. Volg ons en kijk mee hoe het ontstaat. Maak die van jou op taleoftiles.com.",
       "Fijn dat je kijkt. Zoiets moois hoeft niet onbetaalbaar te zijn, en dat is precies waar wij voor staan. Volg je ons voor meer? Ontwerp je eigen naambord op taleoftiles.com.",
+      "Even helemaal niks? Leun achterover en kijk hoe jouw naam tegel voor tegel ontstaat. Wij vinden het zelf ook nog steeds magisch.",
+      "Hoor je dat tikken? Dat is de maalem die elke tegel op het gehoor bijhakt. Zo rustgevend, en het wordt ook nog van jou.",
+      "We zijn in 2026 begonnen, gewoon vanuit liefde voor dit ambacht. Fijn dat je kijkt. Jouw naam maken we net zo zorgvuldig.",
+      "Van een hoopje losse steentjes naar iets om trots op te zijn. Blijf kijken tot het einde, dan zie je de magie.",
     ],
     en: [
       "Hundreds of pieces, laid by hand, until your name takes shape. No two come out identical, and that is exactly the point.",
@@ -894,6 +950,10 @@ export const DESCS = {
       "Every piece cut and placed on its own. That is why no two panels look alike.",
       "Welcome. We started in 2026 with something simple: turning a craft that is centuries old into something personal, with your name in it. Follow along and watch it happen. Make yours at taleoftiles.com.",
       "Glad you are watching. Something this beautiful does not have to be out of reach, and that is exactly what we stand for. Follow us for more, and design your own at taleoftiles.com.",
+      "Need a little calm? Sit back and watch your name come together, tile by tile. We still find it magic too.",
+      "Hear that tapping? That's the maalem shaping every tile by ear. So soothing, and it becomes yours.",
+      "We started in 2026, simply out of love for this craft. So glad you're watching. We make your name with the same care.",
+      "From a pile of loose pieces to something to be proud of. Stay till the end and catch the magic.",
     ],
     fr: [
       "Des centaines de pièces posées à la main, jusqu'à ce que votre nom apparaisse. Aucune n'est identique, et c'est exactement le but.",
@@ -910,6 +970,9 @@ export const DESCS = {
       "Chaque pièce taillée et posée à part. C'est pourquoi aucun panneau ne se ressemble.",
       "Bienvenue. Nous avons commencé en 2026 avec une idée simple : transformer un art centenaire en quelque chose de personnel, avec votre nom. Suivez-nous et regardez-le naître. Créez le vôtre sur taleoftiles.com.",
       "Merci de regarder. Une telle beauté ne doit pas être hors de prix, et c'est exactement ce que nous défendons. Suivez-nous pour plus, et composez le vôtre sur taleoftiles.com.",
+      "Envie d'un peu de calme ? Installez-vous et regardez votre nom prendre forme, carreau par carreau. Nous trouvons ça magique aussi.",
+      "Vous entendez ce petit tic ? C'est le maalem qui taille chaque carreau à l'oreille. Si apaisant, et c'est pour vous.",
+      "Nous avons commencé en 2026, par amour pour cet artisanat. Ravis que vous regardiez. Votre nom, fait avec le même soin.",
     ],
   },
   insitu: {
@@ -928,6 +991,10 @@ export const DESCS = {
       "Een naam om trots op te zijn, waar klanten je op aanspreken.",
       "Welkom bij Tale of Tiles. Sinds 2026 maken wij handgemaakte naamborden in echt glazuur, voor aan je gevel, balie of muur. Mooi hoeft niet duur te zijn. Volg ons voor meer en kom langs op taleoftiles.com.",
       "Leuk dat je er bent. Jouw naam verdient meer dan plastic, en dat is betaalbaarder dan je denkt. Volg ons en maak die van jou op taleoftiles.com.",
+      "Stel je voor: jouw naam naast de deur, in echt glazuur, waar iedereen even blijft kijken. Daar doen wij het voor. Welkom op taleoftiles.com.",
+      "Een plastic bordje schreeuwt tijdelijk. Dit fluistert: hier zit iemand met liefde voor de zaak. En mooi hoeft echt niet duur.",
+      "Café, salon of kantoor, jouw naam verdient een warm welkom aan de muur. Kom gerust langs op taleoftiles.com, we helpen je graag.",
+      "Over tien jaar hangt dit er nog, net zo mooi. Een print ligt dan allang in de kliko. Kies voor iets dat blijft.",
     ],
     en: [
       "No plastic sign, but a handmade panel in real glaze. On your facade, behind the counter or in the hall.",
@@ -944,6 +1011,10 @@ export const DESCS = {
       "A name to be proud of, one customers actually mention to you.",
       "Welcome to Tale of Tiles. Since 2026 we have been making handmade nameplates in real glaze, for your facade, counter or wall. Beautiful does not have to mean expensive. Follow us for more and visit taleoftiles.com.",
       "Glad you are here. Your name deserves more than plastic, and it is more affordable than you think. Follow us and make yours at taleoftiles.com.",
+      "Picture your name by the door, in real glaze, making everyone pause for a second. That's what we live for. Welcome at taleoftiles.com.",
+      "A plastic sign shouts temporary. This one whispers: someone here truly cares. And beautiful needn't be pricey at all.",
+      "Cafe, salon or office, your name deserves a warm welcome on the wall. Come say hi at taleoftiles.com, we'd love to help.",
+      "Ten years on this is still here, just as lovely. A print would be long gone. Choose something that stays.",
     ],
     fr: [
       "Pas une plaque en plastique, mais un panneau fait main en véritable émail. Sur votre façade, derrière le comptoir ou dans l'entrée.",
@@ -960,6 +1031,9 @@ export const DESCS = {
       "Un nom dont on est fier, dont les clients vous parlent.",
       "Bienvenue chez Tale of Tiles. Depuis 2026, nous créons des plaques faites main en véritable émail, pour votre façade, comptoir ou mur. Le beau ne doit pas être cher. Suivez-nous et passez sur taleoftiles.com.",
       "Ravis de vous voir. Votre nom mérite mieux que du plastique, et c'est plus abordable qu'on ne pense. Suivez-nous et créez le vôtre sur taleoftiles.com.",
+      "Imaginez votre nom près de la porte, en véritable émail, qui fait marquer une pause à chacun. C'est notre raison d'être. Bienvenue sur taleoftiles.com.",
+      "Une plaque plastique crie provisoire. Celle-ci murmure : ici, quelqu'un y tient vraiment. Et le beau n'est pas forcément cher.",
+      "Café, salon ou bureau, votre nom mérite un accueil chaleureux au mur. Passez nous voir sur taleoftiles.com, avec plaisir.",
     ],
   },
   sfeer: {
@@ -978,6 +1052,10 @@ export const DESCS = {
       "Een eeuwenoud ambacht, van dichtbij. Zo ontstaat jouw paneel, stap voor stap.",
       "Welkom in ons atelier in Tetouan. Dit ambacht is eeuwen oud, en sinds 2026 brengen wij het naar jouw muur, met jouw naam. Toegankelijk gemaakt, met liefde. Volg ons voor meer en kom kijken op taleoftiles.com.",
       "Fijn dat je even meekijkt. Wij houden een eeuwenoud ambacht levend en maken het betaalbaar voor nu. Volg je ons? Je eigen paneel ontwerp je op taleoftiles.com.",
+      "In onze werkplaats in Tetouan ruikt het naar klei en vuur, en klinkt alleen het tikken van hamertjes. Hier, met liefde, ontstaat jouw naam.",
+      "Dit ambacht leeft al eeuwen, doorgegeven van vader op zoon. Sinds 2026 brengen wij het naar jouw muur. Fijn dat je even meekijkt.",
+      "Geen haast, geen machine, gewoon geduld en plezier in het maken. Dat voel je straks aan je paneel. Welkom in onze wereld.",
+      "Elke kleur komt uit het vuur, niet uit een printer. Daar zit die warme diepte die je blijft aanraken. Kom kijken op taleoftiles.com.",
     ],
     en: [
       "Clay, sun, fire and patience. Every tile cut and glazed by hand, the way it's been done for ages. Haste doesn't exist here.",
@@ -994,6 +1072,10 @@ export const DESCS = {
       "An age-old craft, up close. This is how your panel takes shape, step by step.",
       "Welcome to our studio in Tetouan. This craft is centuries old, and since 2026 we bring it to your wall, with your name. Made accessible, with love. Follow us for more and come see at taleoftiles.com.",
       "Glad you stopped by. We keep an age-old craft alive and make it affordable for today. Follow us, and design your own panel at taleoftiles.com.",
+      "Our workshop in Tetouan smells of clay and fire, and all you hear is the tapping of little hammers. Here, with love, your name takes shape.",
+      "This craft has lived for centuries, passed from father to son. Since 2026 we bring it to your wall. So glad you're watching.",
+      "No rush, no machine, just patience and joy in the making. You'll feel it in your panel. Welcome to our world.",
+      "Every colour comes from the fire, not a printer. That's the warm depth you keep wanting to touch. Come see at taleoftiles.com.",
     ],
     fr: [
       "Argile, soleil, feu et patience. Chaque carreau taillé et émaillé à la main, comme depuis des siècles. La hâte n'existe pas ici.",
@@ -1010,6 +1092,9 @@ export const DESCS = {
       "Un art ancestral, de près. Voilà comment naît votre panneau, étape par étape.",
       "Bienvenue dans notre atelier à Tétouan. Cet art a des siècles, et depuis 2026 nous l'amenons sur votre mur, avec votre nom. Rendu accessible, avec amour. Suivez-nous et venez voir sur taleoftiles.com.",
       "Merci de regarder un instant. Nous gardons un art ancestral vivant et le rendons abordable pour aujourd'hui. Suivez-nous, et composez votre panneau sur taleoftiles.com.",
+      "Notre atelier à Tétouan sent l'argile et le feu, et on n'entend que le tic des petits marteaux. Ici, avec amour, naît votre nom.",
+      "Cet art vit depuis des siècles, transmis de père en fils. Depuis 2026 nous l'amenons sur votre mur. Ravis que vous regardiez.",
+      "Pas de hâte, pas de machine, juste de la patience et du plaisir. Vous le sentirez sur votre panneau. Bienvenue chez nous.",
     ],
   },
   trio: {
@@ -1026,6 +1111,9 @@ export const DESCS = {
       "Welke voelt als jouw merk? Drie keer handwerk, jij kiest de winnaar.",
       "Drie keer dezelfde naam, nooit twee panelen gelijk. Stem mee.",
       "Jij doet het kiezen, de maalem doet het hakken. Welke stijl wordt die van jou?",
+      "Eén naam, drie looks, en jij mag kiezen. Leuk he? Zeg in de comments welke jouw favoriet is, en maak 'm op taleoftiles.com.",
+      "Dezelfde naam, telkens een ander jasje. Wij vinden ze alle drie prachtig. Welke wordt die van jou? We helpen je graag kiezen.",
+      "Kleur, patroon, sfeer: jij bepaalt het helemaal zelf. En wij leggen 'm met de hand. Kom spelen met de ontwerper op taleoftiles.com.",
     ],
     en: [
       "Same name, three different looks. Which would you hang on your wall? Tell us in the comments.",
@@ -1040,6 +1128,9 @@ export const DESCS = {
       "Which one feels like your brand? Three takes on handwork, you pick the winner.",
       "The same name three times, no two panels alike. Cast your vote.",
       "You do the choosing, the maalem does the chipping. Which style becomes yours?",
+      "One name, three looks, and you get to choose. Fun, right? Tell us your favourite in the comments and make it at taleoftiles.com.",
+      "Same name, a new outfit each time. We love all three. Which one becomes yours? We're happy to help you pick.",
+      "Colour, pattern, mood: it's all yours to decide. And we lay it by hand. Come play with the designer at taleoftiles.com.",
     ],
     fr: [
       "Même nom, trois styles. Lequel accrocheriez-vous ? Dites-le en commentaire.",
@@ -1054,6 +1145,8 @@ export const DESCS = {
       "Lequel est votre marque ? Trois versions du fait main, choisissez le gagnant.",
       "Le même nom trois fois, jamais deux panneaux pareils. Votez.",
       "Vous choisissez, le maalem taille. Quel style sera le vôtre ?",
+      "Un nom, trois looks, et c'est vous qui choisissez. Sympa, non ? Dites votre préféré en commentaire et créez-le sur taleoftiles.com.",
+      "Même nom, une nouvelle tenue à chaque fois. On les adore tous les trois. Lequel sera le vôtre ? On vous aide avec plaisir.",
     ],
   },
   colorway: {
@@ -1070,6 +1163,9 @@ export const DESCS = {
       "Welke kleur voelt als thuis? Laat het ons weten in de comments.",
       "Drie keer dezelfde naam, en toch compleet anders. Dat doet kleur.",
       "Jij kiest de kleur, de maalem hakt en legt. Welke wint?",
+      "Blauw, terracotta, saffraan? Kijk hoe dezelfde naam steeds anders tot leven komt. Welke kleur past bij jou? Zeg het ons gerust.",
+      "Wij spelen graag met kleur, en jij straks ook op taleoftiles.com. Elke combinatie is met de hand gelegd, speciaal voor jou.",
+      "Soms is kiezen het leukste deel. Scroll mee door de kleuren en laat je hart spreken. Volg ons voor nog meer inspiratie.",
     ],
     en: [
       "One panel, three colourways. Which fits your home? A, B or C?",
@@ -1084,6 +1180,9 @@ export const DESCS = {
       "Which colour feels like home? Let us know in the comments.",
       "The same name three times, yet completely different. That's what colour does.",
       "You pick the colour, the maalem chips and lays. Which one wins?",
+      "Blue, terracotta, saffron? Watch the same name come alive in different colours. Which one's you? Tell us, we love to hear it.",
+      "We love playing with colour, and soon so will you at taleoftiles.com. Every combo is laid by hand, just for you.",
+      "Sometimes choosing is the best part. Scroll through the colours and follow your heart. Follow us for more inspiration.",
     ],
     fr: [
       "Un panneau, trois couleurs. Laquelle pour chez vous ? A, B ou C ?",
@@ -1098,6 +1197,8 @@ export const DESCS = {
       "Quelle couleur vous semble chez vous ? Dites-le en commentaire.",
       "Le même nom trois fois, et pourtant tout autre. Voilà la couleur.",
       "Vous choisissez la couleur, le maalem taille et pose. Laquelle gagne ?",
+      "Bleu, terre cuite, safran ? Regardez le même nom s'animer en couleurs. Laquelle est vous ? Dites-le nous, on adore.",
+      "On adore jouer avec la couleur, et bientôt vous aussi sur taleoftiles.com. Chaque combinaison est posée à la main, pour vous.",
     ],
   },
   geentwee: {
@@ -1116,6 +1217,10 @@ export const DESCS = {
       "Van alle panelen die wij maken, is de jouwe er precies één.",
       "Welkom. Elk paneel dat wij sinds 2026 maken is uniek, net als jouw naam. Zoiets persoonlijks hoeft niet onbetaalbaar te zijn. Volg ons en ontwerp die van jou op taleoftiles.com.",
       "Leuk dat je kijkt. Honderd namen, honderd kunstwerken, en de jouwe bestaat maar een keer. Volg ons voor meer en maak hem op taleoftiles.com.",
+      "Op zoek naar een cadeau dat niemand anders heeft? Dit is er precies één van, met zijn of haar naam erin. Welkom op taleoftiles.com.",
+      "Housewarming, opening of jubileum: dit vergeten ze nooit meer. Met liefde gemaakt, en zo uniek als de naam erop. Volg ons voor meer.",
+      "Honderd namen, honderd kunstwerkjes, en de jouwe bestaat maar één keer op de hele wereld. Best bijzonder toch? Maak 'm op taleoftiles.com.",
+      "Geen twee hetzelfde, net als mensen. Dat is precies wat het zo leuk maakt om te maken. Kom de jouwe ontwerpen, we kijken ernaar uit.",
     ],
     en: [
       "Made by hand, so never two alike. Just like your name. Endless designs, one name.",
@@ -1132,6 +1237,10 @@ export const DESCS = {
       "Of all the panels we make, yours is exactly one.",
       "Welcome. Every panel we have made since 2026 is unique, just like your name. Something this personal does not have to be out of reach. Follow us and design yours at taleoftiles.com.",
       "Glad you are watching. A hundred names, a hundred artworks, and yours exists only once. Follow us for more and make it at taleoftiles.com.",
+      "Looking for a gift no one else has? There's exactly one of these, with their name in it. Welcome at taleoftiles.com.",
+      "Housewarming, opening or anniversary: they'll never forget this one. Made with love, as unique as the name on it. Follow us for more.",
+      "A hundred names, a hundred little artworks, and yours exists only once in the whole world. Rather special, right? Make it at taleoftiles.com.",
+      "No two alike, just like people. That's exactly what makes them so fun to make. Come design yours, we can't wait.",
     ],
     fr: [
       "Fait main, donc jamais deux pareils. Comme votre nom. Une infinité de designs, un nom.",
@@ -1148,6 +1257,9 @@ export const DESCS = {
       "De tous les panneaux que nous faisons, le vôtre est exactement un.",
       "Bienvenue. Chaque panneau que nous faisons depuis 2026 est unique, comme votre nom. Une telle pièce personnelle ne doit pas être hors de prix. Suivez-nous et créez le vôtre sur taleoftiles.com.",
       "Merci de regarder. Cent noms, cent oeuvres, et le vôtre n'existe qu'une fois. Suivez-nous pour plus et créez-le sur taleoftiles.com.",
+      "Un cadeau que personne d'autre n'a ? Il n'en existe qu'un, avec son nom dedans. Bienvenue sur taleoftiles.com.",
+      "Crémaillère, ouverture ou anniversaire : ça, ils ne l'oublieront jamais. Fait avec amour, aussi unique que le nom. Suivez-nous.",
+      "Cent noms, cent petites oeuvres, et le vôtre n'existe qu'une fois au monde. Plutôt spécial, non ? Créez-le sur taleoftiles.com.",
     ],
   },
   walkthrough: {
@@ -1164,6 +1276,9 @@ export const DESCS = {
       "Van jouw naam naar je muur, in een paar klikken. Start op taleoftiles.com.",
       "Begin met een voorbeeld of een leeg paneel. Jij kiest, wij hakken. taleoftiles.com.",
       "Zo simpel begint een kunstwerk dat jaren meegaat. Ontwerp het op taleoftiles.com.",
+      "Zin om zelf te spelen? Op taleoftiles.com kies je patroon, kleuren en je naam, en zie je 'm meteen ontstaan. Superleuk om te doen.",
+      "Jij ontwerpt, wij leggen met de hand. Zo simpel is het. Kom gerust even stoeien met de ontwerper, je zit nergens aan vast.",
+      "Van idee in je hoofd naar iets aan je muur, in een paar klikjes. Probeer het eens op taleoftiles.com en verras jezelf.",
     ],
     en: [
       "You do the fun part, we do the craft. Pick your pattern, your colours and your name. Design yours at taleoftiles.com.",
@@ -1178,6 +1293,9 @@ export const DESCS = {
       "From your name to your wall in a few clicks. Start at taleoftiles.com.",
       "Begin from an example or a blank panel. You choose, we chip. taleoftiles.com.",
       "This is how simply a work of art that lasts years begins. Design it at taleoftiles.com.",
+      "Fancy a play? On taleoftiles.com you pick the pattern, colours and your name, and watch it appear. Honestly so much fun.",
+      "You design, we lay it by hand. Simple as that. Come have a tinker with the designer, no strings attached.",
+      "From an idea in your head to something on your wall, in a few clicks. Give it a go at taleoftiles.com and surprise yourself.",
     ],
     fr: [
       "Vous faites la partie amusante, nous l'artisanat. Choisissez motif, couleurs et nom. Composez le vôtre sur taleoftiles.com.",
@@ -1192,6 +1310,8 @@ export const DESCS = {
       "De votre nom à votre mur en quelques clics. Commencez sur taleoftiles.com.",
       "Partez d'un exemple ou d'un panneau vierge. Vous choisissez, on taille. taleoftiles.com.",
       "Voilà comme il est simple de lancer une œuvre qui dure. Sur taleoftiles.com.",
+      "Envie de jouer ? Sur taleoftiles.com, choisissez motif, couleurs et votre nom, et regardez-le apparaître. Vraiment chouette à faire.",
+      "Vous concevez, nous posons à la main. C'est aussi simple. Venez bricoler avec le configurateur, sans engagement.",
     ],
   },
   stopzodra: {
@@ -1208,6 +1328,9 @@ export const DESCS = {
       "Dit is echt glazuur, geen filter. Herken je het voor het vol is?",
       "Een raadspel met handgemaakte zellige. Jij bepaalt wanneer je stopt.",
       "Let op de glans en de diepte. Geen scherm komt in de buurt van het echte werk.",
+      "Stop zodra je 'm herkent. Lukt het je? Zeg het in de comments, we zijn benieuwd. En ja, dit is allemaal echt glazuur.",
+      "Even een klein raadspelletje tussendoor. Kijk goed, want elke tegel is met de hand gelegd. Leuk he? Volg ons voor meer.",
+      "Wedden dat je blijft kijken tot het duidelijk wordt? Zo werkt mooi handwerk. Jouw naam maken we net zo zorgvuldig.",
     ],
     en: [
       "Zoomed right into the mosaic. Pause the moment you recognise it. Can you?",
@@ -1222,6 +1345,9 @@ export const DESCS = {
       "This is real glaze, no filter. Can you recognise it before it fills?",
       "A guessing game with handmade zellige. You decide when to pause.",
       "Watch the shine and the depth. No screen comes close to the real thing.",
+      "Pause the moment you recognise it. Can you? Tell us in the comments, we're curious. And yes, this is all real glaze.",
+      "A little guessing game for in between. Look closely, every tile is laid by hand. Fun, right? Follow us for more.",
+      "Bet you watch till it clicks? That's lovely handwork for you. We make your name with the same care.",
     ],
     fr: [
       "Zoom extrême sur la mosaïque. Arrêtez dès que vous reconnaissez. Vous y arrivez ?",
@@ -1236,6 +1362,8 @@ export const DESCS = {
       "C'est du vrai émail, pas un filtre. Le reconnaissez-vous avant que ce soit plein ?",
       "Un jeu avec du zellige fait main. Vous décidez quand faire pause.",
       "Observez l'éclat et la profondeur. Aucun écran n'approche le vrai.",
+      "Mettez en pause dès que vous reconnaissez. Vous y arrivez ? Dites-le en commentaire. Et oui, tout est en véritable émail.",
+      "Un petit jeu de devinette entre deux. Regardez bien, chaque carreau est posé à la main. Sympa, non ? Suivez-nous.",
     ],
   },
   onthul: {
@@ -1252,6 +1380,9 @@ export const DESCS = {
       "Het geheim zit onder het patroon. Herken je het op tijd?",
       "Zoveel stukjes, één beeld. Zie jij het voor de laatste tegel?",
       "Een modern raadsel, gemaakt met een eeuwenoud ambacht.",
+      "Raad je wat eronder zit? Even geduld, het wordt onthuld. En alles wat je ziet is met de hand gelegd, met liefde.",
+      "Een kleine verrassing voor je oog. Blijf kijken tot het moment klopt. Leuk om te maken, nog leuker om te delen. Volg ons.",
+      "Kijk mee hoe het zich prijsgeeft, stukje voor stukje. Zo speels is ambacht ook. Jouw naam kan hier net zo mooi staan.",
     ],
     en: [
       "An image is hidden under the pattern. Can you recognise it before it's fully revealed?",
@@ -1266,6 +1397,9 @@ export const DESCS = {
       "The secret sits under the pattern. Can you recognise it in time?",
       "So many pieces, one image. Do you see it before the last tile?",
       "A modern riddle, made with an age-old craft.",
+      "Can you guess what's underneath? Hang on, it's about to reveal itself. And everything you see is laid by hand, with love.",
+      "A little surprise for your eye. Stay till the moment lands. Fun to make, even better to share. Follow us.",
+      "Watch it give itself away, piece by piece. Craft can be playful too. Your name could look just as lovely here.",
     ],
     fr: [
       "Une image se cache sous le motif. La reconnaissez-vous avant la fin ?",
@@ -1280,6 +1414,8 @@ export const DESCS = {
       "Le secret est sous le motif. Le reconnaissez-vous à temps ?",
       "Tant de pièces, une image. La voyez-vous avant le dernier carreau ?",
       "Une énigme moderne, faite avec un art ancestral.",
+      "Vous devinez ce qu'il y a dessous ? Patience, ça se révèle. Et tout ce que vous voyez est posé à la main, avec amour.",
+      "Une petite surprise pour l'oeil. Restez jusqu'au bon moment. Chouette à faire, encore mieux à partager. Suivez-nous.",
     ],
   },
   cadeau: {
@@ -1296,6 +1432,9 @@ export const DESCS = {
       "Voor de zaak die net opent of er al vijfentwintig jaar staat. Een cadeau dat blijft.",
       "Eeuwenoud ambacht uit Fes, als cadeau met hun naam erin. Dat vergeet niemand.",
       "Wij sturen het naar jou of rechtstreeks naar degene die het krijgt. Klaar om te geven.",
+      "Zoek je een cadeau dat echt binnenkomt? Een naam in handgemaakt mozaïek vergeten ze nooit meer. Met liefde gemaakt, speciaal voor hen.",
+      "Housewarming, bruiloft, nieuwe zaak? Geef iets dat jaren blijft staan en elke dag een glimlach geeft. Welkom op taleoftiles.com.",
+      "Het mooiste cadeau is iets persoonlijks. En dit is letterlijk het enige met precies die naam. Kom 'm samen met ons maken.",
     ],
     en: [
       "What do you give someone who has everything? A handmade nameplate in real glaze, with their name. A gift they'll never give away.",
@@ -1310,6 +1449,9 @@ export const DESCS = {
       "For the business just opening or running for twenty-five years. A gift that stays.",
       "Age-old craft from Fes, as a gift with their name in it. No one forgets that.",
       "We send it to you or straight to the recipient. Ready to give.",
+      "After a gift that really lands? A name in handmade mosaic, they'll never forget it. Made with love, just for them.",
+      "Housewarming, wedding, new business? Give something that stays for years and brings a daily smile. Welcome at taleoftiles.com.",
+      "The best gift is something personal. And this is literally the only one with that exact name. Come make it with us.",
     ],
     fr: [
       "Que offrir à qui a déjà tout ? Une plaque faite main en véritable émail, à leur nom. Un cadeau qu'on ne redonne jamais.",
@@ -1324,6 +1466,8 @@ export const DESCS = {
       "Pour l'affaire qui ouvre ou qui tient depuis vingt-cinq ans. Un cadeau qui reste.",
       "Art ancestral de Fès, en cadeau avec leur nom. Personne ne l'oublie.",
       "Nous l'envoyons chez vous ou directement au destinataire. Prêt à offrir.",
+      "Un cadeau qui touche vraiment ? Un nom en mosaïque faite main, ils ne l'oublieront jamais. Fait avec amour, rien que pour eux.",
+      "Crémaillère, mariage, nouveau commerce ? Offrez ce qui dure des années et fait sourire chaque jour. Bienvenue sur taleoftiles.com.",
     ],
   },
   intro: {
@@ -1340,6 +1484,9 @@ export const DESCS = {
       "Dit maakt geen machine, dit maakt een mens. Maak kennis met jouw paneel op taleoftiles.com.",
       "Oud ambacht, nieuw gezicht: jouw naam in echt glazuur. Ontwerp 'm op taleoftiles.com.",
       "Van ons atelier in Tetouan naar jouw muur. Ontwerp jouw paneel op taleoftiles.com.",
+      "Welkom bij Tale of Tiles. Wij maken sinds 2026 handgemaakte naamborden, met een eeuwenoud ambacht uit Fès. Fijn dat je er bent.",
+      "Leuk je te ontmoeten. Wij zijn een klein atelier met een grote liefde voor zellige. Blijf hangen, er komt elke dag iets moois voorbij.",
+      "Een naam verdient meer dan plastic, vinden wij. Daarom leggen we 'm met de hand, in echt glazuur. Volg ons en kijk gerust mee.",
     ],
     en: [
       "Handmade mosaic art with your name, in real glaze. You pick pattern, colours and name, we lay it by hand. Design yours at taleoftiles.com.",
@@ -1354,6 +1501,9 @@ export const DESCS = {
       "No machine makes this, a person does. Meet your panel at taleoftiles.com.",
       "Old craft, new face: your name in real glaze. Design it at taleoftiles.com.",
       "From our workshop in Tetouan to your wall. Design yours at taleoftiles.com.",
+      "Welcome to Tale of Tiles. Since 2026 we've made handmade nameplates with an age-old craft from Fès. So glad you're here.",
+      "Lovely to meet you. We're a small studio with a big love for zellige. Stick around, something beautiful comes by every day.",
+      "A name deserves more than plastic, we think. So we lay it by hand, in real glaze. Follow us and watch along.",
     ],
     fr: [
       "Art mosaïque fait main, à votre nom, en véritable émail. Vous choisissez motif, couleurs et nom, nous posons à la main. Composez le vôtre sur taleoftiles.com.",
@@ -1368,6 +1518,8 @@ export const DESCS = {
       "Ce n'est pas une machine qui fait ça, c'est une personne. Découvrez votre panneau sur taleoftiles.com.",
       "Art ancien, nouveau visage : votre nom en véritable émail. Composez-le sur taleoftiles.com.",
       "De notre atelier de Tétouan à votre mur. Composez le vôtre sur taleoftiles.com.",
+      "Bienvenue chez Tale of Tiles. Depuis 2026, nous créons des plaques faites main avec un art ancestral de Fès. Ravis que vous soyez là.",
+      "Enchantés. Nous sommes un petit atelier avec un grand amour du zellige. Restez, chaque jour une jolie chose passe.",
     ],
   },
   droste: {
@@ -1377,6 +1529,9 @@ export const DESCS = {
       "Hoe diep gaat dit? Verlies jezelf in de zellige, van patroon naar patroon, oneindig door.",
       "Oneindig veel detail, allemaal met de hand gelegd. Dit is wat 1200 jaar ambacht oplevert.",
       "Hypnotiserend: een naadloze loop door onze patronen. Ontwerp die van jou op taleoftiles.com.",
+      "Even wegdromen in het patroon? Blijf maar lekker kijken, het blijft maar doorgaan. En ja, het is allemaal echt glazuur.",
+      "Zo hypnotiserend, dit handwerk. Wij kunnen er zelf ook uren naar kijken. Fijn dat je meekijkt. Volg ons voor meer rust op je tijdlijn.",
+      "Oneindig patroon, oneindig geduld. Dat is zellige. Jouw naam kan hier net zo mooi in verdwijnen. Kom kijken op taleoftiles.com.",
     ],
     en: [
       "Zoom in and it never stops: inside every tile sits the next pattern, endlessly. Hundreds of real zellige designs, infinitely stacked.",
@@ -1384,6 +1539,9 @@ export const DESCS = {
       "How deep does it go? Lose yourself in the zellige, pattern after pattern, forever.",
       "Infinite detail, all laid by hand. This is what 1200 years of craft looks like.",
       "Hypnotic: a seamless loop through our patterns. Design yours at taleoftiles.com.",
+      "Fancy a little drift into the pattern? Keep watching, it just keeps going. And yes, it's all real glaze.",
+      "So hypnotic, this handwork. We could watch it for hours too. Glad you're here. Follow us for more calm on your feed.",
+      "Endless pattern, endless patience. That's zellige. Your name could melt into it just as beautifully. See it at taleoftiles.com.",
     ],
     fr: [
       "Zoomez et ça ne s'arrête jamais : dans chaque carreau, le motif suivant, à l'infini. Des centaines de vrais designs zellige, empilés sans fin.",
@@ -1391,6 +1549,8 @@ export const DESCS = {
       "Jusqu'où ça descend ? Perdez-vous dans le zellige, de motif en motif, pour toujours.",
       "Un détail infini, tout posé à la main. Voilà 1200 ans d'artisanat.",
       "Hypnotique : une boucle fluide à travers nos motifs. Composez le vôtre sur taleoftiles.com.",
+      "Envie de vous perdre dans le motif ? Continuez à regarder, ça n'arrête pas. Et oui, tout est en véritable émail.",
+      "Si hypnotique, ce travail à la main. On pourrait le regarder des heures. Ravis que vous soyez là. Suivez-nous.",
     ],
   },
 };
