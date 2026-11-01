@@ -13,6 +13,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { composeChrome, FORMATS, escapeXml } from "../core/renderer.mjs";
 
+// WAV-lengte (seconden) uit de header — geen ffprobe nodig. Faalt netjes (0).
+async function wavDuration(absPath) {
+  try {
+    const fh = await fs.open(absPath, "r");
+    try {
+      const buf = Buffer.alloc(44);
+      await fh.read(buf, 0, 44, 0);
+      if (buf.toString("ascii", 0, 4) !== "RIFF" || buf.toString("ascii", 8, 12) !== "WAVE") return 0;
+      const byteRate = buf.readUInt32LE(28);
+      const { size } = await fh.stat();
+      const dataBytes = size - 44;
+      return (byteRate > 0 && dataBytes > 0) ? dataBytes / byteRate : 0;
+    } finally { await fh.close(); }
+  } catch { return 0; }
+}
+
 // ---------------------------------------------------------------- huisstijl
 const COL = {
   ink: "#0d1427", navy: "#111a33", navy2: "#1b2748",
@@ -149,6 +165,13 @@ function parseStory(text, name2id) {
         } else if (key === "view") {
           const v = resolveView(parseViewToken(val)); if (v) sc.view = parseViewToken(val); else out.warnings.push("view onbekend: " + val);
         } else if (key === "dur") { const d = parseFloat(val); if (d > 0) sc.dur = d; }
+        else if (key === "voice") { sc.voice = val; }
+        else if (key === "sfx") { sc.sfx = val; }
+        else if (key === "voicegain") { const g = parseFloat(val); if (g >= 0) sc.voiceGain = g; }
+        else if (key === "sfxgain") { const g = parseFloat(val); if (g >= 0) sc.sfxGain = g; }
+        else if (key === "tech") { sc.tech = val.toLowerCase(); }   // welke techniek beeldt deze scène uit
+        else if (key === "truth") { sc.truth = val; }               // mythe-techniek: de waarheid onder de leugen
+        else if (key === "kick") { sc.kick = val; }                 // kleine onderregel/kicker
       }
       out.scenes.push(sc); continue;
     }
@@ -251,6 +274,7 @@ export function makeBrand({ ROOT = "." } = {}) {
 
   const templates = [
     { id: "kaart", name: "Kaart door de tijd", music: ["oriental", "calm"], defaults: {} },
+    { id: "mix", name: "Gemengd (kaart + statement + mythe)", music: ["oriental", "calm"], defaults: {} },
   ];
 
   // ---- demo-verhaal (idee 1), zodat het type standalone rendert ----
@@ -287,8 +311,14 @@ export function makeBrand({ ROOT = "." } = {}) {
       scenes: opts.scenes || (picked && picked.scenes) || dem.scenes,
     };
     const title = opts.title || (picked && picked.title) || "They never conquered our faith";
-    // scene-tijden
-    const durs = story.scenes.map((s) => Number(s.dur) || 2.6);
+    // scene-tijden: heeft een scène een stem? dan loopt de duur mee met de wav-lengte.
+    const VOICE_PAD = 0.5;
+    const durs = [];
+    for (const s of story.scenes) {
+      let d = Number(s.dur) || 2.6;
+      if (s && s.voice) { const wl = await wavDuration(path.resolve(ROOT, s.voice)); if (wl > 0) d = wl + VOICE_PAD; }
+      durs.push(d);
+    }
     const mapEnd = durs.reduce((a, b) => a + b, 0);      // kaart speelt tot hier
     const CTA_DUR = 2.8;                                  // daarna de CTA-fold-out erover
     const total = mapEnd + CTA_DUR;
@@ -424,10 +454,173 @@ export function makeBrand({ ROOT = "." } = {}) {
     return { W, H, FPS, SS, durSec: total, sceneAt, audio: tracks.length ? { tracks } : undefined };
   }
 
+  // ================================================================
+  // SCÈNE-COMPOSITIE: een filmpje mengt technieken. Elke scène kiest een `tech`; de compositie
+  // rendert ze achter elkaar op één tijdlijn (één sceneAt, resvg-veilig, raakt de kern niet).
+  // Elke techniek = fn({W,H,p,scene,sub}) -> SVG-laag. p = voortgang 0..1 binnen de scène.
+  // sub = hulpstukken (word-reveal, kader, sterrenveld) zodat technieken ze delen.
+  // ================================================================
+
+  // -- word-voor-woord reveal (overgenomen/herschreven uit Tale of Tiles' wordsReveal, Umma-stijl) --
+  // Woord-voor-woord reveal via één gecentreerde <text> met <tspan> per woord: de renderer doet
+  // de spatiëring (betrouwbaar, geen eigen breedte-schatting), de opacity per woord doet de reveal.
+  function wordReveal(txt, cx, y, fs, fill, p) {
+    const words = String(txt).split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
+    const per = 1 / words.length;
+    let spans = "";
+    words.forEach((w, i) => {
+      const o = clamp01((p - i * per) / (per * 0.9));
+      // spatie vóór elk woord behalve het eerste, als eigen tspan met em-breedte (renderers
+      // strippen leidende spaties binnen tspans; een dx-spatie is betrouwbaar).
+      if (i) spans += `<tspan dx="${(fs * 0.3).toFixed(1)}"> </tspan>`;
+      spans += `<tspan fill="${fill}" fill-opacity="${o.toFixed(2)}">${escapeXml(w)}</tspan>`;
+    });
+    return `<text x="${cx}" y="${y}" text-anchor="middle" xml:space="preserve" font-family="${SERIF}" font-weight="800" font-size="${fs}">${spans}</text>`;
+  }
+  // -- rustig sterrenveld (merk-achtergrond, deterministisch) --
+  function starfield(W, H, seed = 7) {
+    let s = seed, out = "";
+    const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * W, y = rnd() * H, r = 0.6 + rnd() * 1.8, o = 0.15 + rnd() * 0.5;
+      out += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(1)}" fill="${COL.cream}" opacity="${o.toFixed(2)}"/>`;
+    }
+    return out;
+  }
+  const bgField = (W, H, seed) => `<rect width="${W}" height="${H}" fill="${COL.ink}"/>`
+    + `<rect width="${W}" height="${H}" fill="${COL.navy}" opacity="0.5"/>` + starfield(W, H, seed);
+
+  // -- TECHNIEK: statement (grote woord-voor-woord kernzin, merk-achtergrond) --
+  function techStatement({ W, H, p, scene }) {
+    const txt = scene.text || "";
+    const fs = fitFs(txt, Math.round(W * 0.11), W * 0.80, 0.56);
+    let g = bgField(W, H, (txt.length * 7) % 97);
+    // zachte oranje gloed achter de tekst
+    g += `<ellipse cx="${W / 2}" cy="${H * 0.46}" rx="${W * 0.44}" ry="${H * 0.14}" fill="${COL.orange}" opacity="${(0.10 * sm(p)).toFixed(2)}"/>`;
+    g += wordReveal(txt, W / 2, H * 0.48, fs, COL.cream, p);
+    // kicker onder de zin (scene.kick), rustig
+    if (scene.kick) {
+      const ko = clamp01((p - 0.5) / 0.3);
+      g += `<text x="${W / 2}" y="${H * 0.60}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.045)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+    }
+    return g;
+  }
+
+  // -- TECHNIEK: mythe (de beschuldiging verschijnt -> wordt doorgestreept -> waarheid eronder) --
+  function techMythe({ W, H, p, scene }) {
+    const claim = scene.text || "";               // de leugen/beschuldiging
+    const truth = scene.truth || scene.kick || ""; // wat er echt is
+    let g = bgField(W, H, (claim.length * 13) % 89);
+    const fsC = fitFs(claim, Math.round(W * 0.085), W * 0.82, 0.56);
+    const cy = truth ? H * 0.40 : H * 0.48;
+    // claim verschijnt (0..0.4), streep eroverheen (0.4..0.7)
+    const claimOp = clamp01(p / 0.3);
+    g += `<text x="${W / 2}" y="${cy}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fsC}" fill="${COL.mute}" opacity="${claimOp.toFixed(2)}">${escapeXml(claim)}</text>`;
+    const strike = clamp01((p - 0.35) / 0.3);
+    if (strike > 0.01) {
+      const halfW = Math.min(W * 0.80, claim.length * fsC * 0.30) * strike;
+      g += `<line x1="${(W / 2 - halfW).toFixed(0)}" y1="${(cy - fsC * 0.32).toFixed(0)}" x2="${(W / 2 + halfW).toFixed(0)}" y2="${(cy - fsC * 0.32).toFixed(0)}" stroke="${COL.red}" stroke-width="${Math.round(W * 0.018)}" stroke-linecap="round"/>`;
+    }
+    // waarheid eronder, woord-voor-woord (0.6..1)
+    if (truth) {
+      const tp = clamp01((p - 0.6) / 0.4);
+      const fsT = fitFs(truth, Math.round(W * 0.075), W * 0.82, 0.56);
+      g += wordReveal(truth, W / 2, H * 0.58, fsT, COL.orange, tp);
+    }
+    return g;
+  }
+
+  // -- TECHNIEK: kaart (één scène) — toont de wereldkaart met deze scène z'n fills/rule/view.
+  // Hergebruikt de kaart-tekenlogica, maar als los scène-beeld (geen eigen tijdlijn/tijdbalk).
+  function techKaart({ W, H, p, scene, groups }) {
+    const view = resolveView(scene.view) || REGIONS.belt;
+    const bandTop = H * 0.16, bandBot = H * 0.74;
+    const availW = W * 0.90, availH = bandBot - bandTop;
+    const scale = Math.min(availW / view[2], availH / view[3]);
+    const dW = view[2] * scale, dH = view[3] * scale;
+    const offX = (W - dW) / 2 - view[0] * scale, offY = bandTop + (availH - dH) / 2 - view[1] * scale;
+    const colorOf = (id, key) => {
+      for (const [grp, col] of Object.entries(scene[key] || {})) {
+        const ids = (groups[grp] || []); if (ids.includes(id)) return resolveColor(col) || col;
+      }
+      return null;
+    };
+    let paths = "", rulerPaths = "";
+    if (MAP) {
+      for (const [id, d] of Object.entries(MAP.countries)) {
+        const fi = colorOf(id, "fills");
+        const fill = fi ? lerpCol(COL.land, fi, sm(clamp01(p / 0.5))) : COL.land;   // veegt in
+        paths += `<path d="${d}" fill="${fill}" stroke="${COL.landEdge}" stroke-width="0.6"/>`;
+        const ri = colorOf(id, "rule");
+        if (ri) {
+          const rop = sm(clamp01(p / 0.5));
+          rulerPaths += `<path d="${d}" fill="${ri}" fill-opacity="${(0.42 * rop).toFixed(2)}" stroke="${ri}" stroke-width="${(3.4 / scale).toFixed(2)}" stroke-opacity="${(0.9 * rop).toFixed(2)}" stroke-linejoin="round"/>`;
+        }
+      }
+    }
+    let g = `<rect width="${W}" height="${H}" fill="${COL.ink}"/>` + starfield(W, H, 11);
+    g += `<g transform="translate(${offX.toFixed(2)} ${offY.toFixed(2)}) scale(${scale.toFixed(4)})">${paths}${rulerPaths}</g>`;
+    // onderschrift (de korte zin in beeld)
+    g += onderschrift(scene.text || "", W, H, clamp01(p / 0.3) * clamp01((1 - p) / 0.2 + 0.5));
+    return g;
+  }
+
+  // techniek-register: naam -> fn
+  const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart };
+
+  // COMPOSITIE-render: scènes met gemengde technieken -> één video.
+  async function makeComposedRender({ subjectId, opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const SS = 2, FPS = 24;
+    const picked = (subjectId && STORIES[subjectId] && STORIES[subjectId].scenes.length) ? STORIES[subjectId] : null;
+    const scenes = opts.scenes || (picked && picked.scenes) || [];
+    const groups = opts.groups || (picked && picked.groups) || {};
+    const title = opts.title || (picked && picked.title) || "Umma United";
+
+    // duur per scène: stem stuurt (wav-lengte + marge), anders dur of 3s.
+    const VOICE_PAD = 0.5;
+    const durs = [];
+    for (const s of scenes) {
+      let d = Number(s.dur) || 3.0;
+      if (s && s.voice) { const wl = await wavDuration(path.resolve(ROOT, s.voice)); if (wl > 0) d = wl + VOICE_PAD; }
+      durs.push(d);
+    }
+    const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
+    const total = acc;
+
+    // voor kaart-scènes binnen de compositie: we laten die één-scène als mini-kaart lopen.
+    // (de volledige kaart-techniek met zijn eigen tijdlijn draaien we hier per scène af.)
+    function sceneAt(frame) {
+      const t = frame / FPS;
+      let i = 0; for (let k = scenes.length - 1; k >= 0; k--) if (t >= starts[k]) { i = k; break; }
+      const s = scenes[i];
+      const p = clamp01((t - starts[i]) / Math.max(0.1, durs[i]));
+      const techName = s.tech || "statement";
+      const fn = TECHS[techName] || techStatement;
+      const inner = fn({ W, H, p, scene: s, groups });
+      // kader + merk op elke scène; CTA-fold-out op de laatste scène
+      const isLast = i === scenes.length - 1;
+      const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
+      const ovl = kader(W, H) + (ctaOp > 0.01 ? ctaFoldout(W, H, ctaOp) : "");
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
+    }
+
+    // audio: stem + SFX per scène op het startmoment
+    const tracks = [];
+    scenes.forEach((s, i) => {
+      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.0 : s.voiceGain });
+      if (s && s.sfx) tracks.push({ file: path.resolve(ROOT, s.sfx), atSec: starts[i], gain: s.sfxGain == null ? 0.8 : s.sfxGain });
+    });
+    return { W, H, FPS, SS, durSec: total, sceneAt, audio: tracks.length ? { tracks } : undefined };
+  }
+
   async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
     const type = opts.type || opts.template || "kaart";
     switch (type) {
       case "kaart": return makeKaartRender({ subjectId, opts, format });
+      case "mix":
+      case "composed": return makeComposedRender({ subjectId, opts, format });
       default: return makeKaartRender({ subjectId, opts, format });
     }
   }
