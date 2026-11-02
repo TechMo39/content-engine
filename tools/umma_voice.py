@@ -103,7 +103,7 @@ STORIES["sword1"]["map"] = [
 STORIES["sword2"]["map"] = [
   (1, "The whole world came for it.",        ["tech: beeld", "vid: vid-kolonisatie.mp4", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
   (2, "300 years. Nothing moved.",           ["tech: kaart", "fill: indonesia=orange", "rule: indonesia=ruler", "view: sea"]),
-  (3, "Alone, and still standing.",          ["tech: beeld", "img: foto-bosnie.jpg"]),
+  (3, "Alone, and still standing.",          ["tech: beeld", "vid: vid-bosnie.mp4"]),
   (4, "One exception proves it.",            ["tech: beeld", "img: foto-spanje.jpg"]),
   (5, "Truth takes the heart.",              ["tech: beeld", "vid: vid-gebed-massa.mp4", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
   (6, "You are the proof.",                  ["tech: beeld", "vid: vid-gebed.mp4"]),
