@@ -909,12 +909,17 @@ export function makeBrand({ ROOT = "." } = {}) {
         const bron = hasVid ? `video (${s.vid})` : hasImg ? `foto (${s.img})` : `getekend (${s.tech || "statement"})`;
         say(`  scène ${i + 1}/${scenes.length}: ${bron}, ${dur.toFixed(1)}s, ${nFrames} frames`);
 
+        // logt binnen een scène elke ~seconde een frame-teller, zodat je NOOIT minutenlang op
+        // hetzelfde "scène x/y" blijft staan maar echt ziet dat hij tekent.
+        const tick = (f) => { if (f % FPS === 0 || f === nFrames - 1) say(`      tekenen ${f + 1}/${nFrames}`); };
+
         if (hasVid || hasImg) {
           // overlay-frames (transparant) renderen
           for (let f = 0; f < nFrames; f++) {
             const p = clamp01(f / Math.max(1, nFrames - 1));
             const png = rasterize(overlaySVG(i, p));
             await fs.writeFile(path.join(sdir, `o${String(f).padStart(4, "0")}.png`), png);
+            tick(f);
           }
           const clip = path.join(work, `clip${i}.mp4`);
           if (hasVid) {
@@ -940,6 +945,7 @@ export function makeBrand({ ROOT = "." } = {}) {
             const p = clamp01(f / Math.max(1, nFrames - 1));
             const png = rasterize(fullSceneSVG(i, p));
             await fs.writeFile(path.join(sdir, `f${String(f).padStart(4, "0")}.png`), png);
+            tick(f);
           }
           const clip = path.join(work, `clip${i}.mp4`);
           await ff(["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
