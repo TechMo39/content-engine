@@ -14,8 +14,68 @@ import path from "node:path";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { Worker } from "node:worker_threads";
+import { createRequire } from "node:module";
 import { composeChrome, FORMATS, escapeXml } from "../core/renderer.mjs";
 const execFileP = promisify(execFile);
+const _require = createRequire(import.meta.url);
+// pad naar de resvg-module, zodat de worker 'm zeker kan laden (niet afhankelijk van eval-require).
+function resvgModulePath() { try { return _require.resolve("@resvg/resvg-js"); } catch { return "@resvg/resvg-js"; } }
+
+// Worker-pool die SVG-strings parallel naar PNG-bestanden rastert (resvg), over meerdere cores.
+// Elke worker laadt resvg zelf (CJS require, werkt in een worker-thread). .run(jobs) verdeelt de
+// jobs over de workers en wacht tot alles klaar is. .destroy() sluit ze af.
+const RASTER_WORKER_SRC = `
+const { parentPort, workerData } = require("node:worker_threads");
+const fs = require("node:fs");
+let Resvg;
+try { const m = require(workerData.resvgPath); Resvg = m.Resvg || (m.default && m.default.Resvg) || m.default || m; } catch (e) { parentPort.postMessage({ fatal: String(e && e.message || e) }); }
+const width = workerData.width;
+parentPort.on("message", (job) => {
+  if (job === null) { process.exit(0); return; }
+  try {
+    const r = new Resvg(job.svg, { fitTo: { mode: "width", value: width } });
+    fs.writeFileSync(job.path, r.render().asPng());
+    parentPort.postMessage({ i: job.i });
+  } catch (e) { parentPort.postMessage({ i: job.i, err: String(e && e.message || e) }); }
+});
+`;
+function makeRasterPool(size, width) {
+  const resvgPath = resvgModulePath();
+  const workers = [];
+  for (let k = 0; k < size; k++) {
+    const w = new Worker(RASTER_WORKER_SRC, { eval: true, workerData: { width, resvgPath } });
+    w.on("error", () => {});
+    workers.push({ w, busy: false });
+  }
+  async function run(jobs, onProgress) {
+    return new Promise((resolve, reject) => {
+      let next = 0, done = 0; const total = jobs.length;
+      if (!total) return resolve();
+      let failed = null;
+      const feed = (slot) => {
+        if (next >= total) { return; }
+        const job = jobs[next++]; slot.busy = true;
+        slot.w.postMessage({ i: job._i, svg: job.svg, path: job.path });
+      };
+      workers.forEach((slot) => {
+        slot.w.removeAllListeners("message");
+        slot.w.on("message", (msg) => {
+          if (msg && msg.fatal) { failed = msg.fatal; return reject(new Error(msg.fatal)); }
+          if (msg && msg.err) { failed = msg.err; }
+          done++; if (onProgress) onProgress(done);
+          if (done >= total) return resolve();
+          feed(slot);
+        });
+      });
+      jobs.forEach((j, idx) => { j._i = idx; });
+      // start: geef elke worker één job
+      for (const slot of workers) { if (next < total) feed(slot); }
+    });
+  }
+  function destroy() { for (const s of workers) { try { s.w.postMessage(null); } catch {} try { s.w.terminate(); } catch {} } }
+  return { size, run, destroy };
+}
 
 // FFmpeg-pad bepalen. Op Mo's laptop staat "ffmpeg" NIET los op het PATH (spawn ENOENT), maar de
 // kern gebruikt hem wel — vrijwel zeker via het npm-pakket ffmpeg-static (gebundelde binary).
@@ -841,6 +901,26 @@ export function makeBrand({ ROOT = "." } = {}) {
       return null;
     }
 
+    // PARALLELLE RASTERING over ALLE CPU-cores (zoals de kern). Een worker-pool rastert de SVG-
+    // frames tegelijk i.p.v. één voor één -> ~N keer sneller zonder kwaliteitsverlies (exact
+    // hetzelfde beeld). Faalt de pool (bv. worker kan resvg niet laden), dan val ik netjes terug
+    // op sequentieel rasteren in deze thread, zodat het altijd blijft werken.
+    const NCORES = Math.max(1, (os.cpus() ? os.cpus().length : 2));
+    let pool = null;
+    try { pool = makeRasterPool(Math.min(NCORES, 8), OW); } catch { pool = null; }
+    say(pool ? `rasteren over ${pool.size} core(s)` : `rasteren op 1 core`);
+    // rastert een lijst {svg, path} parallel (pool) of sequentieel (fallback); roept onProgress(done).
+    // Faalt de pool (bv. worker kan resvg niet laden), dan val ik NIET terug op zwarte schermen maar
+    // doe ik het sequentieel in deze thread -> trager maar correct. De pool wordt dan uitgezet.
+    async function rasterizeFrames(jobs, onProgress) {
+      if (pool) {
+        try { await pool.run(jobs, onProgress); return; }
+        catch (e) { say("parallelle rastering faalde (" + (e && e.message || e) + ") -> sequentieel"); try { pool.destroy(); } catch {} pool = null; }
+      }
+      let done = 0;
+      for (const j of jobs) { await fs.writeFile(j.path, rasterize(j.svg)); done++; if (onProgress) onProgress(done); }
+    }
+
     // duur per scène (stem stuurt, + adempauze), en media vooraf resolven.
     const VOICE_PAD = 0.9;
     const durs = [];
@@ -909,18 +989,20 @@ export function makeBrand({ ROOT = "." } = {}) {
         const bron = hasVid ? `video (${s.vid})` : hasImg ? `foto (${s.img})` : `getekend (${s.tech || "statement"})`;
         say(`  scène ${i + 1}/${scenes.length}: ${bron}, ${dur.toFixed(1)}s, ${nFrames} frames`);
 
-        // logt binnen een scène elke ~seconde een frame-teller, zodat je NOOIT minutenlang op
-        // hetzelfde "scène x/y" blijft staan maar echt ziet dat hij tekent.
-        const tick = (f) => { if (f % FPS === 0 || f === nFrames - 1) say(`      tekenen ${f + 1}/${nFrames}`); };
+        // voortgang binnen een scène: elke ~seconde een teller, zodat je nooit minutenlang op
+        // "scène x/y" blijft staan. Bij parallelle rastering komt de voortgang niet op volgorde
+        // binnen, dus we tonen "x/nFrames klaar".
+        let lastShown = -1;
+        const onProg = (done) => { const sec = Math.floor(done / FPS); if (sec !== lastShown || done === nFrames) { lastShown = sec; if (done % FPS === 0 || done === nFrames) say(`      tekenen ${done}/${nFrames}`); } };
 
         if (hasVid || hasImg) {
-          // overlay-frames (transparant) renderen
+          // overlay-frames (transparant) PARALLEL renderen
+          const jobs = [];
           for (let f = 0; f < nFrames; f++) {
             const p = clamp01(f / Math.max(1, nFrames - 1));
-            const png = rasterize(overlaySVG(i, p));
-            await fs.writeFile(path.join(sdir, `o${String(f).padStart(4, "0")}.png`), png);
-            tick(f);
+            jobs.push({ svg: overlaySVG(i, p), path: path.join(sdir, `o${String(f).padStart(4, "0")}.png`) });
           }
+          await rasterizeFrames(jobs, onProg);
           const clip = path.join(work, `clip${i}.mp4`);
           if (hasVid) {
             // video schalen+croppen tot 9:16, iets donkerder, overlay eroverheen, trim op duur
@@ -940,13 +1022,13 @@ export function makeBrand({ ROOT = "." } = {}) {
           }
           sceneClips.push(clip);
         } else {
-          // GEEN media: volledige scène-SVG per frame -> clip (kaart/statement/mythe)
+          // GEEN media: volledige scène-SVG per frame -> clip (kaart/statement/mythe), PARALLEL
+          const jobs = [];
           for (let f = 0; f < nFrames; f++) {
             const p = clamp01(f / Math.max(1, nFrames - 1));
-            const png = rasterize(fullSceneSVG(i, p));
-            await fs.writeFile(path.join(sdir, `f${String(f).padStart(4, "0")}.png`), png);
-            tick(f);
+            jobs.push({ svg: fullSceneSVG(i, p), path: path.join(sdir, `f${String(f).padStart(4, "0")}.png`) });
           }
+          await rasterizeFrames(jobs, onProg);
           const clip = path.join(work, `clip${i}.mp4`);
           await ff(["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
             "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
@@ -994,8 +1076,10 @@ export function makeBrand({ ROOT = "." } = {}) {
         await fs.copyFile(silent, out);
       }
       say(`video-render klaar (${total.toFixed(1)}s).`);
+      if (pool) try { pool.destroy(); } catch {}
       return { prebuilt: out, cleanup: work, W, H, FPS, SS, durSec: total };
     } catch (e) {
+      if (pool) try { pool.destroy(); } catch {}
       try { await fs.rm(work, { recursive: true, force: true }); } catch {}
       throw e;
     }
