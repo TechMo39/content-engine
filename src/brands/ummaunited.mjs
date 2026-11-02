@@ -905,7 +905,9 @@ export function makeBrand({ ROOT = "." } = {}) {
     // frames tegelijk i.p.v. één voor één -> ~N keer sneller zonder kwaliteitsverlies (exact
     // hetzelfde beeld). Faalt de pool (bv. worker kan resvg niet laden), dan val ik netjes terug
     // op sequentieel rasteren in deze thread, zodat het altijd blijft werken.
-    const NCORES = Math.max(1, (os.cpus() ? os.cpus().length : 2));
+    // ALLE cores MIN ÉÉN: laat altijd 1 core vrij voor de rest van Mo's systeem (anders loopt de
+    // laptop vol en kan hij niks anders meer doen). Op een 6-core machine -> 5 workers.
+    const NCORES = Math.max(1, (os.cpus() ? os.cpus().length : 2) - 1);
     let pool = null;
     try { pool = makeRasterPool(Math.min(NCORES, 8), OW); } catch { pool = null; }
     say(pool ? `rasteren over ${pool.size} core(s)` : `rasteren op 1 core`);
