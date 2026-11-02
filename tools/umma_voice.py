@@ -20,11 +20,13 @@ VOICES = {
 
 # Toon-presets: length-scale (tempo, hoger=trager), sentence-silence (pauze na zin), noise-scale (variatie)
 # STRAKKER tempo dan eerst (de video werd 4 min; pauzes waren te lang). Nu vlotter, past bij een short.
+# Meer ADEM: langere stilte na elke zin zodat een gedachte kan landen (niet bam-bam-bam).
+# length = tempo (iets rustiger), sil = pauze na een zin (ruimer), noise = variatie.
 TONE = {
-    "rustig": dict(length=1.0,  sil=0.35, noise=0.80),   # verhalend, vlot
-    "nadruk": dict(length=1.1,  sil=0.45, noise=0.75),   # statement, iets gezet
-    "warm":   dict(length=1.12, sil=0.5,  noise=0.82),   # payoff, met gevoel maar niet sloom
-    "hook":   dict(length=1.0,  sil=0.4,  noise=0.80),   # opening, pakkend
+    "rustig": dict(length=1.06, sil=0.70, noise=0.80),   # verhalend, met rust tussen de zinnen
+    "nadruk": dict(length=1.16, sil=0.95, noise=0.75),   # statement, laat de klap hangen
+    "warm":   dict(length=1.18, sil=1.05, noise=0.82),   # payoff, ruim, laat het bezinken
+    "hook":   dict(length=1.08, sil=0.80, noise=0.80),   # opening, pakkend maar met lucht
 }
 
 # Het script "sword" (idee 1), per scene: nummer, toon, on-screen-tekst, en de VOICE-zin.
@@ -39,43 +41,46 @@ STORIES = {
   "sword1": {
     "title": "Spread by the sword? (1)",
     "scenes": [
-      (1,  "hook",   "They say we spread Islam by the sword.",
-           "They told you Islam was spread by the sword. You've heard it so often you almost believe it. So let's talk about who actually used the sword."),
-      (2,  "nadruk", "Rome forced its faith. At the point of a blade.",
-           "Rome ruled North Africa, Syria, Egypt. Christianity, forced from above. Believe something else, and you were taxed, shut out, or killed. That is what the sword really looks like."),
-      (3,  "rustig", "And today? That faith is almost gone there.",
-           "Look at those same lands now. That forced Christianity? Almost gone. Because what you take by force, you lose the moment the force is gone."),
-      (4,  "nadruk", "It couldn't even survive in Europe itself.",
-           "And the heart of that empire, Europe itself? Today most of it has walked away from religion completely. The faith Rome forced on the world couldn't even survive at home."),
-      (5,  "rustig", "Islam didn't need an army. People chose it.",
-           "Islam spread differently. Not by replacing people, but by convincing them. The Egyptians, the Berbers, the Persians, they chose it themselves, generation after generation."),
-      (6,  "rustig", "Indonesia: the biggest Muslim nation. No army ever came.",
-           "Indonesia proves it. No Muslim army ever set foot there. It became the largest Muslim country on earth through trade. People saw how the merchants lived, and chose their faith freely."),
-      (7,  "warm",   "Then came the real test. Part 2.",
-           "So it grew without the sword. But then came the real test. Five hundred years of foreign power, built to break us. Did we bend? Part two."),
+      (1,  "hook",   "Spread by the sword?",
+           "You have heard it your whole life. That Islam was forced on the world at the point of a sword. Convert, or die. You have heard it so many times that somewhere, quietly, a part of you started to believe it. Today, I want to give you that part of you back."),
+      (2,  "nadruk", "Here is what force actually looks like.",
+           "Because if you want to see a faith that truly was forced on people, you do not need to look at us. Look at Rome. For three hundred years Rome ruled North Africa, Egypt, Syria, and it handed every one of them a single religion from above. Keep your own belief, and you were taxed, shut out, or killed."),
+      (3,  "rustig", "So where is that faith today?",
+           "So let me ask you something simple. All of that power. All of that pressure. For all of those centuries. Where is that faith in those lands today? It is almost gone. Because this is the nature of force. The moment the hand holding the sword lets go, whatever it was holding up, falls."),
+      (4,  "nadruk", "It could not even hold its own home.",
+           "And it was not only the edges of the empire. Look at its very heart, Europe itself. The faith it forced on half the world could not even keep its grip at home. Today most of Europe has walked away from religion entirely. That is what force always leaves behind in the end. An empty room."),
+      (5,  "rustig", "No sword can reach a heart.",
+           "Now understand why Islam did the opposite. No human being can force faith into a heart. Guidance comes from Allah alone, and no army that has ever marched can hand it out. All our people did was carry the message, live it honestly, and deal justly, and those who saw it, Allah opened their hearts to the truth."),
+      (6,  "rustig", "No army ever reached these shores.",
+           "And if any doubt remains, look at the largest Muslim nation on earth today. Indonesia. No Muslim army ever set foot on its shores. No conquest. No empire. Only honest traders in a dishonest world, and a people who saw the truth in how they lived, and reached for it themselves."),
+      (7,  "warm",   "Then came the real test.",
+           "So no, this faith was never spread by the sword. It spread because hearts recognised the truth when they finally saw it. But then came the real test. Five hundred years of empires with every weapon on earth, all of it aimed at tearing it back out. Did it break? That is part two."),
     ],
   },
   "sword2": {
     "title": "Spread by the sword? (2)",
     "scenes": [
-      (1,  "nadruk", "500 years of colonisation. Almost no one converted.",
-           "Then came Europe. Five hundred years of colonial rule over almost the whole Muslim world. Their armies, their schools, their power. And still, almost no one converted."),
-      (2,  "nadruk", "300 years of Dutch rule. Indonesia stayed Muslim.",
-           "The Dutch ruled Indonesia for three hundred years. Three centuries of power. And they changed nothing. A people who chose Islam freely, kept it under the rule that tried to take it."),
-      (3,  "warm",   "Bosnia stood alone. And never let go.",
-           "Bosnia. Alone in Europe, surrounded for centuries, through wars meant to erase them. And still, today, Muslim. Respect to our Bosnian brothers."),
-      (4,  "rustig", "Spain is the proof. The people were driven out.",
-           "Only one place lost Islam. Spain. Not because minds changed, but because Muslims were given three choices. Convert, leave, or die. They weren't persuaded. They were driven out. Where the people stayed, Islam stayed."),
-      (5,  "warm",   "You can rewrite the story. Not the truth.",
-           "So when they tell you your faith was forced on the world, remember. The accuser is usually the guilty one. You can rewrite the story. You cannot rewrite the truth. And your people never broke."),
-      (6,  "warm",   "Be proud. This is who you are.",
-           "Rulers came and went. Your people stayed. Be proud of that. Follow Umma United, and know who you are."),
+      (1,  "nadruk", "Then the whole world came for it.",
+           "In part one, you saw that Islam was never forced on anyone. Now comes the real test. For five hundred years, Europe colonised almost the entire Muslim world. Their armies, their schools, their wealth, their power, all of it turned against one single thing. Our faith. And after all of it, almost no one let go."),
+      (2,  "nadruk", "Three centuries of power. Nothing moved.",
+           "Take that same Indonesia. The Dutch ruled it for three hundred years. Three centuries of foreign power standing over a people who had chosen Islam entirely on their own. And in all that time, with everything an empire has, they could not move it. What was never forced in, could not be forced out."),
+      (3,  "warm",   "Alone, surrounded, and still standing.",
+           "Then look at Bosnia. Alone in the heart of Europe, far from any Muslim land, surrounded for centuries, through wars built to erase them from the map completely. And still, today, they are standing. Still praying. Still here. To our brothers and sisters in Bosnia, we see you, and we are proud of you."),
+      (4,  "rustig", "The one exception proves the rule.",
+           "There is only one place on earth where Islam was truly erased. Spain. But look closely at how. Not because hearts were changed. The Muslims there were given three choices. Convert, leave, or die. They were not argued out of their faith. They were driven out of their homes at the edge of a blade. The faith only left because the people were forced to leave with it."),
+      (5,  "warm",   "Once the truth takes the heart.",
+           "And that, my brother, my sister, is the whole point. Once the truth has taken hold of a heart, there is no empire on earth strong enough to pull it back out. But a lie held up by force lasts only as long as the force itself. The moment people are free, they free themselves from it. That is why the forced faiths faded, and why we are still here."),
+      (6,  "warm",   "You are the proof.",
+           "So the next time someone tells you your faith was forced on the world, you will know the truth. The truth was always the strongest thing in the room. It never needed a sword. It only needed to be seen. And every time you stand to pray, you are the living proof that no empire could ever win. Hold your head high. Follow Umma United."),
     ],
   },
 }
 # Gedeelde landgroepen voor beide delen.
+# romemoslim = de door Rome beheerste landen die DAARNA moslim werden (en waar het opgelegde
+# christendom nu weg is). BEWUST zonder Italie/Spanje/Griekenland: die bleven christelijk, dus
+# die mee laten kleuren zou de tekst "dat geloof is daar verdwenen" tegenspreken.
 _GROUPS = [
-  "group rome = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Greece, Italy, Spain",
+  "group romemoslim = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Jordan, Iraq",
   "group europe_west = France, Spain, Italy, Portugal, Germany, Netherlands, Belgium",
   "group indonesia = Indonesia",
   "group bosnia = Bosnia and Herz.",
@@ -84,22 +89,24 @@ _GROUPS = [
 STORIES["sword1"]["groups"] = _GROUPS
 STORIES["sword2"]["groups"] = _GROUPS
 # Choreografie per deel (scene-nr binnen DAT deel). Technieken gemengd, SFX op de kantels.
+# tech: beeld = video/foto-achtergrond (uit assets/ummaunited/video/). vid: = video, img: = foto.
+# tech: kaart/statement/mythe = getekend (geen media nodig).
 STORIES["sword1"]["map"] = [
-  (1, "Islam was spread by the sword.",                   ["tech: mythe", "truth: Look who's really pointing.", "sfx: assets/ummaunited/sfx/sfx-zwaard.mp3"]),
-  (2, "Rome. This is what forcing a faith looks like.",   ["tech: beeld", "img: beeld-rome.jpg", "sfx: assets/ummaunited/sfx/sfx-boom.mp3"]),
-  (3, "Forced faith dies with the power behind it.",      ["tech: kaart", "rule: rome=cream", "view: mena"]),
-  (4, "It couldn't even hold on at home.",                ["tech: kaart", "fill: europe_west=cream", "view: europe"]),
-  (5, "The locals chose it. Over generations.",           ["tech: beeld", "img: beeld-kaart.jpg"]),
-  (6, "Indonesia. No army. Just trade.",                  ["tech: beeld", "img: beeld-indonesie.jpg"]),
-  (7, "Then came the greatest test. Part 2.",             ["tech: statement", "kick: Part 2", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
+  (1, "Spread by the sword?",               ["tech: mythe", "truth: Look who really held the blade.", "sfx: assets/ummaunited/sfx/sfx-zwaard.mp3"]),
+  (2, "This is what force looks like.",      ["tech: beeld", "vid: vid-rome.mp4", "sfx: assets/ummaunited/sfx/sfx-boom.mp3"]),
+  (3, "So where is that faith now?",         ["tech: kaart", "fill: romemoslim=cream", "view: mena"]),
+  (4, "It lost its own home.",               ["tech: kaart", "fill: europe_west=cream", "view: europe"]),
+  (5, "No sword reaches a heart.",           ["tech: beeld", "vid: vid-gebed.mp4"]),
+  (6, "No army ever came here.",             ["tech: beeld", "vid: vid-indonesie.mp4"]),
+  (7, "Then came the real test.",            ["tech: statement", "kick: Part 2", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
 ]
 STORIES["sword2"]["map"] = [
-  (1, "500 years of colonisation. No one converted.",                ["tech: beeld", "img: beeld-kolonisatie.jpg", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
-  (2, "300 years of Dutch rule. Still Muslim.",                      ["tech: kaart", "fill: indonesia=orange", "rule: indonesia=ruler", "view: sea"]),
-  (3, "Bosnia. Alone, surrounded, still here.",                      ["tech: beeld", "img: beeld-bosnie.jpg"]),
-  (4, "Spain: the faith left only when the people were forced out.", ["tech: beeld", "img: beeld-spanje.jpg"]),
-  (5, "You can't rewrite the truth.",                                ["tech: statement", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
-  (6, "Umma United — know your history.",                            ["tech: statement"]),
+  (1, "The whole world came for it.",        ["tech: beeld", "vid: vid-kolonisatie.mp4", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
+  (2, "300 years. Nothing moved.",           ["tech: kaart", "fill: indonesia=orange", "rule: indonesia=ruler", "view: sea"]),
+  (3, "Alone, and still standing.",          ["tech: beeld", "img: foto-bosnie.jpg"]),
+  (4, "One exception proves it.",            ["tech: beeld", "img: foto-spanje.jpg"]),
+  (5, "Truth takes the heart.",              ["tech: beeld", "vid: vid-gebed-massa.mp4", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
+  (6, "You are the proof.",                  ["tech: beeld", "vid: vid-gebed.mp4"]),
 ]
 
 def build_story(story_id, voice, root, only=0):
