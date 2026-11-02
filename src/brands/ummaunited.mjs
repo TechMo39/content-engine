@@ -17,6 +17,22 @@ import { promisify } from "node:util";
 import { composeChrome, FORMATS, escapeXml } from "../core/renderer.mjs";
 const execFileP = promisify(execFile);
 
+// FFmpeg-pad bepalen. Op Mo's laptop staat "ffmpeg" NIET los op het PATH (spawn ENOENT), maar de
+// kern gebruikt hem wel — vrijwel zeker via het npm-pakket ffmpeg-static (gebundelde binary).
+// We proberen: FFMPEG_PATH env -> ffmpeg-static -> kaal "ffmpeg" (laatste redmiddel).
+let _FFMPEG = null;
+async function ffmpegPath() {
+  if (_FFMPEG) return _FFMPEG;
+  if (process.env.FFMPEG_PATH) { _FFMPEG = process.env.FFMPEG_PATH; return _FFMPEG; }
+  try {
+    const mod = await import("ffmpeg-static");
+    const p = mod.default || mod;
+    if (p && typeof p === "string") { _FFMPEG = p; return _FFMPEG; }
+  } catch {}
+  _FFMPEG = "ffmpeg";   // fallback; faalt dit met ENOENT dan loggen we dat luid
+  return _FFMPEG;
+}
+
 // WAV-lengte (seconden) uit de header — geen ffprobe nodig. Faalt netjes (0).
 async function wavDuration(absPath) {
   try {
@@ -792,6 +808,8 @@ export function makeBrand({ ROOT = "." } = {}) {
   // ====================================================================================
   async function makeComposedVideoRender({ subjectId, opts = {}, format = "9:16", log }) {
     const say = (m) => { try { if (log) log(m); else console.log(m); } catch {} };
+    const FFMPEG = await ffmpegPath();       // echte ffmpeg-binary (niet kaal "ffmpeg" op PATH)
+    const ff = (args) => execFileP(FFMPEG, args);
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const FPS = 24, SS = 2;                 // SS2 -> 1080x1920
     const OW = W * SS, OH = H * SS;
@@ -799,14 +817,29 @@ export function makeBrand({ ROOT = "." } = {}) {
     const scenes = opts.scenes || (picked && picked.scenes) || [];
     const groups = opts.groups || (picked && picked.groups) || {};
 
-    // resvg laden (zoals de kern). Faalt dit, dan val terug op de gewone (SVG-only) render.
+    // resvg laden (zoals de kern gebruikt). Robuust voor zowel ESM- als CJS-vorm: de class kan
+    // onder .Resvg, .default.Resvg of direct op de module zitten, afhankelijk van de versie.
+    // Faalt het echt, dan val terug op de gewone (SVG-only) render — MAAR we loggen de reden luid,
+    // zodat we niet stilletjes op zwarte schermen eindigen.
     let Resvg;
-    try { ({ Resvg } = await import("@resvg/resvg-js")); }
-    catch { return null; }                  // signaal: gebruik de gewone render
+    try {
+      const mod = await import("@resvg/resvg-js");
+      Resvg = mod.Resvg || (mod.default && mod.default.Resvg) || mod.default || mod;
+      if (typeof Resvg !== "function") throw new Error("Resvg-class niet gevonden in @resvg/resvg-js (vorm: " + Object.keys(mod).join(",") + ")");
+    } catch (e) {
+      (log ? log : console.log)("video-render kan @resvg/resvg-js niet laden -> terug naar tekst-render: " + (e && e.message || e));
+      return null;
+    }
+    // test de rasterizer met een mini-SVG; faalt dat, dan weten we het NU i.p.v. halverwege.
     const rasterize = (svg) => {
       const r = new Resvg(svg, { fitTo: { mode: "width", value: OW } });
       return r.render().asPng();
     };
+    try { rasterize(`<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="#000"/></svg>`); }
+    catch (e) {
+      (log ? log : console.log)("video-render: resvg rastert niet -> terug naar tekst-render: " + (e && e.message || e));
+      return null;
+    }
 
     // duur per scène (stem stuurt, + adempauze), en media vooraf resolven.
     const VOICE_PAD = 0.9;
@@ -886,7 +919,7 @@ export function makeBrand({ ROOT = "." } = {}) {
           const clip = path.join(work, `clip${i}.mp4`);
           if (hasVid) {
             // video schalen+croppen tot 9:16, iets donkerder, overlay eroverheen, trim op duur
-            await execFileP("ffmpeg", ["-y", "-t", dur.toFixed(2), "-i", vidFile,
+            await ff(["-y", "-t", dur.toFixed(2), "-i", vidFile,
               "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
               "-filter_complex",
               `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
@@ -894,7 +927,7 @@ export function makeBrand({ ROOT = "." } = {}) {
           } else {
             // foto: langzame Ken Burns zoom + overlay
             const zf = Math.round(dur * FPS);
-            await execFileP("ffmpeg", ["-y", "-loop", "1", "-t", dur.toFixed(2), "-i", imgFile,
+            await ff(["-y", "-loop", "1", "-t", dur.toFixed(2), "-i", imgFile,
               "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
               "-filter_complex",
               `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
@@ -909,7 +942,7 @@ export function makeBrand({ ROOT = "." } = {}) {
             await fs.writeFile(path.join(sdir, `f${String(f).padStart(4, "0")}.png`), png);
           }
           const clip = path.join(work, `clip${i}.mp4`);
-          await execFileP("ffmpeg", ["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
+          await ff(["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
             "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
           sceneClips.push(clip);
         }
@@ -920,7 +953,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const listFile = path.join(work, "list.txt");
       await fs.writeFile(listFile, sceneClips.map((c) => `file '${c.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
       const silent = path.join(work, "silent.mp4");
-      await execFileP("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
+      await ff(["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
 
       // AUDIO: muziek-bodem (zacht) + stem (boven) + SFX op kantels. Alles met ffmpeg amix.
       say(`  audio mixen (stem + muziek + sfx)...`);
@@ -948,7 +981,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const out = path.join(work, "final.mp4");
       if (aLabels.length) {
         const mix = `${aLabels.join("")}amix=inputs=${aLabels.length}:duration=longest:dropout_transition=0,atrim=0:${total.toFixed(2)}[a]`;
-        await execFileP("ffmpeg", ["-y", ...inputs,
+        await ff(["-y", ...inputs,
           "-filter_complex", [...aFilters, mix].join(";"),
           "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", out]);
       } else {
