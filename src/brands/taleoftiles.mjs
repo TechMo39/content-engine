@@ -268,7 +268,7 @@ function wordsReveal(line, cx, baseY, fs, lh, fill, wordK) {
   return out;
 }
 // wordK (optioneel, laatste arg): zet word-synced reveal aan voor de hoofdregel. Weglaten = blok.
-function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null, pop = null) {
+function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null) {
   if (!main || op <= 0.01) return "";
   const O = Math.max(0, Math.min(1, op));
   const lines = wrap2(main, 24);
@@ -293,14 +293,7 @@ function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null, pop
       + `<stop offset="0" stop-color="#0a0712" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="${(0.62 * O).toFixed(3)}"/></linearGradient></defs>`
       + `<rect x="0" y="${Math.round(H * 0.56)}" width="${W}" height="${Math.round(H * 0.44)}" fill="url(#capscrim)"/>`;
   }
-  // MOVE C — caption-beat POP: bij binnenkomst even iets groter en dan settelen (schaal-punch),
-  // zodat de regel op de cut "landt" i.p.v. alleen zacht in te faden. pop=null -> geen transform
-  // (alle bestaande aanroepen blijven byte-identiek). pop loopt 0->1 over de intro van de caption.
-  const pSrc = pop != null ? pop : wordK;   // val terug op de word-reveal-voortgang -> ELKE caption popt op binnenkomst
-  const pp = pSrc == null ? null : Math.max(0, Math.min(1, pSrc));
-  const sc = pp == null ? 1 : 1 + 0.14 * (1 - pp);
-  const capTf = sc === 1 ? "" : ` transform="translate(${(W / 2).toFixed(1)} ${cy.toFixed(1)}) scale(${sc.toFixed(3)}) translate(${(-W / 2).toFixed(1)} ${(-cy).toFixed(1)})"`;
-  out += `<g opacity="${O.toFixed(3)}" text-anchor="middle"${capTf}>`;
+  out += `<g opacity="${O.toFixed(3)}" text-anchor="middle">`;
   if (kicker) {
     y += kfs;
     out += `<text x="${W / 2}" y="${y.toFixed(0)}" font-family="${SERIF}" font-weight="600" font-size="${kfs}" letter-spacing="${(kfs * 0.42).toFixed(1)}" fill="#d6b35a">${escapeXml(kicker.toUpperCase())}</text>`;
@@ -362,15 +355,11 @@ function interruptAt(t, { amp = 0.08, beat = 2.6, start = 0, until = 1e9 } = {})
   let pulse = 0;
   if (local < PUNCH) { const p = local / PUNCH; pulse = Math.sin(p * Math.PI); }
   // elke beat een ander karakter zodat het niet mechanisch wordt:
-  //   0: zachte zoom-punch   1/3: stevigere zoom-punch   2: zoom + flits
-  // MOVE A — CLEAN ZOOM-PUNCH i.p.v. de oude zijwaartse "vloep naar rechts en terug": die positie-
-  // sprong keerde terug naar hetzelfde punt en las als een glitch. De beat landt nu puur als een
-  // korte inzoom-punch (soms + flits), wat als bewust oogt. panx/pany blijven 0 (return-vorm gelijk,
-  // alle call-sites tellen gewoon 0 op). kind 1/3 krijgen een iets stevigere punch zodat de
-  // pattern-interrupt voelbaar blijft zonder zijwaartse beweging.
+  //   0: pure zoom-punch   1: zoom + hoek-nudge rechts   2: zoom + flits   3: zoom + hoek-nudge links
   const kind = idx % 4;
-  const punch = (kind === 1 || kind === 3) ? 1.25 : (kind === 2 ? 0.7 : 1);
-  const z = 1 + amp * pulse * punch;
+  const z = 1 + amp * pulse * (kind === 2 ? 0.7 : 1);          // bij een flits iets minder zoom
+  // De zijwaartse "vloep" (positie-sprong naar rechts/links en terug) eruit: dat was die rare
+  // pulserende beweging. Verder exact zoals het was; alleen panx/pany op 0.
   const panx = 0;
   const pany = 0;
   const flash = kind === 2 ? pulse * 0.5 : 0;
@@ -1078,9 +1067,9 @@ export function makeBrand({ ROOT, config }) {
         // 0..HOLD: vol vasthouden; HOLD..HOOK: leegkleuren (fill achteruit afgespeeld)
         const dk = t < HOLD ? 1 : 1 - smooth((t - HOLD) / (HOOK - HOLD));   // 1=vol -> 0=leeg
         const cols = film.flowColorsAt(P0.parsed, { palette: P0.palArr, durSec: 1, buildSec: 1, buildStart: 0, popSec: 0.05 }, dk);
-        // STERKERE hook: ECHTE zoom-open (0.13 -> 0.50). Het volle eindbeeld komt in seconde 1 groot
-        // naar je toe en trekt terug terwijl het leegkleurt. Scroll-stopper, geen klein tikje meer.
-        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.5 * (1 - dk), { x: 0, y: 0 });
+        // STERKERE hook: grotere zoom-punch (was 0.06 -> 0.13), zodat het eindbeeld letterlijk
+        // naar je toe komt in seconde 1 -> harder pattern-interrupt voor de scrollende kijker.
+        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.13 * (1 - dk), { x: 0, y: 0 });
         // FLITS op de knip: net voordat het leeg is trekt een witte veeg over -> markeert de
         // overgang van "resultaat" naar "opbouw" als een echte cut (anders was 'ie onzichtbaar).
         const r0 = rectFor(P0.aspect);
@@ -1102,21 +1091,15 @@ export function makeBrand({ ROOT, config }) {
       // camera: terugtrekken (1.14 -> 1.0) tijdens het vullen, daarna zacht "ademen" op het volle
       // bord + hele trage drift -> nooit stil, chill. Opbouw is de ster, geen payoff vooraf.
       const fillK = Math.min(1, tl / Tfill);
-      // MOVE B — SPEED-RAMP: het vullen start snel en vertraagt naar het eind, zodat de laatste
-      // tegels als een slow-mo payoff landen i.p.v. een vlakke lineaire opbouw (de dode-zone).
-      const fillProg = 1 - Math.pow(1 - fillK, 1.7);
-      let z = 1 + 0.14 * (1 - smooth(fillProg));
-      // ECHTE INZOOM-DIVE op de payoff: zodra het bord vol is duikt de camera krachtig het
-      // afgemaakte glazuur in (van 1.0 naar ~1.68). Het volgende patroon opent weer wijd op 1.0,
-      // dus die overgang leest als een echte zoom-punch i.p.v. een zacht adempje.
-      if (tl > Tfill) { const pk = Math.min(1, (tl - Tfill) / Math.max(0.1, Tseg - Tfill)); z = 1 + 0.68 * smooth(pk); }
+      let z = 1 + 0.14 * (1 - smooth(fillK));
+      if (tl > Tfill) z = 1 + 0.025 * (0.5 - 0.5 * Math.cos(((tl - Tfill) / Math.max(0.1, Tseg - Tfill)) * Math.PI * 2));
       const pan = { x: 0.010 * Math.sin(t * 0.5 + seg * 1.7), y: 0.008 * Math.cos(t * 0.38 + seg) };
       // PATTERN-INTERRUPTS: breek de lange inkleur-dode-zone elke ~2,6s met een zachte zoom-punch
       // + hoek-nudge (subtiel, satisfying blijft hypnotisch). Loopt alleen tijdens het vullen; de
       // payoff-hold aan het eind van elk segment laat ik met rust.
       const ir = interruptAt(tEff, { amp: 0.07, beat: 2.6, start: 0.6, until: seg * Tseg + Tfill });
       z *= ir.z; pan.x += ir.panx; pan.y += ir.pany;
-      inner += drawPanel(P, fillColors(P, fillProg * Tfill), "sp" + seg, inOp, z, pan);
+      inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp, z, pan);
       if (ir.flash > 0.01) { const rF = rectFor(P.aspect); inner += flashSweep(rF.x, rF.y, rF.w, rF.h, ir.flash, "si" + seg); }
       // PAYOFF: zodra het bord vol is trekt een zachte lichtveeg over het glazuur -> het "landt"
       if (tl > Tfill) {
@@ -1145,8 +1128,7 @@ export function makeBrand({ ROOT, config }) {
           if (tEff >= s0 && tEff < s1) { if (tEff < s0 + fade) bo = smooth((tEff - s0) / fade); else if (tEff > s1 - fade) bo = 1 - smooth((tEff - (s1 - fade)) / fade); else bo = 1; }
           // word-synced: woorden ploppen in over de eerste ~55% van het slot, houden daarna vast
           const wordK = Math.max(0, Math.min(1, (tEff - s0) / (slot * 0.55)));
-          const pop = Math.max(0, Math.min(1, (tEff - s0) / (slot * 0.30)));   // MOVE C: schaal-punch bij binnenkomst
-          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK, pop);
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK);
         }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
@@ -1207,13 +1189,7 @@ export function makeBrand({ ROOT, config }) {
         let idx, cols;
         if (t < Tb) { idx = 0; cols = film.flowColorsAt(parsed, { palette: pals3[0], durSec: Tb * 0.78, buildSec: Tb * 0.78, buildStart: 0, popSec: 0.05 }, t); }
         else { idx = Math.floor((t - Tb) / hold) % 3; cols = finals[idx]; }   // SNAP op de beat
-        // ZOOM-PUNCH op elke kleur-snap: het paneel schiet heel even naar voren op het moment dat
-        // de kleurweg wisselt, zodat de A/B/C-switch echt aankomt i.p.v. geruisloos te verspringen.
-        const sinceSnap = t >= Tb ? ((t - Tb) % hold) : 1e9;
-        const snapPunch = Math.max(0, 1 - sinceSnap / 0.22);
-        const cxC = px + w / 2, cyC = py + h / 2, scC = 1 + 0.12 * snapPunch;
-        const tfC = scC === 1 ? "" : ` transform="translate(${cxC} ${cyC}) scale(${scC.toFixed(3)}) translate(${-cxC} ${-cyC})"`;
-        inner += `<g${tfC}>${drawCW(cols, { x: px, y: py, w, h }, "cwbig")}</g>`;
+        inner += drawCW(cols, { x: px, y: py, w, h }, "cwbig");
         const rad = Math.round(w * 0.085), bx = px + w - rad * 1.15, by = py + rad * 1.15;
         const bOp = t < Tb ? Math.max(0, Math.min(1, (t - Tb * 0.78) / 0.4)) : 1;
         overlay += badge(["A", "B", "C"][idx], bx, by, rad, bOp);
@@ -1307,15 +1283,10 @@ export function makeBrand({ ROOT, config }) {
       // RUSTIGER tempo (was te snel): elk ontwerp ~0.9s -> licht versnellend naar ~0.55s.
       const flash = Math.max(0.55, 0.9 - t * 0.008) / TM;
       // tel hoeveel flitsen al voorbij zijn (met versnelling) voor een stabiele index
-      let acc = 0, k = 0, idx = 0, stepLast = 0; while (acc < t && k < 10000) { stepLast = Math.max(0.55, 0.9 - acc * 0.008) / TM; acc += stepLast; if (acc <= t) idx++; k++; }
+      let acc = 0, k = 0, idx = 0; while (acc < t && k < 10000) { acc += Math.max(0.55, 0.9 - acc * 0.008) / TM; if (acc <= t) idx++; k++; }
       const P = prep[idx % prep.length];
       const r = rectFor(P.aspect);
-      // ZOOM-PUNCH per flits: bij elke nieuwe ontwerp-flits schiet het beeld heel even naar voren en
-      // settelt (de flits is de kern van dit type). Via de viewBox, dus de gouden lijst blijft staan.
-      const intoFlash = Math.max(0, t - (acc - stepLast));
-      const zG = 1 + 0.10 * Math.max(0, 1 - intoFlash / 0.18);
-      const pwG = P.parsed.view[2], phG = P.parsed.view[3], vwG = pwG / zG, vhG = phG / zG;
-      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="${((pwG - vwG) / 2).toFixed(1)} ${((phG - vhG) / 2).toFixed(1)} ${vwG.toFixed(1)} ${vhG.toFixed(1)}" preserveAspectRatio="xMidYMid slice">`;
+      const wrap = `<svg x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" viewBox="0 0 ${P.parsed.view[2]} ${P.parsed.view[3]}" preserveAspectRatio="xMidYMid slice">`;
       const mos = film.buildSvg(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap) + film.buildGlaze(P.parsed, P.finalCols).replace(/<svg\b[^>]*>/i, wrap);
       const rr = Math.max(6, r.w * 0.03);
       let inner = `<clipPath id="gtc"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}"/></clipPath><g clip-path="url(#gtc)">${mos}${glazeSvg(r.x, r.y, r.w, r.h, "gtc")}</g><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
@@ -1602,9 +1573,7 @@ export function makeBrand({ ROOT, config }) {
     const Tintro = Math.min(2.8, durSec * 0.22);
     function sceneAt(frame) {
       const t = frame / FPS;
-      // uitzoom versnelt naar herkenning: traag beginnen (spanning blijft), dan sneller resolveren.
-      const _gu = t < Tintro ? 0 : Math.min(1, (t - Tintro) / ((durSec - Tintro) * 0.82));
-      const k = Math.pow(_gu, 1.4);
+      const k = t < Tintro ? 0 : smooth(Math.min(1, (t - Tintro) / ((durSec - Tintro) * 0.82)));   // hold -> uitzoomen
       const z = Z0 + (1 - Z0) * k;
       const cx = fx + (0.5 - fx) * k, cy = fy + (0.5 - fy) * k;
       const vw = pw / z, vh = ph / z;
@@ -1682,9 +1651,7 @@ export function makeBrand({ ROOT, config }) {
     const underMosaic = hasMosaicImg ? film.buildSvg(gparsed, gparsed.tiles.map((tl) => toneFor(tl.nx, tl.ny))).replace(/<svg\b[^>]*>/i, underWrap) : photoImg;
     function sceneAt(frame) {
       const t = frame / FPS;
-      // SPEED-RAMP: langzaam beginnen (spanning blijft), dan versnellen naar de volledige onthulling.
-      const _ru = t < Tintro ? 0 : Math.min(1, (t - Tintro) / revWin);
-      const p = Math.pow(_ru, 1.5);
+      const p = t < Tintro ? 0 : smooth(Math.min(1, (t - Tintro) / revWin));   // hold -> onthullen
       const cols = new Array(parsed.tiles.length);
       // VAN BUITEN NAAR BINNEN: edge-tegels (hoge order) verdwijnen eerst, het midden (waar het
       // object zit) blijft het langst bedekt -> spannend tot het eind.
@@ -1697,8 +1664,6 @@ export function makeBrand({ ROOT, config }) {
       let inner = `<clipPath id="rv"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}"/></clipPath>`
         + `<g clip-path="url(#rv)">${underMosaic}${mosaic}</g>`
         + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
-      // FLITS op het moment van volledige onthulling -> de payoff landt.
-      if (p > 0.82) inner += flashSweep(x, y, w, h, Math.max(0, 1 - (1 - p) / 0.18) * 0.5, "rvf");
       let overlay = "";
       if (t < Tintro) { const op = t < 0.5 ? Math.min(1, t / 0.5) : (t > Tintro - 0.5 ? 1 - smooth((t - (Tintro - 0.5)) / 0.5) : 1); overlay += captionOverlay(intro, kick, W, H, op, "lower", Math.min(1, t / 0.9)); }
       else if (p < 0.72) { const op = p > 0.60 ? 1 - smooth((p - 0.60) / 0.12) : Math.min(1, (t - Tintro) / 0.5); overlay += captionOverlay(line, kick, W, H, op, "lower", Math.max(0, Math.min(1, (t - Tintro) / 0.9))); }
@@ -2495,7 +2460,7 @@ export function makeBrand({ ROOT, config }) {
     // TIJDLIJN (strak voor retentie): seconde-1 hook (open loop) -> korte tease op het ontwerp met
     // oplopende spanning -> FLITS-knip -> de echte foto als payoff, vastgehouden + CTA. Before kort,
     // after is de beloning dus die krijgt de meeste tijd.
-    const Tbefore = durSec * 0.26, Ttrans = Math.min(0.6, durSec * 0.07);   // before korter -> sneller naar de payoff
+    const Tbefore = durSec * 0.30, Ttrans = Math.min(0.6, durSec * 0.07);
     const Tafter0 = Tbefore + Ttrans;
     const LBL = {
       before: { nl: "Het ontwerp", en: "The design", fr: "Le design" }[lang],
@@ -2527,7 +2492,7 @@ export function makeBrand({ ROOT, config }) {
         // AFTER: de echte foto als payoff, zachte push-in + interrupt-pulsen zodat het leeft.
         const ta = t - Tafter0, afterDur = Math.max(0.1, durSec - Tafter0);
         const ir = interruptAt(ta, { amp: 0.045, beat: 2.7, start: 0.5, until: afterDur });
-        const zf = (1.0 + 0.16 * smooth(Math.min(1, ta / afterDur))) * ir.z;   // echte landende inzoom op de foto
+        const zf = (1.0 + 0.07 * smooth(Math.min(1, ta / afterDur))) * ir.z;
         inner += `<g clip-path="url(#vnc)"><g transform="translate(${(w * ir.panx).toFixed(1)} ${(h * ir.pany).toFixed(1)})">${imgFill(afterUri, zf)}</g>${glazeSvg(x, y, w, h, "vna")}</g>`;
         inner += frame;
         if (ir.flash > 0.01) inner += flashSweep(x, y, w, h, ir.flash, "vnaf");
@@ -2779,7 +2744,7 @@ export function makeBrand({ ROOT, config }) {
     const rectBorder = `<rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="10" fill="none" stroke="${branding.gold}" stroke-width="2.5"/>`;
     const maskRectD = `M ${panelX - 3} ${panelY - 3} H ${panelX + panelW + 3} V ${panelY + panelH + 3} H ${panelX - 3} Z`;
     const cornerMaskD = `${maskRectD} ${archD}`;
-    const breath = (tt) => 1 + 0.09 * smooth(Math.min(1, tt / durSec));   // trage cinematische push-in i.p.v. heen-en-weer adem
+    const breath = (tt) => 1 + 0.10 * (0.5 - 0.5 * Math.cos(2 * Math.PI * 2 * (tt / durSec)));   // heel zachte zoom-adem (getemperd)
     // Mid-reveals: toon tussen het patroon door een paar keer het ECHTE paneel (de foto)
     //, patroon -> eindresultaat zellige -> patroon. Puls 0..1..0 op een paar momenten in de flow.
     function revealK(tt) {
