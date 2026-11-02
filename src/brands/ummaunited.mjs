@@ -534,26 +534,44 @@ export function makeBrand({ ROOT = "." } = {}) {
     return g;
   }
 
-  // -- TECHNIEK: mythe (de beschuldiging verschijnt -> wordt doorgestreept -> waarheid eronder) --
+  // -- TECHNIEK: mythe. GEEN lelijke rode streep meer. De beschuldiging verschijnt stevig, blijft
+  // even staan, en LOST DAN OP: de woorden drijven licht uiteen en vervagen (alsof de leugen geen
+  // grond heeft en uit elkaar valt). Daaronder RIJST de waarheid op in warm oranje. Stijlvol,
+  // volwassen, past bij een serieus statement.
   function techMythe({ W, H, p, scene }) {
     const claim = scene.text || "";               // de leugen/beschuldiging
     const truth = scene.truth || scene.kick || ""; // wat er echt is
     let g = bgField(W, H, (claim.length * 13) % 89);
-    const fsC = fitFs(claim, Math.round(W * 0.085), W * 0.82, 0.56);
-    const cy = truth ? H * 0.40 : H * 0.48;
-    // claim verschijnt (0..0.4), streep eroverheen (0.4..0.7)
-    const claimOp = clamp01(p / 0.3);
-    g += `<text x="${W / 2}" y="${cy}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fsC}" fill="${COL.mute}" opacity="${claimOp.toFixed(2)}">${escapeXml(claim)}</text>`;
-    const strike = clamp01((p - 0.35) / 0.3);
-    if (strike > 0.01) {
-      const halfW = Math.min(W * 0.80, claim.length * fsC * 0.30) * strike;
-      g += `<line x1="${(W / 2 - halfW).toFixed(0)}" y1="${(cy - fsC * 0.32).toFixed(0)}" x2="${(W / 2 + halfW).toFixed(0)}" y2="${(cy - fsC * 0.32).toFixed(0)}" stroke="${COL.red}" stroke-width="${Math.round(W * 0.018)}" stroke-linecap="round"/>`;
+    const fsC = fitFs(claim, Math.round(W * 0.082), W * 0.84, 0.56);
+    const cy = truth ? H * 0.38 : H * 0.46;
+
+    // fasen: verschijnen 0..0.28, vasthouden 0.28..0.5, oplossen 0.5..0.82
+    const appear = clamp01(p / 0.28);
+    const dissolve = clamp01((p - 0.5) / 0.32);
+    const d = sm(dissolve);
+    // de claim per woord laten uiteendrijven: elk woord schuift iets naar buiten + omhoog en vervaagt
+    const words = claim.split(/\s+/).filter(Boolean);
+    const claimOp = appear * (1 - d);
+    if (claimOp > 0.01) {
+      // tijdens oplossen: letter-spacing groeit, hele regel drijft iets omhoog, opacity zakt
+      const drift = -d * H * 0.03;
+      const spacing = (d * fsC * 0.18).toFixed(1);
+      const blurOp = claimOp.toFixed(2);
+      g += `<text x="${W / 2}" y="${(cy + drift).toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fsC}" letter-spacing="${spacing}" fill="${COL.cream}" opacity="${blurOp}">${escapeXml(claim)}</text>`;
+      // subtiele "echo" die verder uiteen drijft (geeft het uiteenvallen diepte), alleen tijdens oplossen
+      if (d > 0.05) {
+        const drift2 = -d * H * 0.06;
+        const sp2 = (d * fsC * 0.4).toFixed(1);
+        g += `<text x="${W / 2}" y="${(cy + drift2).toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fsC}" letter-spacing="${sp2}" fill="${COL.cream}" opacity="${(claimOp * 0.4).toFixed(2)}">${escapeXml(claim)}</text>`;
+      }
     }
-    // waarheid eronder, woord-voor-woord (0.6..1)
+    // de waarheid rijst op (0.58..1): vanaf iets lager naar z'n plek, vervaagt in
     if (truth) {
-      const tp = clamp01((p - 0.6) / 0.4);
-      const fsT = fitFs(truth, Math.round(W * 0.075), W * 0.82, 0.56);
-      g += wordReveal(truth, W / 2, H * 0.58, fsT, COL.orange, tp);
+      const tp = clamp01((p - 0.58) / 0.4);
+      const te = sm(tp);
+      const ty = H * 0.56 + (1 - te) * H * 0.04;
+      const fsT = fitFs(truth, Math.round(W * 0.072), W * 0.84, 0.56);
+      g += `<g opacity="${te.toFixed(2)}"><text x="${W / 2}" y="${ty.toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${fsT}" fill="${COL.orange}">${escapeXml(truth)}</text></g>`;
     }
     return g;
   }
@@ -772,7 +790,8 @@ export function makeBrand({ ROOT = "." } = {}) {
   // gebruikt die direct, zie engine runOne). Raakt de gedeelde renderer NIET aan.
   // Rastert SVG met @resvg/resvg-js (dezelfde dep die de kern al gebruikt).
   // ====================================================================================
-  async function makeComposedVideoRender({ subjectId, opts = {}, format = "9:16" }) {
+  async function makeComposedVideoRender({ subjectId, opts = {}, format = "9:16", log }) {
+    const say = (m) => { try { if (log) log(m); else console.log(m); } catch {} };
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const FPS = 24, SS = 2;                 // SS2 -> 1080x1920
     const OW = W * SS, OH = H * SS;
@@ -838,6 +857,7 @@ export function makeBrand({ ROOT = "." } = {}) {
         + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
     }
 
+    say(`video-render gestart: ${scenes.length} scènes, ${total.toFixed(1)}s`);
     const work = await fs.mkdtemp(path.join(os.tmpdir(), "umma-vid-"));
     const sceneClips = [];
     try {
@@ -853,6 +873,8 @@ export function makeBrand({ ROOT = "." } = {}) {
         const imgFile = s.img ? path.resolve(ROOT, "assets/ummaunited/video", s.img) : "";
         const hasVid = vidFile && await exists(vidFile);
         const hasImg = imgFile && await exists(imgFile);
+        const bron = hasVid ? `video (${s.vid})` : hasImg ? `foto (${s.img})` : `getekend (${s.tech || "statement"})`;
+        say(`  scène ${i + 1}/${scenes.length}: ${bron}, ${dur.toFixed(1)}s, ${nFrames} frames`);
 
         if (hasVid || hasImg) {
           // overlay-frames (transparant) renderen
@@ -894,12 +916,14 @@ export function makeBrand({ ROOT = "." } = {}) {
       }
 
       // scène-clips aan elkaar (concat demuxer)
+      say(`  scènes samenvoegen...`);
       const listFile = path.join(work, "list.txt");
       await fs.writeFile(listFile, sceneClips.map((c) => `file '${c.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
       const silent = path.join(work, "silent.mp4");
       await execFileP("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
 
       // AUDIO: muziek-bodem (zacht) + stem (boven) + SFX op kantels. Alles met ffmpeg amix.
+      say(`  audio mixen (stem + muziek + sfx)...`);
       const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
       const aIn = [], aFilters = [], aLabels = [];
       let idx = 1; // 0 = de stille video
@@ -930,6 +954,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       } else {
         await fs.copyFile(silent, out);
       }
+      say(`video-render klaar (${total.toFixed(1)}s).`);
       return { prebuilt: out, cleanup: work, W, H, FPS, SS, durSec: total };
     } catch (e) {
       try { await fs.rm(work, { recursive: true, force: true }); } catch {}
@@ -952,7 +977,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     return withSize.length ? path.resolve(dir, withSize[0][0]) : "";
   }
 
-  async function makeRender({ subjectId, opts = {}, format = "9:16" }) {
+  async function makeRender({ subjectId, opts = {}, format = "9:16", log }) {
     let type = opts.type || opts.template || "kaart";
     // AUTOMATISCH: als het gekozen verhaal (of opts) scènes met een `tech`-veld bevat, gebruik
     // de compositie — zo hoeft de studio geen aparte "mix"-keuze te hebben; Importeer + Render volstaat.
@@ -964,9 +989,9 @@ export function makeBrand({ ROOT = "." } = {}) {
     const hasMedia = sc.some((s) => s && (s.vid || s.img));
     if ((type === "mix" || type === "composed") && hasMedia) {
       try {
-        const r = await makeComposedVideoRender({ subjectId, opts, format });
+        const r = await makeComposedVideoRender({ subjectId, opts, format, log });
         if (r) return r;
-      } catch (e) { /* val terug op SVG-render hieronder */ }
+      } catch (e) { if (log) log("video-render faalde, val terug op tekst-render: " + (e && e.message || e)); }
     }
     switch (type) {
       case "kaart": return makeKaartRender({ subjectId, opts, format });
