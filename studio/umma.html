@@ -143,7 +143,7 @@ function parseScript(text){
     if(m){out.groups.push({name:m[1].trim(),countries:m[2].trim()});continue;}
     if(/^scene\s+/i.test(line)){
       const segs=line.replace(/^scene\s+/i,'').split('|').map(s=>s.trim());
-      const sc={tech:'kaart',year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:0,voice:'',sfx:'',truth:'',kick:'',img:'',caption:''};
+      const sc={tech:'kaart',year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:0,voice:'',sfx:'',truth:'',kick:'',img:'',vid:'',caption:''};
       for(let k=2;k<segs.length;k++){const seg=segs[k];const ci=seg.indexOf(':');if(ci<0)continue;
         const key=seg.slice(0,ci).trim().toLowerCase();const val=seg.slice(ci+1).trim();
         if(key==='fill'||key==='rule'){for(const pr of val.split(';')){const eq=pr.indexOf('=');if(eq<0)continue;const g=pr.slice(0,eq).trim();const c=pr.slice(eq+1).trim();if(g&&c)(key==='fill'?sc.fills:sc.rule).push({g,c});}}
@@ -155,6 +155,7 @@ function parseScript(text){
         else if(key==='voice')sc.voice=val;
         else if(key==='sfx')sc.sfx=val;
         else if(key==='img')sc.img=val;
+        else if(key==='vid')sc.vid=val;
         else if(key==='caption')sc.caption=val;
       }
       out.scenes.push(sc);
@@ -272,7 +273,7 @@ function buildOpts(warn){
   const groups={};
   for(const g of state.groups){ if(!g.name)continue; const ids=[]; for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()); } groups[g.name]=ids; }
   const scenes=state.scenes.map(s=>{ const fills={},rule={}; for(const p of s.fills){if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c];} for(const p of s.rule){if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c];}
-    const o={tech:s.tech||'kaart',year:s.year,text:s.text,fills,rule,view:s.view}; if(s.dur)o.dur=s.dur; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; if(s.truth)o.truth=s.truth; if(s.kick)o.kick=s.kick; if(s.img)o.img=s.img; if(s.caption)o.caption=s.caption; return o; });
+    const o={tech:s.tech||'kaart',year:s.year,text:s.text,fills,rule,view:s.view}; if(s.dur)o.dur=s.dur; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; if(s.truth)o.truth=s.truth; if(s.kick)o.kick=s.kick; if(s.img)o.img=s.img; if(s.vid)o.vid=s.vid; if(s.caption)o.caption=s.caption; return o; });
   const out={title:state.title, mapView:state.baseview, groups, scenes};
   if(state.music) out.music=state.music;  // muziek gaat via opts -> brand leest uit assets/ummaunited/muziek/
   return out;

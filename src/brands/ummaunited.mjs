@@ -11,7 +11,11 @@
 // Geen geneste/ingezoomde SVG naar resvg.
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { composeChrome, FORMATS, escapeXml } from "../core/renderer.mjs";
+const execFileP = promisify(execFile);
 
 // WAV-lengte (seconden) uit de header — geen ffprobe nodig. Faalt netjes (0).
 async function wavDuration(absPath) {
@@ -188,7 +192,8 @@ function parseStory(text, name2id) {
         else if (key === "tech") { sc.tech = val.toLowerCase(); }   // welke techniek beeldt deze scène uit
         else if (key === "truth") { sc.truth = val; }               // mythe-techniek: de waarheid onder de leugen
         else if (key === "kick") { sc.kick = val; }                 // kleine onderregel/kicker
-        else if (key === "img") { sc.img = val; }                   // beeld-techniek: bestandsnaam in assets/ummaunited/beeld/
+        else if (key === "img") { sc.img = val; }                   // foto-achtergrond: bestandsnaam in assets/ummaunited/video/ (of /beeld/)
+        else if (key === "vid") { sc.vid = val; }                   // video-achtergrond: bestandsnaam in assets/ummaunited/video/
         else if (key === "caption") { sc.caption = val; }           // de VOLLE gesproken zin -> ondertitel die meeloopt met de stem
       }
       out.scenes.push(sc); continue;
@@ -256,7 +261,7 @@ function ctaFoldout(W, H, op) {
 
 export function makeBrand({ ROOT = "." } = {}) {
   const branding = {
-    name: "Umma United", footer: "UMMA UNITED",
+    name: "Umma United", footer: "",   // GEEN footer-tekst onderaan (logo staat rechtsboven)
     bg: COL.ink, bg2: COL.navy2, gold: COL.orange, cream: COL.cream, plate: COL.navy,
   };
   let MAP = null;        // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
@@ -583,8 +588,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
     let g = `<rect width="${W}" height="${H}" fill="${COL.ink}"/>` + starfield(W, H, 11);
     g += `<g transform="translate(${offX.toFixed(2)} ${offY.toFixed(2)}) scale(${scale.toFixed(4)})">${paths}${rulerPaths}</g>`;
-    // onderschrift (de korte zin in beeld)
-    g += onderschrift(scene.text || "", W, H, clamp01(p / 0.3) * clamp01((1 - p) / 0.2 + 0.5));
+    // GEEN onderschrift meer: de meelopende ondertiteling onderaan is de enige tekst (geen dubbel).
     return g;
   }
 
@@ -608,30 +612,27 @@ export function makeBrand({ ROOT = "." } = {}) {
     } else {
       g = bgField(W, H, 23);
     }
-    // de korte kernzin in de BOVENSTE helft (de onderrand is nu voor de meelopende ondertitel).
-    // Boven een donkere band zodat het leesbaar blijft op het beeld.
-    const txt = scene.text || "";
-    if (txt) {
-      const fs = fitFs(txt, Math.round(W * 0.066), W * 0.84, 0.56);
-      g += `<defs><linearGradient id="btop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${COL.ink}" stop-opacity="0.85"/><stop offset="1" stop-color="${COL.ink}" stop-opacity="0"/></linearGradient></defs>`;
-      g += `<rect x="0" y="${(H * 0.11).toFixed(0)}" width="${W}" height="${(H * 0.22).toFixed(0)}" fill="url(#btop)"/>`;
-      g += wordReveal(txt, W / 2, H * 0.22, fs, COL.cream, clamp01(p / 0.6));
-    }
+    // GEEN losse kernzin meer op beeld-scènes: de enige tekst is de meelopende ondertiteling
+    // onderaan (die loopt gelijk met de stem). Een tweede regel bovenin zou dubbelop zijn.
+    // Alleen de kicker (bv. "PART 2") blijft als los accent toegestaan.
     if (scene.kick) {
       const ko = clamp01((p - 0.4) / 0.3);
-      g += `<text x="${W / 2}" y="${H * 0.29}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.042)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+      g += `<text x="${W / 2}" y="${H * 0.20}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.05)}" letter-spacing="3" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
     }
     return g;
   }
 
-  // -- CHROME: het echte logo-embleem bovenin (klein, met de merknaam eronder). Op elke scène.
+  // -- CHROME: het logo-embleem KLEIN RECHTSBOVEN (geen merknaam-tekst erbij). Discreet watermerk.
   function logoChrome(W, H) {
+    const sz = Math.round(W * 0.11);
+    const x = W - sz - Math.round(W * 0.065);   // rechterhoek, binnen het kader
+    const y = Math.round(H * 0.045);
     if (!LOGO_URI) {
-      // fallback: platte tekst als het logo-bestand ontbreekt
-      return `<text x="${W / 2}" y="${H * 0.075}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${Math.round(W * 0.04)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
+      // fallback: alleen "UU" in een cirkel als het logo-bestand ontbreekt (geen lange wordmark)
+      return `<circle cx="${x + sz / 2}" cy="${y + sz / 2}" r="${sz / 2}" fill="none" stroke="${COL.orange}" stroke-width="2"/>`
+        + `<text x="${x + sz / 2}" y="${y + sz * 0.64}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(sz * 0.44)}" fill="${COL.orange}">UU</text>`;
     }
-    const sz = Math.round(W * 0.14);
-    return `<image href="${LOGO_URI}" x="${(W - sz) / 2}" y="${H * 0.035}" width="${sz}" height="${sz}" preserveAspectRatio="xMidYMid meet"/>`;
+    return `<image href="${LOGO_URI}" x="${x}" y="${y}" width="${sz}" height="${sz}" preserveAspectRatio="xMidYMid meet"/>`;
   }
   // -- ONDERTITEL: de VOLLE gesproken zin onderaan, woord-voor-woord mee met de scène (karaoke-
   // stijl). Op een donkere balk zodat het altijd leesbaar is, ongeacht het beeld eronder.
@@ -704,8 +705,10 @@ export function makeBrand({ ROOT = "." } = {}) {
     const title = opts.title || (picked && picked.title) || "Umma United";
 
     // duur per scène: stem stuurt (wav-lengte + marge), anders dur of 3s.
-    // en: beeld-scènes hun foto vooraf inladen als data-URI (zodat sceneAt synchroon kan tekenen).
-    const VOICE_PAD = 0.5;
+    // VOICE_PAD = ADEMPAUZE na de stem binnen elke scène: na de laatste zin loopt alleen de
+    // muziek nog ~0.9s door voordat de volgende scène begint. Zo is het niet bam-bam-bam maar
+    // krijgt de kijker lucht om het beeld en de zin te laten landen.
+    const VOICE_PAD = 0.9;
     const durs = [];
     for (const s of scenes) {
       let d = Number(s.dur) || 3.0;
@@ -716,8 +719,25 @@ export function makeBrand({ ROOT = "." } = {}) {
     const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
     const total = acc;
 
+    // De CHROME-overlay van een scène (kader, logo, ondertitel, flits, CTA/missie). Los van de
+    // achtergrond, zodat we dezelfde overlay OVER een video kunnen leggen (video-modus) of over
+    // de techniek-SVG (gewone modus). Geeft de overlay-SVG-string terug.
+    function sceneOverlay(i, p) {
+      const s = scenes[i];
+      const isFirst = i === 0, isLast = i === scenes.length - 1;
+      const showLogo = isFirst;
+      const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
+      const flashDur = 0.12;
+      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
+      const ctaOpen = ctaOp > 0.01;
+      return flash + kader(W, H)
+        + (showLogo ? logoChrome(W, H) : "")
+        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
+    }
+
     // voor kaart-scènes binnen de compositie: we laten die één-scène als mini-kaart lopen.
-    // (de volledige kaart-techniek met zijn eigen tijdlijn draaien we hier per scène af.)
     function sceneAt(frame) {
       const t = frame / FPS;
       let i = 0; for (let k = scenes.length - 1; k >= 0; k--) if (t >= starts[k]) { i = k; break; }
@@ -726,24 +746,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const techName = s.tech || "statement";
       const fn = TECHS[techName] || techStatement;
       const inner = fn({ W, H, p, scene: s, groups });
-      // kader altijd. Logo ALLEEN in de intro (scène 1) en de outro (laatste scène), niet ertussen.
-      // Ondertitel loopt mee met de stem. CTA + missie-regel vouwen open op de laatste scène.
-      const isFirst = i === 0;
-      const isLast = i === scenes.length - 1;
-      // Logo ALLEEN in de intro (scène 1). De outro draagt de wordmark "UMMA UNITED" al via de
-      // missie-regel, dus daar geen los logo (zou botsen en dubbelop zijn).
-      const showLogo = isFirst;
-      const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
-      // PATTERN-INTERRUPT: korte visuele reset op elke scène-overgang (behalve de eerste) — een
-      // snelle flits in de eerste ~0.12 van de scène. Houdt het oog wakker, zoals de short-form
-      // retentie-techniek wil (reset elke paar seconden).
-      const flashDur = 0.12;
-      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
-      const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
-      const ovl = flash + kader(W, H)
-        + (showLogo ? logoChrome(W, H) : "")
-        + ondertitelMee(s.caption, W, H, p)
-        + (ctaOp > 0.01 ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
+      const ovl = sceneOverlay(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
 
@@ -762,6 +765,179 @@ export function makeBrand({ ROOT = "." } = {}) {
     let music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
     return { W, H, FPS, SS, durSec: total, sceneAt, music, audio: tracks.length ? { tracks } : undefined };
   }
+
+  // ====================================================================================
+  // VIDEO-COMPOSITIE: scènes met VIDEO (of foto) als achtergrond + de SVG-chrome eroverheen.
+  // Bouwt zelf de volledige mp4 met ffmpeg en geeft { prebuilt, cleanup } terug (de kern
+  // gebruikt die direct, zie engine runOne). Raakt de gedeelde renderer NIET aan.
+  // Rastert SVG met @resvg/resvg-js (dezelfde dep die de kern al gebruikt).
+  // ====================================================================================
+  async function makeComposedVideoRender({ subjectId, opts = {}, format = "9:16" }) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const FPS = 24, SS = 2;                 // SS2 -> 1080x1920
+    const OW = W * SS, OH = H * SS;
+    const picked = (subjectId && STORIES[subjectId] && STORIES[subjectId].scenes.length) ? STORIES[subjectId] : null;
+    const scenes = opts.scenes || (picked && picked.scenes) || [];
+    const groups = opts.groups || (picked && picked.groups) || {};
+
+    // resvg laden (zoals de kern). Faalt dit, dan val terug op de gewone (SVG-only) render.
+    let Resvg;
+    try { ({ Resvg } = await import("@resvg/resvg-js")); }
+    catch { return null; }                  // signaal: gebruik de gewone render
+    const rasterize = (svg) => {
+      const r = new Resvg(svg, { fitTo: { mode: "width", value: OW } });
+      return r.render().asPng();
+    };
+
+    // duur per scène (stem stuurt, + adempauze), en media vooraf resolven.
+    const VOICE_PAD = 0.9;
+    const durs = [];
+    for (const s of scenes) {
+      let d = Number(s.dur) || 3.0;
+      if (s && s.voice) { const wl = await wavDuration(path.resolve(ROOT, s.voice)); if (wl > 0) d = wl + VOICE_PAD; }
+      durs.push(d);
+    }
+    const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
+    const total = acc;
+
+    // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
+    function overlaySVG(i, p) {
+      const s = scenes[i];
+      const isFirst = i === 0, isLast = i === scenes.length - 1;
+      const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
+      const flashDur = 0.12;
+      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
+      const ctaOpen = ctaOp > 0.01;
+      const body = flash + kader(W, H)
+        + (isFirst ? logoChrome(W, H) : "")
+        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
+      // transparante SVG (geen achtergrond-rect) zodat de video/techniek eronder doorschijnt
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
+    }
+    // volledige scène-SVG (mét techniek-achtergrond) voor scènes zonder video/foto (kaart/statement/mythe)
+    function fullSceneSVG(i, p) {
+      const s = scenes[i];
+      const fn = TECHS[s.tech || "statement"] || techStatement;
+      const inner = fn({ W, H, p, scene: s, groups });
+      const ovl = overlayBody(i, p);
+      return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
+    }
+    function overlayBody(i, p) {
+      const s = scenes[i];
+      const isFirst = i === 0, isLast = i === scenes.length - 1;
+      const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
+      const flashDur = 0.12;
+      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
+      const ctaOpen = ctaOp > 0.01;
+      return flash + kader(W, H)
+        + (isFirst ? logoChrome(W, H) : "")
+        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
+    }
+
+    const work = await fs.mkdtemp(path.join(os.tmpdir(), "umma-vid-"));
+    const sceneClips = [];
+    try {
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        const dur = durs[i];
+        const nFrames = Math.max(1, Math.round(dur * FPS));
+        const sdir = path.join(work, `s${i}`);
+        await fs.mkdir(sdir, { recursive: true });
+
+        // ACHTERGROND bepalen: video (vid:) > foto (img:) > techniek-SVG
+        const vidFile = s.vid ? path.resolve(ROOT, "assets/ummaunited/video", s.vid) : "";
+        const imgFile = s.img ? path.resolve(ROOT, "assets/ummaunited/video", s.img) : "";
+        const hasVid = vidFile && await exists(vidFile);
+        const hasImg = imgFile && await exists(imgFile);
+
+        if (hasVid || hasImg) {
+          // overlay-frames (transparant) renderen
+          for (let f = 0; f < nFrames; f++) {
+            const p = clamp01(f / Math.max(1, nFrames - 1));
+            const png = rasterize(overlaySVG(i, p));
+            await fs.writeFile(path.join(sdir, `o${String(f).padStart(4, "0")}.png`), png);
+          }
+          const clip = path.join(work, `clip${i}.mp4`);
+          if (hasVid) {
+            // video schalen+croppen tot 9:16, iets donkerder, overlay eroverheen, trim op duur
+            await execFileP("ffmpeg", ["-y", "-t", dur.toFixed(2), "-i", vidFile,
+              "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
+              "-filter_complex",
+              `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+              "-map", "[v]", "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
+          } else {
+            // foto: langzame Ken Burns zoom + overlay
+            const zf = Math.round(dur * FPS);
+            await execFileP("ffmpeg", ["-y", "-loop", "1", "-t", dur.toFixed(2), "-i", imgFile,
+              "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
+              "-filter_complex",
+              `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+              "-map", "[v]", "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
+          }
+          sceneClips.push(clip);
+        } else {
+          // GEEN media: volledige scène-SVG per frame -> clip (kaart/statement/mythe)
+          for (let f = 0; f < nFrames; f++) {
+            const p = clamp01(f / Math.max(1, nFrames - 1));
+            const png = rasterize(fullSceneSVG(i, p));
+            await fs.writeFile(path.join(sdir, `f${String(f).padStart(4, "0")}.png`), png);
+          }
+          const clip = path.join(work, `clip${i}.mp4`);
+          await execFileP("ffmpeg", ["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
+            "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
+          sceneClips.push(clip);
+        }
+      }
+
+      // scène-clips aan elkaar (concat demuxer)
+      const listFile = path.join(work, "list.txt");
+      await fs.writeFile(listFile, sceneClips.map((c) => `file '${c.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
+      const silent = path.join(work, "silent.mp4");
+      await execFileP("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
+
+      // AUDIO: muziek-bodem (zacht) + stem (boven) + SFX op kantels. Alles met ffmpeg amix.
+      const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
+      const aIn = [], aFilters = [], aLabels = [];
+      let idx = 1; // 0 = de stille video
+      const inputs = ["-i", silent];
+      if (music && await exists(music)) {
+        inputs.push("-stream_loop", "-1", "-i", music);  // loop muziek zodat het nooit korter is
+        aFilters.push(`[${idx}:a]volume=0.22,atrim=0:${total.toFixed(2)}[m]`); aLabels.push("[m]"); idx++;
+      }
+      for (const s of scenes) { /* placeholder to keep order */ }
+      // stem + sfx per scène op hun starttijd
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        if (s && s.voice) { const vf = path.resolve(ROOT, s.voice); if (await exists(vf)) {
+          inputs.push("-i", vf);
+          aFilters.push(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=1.6[v${i}]`); aLabels.push(`[v${i}]`); idx++;
+        }}
+        if (s && s.sfx) { const xf = path.resolve(ROOT, s.sfx); if (await exists(xf)) {
+          inputs.push("-i", xf);
+          aFilters.push(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=0.5[x${i}]`); aLabels.push(`[x${i}]`); idx++;
+        }}
+      }
+      const out = path.join(work, "final.mp4");
+      if (aLabels.length) {
+        const mix = `${aLabels.join("")}amix=inputs=${aLabels.length}:duration=longest:dropout_transition=0,atrim=0:${total.toFixed(2)}[a]`;
+        await execFileP("ffmpeg", ["-y", ...inputs,
+          "-filter_complex", [...aFilters, mix].join(";"),
+          "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", out]);
+      } else {
+        await fs.copyFile(silent, out);
+      }
+      return { prebuilt: out, cleanup: work, W, H, FPS, SS, durSec: total };
+    } catch (e) {
+      try { await fs.rm(work, { recursive: true, force: true }); } catch {}
+      throw e;
+    }
+  }
+
+  async function exists(p) { try { await fs.access(p); return true; } catch { return false; } }
 
   // Kies uit assets/ummaunited/muziek/ de langste track (>= videolengte als dat kan).
   async function pickUmmaMusic(minSec = 0) {
@@ -783,6 +959,15 @@ export function makeBrand({ ROOT = "." } = {}) {
     const picked = subjectId && STORIES[subjectId] ? STORIES[subjectId] : null;
     const sc = opts.scenes || (picked && picked.scenes) || [];
     if (type === "kaart" && sc.some((s) => s && s.tech)) type = "mix";
+    // Heeft ook maar één scène VIDEO (of een foto uit de video-map)? Dan de video-compositie
+    // (ffmpeg, prebuilt). Faalt resvg-js daar (null), val terug op de gewone SVG-render.
+    const hasMedia = sc.some((s) => s && (s.vid || s.img));
+    if ((type === "mix" || type === "composed") && hasMedia) {
+      try {
+        const r = await makeComposedVideoRender({ subjectId, opts, format });
+        if (r) return r;
+      } catch (e) { /* val terug op SVG-render hieronder */ }
+    }
     switch (type) {
       case "kaart": return makeKaartRender({ subjectId, opts, format });
       case "mix":
