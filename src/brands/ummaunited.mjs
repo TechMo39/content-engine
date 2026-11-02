@@ -1005,11 +1005,15 @@ export function makeBrand({ ROOT = "." } = {}) {
           await rasterizeFrames(jobs, onProg);
           const clip = path.join(work, `clip${i}.mp4`);
           if (hasVid) {
-            // video schalen+croppen tot 9:16, iets donkerder, overlay eroverheen, trim op duur
-            await ff(["-y", "-t", dur.toFixed(2), "-i", vidFile,
+            // video schalen+croppen tot 9:16, iets donkerder. -stream_loop -1 LOOPT de video zodat
+            // hij ALTIJD de volle scèneduur vult, ook als het bronbestand korter is dan de stem.
+            // (Zonder loop kapte 'shortest' de scène af op de korte video -> hele video te kort +
+            // stem liep uit de pas. Dit was de afkap/sync-bug.) We trimmen hard op [v] via de PNG-
+            // overlay (shortest) die exact nFrames = dur lang is.
+            await ff(["-y", "-stream_loop", "-1", "-i", vidFile,
               "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
               "-filter_complex",
-              `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+              `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
               "-map", "[v]", "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
           } else {
             // foto: langzame Ken Burns zoom + overlay
@@ -1043,32 +1047,41 @@ export function makeBrand({ ROOT = "." } = {}) {
       const silent = path.join(work, "silent.mp4");
       await ff(["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
 
-      // AUDIO: muziek-bodem (zacht) + stem (boven) + SFX op kantels. Alles met ffmpeg amix.
-      say(`  audio mixen (stem + muziek + sfx)...`);
+      // AUDIO. Twee fouten uit de vorige versie opgelost:
+      //  1) amix DEELT de som door het aantal sporen (gemiddelde) -> alles werd veel te zacht
+      //     (-37 dB). Nu amix met normalize=0 (optellen i.p.v. middelen), zodat de stem op volle
+      //     sterkte blijft; daarna loudnorm over het geheel naar uitzend-niveau (-16 LUFS) zodat
+      //     de hele video lekker luid en consistent klinkt.
+      //  2) De STEM is de ster: die mengen we los op vol niveau; muziek is een ZACHTE bodem eronder;
+      //     SFX kort op de kantels. Zo komt de spreker duidelijk boven de muziek uit.
+      say(`  audio mixen (stem boven, muziek zacht eronder, dan loudnorm)...`);
       const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
-      const aIn = [], aFilters = [], aLabels = [];
-      let idx = 1; // 0 = de stille video
       const inputs = ["-i", silent];
+      const aFilters = [];
+      const aFiltersPush = (x) => aFilters.push(x);
+      let idx = 1; // 0 = de stille video
+      const voiceLabels = [], bedLabels = [];
+      // muziek = zachte bodem
       if (music && await exists(music)) {
-        inputs.push("-stream_loop", "-1", "-i", music);  // loop muziek zodat het nooit korter is
-        aFilters.push(`[${idx}:a]volume=0.22,atrim=0:${total.toFixed(2)}[m]`); aLabels.push("[m]"); idx++;
+        inputs.push("-stream_loop", "-1", "-i", music);
+        aFiltersPush(`[${idx}:a]volume=0.35,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
       }
-      for (const s of scenes) { /* placeholder to keep order */ }
-      // stem + sfx per scène op hun starttijd
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
         if (s && s.voice) { const vf = path.resolve(ROOT, s.voice); if (await exists(vf)) {
           inputs.push("-i", vf);
-          aFilters.push(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=1.6[v${i}]`); aLabels.push(`[v${i}]`); idx++;
+          aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)}[v${i}]`); voiceLabels.push(`[v${i}]`); idx++;
         }}
         if (s && s.sfx) { const xf = path.resolve(ROOT, s.sfx); if (await exists(xf)) {
           inputs.push("-i", xf);
-          aFilters.push(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=0.5[x${i}]`); aLabels.push(`[x${i}]`); idx++;
+          aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=0.6[x${i}]`); bedLabels.push(`[x${i}]`); idx++;
         }}
       }
       const out = path.join(work, "final.mp4");
-      if (aLabels.length) {
-        const mix = `${aLabels.join("")}amix=inputs=${aLabels.length}:duration=longest:dropout_transition=0,atrim=0:${total.toFixed(2)}[a]`;
+      const allLabels = [...voiceLabels, ...bedLabels];
+      if (allLabels.length) {
+        // optellen (normalize=0), dan hard begrenzen tegen klippen, dan loudnorm naar -16 LUFS
+        const mix = `${allLabels.join("")}amix=inputs=${allLabels.length}:duration=longest:normalize=0:dropout_transition=0[sum];[sum]alimiter=limit=0.95,loudnorm=I=-16:TP=-1.5:LRA=11,atrim=0:${total.toFixed(2)}[a]`;
         await ff(["-y", ...inputs,
           "-filter_complex", [...aFilters, mix].join(";"),
           "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", out]);
