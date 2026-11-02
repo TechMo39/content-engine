@@ -1077,9 +1077,9 @@ export function makeBrand({ ROOT, config }) {
         // 0..HOLD: vol vasthouden; HOLD..HOOK: leegkleuren (fill achteruit afgespeeld)
         const dk = t < HOLD ? 1 : 1 - smooth((t - HOLD) / (HOOK - HOLD));   // 1=vol -> 0=leeg
         const cols = film.flowColorsAt(P0.parsed, { palette: P0.palArr, durSec: 1, buildSec: 1, buildStart: 0, popSec: 0.05 }, dk);
-        // STERKERE hook: grotere zoom-punch (was 0.06 -> 0.13), zodat het eindbeeld letterlijk
-        // naar je toe komt in seconde 1 -> harder pattern-interrupt voor de scrollende kijker.
-        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.13 * (1 - dk), { x: 0, y: 0 });
+        // STERKERE hook: ECHTE zoom-open (0.13 -> 0.50). Het volle eindbeeld komt in seconde 1 groot
+        // naar je toe en trekt terug terwijl het leegkleurt. Scroll-stopper, geen klein tikje meer.
+        let innerH = drawPanel(P0, cols, "sp0", 1, 1 + 0.5 * (1 - dk), { x: 0, y: 0 });
         // FLITS op de knip: net voordat het leeg is trekt een witte veeg over -> markeert de
         // overgang van "resultaat" naar "opbouw" als een echte cut (anders was 'ie onzichtbaar).
         const r0 = rectFor(P0.aspect);
@@ -1105,7 +1105,10 @@ export function makeBrand({ ROOT, config }) {
       // tegels als een slow-mo payoff landen i.p.v. een vlakke lineaire opbouw (de dode-zone).
       const fillProg = 1 - Math.pow(1 - fillK, 1.7);
       let z = 1 + 0.14 * (1 - smooth(fillProg));
-      if (tl > Tfill) z = 1 + 0.025 * (0.5 - 0.5 * Math.cos(((tl - Tfill) / Math.max(0.1, Tseg - Tfill)) * Math.PI * 2));
+      // ECHTE INZOOM-DIVE op de payoff: zodra het bord vol is duikt de camera krachtig het
+      // afgemaakte glazuur in (van 1.0 naar ~1.68). Het volgende patroon opent weer wijd op 1.0,
+      // dus die overgang leest als een echte zoom-punch i.p.v. een zacht adempje.
+      if (tl > Tfill) { const pk = Math.min(1, (tl - Tfill) / Math.max(0.1, Tseg - Tfill)); z = 1 + 0.68 * smooth(pk); }
       const pan = { x: 0.010 * Math.sin(t * 0.5 + seg * 1.7), y: 0.008 * Math.cos(t * 0.38 + seg) };
       // PATTERN-INTERRUPTS: breek de lange inkleur-dode-zone elke ~2,6s met een zachte zoom-punch
       // + hoek-nudge (subtiel, satisfying blijft hypnotisch). Loopt alleen tijdens het vullen; de
