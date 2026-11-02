@@ -1,33 +1,95 @@
 #!/usr/bin/env python3
-# umma_voice.py — genereert per scene een voice-over-fragment met Piper, met de TOON per scene
-# (rustig / nadruk / warm), zodat de stem klopt met wat er gezegd wordt. Draait LOKAAL op Mo's
-# laptop. Schrijft assets/ummaunited/voice/<story>/<nn>.wav + een import-script met de voice-paden.
+# umma_voice.py — genereert per scene een voice-over-fragment met KOKORO (lokaal, CPU, geen GPU),
+# met de TOON per scene (rustig / nadruk / warm), zodat de stem klopt met wat er gezegd wordt.
+# Draait LOKAAL op Mo's laptop. Schrijft assets/ummaunited/voice/<story>/<stem>/<nn>.wav + een
+# import-script met de voice-paden. (Piper is vervangen door Kokoro; klinkt veel natuurlijker.)
 #
+# Eenmalig installeren:  pip install "pykokoro[cpu]"
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/umma_voice.py --story sword --voice man
-#   python tools/umma_voice.py --story sword --voice vrouw
+#   python tools/umma_voice.py                 # beide delen, beide stemmen
+#   python tools/umma_voice.py --voice man      # alleen de mannenstem
+#   python tools/umma_voice.py --only 3         # alleen scene 3 opnieuw
 #
-# De TOON per scene staat in SCENES hieronder (door Claude ingesteld op het script). Een zin
-# die later niet goed valt pas je chirurgisch aan: alleen die ene regel in SCENES wijzigen en
-# opnieuw draaien met --only <nn>.
-import argparse, os, subprocess, sys, json
+# De TOON per scene staat in STORIES hieronder. Een zin die niet goed valt: alleen die regel
+# wijzigen en opnieuw draaien met --only <nn>.
+import argparse, os, sys, wave
 
-# De twee gekozen stemmen
+# De twee gekozen Kokoro-stemmen (door Mo gekozen uit de test). a=Amerikaans, m=man, f=vrouw.
 VOICES = {
-    "man":   "en_US-hfc_male-medium",
-    "vrouw": "en_US-kristin-medium",
+    "man":   "am_michael",
+    "vrouw": "af_bella",
 }
 
-# Toon-presets: length-scale (tempo, hoger=trager), sentence-silence (pauze na zin), noise-scale (variatie)
-# STRAKKER tempo dan eerst (de video werd 4 min; pauzes waren te lang). Nu vlotter, past bij een short.
-# Meer ADEM: langere stilte na elke zin zodat een gedachte kan landen (niet bam-bam-bam).
-# length = tempo (iets rustiger), sil = pauze na een zin (ruimer), noise = variatie.
+# Toon-presets voor Kokoro: speed (tempo, <1 = trager/zwaarder, >1 = sneller) en sil = extra
+# STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte kan landen (adem,
+# niet bam-bam-bam). De engine voegt tussen scenes ook nog een adempauze toe (VOICE_PAD).
 TONE = {
-    "rustig": dict(length=1.06, sil=0.70, noise=0.80),   # verhalend, met rust tussen de zinnen
-    "nadruk": dict(length=1.16, sil=0.95, noise=0.75),   # statement, laat de klap hangen
-    "warm":   dict(length=1.18, sil=1.05, noise=0.82),   # payoff, ruim, laat het bezinken
-    "hook":   dict(length=1.08, sil=0.80, noise=0.80),   # opening, pakkend maar met lucht
+    "rustig": dict(speed=1.00, sil=0.45),   # verhalend, vlot met een beetje rust
+    "nadruk": dict(speed=0.92, sil=0.70),   # statement, zwaarder, laat de klap hangen
+    "warm":   dict(speed=0.90, sil=0.85),   # payoff, rustig, laat het bezinken
+    "hook":   dict(speed=0.96, sil=0.55),   # opening, pakkend maar met lucht
 }
+
+# Kokoro-synthesizer wordt per (stem, snelheid) één keer opgezet (model laadt dan één keer per
+# combinatie). De snelheid zit in de SynthesisConfig, zodat de toon-per-scene echt doorwerkt.
+_SYNTH_CACHE = {}
+def _get_synth(voice_model, speed):
+    key = (voice_model, round(speed, 3))
+    if key in _SYNTH_CACHE:
+        return _SYNTH_CACHE[key]
+    from pykokoro import KokoroSynthesizer, SynthesisConfig, GenerationConfig
+    cfg = SynthesisConfig(voice=voice_model, generation=GenerationConfig(lang="en-us", speed=speed))
+    synth = KokoroSynthesizer(cfg).__enter__()
+    _SYNTH_CACHE[key] = synth
+    return synth
+
+def _synthesize(voice_model, text, speed, sil, out_wav):
+    synth = _get_synth(voice_model, speed)
+    rendered = synth.synthesize_text(text, language="en-us", voice=voice_model)
+    rendered.save_wav(out_wav)
+    if sil and sil > 0:
+        _append_silence(out_wav, sil)
+
+def _append_silence(wav_path, seconds):
+    # plak stilte achter de wav zodat er adem na de zin zit. Kokoro schrijft FLOAT-wav (format 3),
+    # die de wave-module niet kan lezen; daarom werken we direct op de RIFF-bytes. Stilte = nullen
+    # (0.0 in float en 0 in PCM zijn allebei nul-bytes). We lezen de fmt-chunk, berekenen hoeveel
+    # bytes stilte nodig is, plakken die achter de data-chunk en werken de twee lengte-velden bij.
+    try:
+        import struct
+        with open(wav_path, "rb") as f:
+            data = bytearray(f.read())
+        if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
+            return
+        # byteRate staat op offset 28 in de standaard fmt-chunk
+        byte_rate = struct.unpack_from("<I", data, 28)[0]
+        if byte_rate <= 0:
+            return
+        # zoek de 'data'-chunk
+        i = 12
+        data_off = None; data_len = None
+        while i + 8 <= len(data):
+            cid = bytes(data[i:i+4]); clen = struct.unpack_from("<I", data, i+4)[0]
+            if cid == b"data":
+                data_off = i + 8; data_len = clen; break
+            i += 8 + clen + (clen & 1)
+        if data_off is None:
+            return
+        nbytes = int(byte_rate * seconds)
+        # sample-uitlijning (4 bytes bij 32-bit mono; blockalign op offset 32)
+        block_align = struct.unpack_from("<H", data, 32)[0] or 1
+        nbytes -= (nbytes % block_align)
+        silence = b"\x00" * nbytes
+        # voeg stilte toe direct na de data-bytes
+        insert_at = data_off + data_len
+        new = data[:insert_at] + silence + data[insert_at:]
+        # werk data-chunk-lengte (offset data_off-4) en RIFF-lengte (offset 4) bij
+        struct.pack_into("<I", new, data_off - 4, data_len + nbytes)
+        struct.pack_into("<I", new, 4, len(new) - 8)
+        with open(wav_path, "wb") as f:
+            f.write(new)
+    except Exception:
+        pass
 
 # Het script "sword" (idee 1), per scene: nummer, toon, on-screen-tekst, en de VOICE-zin.
 # De voice-zin is wat ingesproken wordt; de on-screen-tekst is de korte zin in beeld.
@@ -112,8 +174,6 @@ STORIES["sword2"]["map"] = [
 def build_story(story_id, voice, root, only=0):
     story = STORIES[story_id]
     model = VOICES[voice]
-    subprocess.run([sys.executable, "-m", "piper.download_voices", model],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     outdir = os.path.join(root, "assets", "ummaunited", "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
@@ -122,12 +182,10 @@ def build_story(story_id, voice, root, only=0):
             continue
         t = TONE[tone]
         wav = os.path.join(outdir, f"{num:02d}.wav")
-        cmd = [sys.executable, "-m", "piper", "-m", model,
-               "--length-scale", str(t["length"]), "--sentence-silence", str(t["sil"]),
-               "--noise-scale", str(t["noise"]), "-f", wav]
-        p = subprocess.run(cmd, input=voiceline.encode("utf-8"), stderr=subprocess.PIPE)
-        if p.returncode != 0:
-            print(f"  scene {num}: FOUT\n", p.stderr.decode(errors="ignore")[-400:]); continue
+        try:
+            _synthesize(model, voiceline, t["speed"], t["sil"], wav)
+        except Exception as e:
+            print(f"  scene {num}: FOUT -> {e}"); continue
         made.append((num, wav)); print(f"  scene {num:02d} [{tone}] -> {wav}")
     if not only:
         lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
@@ -155,16 +213,26 @@ def main():
     ap.add_argument("--root", default=".", help="content-engine root")
     args = ap.parse_args()
 
+    # vroege check: is Kokoro geinstalleerd?
+    try:
+        import pykokoro  # noqa
+    except Exception:
+        print("Kokoro is niet geinstalleerd. Doe eerst:  pip install \"pykokoro[cpu]\"")
+        sys.exit(1)
+
     stories = ["sword1", "sword2"] if args.story == "all" else [args.story]
+    voices = list(VOICES.keys()) if args.voice == "beide" else [args.voice]
     for sid in stories:
         if sid not in STORIES:
             print("onbekend verhaal:", sid); continue
-    voices = list(VOICES.keys()) if args.voice == "beide" else [args.voice]
-    for sid in stories:
-        if sid not in STORIES: continue
         for voice in voices:
             print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) ===")
             build_story(sid, voice, args.root, args.only)
+
+    # synthesizers netjes afsluiten
+    for synth in _SYNTH_CACHE.values():
+        try: synth.__exit__(None, None, None)
+        except Exception: pass
 
 if __name__ == "__main__":
     main()
