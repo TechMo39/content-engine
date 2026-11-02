@@ -268,7 +268,7 @@ function wordsReveal(line, cx, baseY, fs, lh, fill, wordK) {
   return out;
 }
 // wordK (optioneel, laatste arg): zet word-synced reveal aan voor de hoofdregel. Weglaten = blok.
-function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null) {
+function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null, pop = null) {
   if (!main || op <= 0.01) return "";
   const O = Math.max(0, Math.min(1, op));
   const lines = wrap2(main, 24);
@@ -293,7 +293,13 @@ function captionOverlay(main, kicker, W, H, op, pos = "lower", wordK = null) {
       + `<stop offset="0" stop-color="#0a0712" stop-opacity="0"/><stop offset="1" stop-color="#0a0712" stop-opacity="${(0.62 * O).toFixed(3)}"/></linearGradient></defs>`
       + `<rect x="0" y="${Math.round(H * 0.56)}" width="${W}" height="${Math.round(H * 0.44)}" fill="url(#capscrim)"/>`;
   }
-  out += `<g opacity="${O.toFixed(3)}" text-anchor="middle">`;
+  // MOVE C — caption-beat POP: bij binnenkomst even iets groter en dan settelen (schaal-punch),
+  // zodat de regel op de cut "landt" i.p.v. alleen zacht in te faden. pop=null -> geen transform
+  // (alle bestaande aanroepen blijven byte-identiek). pop loopt 0->1 over de intro van de caption.
+  const pp = pop == null ? null : Math.max(0, Math.min(1, pop));
+  const sc = pp == null ? 1 : 1 + 0.14 * (1 - pp);
+  const capTf = sc === 1 ? "" : ` transform="translate(${(W / 2).toFixed(1)} ${cy.toFixed(1)}) scale(${sc.toFixed(3)}) translate(${(-W / 2).toFixed(1)} ${(-cy).toFixed(1)})"`;
+  out += `<g opacity="${O.toFixed(3)}" text-anchor="middle"${capTf}>`;
   if (kicker) {
     y += kfs;
     out += `<text x="${W / 2}" y="${y.toFixed(0)}" font-family="${SERIF}" font-weight="600" font-size="${kfs}" letter-spacing="${(kfs * 0.42).toFixed(1)}" fill="#d6b35a">${escapeXml(kicker.toUpperCase())}</text>`;
@@ -355,12 +361,17 @@ function interruptAt(t, { amp = 0.08, beat = 2.6, start = 0, until = 1e9 } = {})
   let pulse = 0;
   if (local < PUNCH) { const p = local / PUNCH; pulse = Math.sin(p * Math.PI); }
   // elke beat een ander karakter zodat het niet mechanisch wordt:
-  //   0: pure zoom-punch   1: zoom + hoek-nudge rechts   2: zoom + flits   3: zoom + hoek-nudge links
+  //   0: zachte zoom-punch   1/3: stevigere zoom-punch   2: zoom + flits
+  // MOVE A — CLEAN ZOOM-PUNCH i.p.v. de oude zijwaartse "vloep naar rechts en terug": die positie-
+  // sprong keerde terug naar hetzelfde punt en las als een glitch. De beat landt nu puur als een
+  // korte inzoom-punch (soms + flits), wat als bewust oogt. panx/pany blijven 0 (return-vorm gelijk,
+  // alle call-sites tellen gewoon 0 op). kind 1/3 krijgen een iets stevigere punch zodat de
+  // pattern-interrupt voelbaar blijft zonder zijwaartse beweging.
   const kind = idx % 4;
-  const z = 1 + amp * pulse * (kind === 2 ? 0.7 : 1);          // bij een flits iets minder zoom
-  const nudge = amp * 0.6 * pulse;
-  const panx = kind === 1 ? nudge : kind === 3 ? -nudge : 0;
-  const pany = kind === 1 || kind === 3 ? nudge * 0.4 : 0;
+  const punch = (kind === 1 || kind === 3) ? 1.25 : (kind === 2 ? 0.7 : 1);
+  const z = 1 + amp * pulse * punch;
+  const panx = 0;
+  const pany = 0;
   const flash = kind === 2 ? pulse * 0.5 : 0;
   return { z, panx, pany, flash };
 }
@@ -1090,7 +1101,10 @@ export function makeBrand({ ROOT, config }) {
       // camera: terugtrekken (1.14 -> 1.0) tijdens het vullen, daarna zacht "ademen" op het volle
       // bord + hele trage drift -> nooit stil, chill. Opbouw is de ster, geen payoff vooraf.
       const fillK = Math.min(1, tl / Tfill);
-      let z = 1 + 0.14 * (1 - smooth(fillK));
+      // MOVE B — SPEED-RAMP: het vullen start snel en vertraagt naar het eind, zodat de laatste
+      // tegels als een slow-mo payoff landen i.p.v. een vlakke lineaire opbouw (de dode-zone).
+      const fillProg = 1 - Math.pow(1 - fillK, 1.7);
+      let z = 1 + 0.14 * (1 - smooth(fillProg));
       if (tl > Tfill) z = 1 + 0.025 * (0.5 - 0.5 * Math.cos(((tl - Tfill) / Math.max(0.1, Tseg - Tfill)) * Math.PI * 2));
       const pan = { x: 0.010 * Math.sin(t * 0.5 + seg * 1.7), y: 0.008 * Math.cos(t * 0.38 + seg) };
       // PATTERN-INTERRUPTS: breek de lange inkleur-dode-zone elke ~2,6s met een zachte zoom-punch
@@ -1098,7 +1112,7 @@ export function makeBrand({ ROOT, config }) {
       // payoff-hold aan het eind van elk segment laat ik met rust.
       const ir = interruptAt(tEff, { amp: 0.07, beat: 2.6, start: 0.6, until: seg * Tseg + Tfill });
       z *= ir.z; pan.x += ir.panx; pan.y += ir.pany;
-      inner += drawPanel(P, fillColors(P, tl), "sp" + seg, inOp, z, pan);
+      inner += drawPanel(P, fillColors(P, fillProg * Tfill), "sp" + seg, inOp, z, pan);
       if (ir.flash > 0.01) { const rF = rectFor(P.aspect); inner += flashSweep(rF.x, rF.y, rF.w, rF.h, ir.flash, "si" + seg); }
       // PAYOFF: zodra het bord vol is trekt een zachte lichtveeg over het glazuur -> het "landt"
       if (tl > Tfill) {
@@ -1127,7 +1141,8 @@ export function makeBrand({ ROOT, config }) {
           if (tEff >= s0 && tEff < s1) { if (tEff < s0 + fade) bo = smooth((tEff - s0) / fade); else if (tEff > s1 - fade) bo = 1 - smooth((tEff - (s1 - fade)) / fade); else bo = 1; }
           // word-synced: woorden ploppen in over de eerste ~55% van het slot, houden daarna vast
           const wordK = Math.max(0, Math.min(1, (tEff - s0) / (slot * 0.55)));
-          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK);
+          const pop = Math.max(0, Math.min(1, (tEff - s0) / (slot * 0.30)));   // MOVE C: schaal-punch bij binnenkomst
+          if (bo > 0.01) overlay += captionOverlay(storyBeats[i].t, storyBeats[i].k, W, H, bo, "lower", wordK, pop);
         }
       }
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: branding.logoUri });
