@@ -50,6 +50,29 @@ def _synthesize(voice_model, text, speed, sil, out_wav):
     if sil and sil > 0:
         _append_silence(out_wav, sil)
 
+def _wav_duration(wav_path):
+    # exacte duur (seconden) van een wav, OOK als het een float32-wav van Kokoro is (die de
+    # wave-module niet kan lezen). We lezen byteRate (offset 28) en de lengte van de data-chunk
+    # en delen: duur = data_bytes / byteRate. Dit is dezelfde RIFF-logica als _append_silence.
+    try:
+        import struct
+        with open(wav_path, "rb") as f:
+            data = f.read()
+        if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
+            return 0.0
+        byte_rate = struct.unpack_from("<I", data, 28)[0]
+        if byte_rate <= 0:
+            return 0.0
+        i = 12
+        while i + 8 <= len(data):
+            cid = data[i:i+4]; clen = struct.unpack_from("<I", data, i+4)[0]
+            if cid == b"data":
+                return round(clen / byte_rate, 3)
+            i += 8 + clen + (clen & 1)
+        return 0.0
+    except Exception:
+        return 0.0
+
 def _append_silence(wav_path, seconds):
     # plak stilte achter de wav zodat er adem na de zin zit. Kokoro schrijft FLOAT-wav (format 3),
     # die de wave-module niet kan lezen; daarom werken we direct op de RIFF-bytes. Stilte = nullen
@@ -100,38 +123,44 @@ def _append_silence(wav_path, seconds):
 # zinnen, pakkende haak, geen neutraal-documentaire-toon. Per scene: nr, toon, ON-SCREEN kernzin
 # (groot in beeld bij statement/mythe), en de VOICE-zin (ook de ondertitel die meeloopt).
 STORIES = {
-  "sword1": {
-    "title": "Spread by the sword? (1)",
+  # LANGE VIDEO (8-10 min) — ÉÉN doorlopend verhaal, 16 verhaalscènes. GEEN twee delen meer.
+  # Per scène: nr, toon, korte on-screen kernzin (alleen bij statement/mythe groot in beeld),
+  # en de VOLLE gesproken zin (= ook de meelopende ondertitel). GEEN m-dashes in de tekst.
+  "sword": {
+    "title": "Spread by the sword?",
     "scenes": [
       (1,  "hook",   "Spread by the sword?",
-           "They say Islam was spread by the sword. That your faith was forced on the world. It is the one accusation they always reach for. So let us look at it, calmly, you and I."),
-      (2,  "nadruk", "Every empire took land by the sword.",
-           "Yes, Muslim empires conquered land. But so did every empire that ever existed. Rome, Persia, Britain, all of them took land by the sword. That is how the world was ruled. Conquering land tells you nothing about a faith. So that is not the real question."),
-      (3,  "nadruk", "So what is the real question?",
-           "Here is the real question. When the armies left, and the power was gone, what happened to the faith? Because that, and only that, tells you whether it was forced, or whether it was chosen."),
-      (4,  "rustig", "What is forced, fades.",
-           "Look at where faith was forced on people from above. The moment the empire fell, it drained away. Vanished, like it was never there. Because a faith held up by power dies the moment the power dies."),
-      (5,  "rustig", "We left the people free.",
-           "Now look at us. No one was ever forced to believe. People were left free, and over generations, by their own will, they chose it. Because faith is not placed in a heart by a sword. Guidance is from Allah alone."),
-      (6,  "warm",   "Then came the hardest test.",
-           "And that is why it held. But do not take my word for it. Because then came the hardest test this faith would ever face. That is part two."),
-    ],
-  },
-  "sword2": {
-    "title": "Spread by the sword? (2)",
-    "scenes": [
-      (1,  "nadruk", "They tried everything.",
-           "For five hundred years, Europe ruled almost the entire Muslim world. And they did not just rule. They tried to pull the faith out by the root. They killed. They humiliated. They turned brother against brother. Everything a power can do, they did."),
-      (2,  "rustig", "What enters freely cannot be ripped out.",
-           "And it did not work. Indonesia. No army ever brought Islam there, only honest men. And three hundred years of Dutch rule could not take it back out. What enters a heart freely cannot be ripped out by force."),
-      (3,  "warm",   "Surrounded, and still standing.",
-           "Bosnia. Surrounded in the heart of Europe. Through wars meant to erase them from the earth. And still, today, they stand. Still praying. Still here."),
-      (4,  "nadruk", "What is chosen, stays.",
-           "And everywhere our people were once conquered, North Africa, the East, when the occupier finally left, the faith was still standing. That is the proof. What is forced, fades. What is chosen, stays."),
-      (5,  "rustig", "The sword was always theirs.",
-           "So remember this. The sword, the forcing, the burning, that was never ours. It was always theirs. And a faith taken by force leaves a wound. Look at the West today, turning its back on belief entirely. But that is their story to carry, not ours."),
-      (6,  "warm",   "You are the proof.",
-           "We never needed a sword. The truth only ever needed to be seen. That is why, after everything they threw at us, we are still here. So stand tall. Every time you pray, you are the proof that no empire could ever win. Follow Umma United."),
+           "You have heard it your whole life. Islam was spread by the sword. Convert, or die. And underneath that sentence sits a rule they are very proud of. A faith that is forced on people never lasts. The moment the pressure lifts, the people let it go. Remember that rule. Because today we are going to follow it all the way to the end. And it does not lead where they think it does."),
+      (2,  "nadruk", "The rule is true.",
+           "I am not going to tell you the rule is wrong. The rule is true. A faith held up by force really does fall the moment the force is gone. So the only honest question left is this one. In all of history, which faith was actually spread that way? Not which one was accused of it. Which one was really built on the blade. Let us go and look."),
+      (3,  "rustig", "Go back to Rome.",
+           "Go back to Rome. For three hundred years Rome ruled the lands around the Mediterranean. Syria, Egypt, across North Africa to the edge of Morocco, up into Anatolia. And once the empire took one faith as its own, that faith became the law. Not an invitation. A command, carried by the power of the state."),
+      (4,  "nadruk", "Baptism, or ruin.",
+           "And if your belief was not theirs, you learned what that meant. The Jews knew it first. Taxed, pushed out, driven from city after city, blamed for whatever the empire needed blamed. And they were not alone. Anyone who would not take the official faith, other Christians, old believers, whole peoples, lived under the same shadow. Baptism, or ruin. This is what a forced faith actually looks like. Not a story. A boot."),
+      (5,  "rustig", "Then the Muslims came.",
+           "Now hold that picture, because here is the part they never tell you. When the Muslims came to those same lands, Syria, Egypt, across to Morocco, the people did not meet them as conquerors to be feared. For many of them, it was relief. The weight they had carried under Rome, the taxes for believing wrong, the choice of convert or suffer, that weight lifted. The Jews who had been hunted found, under Muslim rule, a place they could live, pray, and breathe. Ask the Jews. Read the history. It is written down."),
+      (6,  "warm",   "No one was forced.",
+           "And here is why it felt like relief. Under Muslim rule, you were not forced to become Muslim. The Christian who wanted to stay Christian, stayed Christian. The Jew kept his synagogue. The churches stayed open. The law was clear. Faith is not something you hammer into a person. No human can place belief in a heart. Guidance is from Allah alone. So the Muslims did not try to do Allah's work with a sword. They carried the message, lived it honestly, dealt justly, and left the hearts to Allah."),
+      (7,  "rustig", "For centuries.",
+           "And so it stood. Not for a year. Not for a generation. For centuries. These lands were ruled by Muslims for hundreds and hundreds of years. Long enough for empires to rise and fall. Long enough that if Islam were truly nothing but a sword held to the throat, the proof would be everywhere. Instead, over all those generations, people came to it freely, at their own pace, family by family, because of what they saw, not because of what they were threatened with."),
+      (8,  "nadruk", "Then came the test.",
+           "Then, about a thousand years later, the tide turned the other way. Now it was Europe that marched out. And this time the sword was real, and it was aimed straight at the faith. It began with Spain. Then the British, the Dutch, the French. Across North Africa. Into Indonesia. Into the Balkans, into Bosnia. For centuries their flags flew over the Muslim world. And here, finally, we can test the rule. Their own rule. If a forced faith cannot last, then a faith crushed by five hundred years of empire should have nothing left."),
+      (9,  "nadruk", "They tried everything.",
+           "And do not imagine they were gentle. Do not tell yourself they simply ruled and let people be. They tried to take the faith out. They killed. They humiliated. They outlawed the language of the Quran in the street and the school. They turned brother against brother so a people could not stand together. Everything an empire can do to erase a thing, they did it. This was the sword, finally, for real. So, did it work?"),
+      (10, "warm",   "It held.",
+           "No. When the empires finally packed up and left, after everything, the faith was still there. Indonesia, after centuries of foreign rule, walked into independence and remained what it was, the largest Muslim nation on earth. Bosnia, surrounded, hunted, marked for erasure in the very heart of Europe, still standing, still praying, still here. Across North Africa, independence came after the Second World War, and the people who emerged were the same people who went in."),
+      (11, "rustig", "No army takes a heart.",
+           "Look at it plainly. Count the believers in those lands before the colonisers came. Count them after they left. The number barely moves. Hundreds of years of the most powerful empires in history, with every weapon and every school and every law turned against one single thing, and they could not shift it. Because you cannot conquer what does not live in the land. It lived in the heart. And no army has ever taken a heart."),
+      (12, "nadruk", "The wrong religion.",
+           "So let us go back to their rule. A forced faith never lasts. The moment the force is gone, the people let it go. They are right. That rule is true. They just pointed it at the wrong religion. Because the faith that was forced, in Rome, across Europe, convert or be ruined, look at those same lands today. The churches stand empty. A whole continent has quietly walked away from God."),
+      (13, "nadruk", "A forced faith leaves a wound.",
+           "And ask yourself honestly why. It is not an accident. When a faith is pressed onto people by force, generation after generation, it leaves a wound. And a wounded people do not just leave one faith. They grow a quiet aversion to faith itself. That is what you see in Europe now. Not only an empty church. A reflex of pushing religion away, because somewhere in their history religion arrived as a hand around the throat. Their rule came true, in their own home, on their own faith. That is not something to laugh at. It is the proof."),
+      (14, "warm",   "Two opposite endings.",
+           "And ours? Ours was never forced. It came as relief after cruelty. It was chosen freely, over centuries, in lands where you were free to refuse it. And when the real sword finally came, not to spread it, but to destroy it, it did not fall. They forced their faith and lost it. We were given ours freely, and we kept it. The same rule. Two opposite endings. That is the whole story."),
+      (15, "warm",   "You are the proof.",
+           "So the next time someone tells you your faith was spread by the sword, you do not need to raise your voice. You know the history now. You know whose hand actually held the blade, and what it cost them. The truth never needed a sword. It only ever needed to be seen. That is why, after Rome, after empires, after five hundred years of everything they could throw at it, we are still here. And every single time you rise to pray, you are the living proof that the truth never needed a sword."),
+      (16, "warm",   "The truth runs straight.",
+           "This is what we do here. We show you the other side of the story, the one you were never handed. Because a lie has to travel in crooked lines. It has to bend the facts, hide half of them, and hope you never check. The truth does not need any of that. The truth runs straight. So if you are tired of being told to feel small about who you are, stay with us. Follow Umma United, and hold your head high."),
     ],
   },
 }
@@ -146,27 +175,32 @@ _GROUPS = [
   "group bosnia = Bosnia and Herz.",
   "group spain = Spain",
 ]
-STORIES["sword1"]["groups"] = _GROUPS
-STORIES["sword2"]["groups"] = _GROUPS
+STORIES["sword"]["groups"] = _GROUPS
 # Choreografie per deel (scene-nr binnen DAT deel). Technieken gemengd, SFX op de kantels.
 # tech: beeld = video/foto-achtergrond (uit assets/ummaunited/video/). vid: = video, img: = foto.
 # tech: kaart/statement/mythe = getekend (geen media nodig).
 # Beeld per scène afgestemd op het NIEUWE script (trots, niet aanvallend).
-STORIES["sword1"]["map"] = [
-  (1, "Spread by the sword?",            ["tech: mythe", "truth: Conquering land says nothing about faith.", "sfx: assets/ummaunited/sfx/sfx-zwaard.mp3"]),
-  (2, "Every empire took land this way.", ["tech: beeld", "vid: vid-rome.mp4", "sfx: assets/ummaunited/sfx/sfx-boom.mp3"]),
-  (3, "So what is the real question?",   ["tech: statement"]),
-  (4, "What is forced, fades.",          ["tech: kaart", "fill: romemoslim=cream", "view: mena"]),
-  (5, "We left the people free.",        ["tech: beeld", "vid: vid-gebed.mp4"]),
-  (6, "Then came the hardest test.",     ["tech: statement", "kick: Part 2", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
-]
-STORIES["sword2"]["map"] = [
-  (1, "They tried everything.",          ["tech: beeld", "vid: vid-kolonisatie.mp4", "sfx: assets/ummaunited/sfx/sfx-impact.mp3"]),
-  (2, "And still, it did not leave.",    ["tech: beeld", "vid: vid-indonesie.mp4"]),
-  (3, "Alone, surrounded, still here.",  ["tech: beeld", "vid: vid-bosnie.mp4"]),
-  (4, "What is chosen, stays.",          ["tech: kaart", "fill: romemoslim=cream; spain=cream", "view: mena"]),
-  (5, "The sword was always theirs.",    ["tech: statement"]),
-  (6, "You are the proof.",              ["tech: beeld", "vid: vid-gebed-massa.mp4", "sfx: assets/ummaunited/sfx/sfx-riser.mp3"]),
+# LANGE VIDEO — 16 scènes. BEELD NOG LEEG (getekende basis): echte video/foto bepalen we PAS
+# na het meten van de stem (Blok C), dan instrueert Claude Mo gericht per scène. Hier staat nu
+# alleen de veilige getekende techniek die bij de tekst past, zodat de keten compleet is en de
+# kaart de tekst nooit tegenspreekt. SFX ook nog niet gekoppeld (gebeurt na meting).
+STORIES["sword"]["map"] = [
+  (1,  "Spread by the sword?",            ["tech: mythe", "truth: Which faith was really built on the blade?"]),
+  (2,  "The rule is true.",               ["tech: statement"]),
+  (3,  "Rome ruled it all.",              ["tech: kaart", "fill: romemoslim=red", "view: mena"]),
+  (4,  "Baptism, or ruin.",               ["tech: statement"]),
+  (5,  "Then the Muslims came.",          ["tech: kaart", "fill: romemoslim=cream", "view: mena"]),
+  (6,  "No one was forced.",              ["tech: statement"]),
+  (7,  "For centuries.",                  ["tech: kaart", "fill: romemoslim=cream", "view: mena"]),
+  (8,  "Then came the test.",             ["tech: statement", "kick: The test"]),
+  (9,  "They tried everything.",          ["tech: statement"]),
+  (10, "It held.",                        ["tech: kaart", "fill: indonesia=cream; bosnia=cream; romemoslim=cream", "view: belt"]),
+  (11, "No army takes a heart.",          ["tech: statement"]),
+  (12, "The wrong religion.",             ["tech: kaart", "fill: europe_west=red", "view: europe"]),
+  (13, "A forced faith leaves a wound.",  ["tech: statement"]),
+  (14, "Two opposite endings.",           ["tech: statement"]),
+  (15, "You are the proof.",              ["tech: statement"]),
+  (16, "The truth runs straight.",        ["tech: statement", "kick: Umma United"]),
 ]
 
 def build_story(story_id, voice, root, only=0):
@@ -175,6 +209,7 @@ def build_story(story_id, voice, root, only=0):
     outdir = os.path.join(root, "assets", "ummaunited", "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
+    durs = {}  # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
     for num, tone, screen, voiceline in story["scenes"]:
         if only and num != only:
             continue
@@ -184,7 +219,9 @@ def build_story(story_id, voice, root, only=0):
             _synthesize(model, voiceline, t["speed"], t["sil"], wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
-        made.append((num, wav)); print(f"  scene {num:02d} [{tone}] -> {wav}")
+        d = _wav_duration(wav)
+        durs[num] = d
+        made.append((num, wav)); print(f"  scene {num:02d} [{tone}] {d:6.2f}s -> {wav}")
     if not only:
         lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
         by = {num: wav for num, wav in made}
@@ -201,11 +238,35 @@ def build_story(story_id, voice, root, only=0):
         with open(imp, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         print("  import-script:", imp)
+
+        # DUUR-METING wegschrijven: de spil van de timeline. Per scène de EXACTE gemeten duur,
+        # plus toon en de volle zin, zodat Claude hiermee de timeline kan vullen en gericht het
+        # beeld + de sound effects per scène kan bepalen (lengte >= zinsduur).
+        tone_by = {num: tone for (num, tone, screen, voiceline) in story["scenes"]}
+        line_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
+        total = round(sum(durs.get(n, 0.0) for n in durs), 2)
+        meta = {
+            "story": story_id,
+            "voice": voice,
+            "title": story["title"],
+            "total_seconds": total,
+            "total_mmss": f"{int(total)//60}:{int(total)%60:02d}",
+            "scenes": [
+                {"scene": num, "tone": tone_by.get(num, ""),
+                 "seconds": durs.get(num, 0.0), "line": line_by.get(num, "")}
+                for num, _wav in made
+            ],
+        }
+        import json as _json
+        dj = os.path.join(outdir, "_durations.json")
+        with open(dj, "w", encoding="utf-8") as f:
+            _json.dump(meta, f, ensure_ascii=False, indent=2)
+        print(f"  duur-meting: {dj}  (totaal {meta['total_mmss']})")
     print(f"  klaar: {len(made)} fragment(en)")
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", default="all", help="sword1, sword2, of all (default: beide delen)")
+    ap.add_argument("--story", default="sword", help="sword (het lange verhaal, default)")
     ap.add_argument("--voice", default="beide", choices=list(VOICES.keys()) + ["beide"])
     ap.add_argument("--only", type=int, default=0, help="alleen scene-nummer N opnieuw maken")
     ap.add_argument("--root", default=".", help="content-engine root")
@@ -218,7 +279,7 @@ def main():
         print("Kokoro is niet geinstalleerd. Doe eerst:  pip install \"pykokoro[cpu]\"")
         sys.exit(1)
 
-    stories = ["sword1", "sword2"] if args.story == "all" else [args.story]
+    stories = ["sword"] if args.story in ("all", "sword") else [args.story]
     voices = list(VOICES.keys()) if args.voice == "beide" else [args.voice]
     for sid in stories:
         if sid not in STORIES:
