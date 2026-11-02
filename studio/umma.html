@@ -205,7 +205,7 @@ function renderInspector(){
   const o=(v,sel)=>'<option'+(v===sel?' selected':'')+'>'+v+'</option>';
   let h=`<div class="fld"><label>Techniek</label><select onchange="state.scenes[${i}].tech=this.value;renderList();renderInspector();drawPreview()">${TECHS.map(t=>o(t,s.tech)).join('')}</select></div>`;
   h+=`<div class="fld"><label>Tekst op scherm</label><textarea rows="2" oninput="state.scenes[${i}].text=this.value;renderList();drawPreview()">${esc(s.text)}</textarea></div>`;
-  if(s.tech==='mythe') h+=`<div class="fld"><label>Waarheid (onder de doorgestreepte leugen)</label><textarea rows="2" oninput="state.scenes[${i}].truth=this.value;drawPreview()">${esc(s.truth)}</textarea></div>`;
+  if(s.tech==='mythe') h+=`<div class="fld"><label>Waarheid (verschijnt terwijl de leugen oplost)</label><textarea rows="2" oninput="state.scenes[${i}].truth=this.value;drawPreview()">${esc(s.truth)}</textarea></div>`;
   if(s.tech==='statement') h+=`<div class="fld"><label>Kicker (kleine onderregel, optioneel)</label><input value="${esc(s.kick)}" oninput="state.scenes[${i}].kick=this.value;drawPreview()"></div>`;
   if(s.tech==='kaart'){
     h+=`<div class="fld"><label>Zoom (regio)</label><select onchange="state.scenes[${i}].view=this.value;renderList();drawPreview()">${REGIONS.map(r=>o(r,s.view)).join('')}</select></div>`;
@@ -230,10 +230,20 @@ function previewSVG(s,p){
     inner=bg+`<ellipse cx="${W/2}" cy="${H*0.46}" rx="${W*0.44}" ry="${H*0.14}" fill="${COL.orange}" opacity="${(0.10*sm(p)).toFixed(2)}"/>`+wordRevealSVG(s.text,W/2,H*0.48,fs,COL.cream,p);
     if(s.kick){const ko=clamp01((p-0.5)/0.3).toFixed(2);inner+=`<text x="${W/2}" y="${H*0.60}" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="${Math.round(W*0.045)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko}">${esc((s.kick||'').toUpperCase())}</text>`;}
   } else if(s.tech==='mythe'){
-    const fsC=fitFs(s.text,Math.round(W*0.085),W*0.82);const cy=s.truth?H*0.40:H*0.48;
-    inner=bg+`<text x="${W/2}" y="${cy}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${fsC}" fill="${COL.mute}" opacity="${clamp01(p/0.3).toFixed(2)}">${esc(s.text)}</text>`;
-    const strike=clamp01((p-0.35)/0.3);if(strike>0.01){const hw=Math.min(W*0.80,(s.text||'').length*fsC*0.30)*strike;inner+=`<line x1="${(W/2-hw).toFixed(0)}" y1="${(cy-fsC*0.32).toFixed(0)}" x2="${(W/2+hw).toFixed(0)}" y2="${(cy-fsC*0.32).toFixed(0)}" stroke="${COL.red}" stroke-width="${Math.round(W*0.018)}" stroke-linecap="round"/>`;}
-    if(s.truth){const tp=clamp01((p-0.6)/0.4);inner+=wordRevealSVG(s.truth,W/2,H*0.58,fitFs(s.truth,Math.round(W*0.075),W*0.82),COL.orange,tp);}
+    // ZELFDE als de engine: GEEN rode streep. De claim verschijnt, lost op (woorden drijven uiteen
+    // en vervagen), en de waarheid rijst eronder op in oranje.
+    const fsC=fitFs(s.text,Math.round(W*0.082),W*0.84);const cy=s.truth?H*0.38:H*0.46;
+    inner=bg;
+    const appear=clamp01(p/0.28), dissolve=clamp01((p-0.5)/0.32), d=sm(dissolve);
+    const claimOp=appear*(1-d);
+    if(claimOp>0.01){
+      const drift=-d*H*0.03, spacing=(d*fsC*0.18).toFixed(1);
+      inner+=`<text x="${W/2}" y="${(cy+drift).toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${fsC}" letter-spacing="${spacing}" fill="${COL.cream}" opacity="${claimOp.toFixed(2)}">${esc(s.text)}</text>`;
+      if(d>0.05){const drift2=-d*H*0.06, sp2=(d*fsC*0.4).toFixed(1);
+        inner+=`<text x="${W/2}" y="${(cy+drift2).toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${fsC}" letter-spacing="${sp2}" fill="${COL.cream}" opacity="${(claimOp*0.4).toFixed(2)}">${esc(s.text)}</text>`;}
+    }
+    if(s.truth){const tp=clamp01((p-0.58)/0.4),te=sm(tp),ty=H*0.56+(1-te)*H*0.04,fsT=fitFs(s.truth,Math.round(W*0.072),W*0.84);
+      inner+=`<g opacity="${te.toFixed(2)}"><text x="${W/2}" y="${ty.toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="${fsT}" fill="${COL.orange}">${esc(s.truth)}</text></g>`;}
   } else { // kaart (schematisch in de preview: we tonen de regio-naam + onderschrift; echte kaart komt bij render)
     inner=`<rect width="${W}" height="${H}" fill="${COL.ink}"/>`+starfield(W,H,11)+`<text x="${W/2}" y="${H*0.45}" text-anchor="middle" font-family="sans-serif" font-size="26" fill="${COL.mute}">[ kaart · zoom: ${esc(s.view)} ]</text>`;
     const idn=s.fills.map(f=>f.g).join(', ');const rln=s.rule.map(r=>r.g).join(', ');
