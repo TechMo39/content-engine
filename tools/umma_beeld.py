@@ -12,7 +12,7 @@
 #   python tools/umma_beeld.py --force         # ook beats die al beeld hebben opnieuw ophalen
 #
 # Geen API-sleutel nodig. Alles via de open Wikimedia Commons API.
-import argparse, os, json, time, urllib.parse, urllib.request, re
+import argparse, os, json, time, urllib.parse, urllib.request, urllib.error, re
 
 UA = "UmmaUnited-content-engine/1.0 (local research use; contact via app)"
 API = "https://commons.wikimedia.org/w/api.php"
@@ -98,13 +98,29 @@ PLAN = {
  16:[("drawn",""),("drawn",""),("drawn",""),("drawn","")],
 }
 
-def _get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read()
+def _get(url, tries=4):
+    # robuust tegen 429/503 (snelheidslimiet): lees Retry-After of gebruik oplopende backoff en
+    # probeer opnieuw. Zo pakt één run alles, ook als een bron even op de rem gaat staan.
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=40) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 503):
+                ra = e.headers.get("Retry-After")
+                wait = int(ra) if (ra and ra.isdigit()) else (3 * (i + 1) + 2)
+                print(f"    {e.code} (te snel) -> {wait}s wachten en opnieuw...")
+                time.sleep(wait); continue
+            raise
+        except Exception as e:
+            last = e; time.sleep(2 * (i + 1)); continue
+    if last: raise last
 
 def _api(params):
-    params = {**params, "format": "json"}
+    params = {**params, "format": "json", "maxlag": "5"}  # maxlag = beleefd tegen Wikimedia
     url = API + "?" + urllib.parse.urlencode(params)
     return json.loads(_get(url).decode("utf-8", "replace"))
 
@@ -241,7 +257,7 @@ def main():
             credits.append(f"scene {num} beat {bi+1}: {hit.get('title','')} | {hit['license']} | {hit['credit']}")
             print(f"    -> {fname}  ({'video' if is_video else 'foto'}, {hit['license']})")
             n_done += 1
-            time.sleep(0.6)  # beleefd tegen de API's
+            time.sleep(1.3)  # beleefd tegen de API's (voorkomt de 429-snelheidslimiet)
 
     with open(tlpath, "w", encoding="utf-8") as f:
         json.dump(tl, f, ensure_ascii=False, indent=2)
