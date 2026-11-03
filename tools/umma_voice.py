@@ -309,8 +309,6 @@ STORIES = {
     "scenes": [
       (0,  "intro",  "Umma United",
            "Welcome to Umma United. This is where we hand you back the side of the story you were never told. Our history. Our pride. Our present."),
-      (0,  "intro",  "Umma United",
-           "Welcome to Umma United. This is where we hand you back the side of the story you were never told. Our history. Our pride. Our present."),
       (1,  "hook",   "Spread by the sword?",
            "You have heard it your whole life. Islam was spread by the sword. Convert, or die. And underneath that sentence sits a rule they are very proud of. A faith that is forced on people never lasts. The moment the pressure lifts, the people let it go. Remember that rule. Because today we are going to follow it all the way to the end. And it does not lead where they think it does."),
       (2,  "nadruk", "The rule is true.",
@@ -343,8 +341,6 @@ STORIES = {
            "So the next time someone tells you your faith was spread by the sword, you do not need to raise your voice. You know the history now. You know whose hand actually held the blade, and what it cost them. The truth never needed a sword. It only ever needed to be seen. That is why, after Rome, after empires, after five hundred years of everything they could throw at it, we are still here. And every single time you rise to pray, you are the living proof that the truth never needed a sword."),
       (16, "warm",   "The truth runs straight.",
            "This is what we do here. We show you the other side of the story, the one you were never handed. Because a lie has to travel in crooked lines. It has to bend the facts, hide half of them, and hope you never check. The truth does not need any of that. The truth runs straight. So if you are tired of being told to feel small about who you are, stay with us. Follow Umma United, and hold your head high."),
-      (17, "outro",  "Umma United",
-           "Umma United. Our history. Our pride. Our present. Hold your head high."),
       (17, "outro",  "Umma United",
            "Umma United. Our history. Our pride. Our present. Hold your head high."),
     ],
