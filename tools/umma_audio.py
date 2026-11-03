@@ -105,16 +105,26 @@ def search_cc0(query, key, prefer_long=False):
         if not lab:
             continue
         pv = (r.get("previews") or {})
-        mp3 = pv.get("preview-hq-mp3") or pv.get("preview-lq-mp3")
-        if not mp3:
+        hq = pv.get("preview-hq-mp3"); lq = pv.get("preview-lq-mp3")
+        if not (hq or lq):
             continue
-        cands.append({"url": mp3, "name": r.get("name", ""), "user": r.get("username", ""),
+        cands.append({"hq": hq, "lq": lq, "name": r.get("name", ""), "user": r.get("username", ""),
                       "dur": r.get("duration", 0) or 0, "lic": lab})
     if not cands:
         print(f"    {len(res)} treffers, maar geen bruikbare (CC0/CC-BY met preview)"); return None
-    # CC0 eerst; voor muziek daarna het langste fragment.
-    cands.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -(c["dur"] if prefer_long else 0)))
-    return cands[0]
+    if prefer_long:
+        # MUZIEK: de render loopt de track, dus we hoeven geen reuzebestand. Kies een NORMAAL formaat
+        # (20-240s) en de LICHTE voorbeeld-mp3 (snel binnen). CC0 eerst, dan het langste binnen de cap.
+        fit = [c for c in cands if 20 <= c["dur"] <= 240] or cands
+        fit.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -min(c["dur"], 240)))
+        b = fit[0]; url = b["lq"] or b["hq"]
+    else:
+        # SFX: een effect is KORT. Liefst <= 15s (anders is het een track, geen effect). CC0 eerst,
+        # dan het kortste. HQ-voorbeeld-mp3 (kort, dus snel).
+        short = [c for c in cands if c["dur"] <= 15] or cands
+        short.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, c["dur"]))
+        b = short[0]; url = b["hq"] or b["lq"]
+    return {"url": url, "name": b["name"], "user": b["user"], "dur": b["dur"], "lic": b["lic"]}
 
 def download(url, outpath):
     # de voorbeeld-mp3 is publiek (cdn.freesound.org), dus GEEN token meesturen (die liet de
