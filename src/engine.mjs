@@ -492,6 +492,15 @@ const server = http.createServer(async (req, res) => {
       if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/wav", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; }
       res.writeHead(404); res.end(""); return;
     }
+    // UMMA BEELD — serveer het opgehaalde beeld/video per beat (uit assets/ummaunited/video/) zodat
+    // de editor een thumbnail per beat kan tonen en je de missers direct ziet.
+    if (u.pathname.startsWith("/umma-media/")) {
+      const base = path.resolve(ROOT, "assets/ummaunited/video");
+      const f = path.resolve(base, decodeURIComponent(u.pathname.slice("/umma-media/".length)));
+      if (!f.startsWith(base)) { res.writeHead(403); res.end("nee"); return; }
+      if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" }); res.end(await fs.readFile(f)); return; }
+      res.writeHead(404); res.end(""); return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/umma-upload" && req.method === "POST") {

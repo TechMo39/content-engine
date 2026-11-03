@@ -40,6 +40,11 @@
  .lane.beeld .track{min-height:46px}.lane.tekst .track{min-height:58px}.lane.sfx .track{min-height:32px}.lane.muziek .track{min-height:26px}
  .blk{position:absolute;top:5px;bottom:5px;border-radius:6px;font-size:11px;padding:3px 6px;overflow:hidden;border:1px solid transparent;line-height:1.25}
  .blk.beeld{background:rgba(47,109,240,.16);border-color:rgba(47,109,240,.5);color:#cfe0ff;white-space:normal}
+ .blk.beeld.hasimg{background-size:cover;background-position:center;color:#fff;border-color:rgba(47,109,240,.8);padding:3px}
+ .blk.beeld.hasvid{background:linear-gradient(135deg,rgba(47,109,240,.4),rgba(20,30,55,.6));border-color:rgba(47,109,240,.9);color:#fff;padding:3px;position:relative}
+ .blk.beeld.miss{background:rgba(224,85,107,.12);border-color:rgba(224,85,107,.6);color:#ffd2da;border-style:dashed}
+ .blk.beeld .chip{display:inline-block;background:rgba(0,0,0,.6);border-radius:4px;padding:1px 5px;font-size:10.5px;line-height:1.3}
+ .blk.beeld .mtag{position:absolute;top:3px;right:4px;font-size:9px;background:rgba(0,0,0,.6);border-radius:3px;padding:0 4px;color:#9fc0ff}
  .blk.tekst{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.45);color:#ffe4bb;white-space:normal}
  .blk.sfx{background:rgba(224,85,107,.2);border-color:var(--sfx);color:#ffd2da;white-space:nowrap;cursor:grab}
  .handle{position:absolute;top:0;bottom:0;width:9px;margin-left:-5px;cursor:ew-resize;z-index:6}
@@ -92,15 +97,19 @@ function buildState(){
  SC=TL.scenes.map(s=>{const def=BEATS[s.scene]||{splits:[],img:[]};
    const splits=def.splits.slice();
    const bounds=splits.map(i=> s.sentences[i]?s.sentences[i].start:s.dur);
-   const st={...s, imgLabels:def.img.slice(), beatBounds:bounds, sfx:(s.sfx||[]).slice(), subBounds:null};
+   const st={...s, imgLabels:def.img.slice(), beatBounds:bounds, sfx:(s.sfx||[]).slice(), subBounds:null, beatMedia:[]};
    st.subBounds=s.sentences.slice(1).map(se=>se.start);
    // als er al opgeslagen beats/sfx in het timeline-bestand staan, die voorrang geven
-   if(Array.isArray(s.beats)&&s.beats.length){ st.beatBounds=s.beats.slice(1).map(b=>b.start); if(s.beats.every(b=>b.label)) st.imgLabels=s.beats.map(b=>b.label); }
+   if(Array.isArray(s.beats)&&s.beats.length){ st.beatBounds=s.beats.slice(1).map(b=>b.start); if(s.beats.every(b=>b.label)) st.imgLabels=s.beats.map(b=>b.label);
+     st.beatMedia=s.beats.map(b=>({img:b.img||'',vid:b.vid||''})); }
    return st;});
  total=TL.total_seconds;
 }
 function beatsOf(s){const edges=[s.speech_start||s.sentences[0].start,...s.beatBounds,s.speech_end||s.dur];
- const out=[];for(let i=0;i<edges.length-1;i++)out.push({start:edges[i],end:edges[i+1],label:s.imgLabels[i]||('beeld '+(i+1))});return out;}
+ const out=[];for(let i=0;i<edges.length-1;i++){const m=(s.beatMedia&&s.beatMedia[i])||{};
+   out.push({start:edges[i],end:edges[i+1],label:s.imgLabels[i]||('beeld '+(i+1)),img:m.img||'',vid:m.vid||''});}return out;}
+function mediaUrl(p){return '/umma-media/'+String(p).split('/').pop();}
+function isDrawnLabel(l){return /getekend|tekst|kaart|CTA|logo/i.test(l||'');}
 function subsOf(s){const starts=[s.sentences[0].start,...s.subBounds];const ends=[...s.subBounds,s.speech_end||s.dur];
  return s.sentences.map((se,i)=>({text:se.text,start:starts[i],end:ends[i]}));}
 
@@ -124,7 +133,11 @@ function layout(){
   tb.innerHTML='';tt.innerHTML='';ts.innerHTML='';
   beatsOf(s).forEach((b,bi)=>{const d=document.createElement('div');d.className='blk beeld';
     d.style.left=(b.start*pps)+'px';d.style.width=Math.max(10,(b.end-b.start)*pps-2)+'px';
-    d.textContent='■ '+(bi+1)+'. '+b.label;d.title=b.label;tb.appendChild(d);
+    if(b.vid){ d.classList.add('hasvid'); d.innerHTML='<span class="chip">&#9654; '+(bi+1)+'. '+b.label+'</span><span class="mtag">video</span>'; d.title='video: '+b.vid+'  (dubbelklik = verwijder beeld)'; }
+    else if(b.img){ d.classList.add('hasimg'); d.style.backgroundImage='url('+mediaUrl(b.img)+')'; d.innerHTML='<span class="chip">&#9632; '+(bi+1)+'. '+b.label+'</span>'; d.title='foto: '+b.img+'  (dubbelklik = verwijder beeld)'; }
+    else { d.textContent='&#9632; '+(bi+1)+'. '+b.label; d.textContent='■ '+(bi+1)+'. '+b.label; if(!isDrawnLabel(b.label)){ d.classList.add('miss'); d.title='nog geen beeld (zoek jij)'; } else d.title=b.label; }
+    d.dataset.si=si; d.dataset.bi=bi;
+    tb.appendChild(d);
     if(bi>0){const h=document.createElement('div');h.className='handle beeld';h.style.left=(b.start*pps)+'px';h.dataset.si=si;h.dataset.kind='beeld';h.dataset.bi=(bi-1);tb.appendChild(h);}});
   subsOf(s).forEach((u,ui)=>{const d=document.createElement('div');d.className='blk tekst';
     d.style.left=(u.start*pps)+'px';d.style.width=Math.max(8,(u.end-u.start)*pps-2)+'px';d.textContent=u.text;d.title=u.text;tt.appendChild(d);
@@ -153,7 +166,8 @@ function moveDrag(e){if(!drag)return;const{si,kind,bi,arr}=drag;const s=SC[si];c
  tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';layout();}
 addEventListener('pointermove',e=>{if(drag)moveDrag(e);});
 addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}});
-host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);dirty();layout();}});
+host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);dirty();layout();return;}
+ const bb=e.target.closest('.blk.beeld');if(bb&&bb.dataset.bi!==undefined){const si=+bb.dataset.si,bi=+bb.dataset.bi;const m=SC[si].beatMedia[bi];if(m&&(m.img||m.vid)){m.img='';m.vid='';dirty();layout();}}});
 let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
 
 let t=0,playing=false,raf=null,last=0;const voiceAudio={},musicAudio={a:null,dur:0};let curScene=-1;
@@ -194,7 +208,7 @@ function updAudioLabel(){const nv=Object.keys(voiceAudio).length;$('pv-audio').t
 let isDirty=false;function dirty(){isDirty=true;$('savemsg').textContent='niet opgeslagen';$('savemsg').style.color='var(--sfx)';}
 function buildPayload(){
  const scenes=SC.map(s=>{const subs=subsOf(s);const sentences=s.sentences.map((se,i)=>({i,text:se.text,start:+subs[i].start.toFixed(3),dur:+(subs[i].end-subs[i].start).toFixed(3),abs_start:+(s.start+subs[i].start).toFixed(3)}));
-   const beats=beatsOf(s).map(b=>({start:+b.start.toFixed(3),dur:+(b.end-b.start).toFixed(3),label:b.label,img:""}));
+   const beats=beatsOf(s).map(b=>({start:+b.start.toFixed(3),dur:+(b.end-b.start).toFixed(3),label:b.label,img:b.img||"",vid:b.vid||""}));
    const sfx=s.sfx.map(f=>({t:+f.t.toFixed(3),name:f.name||'sfx'}));
    return {scene:s.scene,tone:s.tone,wav:s.wav,start:s.start,dur:s.dur,speech_start:s.speech_start,speech_end:s.speech_end,sentences,beats,sfx};});
  return {story:TL.story,voice:TL.voice,title:TL.title,total_seconds:TL.total_seconds,total_mmss:TL.total_mmss,scenes};

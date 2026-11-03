@@ -812,6 +812,22 @@ export function makeBrand({ ROOT = "." } = {}) {
     for (const se of sents) { if (localTime >= se.start) cur = se; else break; }
     return cur ? cur.text : null;
   }
+  // de beeld-beats per scène uit dezelfde tijdlijn (start/dur + img/vid). Hiermee wisselt het beeld
+  // BINNEN een scène op de beat-grenzen, precies zoals de editor toont. null -> geen tijdlijn.
+  async function loadSceneBeats(scenes) {
+    try {
+      const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
+      const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
+      if (!m) return null;
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", m[1], m[2], "_timeline.json");
+      const tl = JSON.parse(await fs.readFile(p, "utf8"));
+      if (!tl || !Array.isArray(tl.scenes)) return null;
+      return scenes.map((s, i) => {
+        const ts = tl.scenes[i] || tl.scenes.find((x) => x.scene === i + 1);
+        return ts && Array.isArray(ts.beats) ? ts.beats : null;
+      });
+    } catch { return null; }
+  }
 
   // techniek-register: naam -> fn
   const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart, beeld: techBeeld };
@@ -969,6 +985,10 @@ export function makeBrand({ ROOT = "." } = {}) {
     // ondertitel-bron: de gedeelde tijdlijn (per-zin-tijden), gelijk aan de editor.
     const sentsByIndex = await loadSceneSents(scenes);
     const subAt = (i, p) => { const tx = sentsByIndex && activeSentText(sentsByIndex[i], p * durs[i]); return tx != null ? ondertitelMee(tx, W, H, 1) : ondertitelMee(scenes[i].caption, W, H, p); };
+    // beeld-beats uit dezelfde tijdlijn -> per beat een eigen achtergrond binnen de scène.
+    const beatsByIndex = await loadSceneBeats(scenes);
+    // media-pad oplossen: een volledig pad (met /) valt onder ROOT, anders onder de video-map.
+    const resolveMedia = (x) => !x ? "" : (String(x).includes("/") ? path.resolve(ROOT, x) : path.resolve(ROOT, "assets/ummaunited/video", x));
 
     // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
     function overlaySVG(i, p) {
@@ -1015,66 +1035,79 @@ export function makeBrand({ ROOT = "." } = {}) {
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
         const dur = durs[i];
-        const nFrames = Math.max(1, Math.round(dur * FPS));
         const sdir = path.join(work, `s${i}`);
         await fs.mkdir(sdir, { recursive: true });
 
-        // ACHTERGROND bepalen: video (vid:) > foto (img:) > techniek-SVG
-        const vidFile = s.vid ? path.resolve(ROOT, "assets/ummaunited/video", s.vid) : "";
-        const imgFile = s.img ? path.resolve(ROOT, "assets/ummaunited/video", s.img) : "";
-        const hasVid = vidFile && await exists(vidFile);
-        const hasImg = imgFile && await exists(imgFile);
-        const bron = hasVid ? `video (${s.vid})` : hasImg ? `foto (${s.img})` : `getekend (${s.tech || "statement"})`;
-        say(`  scène ${i + 1}/${scenes.length}: ${bron}, ${dur.toFixed(1)}s, ${nFrames} frames`);
-
-        // voortgang binnen een scène: elke ~seconde een teller, zodat je nooit minutenlang op
-        // "scène x/y" blijft staan. Bij parallelle rastering komt de voortgang niet op volgorde
-        // binnen, dus we tonen "x/nFrames klaar".
-        let lastShown = -1;
-        const onProg = (done) => { const sec = Math.floor(done / FPS); if (sec !== lastShown || done === nFrames) { lastShown = sec; if (done % FPS === 0 || done === nFrames) say(`      tekenen ${done}/${nFrames}`); } };
-
-        if (hasVid || hasImg) {
-          // overlay-frames (transparant) PARALLEL renderen
-          const jobs = [];
-          for (let f = 0; f < nFrames; f++) {
-            const p = clamp01(f / Math.max(1, nFrames - 1));
-            jobs.push({ svg: overlaySVG(i, p), path: path.join(sdir, `o${String(f).padStart(4, "0")}.png`) });
-          }
-          await rasterizeFrames(jobs, onProg);
-          const clip = path.join(work, `clip${i}.mp4`);
-          if (hasVid) {
-            // video schalen+croppen tot 9:16, iets donkerder. -stream_loop -1 LOOPT de video zodat
-            // hij ALTIJD de volle scèneduur vult, ook als het bronbestand korter is dan de stem.
-            // (Zonder loop kapte 'shortest' de scène af op de korte video -> hele video te kort +
-            // stem liep uit de pas. Dit was de afkap/sync-bug.) We trimmen hard op [v] via de PNG-
-            // overlay (shortest) die exact nFrames = dur lang is.
-            await ff(["-y", "-stream_loop", "-1", "-i", vidFile,
-              "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
-              "-filter_complex",
-              `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
-              "-map", "[v]", "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
-          } else {
-            // foto: langzame Ken Burns zoom + overlay
-            const zf = Math.round(dur * FPS);
-            await ff(["-y", "-loop", "1", "-t", dur.toFixed(2), "-i", imgFile,
-              "-framerate", String(FPS), "-i", path.join(sdir, "o%04d.png"),
-              "-filter_complex",
-              `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
-              "-map", "[v]", "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
-          }
-          sceneClips.push(clip);
+        // SEGMENTEN: per beeld-beat een eigen achtergrond (video/foto/techniek). Het beeld wisselt
+        // zo BINNEN de scène op de beat-grenzen, precies zoals de editor toont. De ondertitel en de
+        // audio blijven op tijd (p loopt continu door de scène). Geen beats of geen media-beats ->
+        // één segment = de hele scène (oud gedrag, geen regressie).
+        const beats = (beatsByIndex && beatsByIndex[i]) || null;
+        let segs;
+        if (beats && beats.length && beats.some((b) => b.vid || b.img)) {
+          const edges = [0];
+          for (let k = 1; k < beats.length; k++) edges.push(Math.min(dur, Math.max(0, Number(beats[k].start) || 0)));
+          edges.push(dur);
+          segs = beats.map((b, k) => ({ b, start: edges[k], end: edges[k + 1] }));
         } else {
-          // GEEN media: volledige scène-SVG per frame -> clip (kaart/statement/mythe), PARALLEL
-          const jobs = [];
-          for (let f = 0; f < nFrames; f++) {
-            const p = clamp01(f / Math.max(1, nFrames - 1));
-            jobs.push({ svg: fullSceneSVG(i, p), path: path.join(sdir, `f${String(f).padStart(4, "0")}.png`) });
+          segs = [{ b: { vid: s.vid, img: s.img }, start: 0, end: dur }];
+        }
+
+        const onProg = () => {};
+        let segIdx = 0;
+        for (const seg of segs) {
+          const segDur = +(seg.end - seg.start).toFixed(3);
+          if (segDur <= 0.03) { segIdx++; continue; }
+          const nF = Math.max(1, Math.round(segDur * FPS));
+          const vidFile = resolveMedia(seg.b.vid);
+          const imgFile = resolveMedia(seg.b.img);
+          const hasVid = vidFile && await exists(vidFile);
+          const hasImg = !hasVid && imgFile && await exists(imgFile);
+          const segdir = path.join(sdir, `g${segIdx}`);
+          await fs.mkdir(segdir, { recursive: true });
+          const bron = hasVid ? `video ${path.basename(vidFile)}` : hasImg ? `foto ${path.basename(imgFile)}` : `getekend (${s.tech || "statement"})`;
+          say(`  scène ${i + 1}/${scenes.length} beat ${segIdx + 1}/${segs.length}: ${bron}, ${segDur.toFixed(1)}s`);
+          const clip = path.join(work, `clip${i}_${segIdx}.mp4`);
+          // p loopt CONTINU over de hele scène (seg.start + f/FPS)/dur, zodat de ondertitel de juiste
+          // zin op tijd toont en de flits/CTA op de scène-grenzen vallen, niet op beat-grenzen.
+          if (hasVid || hasImg) {
+            const jobs = [];
+            for (let f = 0; f < nF; f++) {
+              const p = clamp01((seg.start + f / FPS) / dur);
+              jobs.push({ svg: overlaySVG(i, p), path: path.join(segdir, `o${String(f).padStart(4, "0")}.png`) });
+            }
+            await rasterizeFrames(jobs, onProg);
+            if (hasVid) {
+              // video schalen+croppen tot 9:16, iets donkerder. -stream_loop -1 LOOPT de bron zodat
+              // hij ALTIJD de volle beat-duur vult, ook als het bestand korter is. De PNG-overlay
+              // (shortest) bepaalt de harde beat-lengte.
+              await ff(["-y", "-stream_loop", "-1", "-i", vidFile,
+                "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
+                "-filter_complex",
+                `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+                "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
+            } else {
+              // foto: langzame Ken Burns zoom + overlay
+              const zf = Math.max(1, Math.round(segDur * FPS));
+              await ff(["-y", "-loop", "1", "-t", segDur.toFixed(2), "-i", imgFile,
+                "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
+                "-filter_complex",
+                `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+                "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
+            }
+          } else {
+            // getekende beat: volledige scène-SVG (techniek + chrome) per frame -> clip
+            const jobs = [];
+            for (let f = 0; f < nF; f++) {
+              const p = clamp01((seg.start + f / FPS) / dur);
+              jobs.push({ svg: fullSceneSVG(i, p), path: path.join(segdir, `f${String(f).padStart(4, "0")}.png`) });
+            }
+            await rasterizeFrames(jobs, onProg);
+            await ff(["-y", "-framerate", String(FPS), "-i", path.join(segdir, "f%04d.png"),
+              "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
           }
-          await rasterizeFrames(jobs, onProg);
-          const clip = path.join(work, `clip${i}.mp4`);
-          await ff(["-y", "-framerate", String(FPS), "-i", path.join(sdir, "f%04d.png"),
-            "-r", String(FPS), "-t", dur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
           sceneClips.push(clip);
+          segIdx++;
         }
       }
 
@@ -1158,9 +1191,12 @@ export function makeBrand({ ROOT = "." } = {}) {
     const picked = subjectId && STORIES[subjectId] ? STORIES[subjectId] : null;
     const sc = opts.scenes || (picked && picked.scenes) || [];
     if (type === "kaart" && sc.some((s) => s && s.tech)) type = "mix";
-    // Heeft ook maar één scène VIDEO (of een foto uit de video-map)? Dan de video-compositie
-    // (ffmpeg, prebuilt). Faalt resvg-js daar (null), val terug op de gewone SVG-render.
-    const hasMedia = sc.some((s) => s && (s.vid || s.img));
+    // Heeft ook maar één scène OF beeld-beat VIDEO/foto? Dan de video-compositie (ffmpeg, prebuilt).
+    // Faalt resvg-js daar (null), val terug op de gewone SVG-render. We kijken ook naar de beats in
+    // _timeline.json, want daar zet de beeld-tool het beeld per beat neer.
+    let beatMedia = false;
+    try { const bb = await loadSceneBeats(sc); beatMedia = !!(bb && bb.some((arr) => arr && arr.some((b) => b && (b.vid || b.img)))); } catch {}
+    const hasMedia = sc.some((s) => s && (s.vid || s.img)) || beatMedia;
     if ((type === "mix" || type === "composed") && hasMedia) {
       try {
         const r = await makeComposedVideoRender({ subjectId, opts, format, log });
