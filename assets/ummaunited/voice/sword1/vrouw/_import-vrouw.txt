@@ -1,0 +1,13 @@
+title: Spread by the sword? (1)
+view: belt
+group romemoslim = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Jordan, Iraq
+group europe_west = France, Spain, Italy, Portugal, Germany, Netherlands, Belgium
+group indonesia = Indonesia
+group bosnia = Bosnia and Herz.
+group spain = Spain
+scene 1 | Spread by the sword? | tech: mythe | truth: Conquering land says nothing about faith. | sfx: assets/ummaunited/sfx/sfx-zwaard.mp3 | caption: They say Islam was spread by the sword. That your faith was forced on the world. It is the one accusation they always reach for. So let us look at it, calmly, you and I. | voice: assets/ummaunited/voice/sword1/vrouw/01.wav
+scene 2 | Every empire took land this way. | tech: beeld | vid: vid-rome.mp4 | sfx: assets/ummaunited/sfx/sfx-boom.mp3 | caption: Yes, Muslim empires conquered land. But so did every empire that ever existed. Rome, Persia, Britain, all of them took land by the sword. That is how the world was ruled. Conquering land tells you nothing about a faith. So that is not the real question. | voice: assets/ummaunited/voice/sword1/vrouw/02.wav
+scene 3 | So what is the real question? | tech: statement | caption: Here is the real question. When the armies left, and the power was gone, what happened to the faith? Because that, and only that, tells you whether it was forced, or whether it was chosen. | voice: assets/ummaunited/voice/sword1/vrouw/03.wav
+scene 4 | What is forced, fades. | tech: kaart | fill: romemoslim=cream | view: mena | caption: Look at where faith was forced on people from above. The moment the empire fell, it drained away. Vanished, like it was never there. Because a faith held up by power dies the moment the power dies. | voice: assets/ummaunited/voice/sword1/vrouw/04.wav
+scene 5 | We left the people free. | tech: beeld | vid: vid-gebed.mp4 | caption: Now look at us. No one was ever forced to believe. People were left free, and over generations, by their own will, they chose it. Because faith is not placed in a heart by a sword. Guidance is from Allah alone. | voice: assets/ummaunited/voice/sword1/vrouw/05.wav
+scene 6 | Then came the hardest test. | tech: statement | kick: Part 2 | sfx: assets/ummaunited/sfx/sfx-riser.mp3 | caption: And that is why it held. But do not take my word for it. Because then came the hardest test this faith would ever face. That is part two. | voice: assets/ummaunited/voice/sword1/vrouw/06.wav

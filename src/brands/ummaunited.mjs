@@ -1027,11 +1027,37 @@ export function makeBrand({ ROOT = "." } = {}) {
       // transparante SVG (geen achtergrond-rect) zodat de video/techniek eronder doorschijnt
       return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
     }
+    // INTRO/OUTRO-achtergrond: de gemerkte UMMA UNITED-kaart (logo groot + woordmerk). De scène
+    // is een gewone scène (nr 0 / 17) met toon "intro"/"outro"; de ondertitel (de gesproken regel)
+    // loopt er net als overal via subAt overheen. Zo is intro/outro geen bolt-on maar deel van het script.
+    function brandInner(kind) {
+      const logoSz = Math.round(W * 0.26);
+      const lx = Math.round((W - logoSz) / 2), ly = Math.round(H * 0.30);
+      const logo = LOGO_URI
+        ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
+        : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`
+          + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
+      const wm = `<text x="${W / 2}" y="${Math.round(H * 0.62)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(W * 0.085)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
+      return `<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy2 || COL.navy}" opacity="0.35"/>` + logo + wm;
+    }
+    // CONTENT-GESTUURD VISUEEL EFFECT per scène, bepaald door de TOON (die is hier uit de inhoud
+    // gekozen). nadruk = zwaarder/dramatischer (vignet + contrast); warm = warmer; hook = meer punch;
+    // rustig = iets rustiger. Een leeg resultaat = geen extra behandeling. Komt als ffmpeg-filterketen
+    // (met leidende komma) achter de basis-correctie van de achtergrond.
+    function toneVf(tone) {
+      switch (tone) {
+        case "nadruk": return ",eq=contrast=1.08:saturation=1.03,vignette=PI/4.5";
+        case "warm":   return ",eq=saturation=1.10:gamma=1.03:brightness=0.02";
+        case "hook":   return ",eq=contrast=1.06:saturation=1.05";
+        case "rustig": return ",eq=saturation=0.98";
+        default:       return "";
+      }
+    }
     // volledige scène-SVG (mét techniek-achtergrond) voor scènes zonder video/foto (kaart/statement/mythe)
     function fullSceneSVG(i, p) {
       const s = scenes[i];
-      const fn = TECHS[s.tech || "statement"] || techStatement;
-      const inner = fn({ W, H, p, scene: s, groups });
+      const isBrand = s.tone === "intro" || s.tone === "outro";
+      const inner = isBrand ? brandInner(s.tone) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups });
       const ovl = overlayBody(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
@@ -1081,10 +1107,8 @@ export function makeBrand({ ROOT = "." } = {}) {
           if (segDur <= 0.03) { segIdx++; continue; }
           const nF = Math.max(1, Math.round(segDur * FPS));
           // ZACHTE OVERGANG: scène-randen vloeien wat langer in/uit (FD); tussen beeldblokken BINNEN
-          // een scène een kórte zachte dip (BD) i.p.v. een harde cut, zodat het beeld niet van scherm
-          // naar scherm knalt. De dip zit alleen op de beeld-laag; de chrome en audio lopen door, en
-          // de ondertitel-timing blijft exact (elke beat houdt z'n eigen lengte). Te korte beats
-          // (< ~0.6s) slaan de extra dip over, anders zou het blok bijna helemaal donker zijn.
+          // een scène een kórte zachte dip (BD) i.p.v. een harde cut. Timing blijft exact. Te korte
+          // beats (< ~0.6s) slaan de extra dip over.
           const FD = 0.22, BD = 0.14;
           const canDip = segDur > 0.6;
           const fo = Math.max(0, segDur - FD).toFixed(2);
@@ -1121,7 +1145,7 @@ export function makeBrand({ ROOT = "." } = {}) {
               await ff(["-y", "-stream_loop", "-1", "-i", vidFile,
                 "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
                 "-filter_complex",
-                `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
+                `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05${toneVf(s.tone)},fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
                 "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
             } else {
               // foto: langzame Ken Burns zoom + overlay
@@ -1129,7 +1153,7 @@ export function makeBrand({ ROOT = "." } = {}) {
               await ff(["-y", "-loop", "1", "-t", segDur.toFixed(2), "-i", imgFile,
                 "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
                 "-filter_complex",
-                `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
+                `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08${toneVf(s.tone)}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
                 "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
             }
           } else {

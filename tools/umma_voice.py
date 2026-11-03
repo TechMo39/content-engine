@@ -16,7 +16,7 @@ import argparse, os, sys, wave, re, math, array, struct, json
 
 # De twee gekozen Kokoro-stemmen (door Mo gekozen uit de test). a=Amerikaans, m=man, f=vrouw.
 VOICES = {
-    "man":   "am_michael",
+    "man":   "bm_george",
     "vrouw": "af_bella",
 }
 
@@ -31,10 +31,14 @@ MAX_CHARS = 490
 # STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte kan landen (adem,
 # niet bam-bam-bam). De engine voegt tussen scenes ook nog een adempauze toe (VOICE_PAD).
 TONE = {
-    "rustig": dict(speed=1.00, sil=0.45),   # verhalend, vlot met een beetje rust
-    "nadruk": dict(speed=0.92, sil=0.70),   # statement, zwaarder, laat de klap hangen
-    "warm":   dict(speed=0.90, sil=0.85),   # payoff, rustig, laat het bezinken
-    "hook":   dict(speed=0.96, sil=0.55),   # opening, pakkend maar met lucht
+    "rustig": dict(speed=0.86, sil=0.45),   # verhalend, vlot met een beetje rust
+    "nadruk": dict(speed=0.82, sil=0.70),   # statement, zwaarder, laat de klap hangen
+    "warm":   dict(speed=0.82, sil=0.85),   # payoff, rustig, laat het bezinken
+    "hook":   dict(speed=0.84, sil=0.55),
+    "intro":  dict(speed=0.88, sil=0.60),
+    "outro":  dict(speed=0.86, sil=0.80),
+    "intro":  dict(speed=0.88, sil=0.60),
+    "outro":  dict(speed=0.86, sil=0.80),   # opening, pakkend maar met lucht
 }
 
 # Kokoro-synthesizer wordt per (stem, snelheid) één keer opgezet (model laadt dan één keer per
@@ -303,6 +307,10 @@ STORIES = {
   "sword": {
     "title": "Spread by the sword?",
     "scenes": [
+      (0,  "intro",  "Umma United",
+           "Welcome to Umma United. This is where we hand you back the side of the story you were never told. Our history. Our pride. Our present."),
+      (0,  "intro",  "Umma United",
+           "Welcome to Umma United. This is where we hand you back the side of the story you were never told. Our history. Our pride. Our present."),
       (1,  "hook",   "Spread by the sword?",
            "You have heard it your whole life. Islam was spread by the sword. Convert, or die. And underneath that sentence sits a rule they are very proud of. A faith that is forced on people never lasts. The moment the pressure lifts, the people let it go. Remember that rule. Because today we are going to follow it all the way to the end. And it does not lead where they think it does."),
       (2,  "nadruk", "The rule is true.",
@@ -335,6 +343,10 @@ STORIES = {
            "So the next time someone tells you your faith was spread by the sword, you do not need to raise your voice. You know the history now. You know whose hand actually held the blade, and what it cost them. The truth never needed a sword. It only ever needed to be seen. That is why, after Rome, after empires, after five hundred years of everything they could throw at it, we are still here. And every single time you rise to pray, you are the living proof that the truth never needed a sword."),
       (16, "warm",   "The truth runs straight.",
            "This is what we do here. We show you the other side of the story, the one you were never handed. Because a lie has to travel in crooked lines. It has to bend the facts, hide half of them, and hope you never check. The truth does not need any of that. The truth runs straight. So if you are tired of being told to feel small about who you are, stay with us. Follow Umma United, and hold your head high."),
+      (17, "outro",  "Umma United",
+           "Umma United. Our history. Our pride. Our present. Hold your head high."),
+      (17, "outro",  "Umma United",
+           "Umma United. Our history. Our pride. Our present. Hold your head high."),
     ],
   },
 }

@@ -17,3 +17,6 @@ r2b.json
 test-upload.cjs
 before/
 after/
+
+assets/ummaunited/video/*.mp4
+assets/ummaunited/video/*.webm
