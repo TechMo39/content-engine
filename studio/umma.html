@@ -1,349 +1,217 @@
 <!doctype html>
-<html lang="nl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Umma United Studio</title>
+<html lang="nl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umma Studio — tijdlijn</title>
 <style>
-  :root{--ink:#0b1120;--bg:#0d1427;--navy:#111a33;--navy2:#1b2748;--cream:#f5efe1;--orange:#ff7a2f;--mute:#9fb6d8;--line:#22304f;--red:#c0392b;--ruler:#5fb6d8}
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-  header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--navy);border-bottom:1px solid var(--line);flex:0 0 auto}
-  header .brand{font-family:Georgia,serif;font-size:19px;white-space:nowrap}
-  header .brand .d{color:var(--orange)}
-  .sp{flex:1}
-  .ttl{font-family:Georgia,serif;font-size:15px;color:var(--mute)}
-  .btn{background:var(--navy2);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;font-family:inherit;font-size:13px}
-  .btn:hover{border-color:var(--orange)}
-  .btn.o{background:var(--orange);color:#1a1200;border-color:var(--orange);font-weight:700;padding:10px 20px}
-  .btn.sm{padding:5px 10px;font-size:12px}
-  .btn.x{padding:2px 7px;color:var(--mute);border-color:transparent;background:transparent}
-  .btn.x:hover{color:var(--orange)}
-  .stat{font-size:12px;color:var(--mute);min-width:50px;text-align:right}
-  /* drie kolommen: scènes | preview | inspector */
-  .cols{flex:1;display:grid;grid-template-columns:330px 1fr 320px;min-height:0}
-  .col{overflow:auto;min-height:0;padding:16px}
-  .colL{background:var(--ink);border-right:1px solid var(--line)}
-  .colR{background:var(--ink);border-left:1px solid var(--line)}
-  h2{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:0 0 10px}
-  h2 .cnt{color:var(--mute);font-weight:400;letter-spacing:0}
-  .sub{color:var(--mute);font-size:12px;margin:0 0 12px;line-height:1.5}
-  /* scène-kaartjes links */
-  .scard{background:var(--navy);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:10px 11px;cursor:pointer}
-  .scard.sel{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset}
-  .scard .top{display:flex;align-items:center;gap:9px}
-  .scard .n{width:20px;height:20px;border-radius:50%;background:var(--navy2);color:var(--cream);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .scard.sel .n{background:var(--orange);color:#1a1200}
-  .scard .tech{margin-left:auto;font-size:10px;color:var(--orange);border:1px solid var(--orange);border-radius:20px;padding:1px 8px;flex:0 0 auto}
-  .scard .tx{font-size:12.5px;margin-top:7px;color:var(--cream);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .scard .meta{font-size:11px;color:var(--mute);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
-  .scard .meta .ok{color:#54c77a}
-  .scard .meta .no{color:var(--red)}
-  /* preview midden */
-  .pvwrap{display:flex;flex-direction:column;align-items:center;gap:12px}
-  .phone{width:300px;height:533px;background:#000;border-radius:18px;border:1px solid var(--line);overflow:hidden;position:relative}
-  .phone svg{width:100%;height:100%;display:block}
-  .scrub{width:300px;display:flex;align-items:center;gap:10px}
-  .scrub input{flex:1}
-  .pvnote{color:var(--mute);font-size:12px;text-align:center;max-width:320px;line-height:1.5}
-  /* inspector rechts */
-  .fld{margin-bottom:12px}
-  .fld>label{display:block;font-size:11px;color:var(--mute);margin-bottom:5px}
-  .fld input,.fld select,.fld textarea{width:100%;background:var(--navy);color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit}
-  .fld textarea{resize:vertical;line-height:1.45}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .pair{display:flex;gap:6px;align-items:center;margin:5px 0}
-  .pair select{flex:1}
-  .filerow{font-size:11.5px;color:var(--mute);margin-top:4px}
-  .filerow b{color:#54c77a}
-  #log{background:#05080f;border:1px solid var(--line);border-radius:8px;padding:9px;height:90px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#bcd;white-space:pre-wrap;margin-top:12px}
-  .empty{color:var(--mute);font-size:12.5px;border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;line-height:1.6}
-  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:center;justify-content:center}
-  .modal .box{background:var(--navy);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(720px,92vw)}
-  .modal textarea{width:100%;height:320px;background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.5}
-  a{color:var(--ruler)}
-</style>
-</head>
-<body>
+ :root{--bg:#0e1118;--panel:#161b26;--panel2:#1d2433;--line:#2a3344;--ink:#eef2f8;--mut:#8a94a6;
+  --beeld:#2f6df0;--tekst:#f5a623;--sfx:#e0556b;--muz:#3ec6a0;--play:#ff5a3c;--ok:#3ec6a0}
+ *{box-sizing:border-box}
+ html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
+ header{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:20}
+ header h1{font-size:15px;margin:0;font-weight:650}
+ header .sub{color:var(--mut);font-size:12.5px}.spacer{flex:1}
+ header button,header label.load{font-size:12px;color:var(--ink);cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:6px 11px;background:var(--panel2)}
+ header button.save{background:var(--beeld);border-color:var(--beeld)}
+ header input[type=file]{display:none}
+ .savemsg{font-size:12px;color:var(--mut)}
+ .preview{display:flex;gap:16px;padding:13px 18px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:51px;z-index:19}
+ .screen{width:116px;aspect-ratio:9/16;border-radius:10px;background:linear-gradient(160deg,#1b2233,#0f1420);border:1px solid var(--line);
+   display:flex;align-items:flex-end;justify-content:center;position:relative;overflow:hidden;flex:none}
+ .screen .sclabel{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:10.5px;color:var(--mut)}
+ .screen .beat{position:absolute;top:46%;left:8px;right:8px;transform:translateY(-50%);text-align:center;color:#cfe0ff;font-size:11px;opacity:.9}
+ .screen .sub{position:relative;z-index:2;margin:0 7px 10px;padding:4px 6px;border-radius:6px;background:rgba(0,0,0,.6);font-size:11px;text-align:center;color:#fff;min-height:1em}
+ .pmeta{flex:1;min-width:0}.pmeta .t{font-size:12px;color:var(--mut);margin-bottom:5px}
+ .pmeta .clock{font-variant-numeric:tabular-nums;font-size:19px;font-weight:650}
+ .pmeta .now{margin-top:5px;color:#cfd8e6;font-size:12.5px}.pmeta .now b{color:var(--beeld)}
+ .controls{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+ .controls button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+ .controls button.play{background:var(--beeld);border-color:var(--beeld)}
+ .legend{display:flex;gap:13px;margin-top:8px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+ .legend span{display:inline-flex;align-items:center;gap:5px}.dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+ .scenes{padding:13px 18px 70px;display:flex;flex-direction:column;gap:13px}
+ .scard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+ .scard.active{border-color:var(--play);box-shadow:0 0 0 1px rgba(255,90,60,.3)}
+ .shead{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:12.5px}
+ .shead .n{font-weight:650}.shead .tone{color:var(--mut)}.shead .rng{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums;font-size:11.5px}
+ .body{position:relative}
+ .lane{position:relative;display:flex;border-top:1px solid var(--line)}.lane:first-child{border-top:none}
+ .lane .lab{width:56px;flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--mut);background:var(--panel2);border-right:1px solid var(--line)}
+ .lane .track{position:relative;flex:1}
+ .lane.beeld .track{min-height:46px}.lane.tekst .track{min-height:58px}.lane.sfx .track{min-height:32px}.lane.muziek .track{min-height:26px}
+ .blk{position:absolute;top:5px;bottom:5px;border-radius:6px;font-size:11px;padding:3px 6px;overflow:hidden;border:1px solid transparent;line-height:1.25}
+ .blk.beeld{background:rgba(47,109,240,.16);border-color:rgba(47,109,240,.5);color:#cfe0ff;white-space:normal}
+ .blk.tekst{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.45);color:#ffe4bb;white-space:normal}
+ .blk.sfx{background:rgba(224,85,107,.2);border-color:var(--sfx);color:#ffd2da;white-space:nowrap;cursor:grab}
+ .handle{position:absolute;top:0;bottom:0;width:9px;margin-left:-5px;cursor:ew-resize;z-index:6}
+ .handle::after{content:"";position:absolute;top:4px;bottom:4px;left:4px;width:2px;background:currentColor;opacity:.5;border-radius:2px}
+ .handle.beeld{color:var(--beeld)}.handle.tekst{color:var(--tekst)}
+ .musicbed{position:absolute;top:5px;bottom:5px;left:0;right:0;border-radius:6px;font-size:10.5px;padding:3px 8px;display:flex;align-items:center;color:#bfeadd;
+   background:repeating-linear-gradient(90deg,rgba(62,198,160,.14),rgba(62,198,160,.14) 10px,rgba(62,198,160,.07) 10px,rgba(62,198,160,.07) 20px);border:1px dashed rgba(62,198,160,.5)}
+ .track.sfx-add{cursor:copy}
+ .ruler{position:relative;height:17px;background:var(--bg);border-top:1px solid var(--line)}
+ .ruler .tk{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);font-size:9.5px;color:var(--mut);padding-left:3px}
+ .phead{position:absolute;top:0;bottom:17px;width:2px;background:var(--play);z-index:9;pointer-events:none;display:none}
+ .scard.active .phead{display:block}
+ .tip{position:fixed;background:#000;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:11px;font-variant-numeric:tabular-nums;z-index:50;pointer-events:none;display:none}
+ .hint{padding:10px 18px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:var(--panel)}
+</style></head><body>
 <header>
-  <button class="btn sm" onclick="location.href='/'" title="terug naar Tale of Tiles">‹ Tiles</button>
-  <div class="brand">Umma United <span class="d">·</span> Studio</div>
-  <span class="ttl" id="ttl"></span>
-  <div class="sp"></div>
-  <select class="btn sm" id="deel" style="max-width:200px" onchange="switchDeel()"><option>deel laden…</option></select>
-  <button class="btn sm" onclick="openImport()">Plak script</button>
-  <select class="btn sm" id="music" style="max-width:160px"><option value="">muziek: (geen)</option></select>
-  <span class="stat" id="stat"></span>
-  <button class="btn" onclick="doRender()">Render dit deel</button>
-  <button class="btn o" onclick="renderAll()">Render alle delen</button>
+ <h1>Umma Studio <span style="color:var(--mut);font-weight:400" id="hdrtitle"></span></h1>
+ <div class="sub" id="hdrsub"></div><div class="spacer"></div>
+ <span class="savemsg" id="savemsg"></span>
+ <button class="save" id="btn-save">opslaan</button>
+ <label class="load">stem-wavs laden<input id="ld-voice" type="file" accept=".wav" multiple></label>
+ <label class="load">muziek laden<input id="ld-music" type="file" accept="audio/*"></label>
 </header>
-
-<div class="cols">
-  <!-- LINKS: alle scènes -->
-  <div class="col colL">
-    <h2>Scènes <span class="cnt" id="scnt"></span></h2>
-    <div id="list"></div>
+<div class="preview">
+ <div class="screen"><div class="sclabel" id="pv-scene"></div><div class="beat" id="pv-beat"></div><div class="sub" id="pv-sub"></div></div>
+ <div class="pmeta">
+  <div class="t">PRE-RENDER PREVIEW — klik in een scène om te scrubben, of speel af. Sleep een grens (■/▐) om beeld of ondertitel te verschuiven; de seconde staat in beeld. Opslaan schrijft deze tijdlijn terug zodat de render hem leest.</div>
+  <div class="clock"><span id="pv-clock">0:00.0</span> <span style="color:var(--mut);font-size:13px">/ <span id="pv-total"></span></span> <span id="pv-audio" style="color:var(--mut);font-size:11px;margin-left:8px"></span></div>
+  <div class="now">scène <b id="pv-scn">1</b> · beeld-beat <b id="pv-bn">1</b></div>
+  <div class="controls"><button class="play" id="btn-play">► afspelen</button><button id="btn-rew">⟲ begin</button><button id="btn-sfx">+ SFX plaatsen: uit</button></div>
+  <div class="legend">
+   <span><i class="dot" style="background:var(--beeld)"></i> beeld (beats, sleep ■-grens)</span>
+   <span><i class="dot" style="background:var(--tekst)"></i> tekst (sleep ▐-grens)</span>
+   <span><i class="dot" style="background:var(--sfx)"></i> sfx (klik laag)</span>
+   <span><i class="dot" style="background:var(--muz)"></i> muziek (bodem)</span>
   </div>
-  <!-- MIDDEN: preview van de geselecteerde scène -->
-  <div class="col">
-    <h2>Voorbeeld</h2>
-    <div class="pvwrap">
-      <div class="phone" id="phone"><div class="empty" style="margin:40px 12px">Laad een script om de scènes te zien.</div></div>
-      <div class="scrub"><span id="ptime" style="font-size:11px;color:var(--mute);width:34px">0.0s</span><input type="range" id="scrub" min="0" max="100" value="40" oninput="drawPreview()"><span style="font-size:11px;color:var(--mute)">anim</span></div>
-      <div class="pvnote" id="pvnote"></div>
-    </div>
-    <div id="log"></div>
-  </div>
-  <!-- RECHTS: inspector voor de geselecteerde scène -->
-  <div class="col colR">
-    <h2>Deze scène aanpassen</h2>
-    <div id="insp"><div class="empty">Kies links een scène om 'm aan te passen.</div></div>
-  </div>
+ </div>
 </div>
-
-<div class="modal" id="importModal">
-  <div class="box">
-    <h2>Script laden</h2>
-    <div class="sub">Plak het script dat Claude je gaf (of het verschijnt vanzelf als het al klaarstaat).</div>
-    <textarea id="importTxt" spellcheck="false"></textarea>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button class="btn" onclick="closeImport()">Annuleer</button>
-      <button class="btn o" onclick="applyImport()">Laad</button>
-    </div>
-  </div>
-</div>
-
+<div class="scenes" id="scenes"></div>
+<div class="tip" id="tip"></div>
+<div class="hint" id="hint">Umma-studio, gevoed door _timeline.json uit de engine. Sleep de grenzen of instrueer mij, plaats SFX, en klik opslaan. De render leest daarna exact deze tijdlijn.</div>
 <script>
-const COUNTRIES = {"Bulgaria":"100","Myanmar":"104","Burundi":"108","Belarus":"112","Cambodia":"116","Cameroon":"120","Canada":"124","Central African Rep.":"140","Sri Lanka":"144","Chad":"148","Chile":"152","China":"156","Taiwan":"158","Colombia":"170","Congo":"178","Dem. Rep. Congo":"180","Costa Rica":"188","Croatia":"191","Cuba":"192","Cyprus":"196","Czechia":"203","Benin":"204","Denmark":"208","Dominican Rep.":"214","Ecuador":"218","El Salvador":"222","Eq. Guinea":"226","Ethiopia":"231","Eritrea":"232","Estonia":"233","Falkland Is.":"238","Fiji":"242","Finland":"246","France":"250","Fr. S. Antarctic Lands":"260","Djibouti":"262","Gabon":"266","Georgia":"268","Gambia":"270","Palestine":"275","Germany":"276","Ghana":"288","Greece":"300","Greenland":"304","Guatemala":"320","Guinea":"324","Guyana":"328","Haiti":"332","Honduras":"340","Hungary":"348","Iceland":"352","India":"356","Indonesia":"360","Iran":"364","Iraq":"368","Ireland":"372","Israel":"376","Italy":"380","Côte d'Ivoire":"384","Jamaica":"388","Japan":"392","Kazakhstan":"398","Jordan":"400","Kenya":"404","North Korea":"408","South Korea":"410","Kuwait":"414","Kyrgyzstan":"417","Laos":"418","Lebanon":"422","Lesotho":"426","Latvia":"428","Liberia":"430","Libya":"434","Lithuania":"440","Luxembourg":"442","Madagascar":"450","Malawi":"454","Malaysia":"458","Mali":"466","Mauritania":"478","Mexico":"484","Mongolia":"496","Moldova":"498","Montenegro":"499","Morocco":"504","Mozambique":"508","Oman":"512","Namibia":"516","Nepal":"524","Netherlands":"528","New Caledonia":"540","Vanuatu":"548","New Zealand":"554","Nicaragua":"558","Niger":"562","Nigeria":"566","Norway":"578","Pakistan":"586","Panama":"591","Papua New Guinea":"598","Paraguay":"600","Peru":"604","Philippines":"608","Poland":"616","Portugal":"620","Guinea-Bissau":"624","Timor-Leste":"626","Puerto Rico":"630","Qatar":"634","Romania":"642","Russia":"643","Rwanda":"646","Saudi Arabia":"682","Senegal":"686","Serbia":"688","Sierra Leone":"694","Slovakia":"703","Vietnam":"704","Slovenia":"705","Somalia":"706","South Africa":"710","Zimbabwe":"716","Spain":"724","S. Sudan":"728","Sudan":"729","W. Sahara":"732","Suriname":"740","eSwatini":"748","Sweden":"752","Switzerland":"756","Syria":"760","Tajikistan":"762","Thailand":"764","Togo":"768","Trinidad and Tobago":"780","United Arab Emirates":"784","Tunisia":"788","Turkey":"792","Turkmenistan":"795","Uganda":"800","Ukraine":"804","Macedonia":"807","Egypt":"818","United Kingdom":"826","Tanzania":"834","United States of America":"840","Burkina Faso":"854","Uruguay":"858","Uzbekistan":"860","Venezuela":"862","Yemen":"887","Zambia":"894","Argentina":"032","Bahamas":"044","Brazil":"076","Bolivia":"068","Belize":"084","Botswana":"072","Angola":"024","Algeria":"012","Bangladesh":"050","Bhutan":"064","Afghanistan":"004","Armenia":"051","Austria":"040","Albania":"008","Belgium":"056","Solomon Is.":"090","Australia":"036","Azerbaijan":"031","Brunei":"096","Antarctica":"010","Bosnia and Herz.":"070"};
-const ALIASES = {uae:"United Arab Emirates",emirates:"United Arab Emirates",saudi:"Saudi Arabia",ksa:"Saudi Arabia",bosnia:"Bosnia and Herz.",turkiye:"Turkey","türkiye":"Turkey",usa:"United States of America",uk:"United Kingdom"};
-const REGIONS = ["belt","world","mena","maghreb","arabia","levant","turkey","iberia","westafrica","hornafrica","southasia","sea","europe","centralasia"];
-const COLORS = {orange:"#ff7a2f",red:"#c0392b",ruler:"#5fb6d8",green:"#2aa84a",blue:"#2756a0",cream:"#f5efe1"};
-const COLKEYS = Object.keys(COLORS);
-const TECHS = ["kaart","statement","mythe"];
-// huisstijl voor de browser-preview (zelfde kleuren als de engine)
-const COL = {ink:"#0d1427",navy:"#111a33",cream:"#f5efe1",orange:"#ff7a2f",red:"#c0392b",ruler:"#5fb6d8",land:"#26324f",mute:"#9fb6d8"};
+const EMBED={"story": "sword", "voice": "man", "title": "Spread by the sword?", "total_seconds": 471.875, "total_mmss": "7:51", "scenes": [{"scene": 1, "tone": "hook", "wav": "assets/ummaunited/voice/sword/man/01.wav", "start": 0.0, "dur": 25.2, "speech_start": 0.44, "speech_end": 24.04, "sentences": [{"i": 0, "text": "You have heard it your whole life.", "start": 0.44, "dur": 1.57, "abs_start": 0.44}, {"i": 1, "text": "Islam was spread by the sword.", "start": 2.01, "dur": 2.26, "abs_start": 2.01}, {"i": 2, "text": "Convert, or die.", "start": 4.27, "dur": 1.284, "abs_start": 4.27}, {"i": 3, "text": "And underneath that sentence sits a rule they are very proud of.", "start": 5.554, "dur": 4.346, "abs_start": 5.554}, {"i": 4, "text": "A faith that is forced on people never lasts.", "start": 9.9, "dur": 2.568, "abs_start": 9.9}, {"i": 5, "text": "The moment the pressure lifts, the people let it go.", "start": 12.468, "dur": 3.312, "abs_start": 12.468}, {"i": 6, "text": "Remember that rule.", "start": 15.78, "dur": 1.346, "abs_start": 15.78}, {"i": 7, "text": "Because today we are going to follow it all the way to the end.", "start": 17.126, "dur": 4.404, "abs_start": 17.126}, {"i": 8, "text": "And it does not lead where they think it does.", "start": 21.53, "dur": 2.51, "abs_start": 21.53}], "beats": [], "sfx": []}, {"scene": 2, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/02.wav", "start": 25.2, "dur": 24.425, "speech_start": 0.48, "speech_end": 22.92, "sentences": [{"i": 0, "text": "I am not going to tell you the rule is wrong.", "start": 0.48, "dur": 2.974, "abs_start": 25.68}, {"i": 1, "text": "The rule is true.", "start": 3.454, "dur": 1.296, "abs_start": 28.654}, {"i": 2, "text": "A faith held up by force really does fall the moment the force is gone.", "start": 4.75, "dur": 4.401, "abs_start": 29.95}, {"i": 3, "text": "So the only honest question left is this one.", "start": 9.151, "dur": 3.224, "abs_start": 34.351}, {"i": 4, "text": "In all of history, which faith was actually spread that way?", "start": 12.375, "dur": 4.123, "abs_start": 37.575}, {"i": 5, "text": "Not which one was accused of it.", "start": 16.498, "dur": 2.522, "abs_start": 41.698}, {"i": 6, "text": "Which one was really built on the blade.", "start": 19.02, "dur": 2.51, "abs_start": 44.22}, {"i": 7, "text": "Let us go and look.", "start": 21.53, "dur": 1.39, "abs_start": 46.73}], "beats": [], "sfx": []}, {"scene": 3, "tone": "rustig", "wav": "assets/ummaunited/voice/sword/man/03.wav", "start": 49.625, "dur": 21.775, "speech_start": 0.42, "speech_end": 20.6, "sentences": [{"i": 0, "text": "Go back to Rome.", "start": 0.42, "dur": 1.16, "abs_start": 50.045}, {"i": 1, "text": "For three hundred years Rome ruled the lands around the Mediterranean.", "start": 1.58, "dur": 4.11, "abs_start": 51.205}, {"i": 2, "text": "Syria, Egypt, across North Africa to the edge of Morocco, up into Anatolia.", "start": 5.69, "dur": 5.99, "abs_start": 55.315}, {"i": 3, "text": "And once the empire took one faith as its own, that faith became the law.", "start": 11.68, "dur": 4.315, "abs_start": 61.305}, {"i": 4, "text": "Not an invitation.", "start": 15.995, "dur": 1.558, "abs_start": 65.62}, {"i": 5, "text": "A command, carried by the power of the state.", "start": 17.553, "dur": 3.047, "abs_start": 67.178}], "beats": [], "sfx": []}, {"scene": 4, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/04.wav", "start": 71.4, "dur": 28.05, "speech_start": 0.44, "speech_end": 26.58, "sentences": [{"i": 0, "text": "And if your belief was not theirs, you learned what that meant.", "start": 0.44, "dur": 3.448, "abs_start": 71.84}, {"i": 1, "text": "The Jews knew it first.", "start": 3.888, "dur": 1.402, "abs_start": 75.288}, {"i": 2, "text": "Taxed, pushed out, driven from city after city, blamed for whatever the empire needed blamed.", "start": 5.29, "dur": 6.518, "abs_start": 76.69}, {"i": 3, "text": "And they were not alone.", "start": 11.808, "dur": 1.535, "abs_start": 83.208}, {"i": 4, "text": "Anyone who would not take the official faith, other Christians, old believers, whole peoples, lived under the same shadow.", "start": 13.343, "dur": 7.408, "abs_start": 84.743}, {"i": 5, "text": "Baptism, or ruin.", "start": 20.751, "dur": 1.319, "abs_start": 92.151}, {"i": 6, "text": "This is what a forced faith actually looks like.", "start": 22.07, "dur": 2.775, "abs_start": 93.47}, {"i": 7, "text": "Not a story.", "start": 24.845, "dur": 0.985, "abs_start": 96.245}, {"i": 8, "text": "A boot.", "start": 25.83, "dur": 0.75, "abs_start": 97.23}], "beats": [], "sfx": []}, {"scene": 5, "tone": "rustig", "wav": "assets/ummaunited/voice/sword/man/05.wav", "start": 99.45, "dur": 31.275, "speech_start": 0.44, "speech_end": 30.14, "sentences": [{"i": 0, "text": "Now hold that picture, because here is the part they never tell you.", "start": 0.44, "dur": 3.51, "abs_start": 99.89}, {"i": 1, "text": "When the Muslims came to those same lands, Syria, Egypt, across to Morocco, the people did not meet them as conquerors to be feared.", "start": 3.95, "dur": 8.239, "abs_start": 103.4}, {"i": 2, "text": "For many of them, it was relief.", "start": 12.189, "dur": 2.293, "abs_start": 111.639}, {"i": 3, "text": "The weight they had carried under Rome, the taxes for believing wrong, the choice of convert or suffer, that weight lifted.", "start": 14.482, "dur": 6.923, "abs_start": 113.932}, {"i": 4, "text": "The Jews who had been hunted found, under Muslim rule, a place they could live, pray, and breathe.", "start": 21.405, "dur": 5.315, "abs_start": 120.855}, {"i": 5, "text": "Ask the Jews.", "start": 26.72, "dur": 0.843, "abs_start": 126.17}, {"i": 6, "text": "Read the history.", "start": 27.563, "dur": 0.967, "abs_start": 127.013}, {"i": 7, "text": "It is written down.", "start": 28.53, "dur": 1.61, "abs_start": 127.98}], "beats": [], "sfx": []}, {"scene": 6, "tone": "warm", "wav": "assets/ummaunited/voice/sword/man/06.wav", "start": 130.725, "dur": 35.5, "speech_start": 0.48, "speech_end": 33.88, "sentences": [{"i": 0, "text": "And here is why it felt like relief.", "start": 0.48, "dur": 2.11, "abs_start": 131.205}, {"i": 1, "text": "Under Muslim rule, you were not forced to become Muslim.", "start": 2.59, "dur": 4.378, "abs_start": 133.315}, {"i": 2, "text": "The Christian who wanted to stay Christian, stayed Christian.", "start": 6.968, "dur": 3.242, "abs_start": 137.693}, {"i": 3, "text": "The Jew kept his synagogue.", "start": 10.21, "dur": 2.264, "abs_start": 140.935}, {"i": 4, "text": "The churches stayed open.", "start": 12.474, "dur": 1.696, "abs_start": 143.199}, {"i": 5, "text": "The law was clear.", "start": 14.169, "dur": 1.201, "abs_start": 144.894}, {"i": 6, "text": "Faith is not something you hammer into a person.", "start": 15.37, "dur": 3.34, "abs_start": 146.095}, {"i": 7, "text": "No human can place belief in a heart.", "start": 18.71, "dur": 3.004, "abs_start": 149.435}, {"i": 8, "text": "Guidance is from Allah alone.", "start": 21.714, "dur": 1.886, "abs_start": 152.439}, {"i": 9, "text": "So the Muslims did not try to do Allah's work with a sword.", "start": 23.6, "dur": 4.37, "abs_start": 154.325}, {"i": 10, "text": "They carried the message, lived it honestly, dealt justly, and left the hearts to Allah.", "start": 27.97, "dur": 5.91, "abs_start": 158.695}], "beats": [], "sfx": []}, {"scene": 7, "tone": "rustig", "wav": "assets/ummaunited/voice/sword/man/07.wav", "start": 166.225, "dur": 30.0, "speech_start": 0.4, "speech_end": 28.8, "sentences": [{"i": 0, "text": "And so it stood.", "start": 0.4, "dur": 1.08, "abs_start": 166.625}, {"i": 1, "text": "Not for a year.", "start": 1.48, "dur": 1.35, "abs_start": 167.705}, {"i": 2, "text": "Not for a generation.", "start": 2.83, "dur": 1.56, "abs_start": 169.055}, {"i": 3, "text": "For centuries.", "start": 4.39, "dur": 1.17, "abs_start": 170.615}, {"i": 4, "text": "These lands were ruled by Muslims for hundreds and hundreds of years.", "start": 5.56, "dur": 3.67, "abs_start": 171.785}, {"i": 5, "text": "Long enough for empires to rise and fall.", "start": 9.23, "dur": 2.47, "abs_start": 175.455}, {"i": 6, "text": "Long enough that if Islam were truly nothing but a sword held to the throat, the proof would be everywhere.", "start": 11.7, "dur": 6.373, "abs_start": 177.925}, {"i": 7, "text": "Instead, over all those generations, people came to it freely, at their own pace, family by family, because of what they saw, not because of what they were threatened with.", "start": 18.073, "dur": 10.727, "abs_start": 184.298}], "beats": [], "sfx": []}, {"scene": 8, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/08.wav", "start": 196.225, "dur": 37.2, "speech_start": 0.46, "speech_end": 35.62, "sentences": [{"i": 0, "text": "Then, about a thousand years later, the tide turned the other way.", "start": 0.46, "dur": 4.657, "abs_start": 196.685}, {"i": 1, "text": "Now it was Europe that marched out.", "start": 5.117, "dur": 2.414, "abs_start": 201.342}, {"i": 2, "text": "And this time the sword was real, and it was aimed straight at the faith.", "start": 7.531, "dur": 4.267, "abs_start": 203.756}, {"i": 3, "text": "It began with Spain.", "start": 11.798, "dur": 1.439, "abs_start": 208.023}, {"i": 4, "text": "Then the British, the Dutch, the French.", "start": 13.237, "dur": 2.463, "abs_start": 209.462}, {"i": 5, "text": "Across North Africa.", "start": 15.699, "dur": 1.682, "abs_start": 211.924}, {"i": 6, "text": "Into Indonesia.", "start": 17.382, "dur": 1.682, "abs_start": 213.607}, {"i": 7, "text": "Into the Balkans, into Bosnia.", "start": 19.064, "dur": 2.56, "abs_start": 215.289}, {"i": 8, "text": "For centuries their flags flew over the Muslim world.", "start": 21.624, "dur": 3.389, "abs_start": 217.849}, {"i": 9, "text": "And here, finally, we can test the rule.", "start": 25.013, "dur": 3.117, "abs_start": 221.238}, {"i": 10, "text": "Their own rule.", "start": 28.13, "dur": 0.785, "abs_start": 224.355}, {"i": 11, "text": "If a forced faith cannot last, then a faith crushed by five hundred years of empire should have nothing left.", "start": 28.915, "dur": 6.705, "abs_start": 225.14}], "beats": [], "sfx": []}, {"scene": 9, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/09.wav", "start": 233.425, "dur": 27.85, "speech_start": 0.46, "speech_end": 26.36, "sentences": [{"i": 0, "text": "And do not imagine they were gentle.", "start": 0.46, "dur": 2.05, "abs_start": 233.885}, {"i": 1, "text": "Do not tell yourself they simply ruled and let people be.", "start": 2.51, "dur": 3.6, "abs_start": 235.935}, {"i": 2, "text": "They tried to take the faith out.", "start": 6.11, "dur": 1.85, "abs_start": 239.535}, {"i": 3, "text": "They killed.", "start": 7.96, "dur": 1.07, "abs_start": 241.385}, {"i": 4, "text": "They humiliated.", "start": 9.03, "dur": 1.37, "abs_start": 242.455}, {"i": 5, "text": "They outlawed the language of the Quran in the street and the school.", "start": 10.4, "dur": 3.79, "abs_start": 243.825}, {"i": 6, "text": "They turned brother against brother so a people could not stand together.", "start": 14.19, "dur": 4.34, "abs_start": 247.615}, {"i": 7, "text": "Everything an empire can do to erase a thing, they did it.", "start": 18.53, "dur": 3.97, "abs_start": 251.955}, {"i": 8, "text": "This was the sword, finally, for real.", "start": 22.5, "dur": 2.76, "abs_start": 255.925}, {"i": 9, "text": "So, did it work?", "start": 25.26, "dur": 1.1, "abs_start": 258.685}], "beats": [], "sfx": []}, {"scene": 10, "tone": "warm", "wav": "assets/ummaunited/voice/sword/man/10.wav", "start": 261.275, "dur": 32.475, "speech_start": 0.48, "speech_end": 30.82, "sentences": [{"i": 0, "text": "No.", "start": 0.48, "dur": 0.45, "abs_start": 261.755}, {"i": 1, "text": "When the empires finally packed up and left, after everything, the faith was still there.", "start": 0.93, "dur": 5.876, "abs_start": 262.205}, {"i": 2, "text": "Indonesia, after centuries of foreign rule, walked into independence and remained what it was, the largest Muslim nation on earth.", "start": 6.806, "dur": 9.154, "abs_start": 268.081}, {"i": 3, "text": "Bosnia, surrounded, hunted, marked for erasure in the very heart of Europe, still standing, still praying, still here.", "start": 15.96, "dur": 7.156, "abs_start": 277.235}, {"i": 4, "text": "Across North Africa, independence came after the Second World War, and the people who emerged were the same people who went in.", "start": 23.116, "dur": 7.704, "abs_start": 284.391}], "beats": [], "sfx": []}, {"scene": 11, "tone": "rustig", "wav": "assets/ummaunited/voice/sword/man/11.wav", "start": 293.75, "dur": 26.875, "speech_start": 0.44, "speech_end": 25.68, "sentences": [{"i": 0, "text": "Look at it plainly.", "start": 0.44, "dur": 1.18, "abs_start": 294.19}, {"i": 1, "text": "Count the believers in those lands before the colonisers came.", "start": 1.62, "dur": 3.68, "abs_start": 295.37}, {"i": 2, "text": "Count them after they left.", "start": 5.3, "dur": 1.65, "abs_start": 299.05}, {"i": 3, "text": "The number barely moves.", "start": 6.95, "dur": 1.53, "abs_start": 300.7}, {"i": 4, "text": "Hundreds of years of the most powerful empires in history, with every weapon and every school and every law turned against one single thing, and they could not shift it.", "start": 8.48, "dur": 10.01, "abs_start": 302.23}, {"i": 5, "text": "Because you cannot conquer what does not live in the land.", "start": 18.49, "dur": 3.26, "abs_start": 312.24}, {"i": 6, "text": "It lived in the heart.", "start": 21.75, "dur": 1.6, "abs_start": 315.5}, {"i": 7, "text": "And no army has ever taken a heart.", "start": 23.35, "dur": 2.33, "abs_start": 317.1}], "beats": [], "sfx": []}, {"scene": 12, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/12.wav", "start": 320.625, "dur": 26.95, "speech_start": 0.46, "speech_end": 25.44, "sentences": [{"i": 0, "text": "So let us go back to their rule.", "start": 0.46, "dur": 1.84, "abs_start": 321.085}, {"i": 1, "text": "A forced faith never lasts.", "start": 2.3, "dur": 2.46, "abs_start": 322.925}, {"i": 2, "text": "The moment the force is gone, the people let it go.", "start": 4.76, "dur": 2.95, "abs_start": 325.385}, {"i": 3, "text": "They are right.", "start": 7.71, "dur": 0.97, "abs_start": 328.335}, {"i": 4, "text": "That rule is true.", "start": 8.68, "dur": 1.58, "abs_start": 329.305}, {"i": 5, "text": "They just pointed it at the wrong religion.", "start": 10.26, "dur": 2.39, "abs_start": 330.885}, {"i": 6, "text": "Because the faith that was forced, in Rome, across Europe, convert or be ruined, look at those same lands today.", "start": 12.65, "dur": 7.46, "abs_start": 333.275}, {"i": 7, "text": "The churches stand empty.", "start": 20.11, "dur": 1.58, "abs_start": 340.735}, {"i": 8, "text": "A whole continent has quietly walked away from God.", "start": 21.69, "dur": 3.75, "abs_start": 342.315}], "beats": [], "sfx": []}, {"scene": 13, "tone": "nadruk", "wav": "assets/ummaunited/voice/sword/man/13.wav", "start": 347.575, "dur": 37.125, "speech_start": 0.44, "speech_end": 35.6, "sentences": [{"i": 0, "text": "And ask yourself honestly why.", "start": 0.44, "dur": 1.81, "abs_start": 348.015}, {"i": 1, "text": "It is not an accident.", "start": 2.25, "dur": 2.104, "abs_start": 349.825}, {"i": 2, "text": "When a faith is pressed onto people by force, generation after generation, it leaves a wound.", "start": 4.354, "dur": 6.547, "abs_start": 351.929}, {"i": 3, "text": "And a wounded people do not just leave one faith.", "start": 10.902, "dur": 2.773, "abs_start": 358.477}, {"i": 4, "text": "They grow a quiet aversion to faith itself.", "start": 13.675, "dur": 2.435, "abs_start": 361.25}, {"i": 5, "text": "That is what you see in Europe now.", "start": 16.11, "dur": 2.644, "abs_start": 363.685}, {"i": 6, "text": "Not only an empty church.", "start": 18.754, "dur": 1.546, "abs_start": 366.329}, {"i": 7, "text": "A reflex of pushing religion away, because somewhere in their history religion arrived as a hand around the throat.", "start": 20.3, "dur": 8.88, "abs_start": 367.875}, {"i": 8, "text": "Their rule came true, in their own home, on their own faith.", "start": 29.18, "dur": 2.97, "abs_start": 376.755}, {"i": 9, "text": "That is not something to laugh at.", "start": 32.15, "dur": 2.54, "abs_start": 379.725}, {"i": 10, "text": "It is the proof.", "start": 34.69, "dur": 0.91, "abs_start": 382.265}], "beats": [], "sfx": []}, {"scene": 14, "tone": "warm", "wav": "assets/ummaunited/voice/sword/man/14.wav", "start": 384.7, "dur": 27.475, "speech_start": 0.48, "speech_end": 25.8, "sentences": [{"i": 0, "text": "And ours?", "start": 0.48, "dur": 0.63, "abs_start": 385.18}, {"i": 1, "text": "Ours was never forced.", "start": 1.11, "dur": 1.6, "abs_start": 385.81}, {"i": 2, "text": "It came as relief after cruelty.", "start": 2.71, "dur": 2.62, "abs_start": 387.41}, {"i": 3, "text": "It was chosen freely, over centuries, in lands where you were free to refuse it.", "start": 5.33, "dur": 5.14, "abs_start": 390.03}, {"i": 4, "text": "And when the real sword finally came, not to spread it, but to destroy it, it did not fall.", "start": 10.47, "dur": 6.043, "abs_start": 395.17}, {"i": 5, "text": "They forced their faith and lost it.", "start": 16.513, "dur": 2.114, "abs_start": 401.213}, {"i": 6, "text": "We were given ours freely, and we kept it.", "start": 18.627, "dur": 2.969, "abs_start": 403.327}, {"i": 7, "text": "The same rule.", "start": 21.596, "dur": 0.974, "abs_start": 406.296}, {"i": 8, "text": "Two opposite endings.", "start": 22.57, "dur": 1.58, "abs_start": 407.27}, {"i": 9, "text": "That is the whole story.", "start": 24.15, "dur": 1.65, "abs_start": 408.85}], "beats": [], "sfx": []}, {"scene": 15, "tone": "warm", "wav": "assets/ummaunited/voice/sword/man/15.wav", "start": 412.175, "dur": 32.025, "speech_start": 0.46, "speech_end": 30.32, "sentences": [{"i": 0, "text": "So the next time someone tells you your faith was spread by the sword, you do not need to raise your voice.", "start": 0.46, "dur": 5.59, "abs_start": 412.635}, {"i": 1, "text": "You know the history now.", "start": 6.05, "dur": 1.63, "abs_start": 418.225}, {"i": 2, "text": "You know whose hand actually held the blade, and what it cost them.", "start": 7.68, "dur": 3.75, "abs_start": 419.855}, {"i": 3, "text": "The truth never needed a sword.", "start": 11.43, "dur": 2.35, "abs_start": 423.605}, {"i": 4, "text": "It only ever needed to be seen.", "start": 13.78, "dur": 2.24, "abs_start": 425.955}, {"i": 5, "text": "That is why, after Rome, after empires, after five hundred years of everything they could throw at it, we are still here.", "start": 16.02, "dur": 7.9, "abs_start": 428.195}, {"i": 6, "text": "And every single time you rise to pray, you are the living proof that the truth never needed a sword.", "start": 23.92, "dur": 6.4, "abs_start": 436.095}], "beats": [], "sfx": []}, {"scene": 16, "tone": "warm", "wav": "assets/ummaunited/voice/sword/man/16.wav", "start": 444.2, "dur": 27.675, "speech_start": 0.48, "speech_end": 25.98, "sentences": [{"i": 0, "text": "This is what we do here.", "start": 0.48, "dur": 1.48, "abs_start": 444.68}, {"i": 1, "text": "We show you the other side of the story, the one you were never handed.", "start": 1.96, "dur": 4.918, "abs_start": 446.16}, {"i": 2, "text": "Because a lie has to travel in crooked lines.", "start": 6.878, "dur": 3.246, "abs_start": 451.078}, {"i": 3, "text": "It has to bend the facts, hide half of them, and hope you never check.", "start": 10.124, "dur": 4.227, "abs_start": 454.324}, {"i": 4, "text": "The truth does not need any of that.", "start": 14.351, "dur": 2.312, "abs_start": 458.551}, {"i": 5, "text": "The truth runs straight.", "start": 16.663, "dur": 1.067, "abs_start": 460.863}, {"i": 6, "text": "So if you are tired of being told to feel small about who you are, stay with us.", "start": 17.73, "dur": 4.85, "abs_start": 461.93}, {"i": 7, "text": "Follow Umma United, and hold your head high.", "start": 22.58, "dur": 3.4, "abs_start": 466.78}], "beats": [], "sfx": []}]}, BEATS={"1": {"splits": [2, 5], "img": ["donkere verovering, zwaard-gravure", "de REGEL als tekst op zwart", "horizon / weg vooruit"]}, "2": {"splits": [2, 6], "img": ["de regel bevestigd (tekst)", "een kling, de echte vraag", "overgang: op pad"]}, "3": {"splits": [2], "img": ["kaart: Rome rond de Middellandse Zee", "Romeins staatsgezag"]}, "4": {"splits": [2, 4], "img": ["vervolgde Joden onder Rome", "bredere vervolging, schaduw", "statement: Baptism or ruin"]}, "5": {"splits": [1, 3], "img": ["moslims komen, geen veroveraars", "verlichting, de last valt weg", "Joden vinden beschutting (bron)"]}, "6": {"splits": [2, 5, 8], "img": ["geen dwang, christen blijft christen", "synagoge en kerk blijven open", "theologie: hidayah van Allah (tekst)", "de boodschap geleefd, harten aan Allah"]}, "7": {"splits": [3, 6], "img": ["eeuwenlang (tekst bouwt op)", "kaart: honderden jaren bestuur", "vrij, generatie na generatie"]}, "8": {"splits": [2, 8], "img": ["Europa marcheert uit, kolonisatie", "kaart: koloniale greep (Spanje..Bosnie)", "de test van hun eigen regel"]}, "9": {"splits": [2, 6], "img": ["niet zacht geregeerd", "gedood, Quran verboden, verdeeld", "alles gedaan. werkte het?"]}, "10": {"splits": [1, 2, 3], "img": ["Nee, het geloof bleef", "Indonesie, grootste moslimland", "Bosnie, staat nog", "Noord-Afrika, zelfde volk"]}, "11": {"splits": [3, 4], "img": ["cijfers voor en na kolonisatie", "machtigste rijken, geen beweging", "in het hart, geen leger pakt een hart"]}, "12": {"splits": [4, 6], "img": ["hun regel is waar", "kaart Europa: de verkeerde religie", "lege kerken, continent weg van God"]}, "13": {"splits": [2, 5, 7], "img": ["waarom? een wond", "afkeer van geloof zelf", "religie als hand om de keel", "hun regel kwam uit = het bewijs"]}, "14": {"splits": [3, 6], "img": ["ons geloof: nooit gedwongen", "het zwaard kwam, het viel niet", "twee tegenovergestelde einden"]}, "15": {"splits": [2, 4], "img": ["je hoeft je stem niet te verheffen", "de waarheid hoefde alleen gezien", "gebed: jij bent het bewijs"]}, "16": {"splits": [1, 3, 5], "img": ["dit doen we hier", "een leugen reist krom", "de waarheid loopt recht", "CTA: Follow Umma United + logo"]}}, STORY='sword', VOICE='man';
+const $=id=>document.getElementById(id);
+const fmt=t=>{const m=Math.floor(t/60),s=(t%60);return m+':'+s.toFixed(1).padStart(4,'0')};
+const fmts=t=>{const m=Math.floor(t/60),s=Math.round(t%60);return m+':'+String(s).padStart(2,'0')};
+let TL=EMBED, SC=[], total=0, host=$('scenes');
 
-const state = { title:"", baseview:"belt", format:"9:16", music:"", sel:0, groups:[], scenes:[] };
-const $=(s)=>document.querySelector(s);
-const esc=(s)=>String(s==null?'':s).replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const clamp01=(x)=>Math.max(0,Math.min(1,x));
-const sm=(p)=>{p=clamp01(p);return p*p*(3-2*p);};
-function logLine(t){const l=$('#log');l.textContent+=t+"\n";l.scrollTop=l.scrollHeight;}
-function fileName(p){return p?String(p).split('/').pop():'';}
+function buildState(){
+ SC=TL.scenes.map(s=>{const def=BEATS[s.scene]||{splits:[],img:[]};
+   const splits=def.splits.slice();
+   const bounds=splits.map(i=> s.sentences[i]?s.sentences[i].start:s.dur);
+   const st={...s, imgLabels:def.img.slice(), beatBounds:bounds, sfx:(s.sfx||[]).slice(), subBounds:null};
+   st.subBounds=s.sentences.slice(1).map(se=>se.start);
+   // als er al opgeslagen beats/sfx in het timeline-bestand staan, die voorrang geven
+   if(Array.isArray(s.beats)&&s.beats.length){ st.beatBounds=s.beats.slice(1).map(b=>b.start); if(s.beats.every(b=>b.label)) st.imgLabels=s.beats.map(b=>b.label); }
+   return st;});
+ total=TL.total_seconds;
+}
+function beatsOf(s){const edges=[s.speech_start||s.sentences[0].start,...s.beatBounds,s.speech_end||s.dur];
+ const out=[];for(let i=0;i<edges.length-1;i++)out.push({start:edges[i],end:edges[i+1],label:s.imgLabels[i]||('beeld '+(i+1))});return out;}
+function subsOf(s){const starts=[s.sentences[0].start,...s.subBounds];const ends=[...s.subBounds,s.speech_end||s.dur];
+ return s.sentences.map((se,i)=>({text:se.text,start:starts[i],end:ends[i]}));}
 
-// ---------- script parsen ----------
-function parseScript(text){
-  const out={title:null,view:null,groups:[],scenes:[]};
-  for(const raw of String(text).split(/\r?\n/)){
-    const line=raw.trim(); if(!line||line.startsWith('#'))continue;
-    if(/^title\s*:/i.test(line)){out.title=line.replace(/^title\s*:/i,'').trim();continue;}
-    if(/^view\s*:/i.test(line)){out.view=line.replace(/^view\s*:/i,'').trim();continue;}
-    const m=line.match(/^group\s+([^=]+)=(.*)$/i);
-    if(m){out.groups.push({name:m[1].trim(),countries:m[2].trim()});continue;}
-    if(/^scene\s+/i.test(line)){
-      const segs=line.replace(/^scene\s+/i,'').split('|').map(s=>s.trim());
-      const sc={tech:'kaart',year:segs[0]||'',text:segs[1]||'',fills:[],rule:[],view:out.view||'belt',dur:0,voice:'',sfx:'',truth:'',kick:'',img:'',vid:'',caption:''};
-      for(let k=2;k<segs.length;k++){const seg=segs[k];const ci=seg.indexOf(':');if(ci<0)continue;
-        const key=seg.slice(0,ci).trim().toLowerCase();const val=seg.slice(ci+1).trim();
-        if(key==='fill'||key==='rule'){for(const pr of val.split(';')){const eq=pr.indexOf('=');if(eq<0)continue;const g=pr.slice(0,eq).trim();const c=pr.slice(eq+1).trim();if(g&&c)(key==='fill'?sc.fills:sc.rule).push({g,c});}}
-        else if(key==='view')sc.view=val;
-        else if(key==='dur'){const d=parseFloat(val);if(d>0)sc.dur=d;}
-        else if(key==='tech'||key==='techniek'||key==='technique')sc.tech=val.toLowerCase();
-        else if(key==='truth')sc.truth=val;
-        else if(key==='kick')sc.kick=val;
-        else if(key==='voice')sc.voice=val;
-        else if(key==='sfx')sc.sfx=val;
-        else if(key==='img')sc.img=val;
-        else if(key==='vid')sc.vid=val;
-        else if(key==='caption')sc.caption=val;
-      }
-      out.scenes.push(sc);
-    }
-  }
-  return out;
+function buildCards(){
+ host.innerHTML='';
+ SC.forEach((s,si)=>{const c=document.createElement('div');c.className='scard';c.dataset.si=si;
+  c.innerHTML='<div class="shead"><span class="n">Scène '+s.scene+'</span><span class="tone">'+s.tone+'</span>'+
+   '<span class="rng">'+fmts(s.start)+'–'+fmts(s.start+s.dur)+' · '+s.dur.toFixed(1)+'s</span></div>'+
+   '<div class="body">'+
+   '<div class="lane beeld"><div class="lab">BEELD</div><div class="track" data-tr="beeld"></div></div>'+
+   '<div class="lane tekst"><div class="lab">TEKST</div><div class="track" data-tr="tekst"></div></div>'+
+   '<div class="lane sfx"><div class="lab">SFX</div><div class="track sfx-add" data-tr="sfx"></div></div>'+
+   '<div class="lane muziek"><div class="lab">MUZIEK</div><div class="track" data-tr="muziek"><div class="musicbed">&#9834; muziek-bed — doorlopend</div></div></div>'+
+   '<div class="ruler"></div><div class="phead"></div></div>';
+  host.appendChild(c);});
 }
-function openImport(){ $('#importTxt').value=''; $('#importModal').style.display='flex'; }
-function closeImport(){ $('#importModal').style.display='none'; }
-function applyImport(){ const p=parseScript($('#importTxt').value); if(!p.scenes.length){logLine('geen scènes gevonden.');return;} loadParsed(p); closeImport(); }
-function loadParsed(p){
-  state.title=p.title||''; if(p.view)state.baseview=p.view;
-  state.groups=p.groups; state.scenes=p.scenes; state.sel=0;
-  $('#ttl').textContent=state.title?('“'+state.title+'”'):'';
-  renderList(); renderInspector(); drawPreview();
-  logLine('✓ script geladen: '+p.scenes.length+' scènes');
+function ppsOf(si){const tb=host.children[si].querySelector('[data-tr="beeld"]');return tb.clientWidth/SC[si].dur;}
+function layout(){
+ SC.forEach((s,si)=>{const card=host.children[si];const pps=ppsOf(si);
+  const tb=card.querySelector('[data-tr="beeld"]'),tt=card.querySelector('[data-tr="tekst"]'),ts=card.querySelector('[data-tr="sfx"]');
+  tb.innerHTML='';tt.innerHTML='';ts.innerHTML='';
+  beatsOf(s).forEach((b,bi)=>{const d=document.createElement('div');d.className='blk beeld';
+    d.style.left=(b.start*pps)+'px';d.style.width=Math.max(10,(b.end-b.start)*pps-2)+'px';
+    d.textContent='■ '+(bi+1)+'. '+b.label;d.title=b.label;tb.appendChild(d);
+    if(bi>0){const h=document.createElement('div');h.className='handle beeld';h.style.left=(b.start*pps)+'px';h.dataset.si=si;h.dataset.kind='beeld';h.dataset.bi=(bi-1);tb.appendChild(h);}});
+  subsOf(s).forEach((u,ui)=>{const d=document.createElement('div');d.className='blk tekst';
+    d.style.left=(u.start*pps)+'px';d.style.width=Math.max(8,(u.end-u.start)*pps-2)+'px';d.textContent=u.text;d.title=u.text;tt.appendChild(d);
+    if(ui>0){const h=document.createElement('div');h.className='handle tekst';h.style.left=(u.start*pps)+'px';h.dataset.si=si;h.dataset.kind='tekst';h.dataset.bi=(ui-1);tt.appendChild(h);}});
+  s.sfx.forEach((f,fi)=>{const d=document.createElement('div');d.className='blk sfx';d.style.left=(f.t*pps)+'px';d.style.width='70px';
+    d.textContent='✦ '+(f.name||'sfx');d.dataset.si=si;d.dataset.fi=fi;d.title='SFX op '+(s.start+f.t).toFixed(2)+'s (dubbelklik = weg)';ts.appendChild(d);});
+  const rl=card.querySelector('.ruler');rl.innerHTML='';const step=s.dur>24?5:(s.dur>12?3:2);
+  for(let x=0;x<=s.dur+0.01;x+=step){const e=document.createElement('div');e.className='tk';e.style.left=(x*pps)+'px';e.textContent=x.toFixed(0)+'s';rl.appendChild(e);}});
+ placePlayhead();
 }
+let drag=null;const tip=$('tip');
+host.addEventListener('pointerdown',e=>{
+ const h=e.target.closest('.handle');
+ if(h){e.preventDefault();const si=+h.dataset.si,kind=h.dataset.kind,bi=+h.dataset.bi;
+   drag={si,kind,bi,arr:kind==='beeld'?SC[si].beatBounds:SC[si].subBounds};tip.style.display='block';moveDrag(e);return;}
+ const card=e.target.closest('.scard');if(!card)return;const si=+card.dataset.si,s=SC[si];
+ const tb=card.querySelector('[data-tr="beeld"]');const r=tb.getBoundingClientRect();
+ if(sfxMode&&e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();return;}
+ stop();const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));t=s.start+local;placePlayhead();
+});
+function moveDrag(e){if(!drag)return;const{si,kind,bi,arr}=drag;const s=SC[si];const pps=ppsOf(si);
+ const r=host.children[si].querySelector('[data-tr="beeld"]').getBoundingClientRect();
+ let v=(e.clientX-r.left)/pps;const lo=(bi>0?arr[bi-1]:0)+0.1,hi=(bi<arr.length-1?arr[bi+1]:s.dur)-0.1;
+ v=Math.max(lo,Math.min(hi,v));arr[bi]=+v.toFixed(2);dirty();
+ tip.textContent=(kind==='beeld'?'beeld-grens':'ondertitel-grens')+' @ '+(s.start+v).toFixed(2)+'s';
+ tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';layout();}
+addEventListener('pointermove',e=>{if(drag)moveDrag(e);});
+addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}});
+host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);dirty();layout();}});
+let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
 
-// ---------- links: lijst van scènes ----------
-function renderList(){
-  $('#scnt').textContent = state.scenes.length?('('+state.scenes.length+')'):'';
-  const el=$('#list');
-  if(!state.scenes.length){ el.innerHTML='<div class="empty">Nog geen script. Klik <b>Script laden</b> rechtsboven.</div>'; return; }
-  el.innerHTML=state.scenes.map((s,i)=>{
-    const vo=s.voice?('<span class="ok">♪ '+esc(fileName(s.voice))+'</span>'):'<span class="no">geen stem</span>';
-    const extra = s.tech==='kaart' ? ('zoom: '+esc(s.view)) : (s.tech==='mythe'&&s.truth?('→ '+esc(s.truth.slice(0,24))):'');
-    return `<div class="scard${i===state.sel?' sel':''}" onclick="selectScene(${i})">
-      <div class="top"><span class="n">${i+1}</span><span class="tech">${esc(s.tech)}</span></div>
-      <div class="tx">${esc(s.text||'(geen tekst)')}</div>
-      <div class="meta">${vo}${extra?('<span>'+extra+'</span>'):''}</div>
-    </div>`;
-  }).join('');
-}
-function selectScene(i){ state.sel=i; renderList(); renderInspector(); drawPreview(); }
+let t=0,playing=false,raf=null,last=0;const voiceAudio={},musicAudio={a:null,dur:0};let curScene=-1;
+function sceneAt(tt){let a=0;SC.forEach((s,i)=>{if(tt>=s.start)a=i;});return a;}
+function activeBeat(s,local){const bs=beatsOf(s);let i=0;bs.forEach((b,k)=>{if(local>=b.start)i=k;});return i;}
+function curSub(){const s=SC[sceneAt(t)];const local=t-s.start;for(const u of subsOf(s)){if(local>=u.start&&local<u.end)return u.text;}return'';}
+function placePlayhead(){const si=sceneAt(t),s=SC[si];[...host.children].forEach((c,i)=>c.classList.toggle('active',i===si));
+ const card=host.children[si];const pps=ppsOf(si);const labW=card.querySelector('.lab').offsetWidth;
+ card.querySelector('.phead').style.left=(labW+(t-s.start)*pps)+'px';updatePreview(si,t-s.start);}
+function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t);$('pv-scene').textContent='scène '+s.scene+' · '+s.tone;
+ const bi=activeBeat(s,local);$('pv-beat').textContent=(beatsOf(s)[bi]||{}).label||'';$('pv-sub').textContent=curSub();$('pv-scn').textContent=s.scene;$('pv-bn').textContent=(bi+1);}
+function syncAudio(){const si=sceneAt(t),s=SC[si];
+ if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}}
+ if(musicAudio.a&&playing&&musicAudio.a.paused){try{musicAudio.a.currentTime=t%(musicAudio.dur||1);musicAudio.a.play();}catch(e){}}}
+function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=total){t=total;stop();}placePlayhead();syncAudio();
+ const card=host.children[sceneAt(t)];const r=card.getBoundingClientRect();if(r.top<60||r.bottom>innerHeight)card.scrollIntoView({block:'center'});raf=requestAnimationFrame(tick);}
+function play(){if(playing)return;playing=true;last=0;curScene=-1;$('btn-play').textContent='❚❚ pauze';
+ const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}
+ if(musicAudio.a){try{musicAudio.a.currentTime=t%(musicAudio.dur||1);musicAudio.a.play();}catch(e){}}raf=requestAnimationFrame(tick);}
+function stop(){playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
+ for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}if(musicAudio.a){try{musicAudio.a.pause();}catch(e){}}}
+$('btn-play').addEventListener('click',()=>playing?stop():play());
+$('btn-rew').addEventListener('click',()=>{stop();t=0;placePlayhead();scrollTo({top:0,behavior:'smooth'});});
 
-// ---------- rechts: inspector ----------
-function pairRows(arr,key){
-  const gn=state.groups.map(g=>g.name).filter(Boolean);
-  const o=(v,sel)=>'<option'+(v===sel?' selected':'')+'>'+v+'</option>';
-  let h=arr.map((p,j)=>`<div class="pair"><select onchange="state.scenes[${state.sel}].${key}[${j}].g=this.value;renderList();drawPreview()">${gn.map(n=>o(n,p.g)).join('')}</select>=<select onchange="state.scenes[${state.sel}].${key}[${j}].c=this.value;renderList();drawPreview()">${COLKEYS.map(c=>o(c,p.c)).join('')}</select><button class="btn x" onclick="state.scenes[${state.sel}].${key}.splice(${j},1);renderInspector();drawPreview()">✕</button></div>`).join('');
-  h+=`<button class="btn sm" onclick="state.scenes[${state.sel}].${key}.push({g:'${gn[0]||''}',c:'${key==='rule'?'ruler':'orange'}'});renderInspector();drawPreview()">+ ${key==='rule'?'heerser':'identiteit'}</button>`;
-  return h;
+// audio: eerst uit de engine proberen, anders handmatig laden
+function autoAudio(){
+ SC.forEach(s=>{const a=new Audio('/api/umma-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0'));
+   a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
+ fetch('/api/umma-music').then(r=>r.json()).then(d=>{if(d.files&&d.files.length){const f=d.files[0];const a=new Audio('/api/umma-audio?f='+encodeURIComponent(f));a.loop=true;
+   a.addEventListener('loadedmetadata',()=>{musicAudio.dur=a.duration;updAudioLabel();});a.addEventListener('error',()=>{});musicAudio.a=a;}}).catch(()=>{});
+ updAudioLabel();
 }
-function renderInspector(){
-  const el=$('#insp'); if(!state.scenes.length){el.innerHTML='<div class="empty">Kies links een scène.</div>';return;}
-  const i=state.sel, s=state.scenes[i];
-  const o=(v,sel)=>'<option'+(v===sel?' selected':'')+'>'+v+'</option>';
-  let h=`<div class="fld"><label>Techniek</label><select onchange="state.scenes[${i}].tech=this.value;renderList();renderInspector();drawPreview()">${TECHS.map(t=>o(t,s.tech)).join('')}</select></div>`;
-  h+=`<div class="fld"><label>Tekst op scherm</label><textarea rows="2" oninput="state.scenes[${i}].text=this.value;renderList();drawPreview()">${esc(s.text)}</textarea></div>`;
-  if(s.tech==='mythe') h+=`<div class="fld"><label>Waarheid (verschijnt terwijl de leugen oplost)</label><textarea rows="2" oninput="state.scenes[${i}].truth=this.value;drawPreview()">${esc(s.truth)}</textarea></div>`;
-  if(s.tech==='statement') h+=`<div class="fld"><label>Kicker (kleine onderregel, optioneel)</label><input value="${esc(s.kick)}" oninput="state.scenes[${i}].kick=this.value;drawPreview()"></div>`;
-  if(s.tech==='kaart'){
-    h+=`<div class="fld"><label>Zoom (regio)</label><select onchange="state.scenes[${i}].view=this.value;renderList();drawPreview()">${REGIONS.map(r=>o(r,s.view)).join('')}</select></div>`;
-    h+=`<div class="fld"><label>Identiteit (oranje = wij)</label>${pairRows(s.fills,'fills')}</div>`;
-    h+=`<div class="fld"><label>Heerser (waas eroverheen)</label>${pairRows(s.rule,'rule')}</div>`;
-  }
-  h+=`<div class="fld"><label>Stem (wav, bepaalt de duur)</label><div class="filerow">${s.voice?('<b>♪ '+esc(fileName(s.voice))+'</b>'):'geen stem gekoppeld'}</div><input type="file" accept="audio/*" style="margin-top:6px" onchange="uploadAudio(this,${i},'voice')"></div>`;
-  h+=`<div class="fld"><label>SFX (wav, optioneel)</label><div class="filerow">${s.sfx?('<b>♪ '+esc(fileName(s.sfx))+'</b>'):'geen'}</div><input type="file" accept="audio/*" style="margin-top:6px" onchange="uploadAudio(this,${i},'sfx')"></div>`;
-  el.innerHTML=h;
-}
+$('ld-voice').addEventListener('change',e=>{for(const f of e.target.files){const m=f.name.match(/(\d+)/);if(!m)continue;voiceAudio[+m[1]]=new Audio(URL.createObjectURL(f));}updAudioLabel();});
+$('ld-music').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));a.loop=true;a.addEventListener('loadedmetadata',()=>{musicAudio.dur=a.duration;updAudioLabel();});musicAudio.a=a;});
+function updAudioLabel(){const nv=Object.keys(voiceAudio).length;$('pv-audio').textContent='audio: '+(nv?nv+' stem':'geen stem')+(musicAudio.a?' + muziek':'');}
 
-// ---------- midden: browser-preview (benadert de engine) ----------
-function starfield(W,H,seed){let s=seed,out="";const rnd=()=>(s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff;for(let i=0;i<60;i++){const x=rnd()*W,y=rnd()*H,r=(0.6+rnd()*1.6).toFixed(1),o=(0.15+rnd()*0.45).toFixed(2);out+=`<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${COL.cream}" opacity="${o}"/>`;}return out;}
-function kaderSVG(W,H){const m=Math.round(W*0.035),r=Math.round(W*0.04);return `<rect x="${m}" y="${m}" width="${W-2*m}" height="${H-2*m}" rx="${r}" fill="none" stroke="${COL.orange}" stroke-width="${Math.round(W*0.012)}"/>`+`<rect x="${m+7}" y="${m+7}" width="${W-2*m-14}" height="${H-2*m-14}" rx="${r-5}" fill="none" stroke="${COL.cream}" stroke-width="2" opacity="0.45"/>`;}
-function wordRevealSVG(txt,cx,y,fs,fill,p){const w=String(txt).split(/\s+/).filter(Boolean);if(!w.length)return"";const per=1/w.length;let sp="";w.forEach((ww,i)=>{const o=clamp01((p-i*per)/(per*0.9)).toFixed(2);if(i)sp+=`<tspan dx="${(fs*0.3).toFixed(1)}"> </tspan>`;sp+=`<tspan fill="${fill}" fill-opacity="${o}">${esc(ww)}</tspan>`;});return `<text x="${cx}" y="${y}" text-anchor="middle" xml:space="preserve" font-family="Georgia,serif" font-weight="800" font-size="${fs}">${sp}</text>`;}
-function fitFs(txt,base,maxW){const need=String(txt).length*base*0.56;return need<=maxW?base:Math.max(10,Math.floor(base*maxW/need));}
-function previewSVG(s,p){
-  const W=540,H=960; let bg=`<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy}" opacity="0.5"/>`+starfield(W,H,((s.text||'').length*7)%97);
-  let inner="";
-  if(s.tech==='statement'){
-    const fs=fitFs(s.text,Math.round(W*0.11),W*0.80);
-    inner=bg+`<ellipse cx="${W/2}" cy="${H*0.46}" rx="${W*0.44}" ry="${H*0.14}" fill="${COL.orange}" opacity="${(0.10*sm(p)).toFixed(2)}"/>`+wordRevealSVG(s.text,W/2,H*0.48,fs,COL.cream,p);
-    if(s.kick){const ko=clamp01((p-0.5)/0.3).toFixed(2);inner+=`<text x="${W/2}" y="${H*0.60}" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="${Math.round(W*0.045)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko}">${esc((s.kick||'').toUpperCase())}</text>`;}
-  } else if(s.tech==='mythe'){
-    // ZELFDE als de engine: GEEN rode streep. De claim verschijnt, lost op (woorden drijven uiteen
-    // en vervagen), en de waarheid rijst eronder op in oranje.
-    const fsC=fitFs(s.text,Math.round(W*0.082),W*0.84);const cy=s.truth?H*0.38:H*0.46;
-    inner=bg;
-    const appear=clamp01(p/0.28), dissolve=clamp01((p-0.5)/0.32), d=sm(dissolve);
-    const claimOp=appear*(1-d);
-    if(claimOp>0.01){
-      const drift=-d*H*0.03, spacing=(d*fsC*0.18).toFixed(1);
-      inner+=`<text x="${W/2}" y="${(cy+drift).toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${fsC}" letter-spacing="${spacing}" fill="${COL.cream}" opacity="${claimOp.toFixed(2)}">${esc(s.text)}</text>`;
-      if(d>0.05){const drift2=-d*H*0.06, sp2=(d*fsC*0.4).toFixed(1);
-        inner+=`<text x="${W/2}" y="${(cy+drift2).toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${fsC}" letter-spacing="${sp2}" fill="${COL.cream}" opacity="${(claimOp*0.4).toFixed(2)}">${esc(s.text)}</text>`;}
-    }
-    if(s.truth){const tp=clamp01((p-0.58)/0.4),te=sm(tp),ty=H*0.56+(1-te)*H*0.04,fsT=fitFs(s.truth,Math.round(W*0.072),W*0.84);
-      inner+=`<g opacity="${te.toFixed(2)}"><text x="${W/2}" y="${ty.toFixed(0)}" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="${fsT}" fill="${COL.orange}">${esc(s.truth)}</text></g>`;}
-  } else { // kaart (schematisch in de preview: we tonen de regio-naam + onderschrift; echte kaart komt bij render)
-    inner=`<rect width="${W}" height="${H}" fill="${COL.ink}"/>`+starfield(W,H,11)+`<text x="${W/2}" y="${H*0.45}" text-anchor="middle" font-family="sans-serif" font-size="26" fill="${COL.mute}">[ kaart · zoom: ${esc(s.view)} ]</text>`;
-    const idn=s.fills.map(f=>f.g).join(', ');const rln=s.rule.map(r=>r.g).join(', ');
-    if(idn)inner+=`<text x="${W/2}" y="${H*0.52}" text-anchor="middle" font-family="sans-serif" font-size="18" fill="${COL.orange}">identiteit: ${esc(idn)}</text>`;
-    if(rln)inner+=`<text x="${W/2}" y="${H*0.57}" text-anchor="middle" font-family="sans-serif" font-size="18" fill="${COL.ruler}">heerser: ${esc(rln)}</text>`;
-    if(s.text){const fs=fitFs(s.text,Math.round(W*0.05),W*0.80);inner+=`<g opacity="${clamp01(p/0.3).toFixed(2)}"><rect x="${W*0.06}" y="${H*0.80-fs}" width="${W*0.88}" height="${fs*1.7}" rx="${fs}" fill="#000" opacity="0.34"/><text x="${W/2}" y="${H*0.80+fs*0.3}" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="${fs}" fill="${COL.cream}">${esc(s.text)}</text></g>`;}
-  }
-  const isLast=state.sel===state.scenes.length-1;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${inner}${kaderSVG(W,H)}</svg>`;
+// opslaan: bouw de bewerkte tijdlijn terug in het _timeline.json-schema en POST naar de engine
+let isDirty=false;function dirty(){isDirty=true;$('savemsg').textContent='niet opgeslagen';$('savemsg').style.color='var(--sfx)';}
+function buildPayload(){
+ const scenes=SC.map(s=>{const subs=subsOf(s);const sentences=s.sentences.map((se,i)=>({i,text:se.text,start:+subs[i].start.toFixed(3),dur:+(subs[i].end-subs[i].start).toFixed(3),abs_start:+(s.start+subs[i].start).toFixed(3)}));
+   const beats=beatsOf(s).map(b=>({start:+b.start.toFixed(3),dur:+(b.end-b.start).toFixed(3),label:b.label,img:""}));
+   const sfx=s.sfx.map(f=>({t:+f.t.toFixed(3),name:f.name||'sfx'}));
+   return {scene:s.scene,tone:s.tone,wav:s.wav,start:s.start,dur:s.dur,speech_start:s.speech_start,speech_end:s.speech_end,sentences,beats,sfx};});
+ return {story:TL.story,voice:TL.voice,title:TL.title,total_seconds:TL.total_seconds,total_mmss:TL.total_mmss,scenes};
 }
-function drawPreview(){
-  const ph=$('#phone'); if(!state.scenes.length){return;}
-  const p=(+$('#scrub').value)/100;
-  const s=state.scenes[state.sel];
-  ph.innerHTML=previewSVG(s,p);
-  $('#ptime').textContent=(p).toFixed(2);
-  $('#pvnote').textContent = s.tech==='kaart' ? 'De kaart-scène toont hier schematisch welke landen en zoom; de echte wereldkaart verschijnt bij het renderen.' : 'Sleep de balk om de animatie van deze scène te zien.';
-}
+async function save(){$('savemsg').textContent='opslaan...';$('savemsg').style.color='var(--mut)';
+ try{const r=await fetch('/api/umma-timeline-save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(buildPayload())});
+   const d=await r.json();if(d.ok){isDirty=false;$('savemsg').textContent='opgeslagen ✓';$('savemsg').style.color='var(--ok)';}
+   else{$('savemsg').textContent='opslaan mislukt: '+(d.error||'?');$('savemsg').style.color='var(--sfx)';}}
+ catch(e){$('savemsg').textContent='geen engine? (lokaal openen slaat niet op)';$('savemsg').style.color='var(--sfx)';}}
+$('btn-save').addEventListener('click',save);
 
-// ---------- audio upload ----------
-async function uploadAudio(input,idx,kind){
-  const f=input.files&&input.files[0]; if(!f)return;
-  const dataB64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
-  logLine('upload '+kind+': '+f.name+' ...');
-  try{ const r=await fetch('/api/umma-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64})});
-    const d=await r.json();
-    if(d.path){ state.scenes[idx][kind]=d.path; logLine('✓ '+kind+' opgeslagen'); renderList(); renderInspector(); }
-    else logLine('✗ upload fout: '+(d.error||'onbekend'));
-  }catch(e){ logLine('✗ upload netwerkfout: '+e.message); }
+function boot(){
+ buildState();buildCards();layout();placePlayhead();autoAudio();
+ $('hdrtitle').textContent='“'+TL.title+'”';$('hdrsub').textContent=SC.length+' scènes · '+TL.total_mmss+' · stem '+TL.voice;
+ $('pv-total').textContent=TL.total_mmss;
 }
-
-// ---------- render ----------
-function resolveCountry(tok){ tok=tok.trim(); if(!tok)return null; if(/^\d+$/.test(tok))return tok; if(COUNTRIES[tok])return COUNTRIES[tok];
-  const hit=Object.keys(COUNTRIES).find(n=>n.toLowerCase()===tok.toLowerCase()); if(hit)return COUNTRIES[hit];
-  const al=ALIASES[tok.toLowerCase()]; if(al&&COUNTRIES[al])return COUNTRIES[al]; return null; }
-function buildOpts(warn){
-  const groups={};
-  for(const g of state.groups){ if(!g.name)continue; const ids=[]; for(const part of g.countries.split(',')){ const id=resolveCountry(part); if(id)ids.push(id); else if(part.trim())warn('land niet gevonden: '+part.trim()); } groups[g.name]=ids; }
-  const scenes=state.scenes.map(s=>{ const fills={},rule={}; for(const p of s.fills){if(p.g&&COLORS[p.c])fills[p.g]=COLORS[p.c];} for(const p of s.rule){if(p.g&&COLORS[p.c])rule[p.g]=COLORS[p.c];}
-    const o={tech:s.tech||'kaart',year:s.year,text:s.text,fills,rule,view:s.view}; if(s.dur)o.dur=s.dur; if(s.voice)o.voice=s.voice; if(s.sfx)o.sfx=s.sfx; if(s.truth)o.truth=s.truth; if(s.kick)o.kick=s.kick; if(s.img)o.img=s.img; if(s.vid)o.vid=s.vid; if(s.caption)o.caption=s.caption; return o; });
-  const out={title:state.title, mapView:state.baseview, groups, scenes};
-  if(state.music) out.music=state.music;  // muziek gaat via opts -> brand leest uit assets/ummaunited/muziek/
-  return out;
-}
-async function doRender(){
-  if(!state.scenes.length){ logLine('geen script geladen.'); return; }
-  const warnings=[]; const opts=buildOpts(w=>warnings.push(w));
-  warnings.forEach(w=>logLine('LET OP: '+w));
-  logLine('▶ render gestart...'); $('#stat').textContent='rendert...';
-  try{ const r=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'ummaunited',format:state.format,opts})});
-    const d=await r.json();
-    if(d.error){logLine('✗ fout: '+d.error);$('#stat').textContent='fout';return;}
-    logLine('✓ klaar: '+d.url+' — staat in je Bibliotheek.');$('#stat').textContent='klaar';
-  }catch(e){logLine('✗ netwerkfout: '+e.message);$('#stat').textContent='fout';}
-}
-
-// ---------- muziek + log + auto-laden van een klaarstaand script ----------
-async function loadMusic(){ try{const r=await fetch('/api/umma-music');const d=await r.json();
-  $('#music').innerHTML='<option value="">muziek: (geen)</option>'+(d.files||[]).map(f=>'<option>'+f+'</option>').join('');
-  $('#music').onchange=e=>state.music=e.target.value;
-}catch{} }
-function connectLog(){ try{const es=new EventSource('/api/log');es.onmessage=(e)=>{try{logLine(JSON.parse(e.data))}catch{logLine(e.data)}};}catch{} }
-// alle klaarstaande delen ophalen -> de deel-kiezer vullen -> het eerste laden
-let ALLDEELS = [];
-async function loadDeels(){
-  try{
-    const r=await fetch('/api/umma-scripts'); const d=await r.json();
-    ALLDEELS = d.items||[];
-    const sel=document.getElementById('deel');
-    if(!ALLDEELS.length){ sel.innerHTML='<option>geen delen klaar</option>'; return; }
-    sel.innerHTML=ALLDEELS.map((it,i)=>`<option value="${i}">${esc(it.title)} · ${esc(it.voice)}</option>`).join('');
-    sel.value='0'; switchDeel();
-  }catch{ document.getElementById('deel').innerHTML='<option>geen delen</option>'; }
-}
-function switchDeel(){
-  const i=+document.getElementById('deel').value; const it=ALLDEELS[i]; if(!it)return;
-  loadParsed(parseScript(it.text));
-  logLine('geladen: '+it.title+' ('+it.voice+')');
-}
-// RENDER ALLE DELEN: zet elk deel achter elkaar in de render-wachtrij (de engine werkt ze één
-// voor één af). Je hoeft dus niet per deel te laden en te drukken.
-async function renderAll(){
-  if(!ALLDEELS.length){ logLine('geen delen om te renderen.'); return; }
-  logLine('▶ alle '+ALLDEELS.length+' delen in de wachtrij...'); $('#stat').textContent='rendert alles...';
-  for(const it of ALLDEELS){
-    const p=parseScript(it.text);
-    // tijdelijke state opbouwen voor buildOpts
-    const save={groups:state.groups,scenes:state.scenes};
-    state.groups=p.groups; state.scenes=p.scenes;
-    const opts=buildOpts(()=>{});
-    state.groups=save.groups; state.scenes=save.scenes;
-    try{ await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'ummaunited',format:state.format,opts})});
-      logLine('✓ '+it.title+' ('+it.voice+') klaar'); }
-    catch(e){ logLine('✗ '+it.title+': '+e.message); }
-  }
-  $('#stat').textContent='alles klaar';
-  logLine('■ alle delen gerenderd — staan in je Bibliotheek.');
-}
-
-renderList(); renderInspector(); loadMusic(); connectLog(); loadDeels();
-</script>
-</body>
-</html>
+// live tijdlijn uit de engine; valt terug op de ingebakken kopie als de engine niet draait
+fetch('/api/umma-timeline?story='+STORY+'&voice='+VOICE).then(r=>r.ok?r.json():null).then(d=>{if(d&&Array.isArray(d.scenes)&&d.scenes.length){TL=d;}boot();}).catch(()=>boot());
+addEventListener('resize',layout);
+</script></body></html>

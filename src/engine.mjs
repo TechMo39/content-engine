@@ -461,6 +461,37 @@ const server = http.createServer(async (req, res) => {
     // UMMA — muziek UITSLUITEND uit de eigen map assets/ummaunited/muziek/ (gescheiden van Tale of Tiles).
     if (u.pathname === "/api/umma-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
     if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
+    // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
+    // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
+    if (u.pathname === "/api/umma-timeline" && req.method === "GET") {
+      const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
+      const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, "_timeline.json");
+      if (existsSync(p)) { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" }); res.end(await fs.readFile(p)); return; }
+      json(res, { error: "geen _timeline.json gevonden; draai eerst python tools/umma_voice.py --voice " + voice }, 404); return;
+    }
+    // UMMA TIJDLIJN — de bewerkte tijdlijn opslaan (sleep-correcties, beeld-beats, sfx), terug naar
+    // hetzelfde _timeline.json zodat de render exact deze tijdlijn leest (geen afwijking meer).
+    if (u.pathname === "/api/umma-timeline-save" && req.method === "POST") {
+      const bd = await readBody(req);
+      if (!bd || !Array.isArray(bd.scenes)) { json(res, { error: "ongeldige tijdlijn" }, 400); return; }
+      const story = String(bd.story || "sword").replace(/[^\w-]/g, "");
+      const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, "_timeline.json");
+      try { await fs.writeFile(p, JSON.stringify(bd, null, 2), "utf8"); json(res, { ok: true, saved: path.relative(ROOT, p).replace(/\\/g, "/") }); }
+      catch (e) { json(res, { error: e.message }, 500); }
+      return;
+    }
+    // UMMA STEM — een scène-wav teruggeven voor de audio-preview in de editor (01.wav .. 16.wav).
+    if (u.pathname === "/api/umma-voice" && req.method === "GET") {
+      const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
+      const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
+      const n = (u.searchParams.get("n") || "").replace(/[^\d]/g, "");
+      if (!n) { res.writeHead(404); res.end(""); return; }
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, n.padStart(2, "0") + ".wav");
+      if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/wav", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; }
+      res.writeHead(404); res.end(""); return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/umma-upload" && req.method === "POST") {
