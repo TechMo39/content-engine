@@ -20,21 +20,21 @@ API = "https://freesound.org/apiv2"
 # MUZIEK PER BLOK: scène-bereik (van..t/m) + stemming/zoekterm. Een blok krijgt één doorlopend
 # muziekje; op de blok-grenzen laat de render het overvloeien.
 BLOCKS = [
- {"from":1,  "to":4,  "mood":"tense dark cinematic ambient underscore"},
- {"from":5,  "to":7,  "mood":"warm hopeful emotional strings ambient"},
- {"from":8,  "to":11, "mood":"tense building cinematic drums rise then resolve"},
- {"from":12, "to":16, "mood":"reflective solemn then warm uplifting cinematic"},
+ {"from":1,  "to":4,  "mood":"dark cinematic ambient"},
+ {"from":5,  "to":7,  "mood":"emotional strings"},
+ {"from":8,  "to":11, "mood":"tense cinematic drums"},
+ {"from":12, "to":16, "mood":"uplifting cinematic"},
 ]
 
 # SFX OP DE KANTELPUNTEN: (scène, seconde-binnen-de-scène, zoekterm). Bewust weinig, alleen waar het
 # verhaal kantelt. De seconde mag ruw; op de montagetafel schuif je hem exact goed.
 SFX = [
- {"scene":4,  "t":25.8, "q":"deep boot stomp impact"},        # "A boot."
- {"scene":8,  "t":0.4,  "q":"low tension riser whoosh"},       # the tide turned
- {"scene":9,  "t":7.9,  "q":"hard short hit impact dark"},     # They killed. They humiliated.
- {"scene":10, "t":0.4,  "q":"turning point soft impact"},      # "No."
- {"scene":12, "t":20.0, "q":"empty hollow reverb tone"},       # lege kerken
- {"scene":15, "t":23.9, "q":"warm uplifting swell riser"},     # payoff: you are the proof
+ {"scene":4,  "t":25.8, "q":"stomp impact"},     # "A boot."
+ {"scene":8,  "t":0.4,  "q":"riser whoosh"},      # the tide turned
+ {"scene":9,  "t":7.9,  "q":"impact hit"},        # They killed. They humiliated.
+ {"scene":10, "t":0.4,  "q":"deep impact"},       # "No."
+ {"scene":12, "t":20.0, "q":"hollow drone"},      # lege kerken
+ {"scene":15, "t":23.9, "q":"uplifting swell"},   # payoff: you are the proof
 ]
 
 def load_key(root):
@@ -65,32 +65,50 @@ def _get(url, tries=4):
             last = e; time.sleep(2 * (i + 1)); continue
     if last: raise last
 
-def search_cc0(query, key, want_min=0, want_max=0):
-    # zoek CC0-geluid; geef de voorbeeld-mp3-URL + meta van de beste treffer, of None.
-    flt = 'license:"Creative Commons 0"'
-    if want_min: flt += f" duration:[{want_min} TO {want_max or 600}]"
-    params = {
-        "query": query, "filter": flt, "page_size": 12, "token": key,
-        "fields": "id,name,username,duration,previews,license",
-        "sort": "score",
-    }
+def _license_label(url):
+    # Freesound geeft de licentie als URL. Commercieel VEILIG = CC0 of CC-BY (naamsvermelding).
+    # Weiger NonCommercial (-nc) en NoDerivatives (-nd).
+    u = (url or "").lower()
+    if "by-nc" in u or "by-nd" in u or "noncommercial" in u or "/nc" in u:
+        return None
+    if "zero" in u or "publicdomain" in u:
+        return "CC0"
+    if "/by/" in u or "licenses/by" in u:
+        return "CC-BY"
+    return None
+
+def search_cc0(query, key, prefer_long=False):
+    # Zoek op de korte term; FILTER NIET op de server (dat gaf nul), maar haal de treffers op en kies
+    # zelf het eerste dat CC0 of CC-BY is (commercieel oké). Voor muziek pakken we het langste.
+    params = {"query": query, "page_size": 15, "token": key,
+              "fields": "id,name,username,duration,previews,license", "sort": "score"}
     url = API + "/search/text/?" + urllib.parse.urlencode(params)
     try:
         d = json.loads(_get(url).decode("utf-8", "replace"))
     except Exception as e:
         print(f"    zoekfout: {e}"); return None
-    for r in d.get("results", []):
+    res = d.get("results", [])
+    cands = []
+    for r in res:
+        lab = _license_label(r.get("license", ""))
+        if not lab:
+            continue
         pv = (r.get("previews") or {})
         mp3 = pv.get("preview-hq-mp3") or pv.get("preview-lq-mp3")
-        if mp3:
-            return {"url": mp3, "name": r.get("name", ""), "user": r.get("username", ""),
-                    "dur": r.get("duration", 0), "id": r.get("id")}
-    return None
+        if not mp3:
+            continue
+        cands.append({"url": mp3, "name": r.get("name", ""), "user": r.get("username", ""),
+                      "dur": r.get("duration", 0) or 0, "lic": lab})
+    if not cands:
+        print(f"    {len(res)} treffers, maar geen bruikbare (CC0/CC-BY met preview)"); return None
+    # CC0 eerst; voor muziek daarna het langste fragment.
+    cands.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -(c["dur"] if prefer_long else 0)))
+    return cands[0]
 
-def download(url, key, outpath):
-    # voorbeeld-mp3 heeft geen OAuth nodig; token meesturen kan geen kwaad.
-    u = url + ("&" if "?" in url else "?") + "token=" + urllib.parse.quote(key)
-    data = _get(u)
+def download(url, outpath):
+    # de voorbeeld-mp3 is publiek (cdn.freesound.org), dus GEEN token meesturen (die liet de
+    # verbinding hangen). Gewoon ophalen met time-out + retry via _get.
+    data = _get(url)
     with open(outpath, "wb") as f: f.write(data)
 
 def main():
@@ -129,17 +147,16 @@ def main():
             music.append({"start": start, "end": end, "file": "assets/ummaunited/muziek/" + fname, "mood": blk["mood"]})
             print(f"blok {bi+1} (scène {blk['from']}-{blk['to']}): muziek staat al"); continue
         print(f"blok {bi+1} (scène {blk['from']}-{blk['to']}): zoek muziek '{blk['mood']}'")
-        need = end - start
-        hit = search_cc0(blk["mood"], key, want_min=max(20, int(need * 0.5)))
+        hit = search_cc0(blk["mood"], key, prefer_long=True)
         if not hit:
-            print("    geen CC0-muziek gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+            print("    geen bruikbare muziek gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
         try:
-            download(hit["url"], key, fpath)
+            download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
         music.append({"start": start, "end": end, "file": "assets/ummaunited/muziek/" + fname, "mood": blk["mood"]})
-        credits.append(f"muziek blok {bi+1}: {hit['name']} by {hit['user']} (Freesound, CC0)")
-        print(f"    -> {fname}  (CC0, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
+        credits.append(f"muziek blok {bi+1}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
+        print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
     tl["music"] = music
 
     # ---- SFX op de kantelpunten ----
@@ -152,17 +169,17 @@ def main():
         if already and not args.force:
             print(f"scène {sx['scene']} sfx @ {sx['t']}s: staat al"); continue
         print(f"scène {sx['scene']} sfx @ {sx['t']}s: zoek '{sx['q']}'")
-        hit = search_cc0(sx["q"], key, want_min=0)
+        hit = search_cc0(sx["q"], key)
         if not hit:
-            print("    geen CC0-effect gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+            print("    geen bruikbaar effect gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
         try:
-            download(hit["url"], key, fpath)
+            download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
         beats[:] = [f for f in beats if abs(float(f.get("t", -9)) - sx["t"]) >= 0.2]
         beats.append({"t": sx["t"], "name": sx["q"].split()[0], "file": "assets/ummaunited/sfx/" + fname})
-        credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, CC0)")
-        print(f"    -> {fname}  (CC0)"); n_sfx += 1; time.sleep(1.2)
+        credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
+        print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
 
     with open(tlpath, "w", encoding="utf-8") as f:
         json.dump(tl, f, ensure_ascii=False, indent=2)
