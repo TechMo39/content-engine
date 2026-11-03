@@ -47,13 +47,24 @@ def load_key(root):
         pass
     return k
 
-def _get(url, tries=4):
+def _get(url, tries=4, timeout=25):
+    # Connection: close voorkomt de klassieke urllib-hang (de server houdt de keep-alive open en
+    # read() blijft wachten). Browser-achtige kop + Referer zodat de Freesound-CDN niet dichtklapt.
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+        "Referer": "https://freesound.org/", "Accept": "*/*", "Connection": "close",
+    }
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "UmmaUnited/1.0"})
-            with urllib.request.urlopen(req, timeout=40) as r:
-                return r.read()
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                chunks = []
+                while True:
+                    b = r.read(65536)
+                    if not b: break
+                    chunks.append(b)
+                return b"".join(chunks)
         except urllib.error.HTTPError as e:
             last = e
             if e.code in (429, 503):
@@ -150,6 +161,7 @@ def main():
         hit = search_cc0(blk["mood"], key, prefer_long=True)
         if not hit:
             print("    geen bruikbare muziek gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+        print(f"    treffer: {hit['name'][:42]} ({hit['lic']}, {hit['dur']:.0f}s), downloaden...")
         try:
             download(hit["url"], fpath)
         except Exception as e:
@@ -172,6 +184,7 @@ def main():
         hit = search_cc0(sx["q"], key)
         if not hit:
             print("    geen bruikbaar effect gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+        print(f"    treffer: {hit['name'][:42]} ({hit['lic']}), downloaden...")
         try:
             download(hit["url"], fpath)
         except Exception as e:
