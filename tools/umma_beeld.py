@@ -80,12 +80,12 @@ def ensure_beats(sc):
 #       'photo' = alleen foto (historisch/gravure, daar bestaat geen video van);
 #       'drawn' = overslaan (engine tekent tekst/kaart/CTA zelf).
 PLAN = {
- 1:[("photo","medieval battle sword knights engraving"),("drawn",""),("video","desert road horizon sunrise")],
+ 1:[("video","ancient sword blade dramatic dark"),("drawn",""),("video","desert road horizon sunrise")],
  2:[("drawn",""),("video","antique sword blade close up"),("drawn","")],
  3:[("drawn",""),("video","roman forum ruins rome")],
- 4:[("photo","expulsion of the jews history engraving"),("photo","medieval persecution engraving"),("drawn","")],
- 5:[("video","old medina gate morocco"),("video","sunrise over old city"),("photo","historic synagogue interior morocco")],
- 6:[("video","old church interior candles"),("photo","historic synagogue morocco"),("drawn",""),("video","muslims praying in mosque")],
+ 4:[("photo","expulsion of the jews history engraving"),("video","dark storm clouds dramatic sky"),("drawn","")],
+ 5:[("video","old medina gate morocco"),("video","sunrise over old city"),("video","synagogue interior")],
+ 6:[("video","old church interior candles"),("video","synagogue interior menorah"),("drawn",""),("video","muslims praying in mosque")],
  7:[("drawn",""),("drawn",""),("video","medina street life morocco")],
  8:[("video","colonial troops marching archive"),("drawn",""),("drawn","")],
  9:[("photo","colonial era north africa historical"),("photo","french colonial algeria historical"),("drawn","")],

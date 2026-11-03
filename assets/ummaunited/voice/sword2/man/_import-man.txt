@@ -1,0 +1,13 @@
+title: Spread by the sword? (2)
+view: belt
+group romemoslim = Morocco, Algeria, Tunisia, Libya, Egypt, Syria, Lebanon, Turkey, Jordan, Iraq
+group europe_west = France, Spain, Italy, Portugal, Germany, Netherlands, Belgium
+group indonesia = Indonesia
+group bosnia = Bosnia and Herz.
+group spain = Spain
+scene 1 | They tried everything. | tech: beeld | vid: vid-kolonisatie.mp4 | sfx: assets/ummaunited/sfx/sfx-impact.mp3 | caption: For five hundred years, Europe ruled almost the entire Muslim world. And they did not just rule. They tried to pull the faith out by the root. They killed. They humiliated. They turned brother against brother. Everything a power can do, they did. | voice: assets/ummaunited/voice/sword2/man/01.wav
+scene 2 | And still, it did not leave. | tech: beeld | vid: vid-indonesie.mp4 | caption: And it did not work. Indonesia. No army ever brought Islam there, only honest men. And three hundred years of Dutch rule could not take it back out. What enters a heart freely cannot be ripped out by force. | voice: assets/ummaunited/voice/sword2/man/02.wav
+scene 3 | Alone, surrounded, still here. | tech: beeld | vid: vid-bosnie.mp4 | caption: Bosnia. Surrounded in the heart of Europe. Through wars meant to erase them from the earth. And still, today, they stand. Still praying. Still here. | voice: assets/ummaunited/voice/sword2/man/03.wav
+scene 4 | What is chosen, stays. | tech: kaart | fill: romemoslim=cream; spain=cream | view: mena | caption: And everywhere our people were once conquered, North Africa, the East, when the occupier finally left, the faith was still standing. That is the proof. What is forced, fades. What is chosen, stays. | voice: assets/ummaunited/voice/sword2/man/04.wav
+scene 5 | The sword was always theirs. | tech: statement | caption: So remember this. The sword, the forcing, the burning, that was never ours. It was always theirs. And a faith taken by force leaves a wound. Look at the West today, turning its back on belief entirely. But that is their story to carry, not ours. | voice: assets/ummaunited/voice/sword2/man/05.wav
+scene 6 | You are the proof. | tech: beeld | vid: vid-gebed-massa.mp4 | sfx: assets/ummaunited/sfx/sfx-riser.mp3 | caption: We never needed a sword. The truth only ever needed to be seen. That is why, after everything they threw at us, we are still here. So stand tall. Every time you pray, you are the proof that no empire could ever win. Follow Umma United. | voice: assets/ummaunited/voice/sword2/man/06.wav
