@@ -1080,14 +1080,20 @@ export function makeBrand({ ROOT = "." } = {}) {
           const segDur = +(seg.end - seg.start).toFixed(3);
           if (segDur <= 0.03) { segIdx++; continue; }
           const nF = Math.max(1, Math.round(segDur * FPS));
-          // ZACHTE OVERGANG: de EERSTE beat van een scène vloeit in, de LAATSTE vloeit uit (korte
-          // dip), zodat scènes niet hard van scherm naar scherm knallen. Binnen een scène wisselt
-          // het beeld onder de doorlopende chrome door (geen dip midden in een zin).
-          const FD = 0.22;
+          // ZACHTE OVERGANG: scène-randen vloeien wat langer in/uit (FD); tussen beeldblokken BINNEN
+          // een scène een kórte zachte dip (BD) i.p.v. een harde cut, zodat het beeld niet van scherm
+          // naar scherm knalt. De dip zit alleen op de beeld-laag; de chrome en audio lopen door, en
+          // de ondertitel-timing blijft exact (elke beat houdt z'n eigen lengte). Te korte beats
+          // (< ~0.6s) slaan de extra dip over, anders zou het blok bijna helemaal donker zijn.
+          const FD = 0.22, BD = 0.14;
+          const canDip = segDur > 0.6;
           const fo = Math.max(0, segDur - FD).toFixed(2);
+          const foB = Math.max(0, segDur - BD).toFixed(2);
           const vf = [];
           if (segIdx === 0) vf.push(`fade=t=in:st=0:d=${FD}`);
+          else if (canDip) vf.push(`fade=t=in:st=0:d=${BD}`);
           if (segIdx === segs.length - 1) vf.push(`fade=t=out:st=${fo}:d=${FD}`);
+          else if (canDip) vf.push(`fade=t=out:st=${foB}:d=${BD}`);
           const fadeChain = vf.length ? "," + vf.join(",") : "";
           const fadeVf = vf.join(",");
           const vidFile = resolveMedia(seg.b.vid);
