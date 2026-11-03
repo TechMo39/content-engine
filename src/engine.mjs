@@ -501,6 +501,29 @@ const server = http.createServer(async (req, res) => {
       if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" }); res.end(await fs.readFile(f)); return; }
       res.writeHead(404); res.end(""); return;
     }
+    // UMMA BEELD — lijst van alle opgehaalde/geüploade bestanden in assets/ummaunited/video/,
+    // zodat de studio een weggegooid beeld terug kan koppelen en lege beats kan vullen.
+    if (u.pathname === "/api/umma-media-list" && req.method === "GET") {
+      let files = [];
+      try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/video"))).filter((f) => /\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(f)); } catch {}
+      json(res, { files });
+      return;
+    }
+    // UMMA BEELD — upload: zet een eigen plaatje/video per beat neer in assets/ummaunited/video/
+    // en geef het relatieve pad terug; de studio zet dat in beat.img of beat.vid.
+    if (u.pathname === "/api/umma-beeld-upload" && req.method === "POST") {
+      const bd = await readBody(req);
+      let safe = String(bd.name || "beeld").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 60);
+      const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
+      if (!b64) { json(res, { error: "geen beeld ontvangen" }, 400); return; }
+      if (!/\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(safe)) safe += ".jpg";
+      const dir = path.resolve(ROOT, "assets/ummaunited/video"); await fs.mkdir(dir, { recursive: true });
+      const fname = Date.now() + "-" + safe;
+      await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
+      const isVid = /\.(mp4|webm)$/i.test(fname);
+      json(res, { path: "assets/ummaunited/video/" + fname, file: fname, kind: isVid ? "vid" : "img" });
+      return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/umma-upload" && req.method === "POST") {
