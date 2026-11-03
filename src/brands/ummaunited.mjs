@@ -786,6 +786,33 @@ export function makeBrand({ ROOT = "." } = {}) {
       + `</g>`;
   }
 
+  // -- PER-ZIN-ONDERTITEL uit _timeline.json (de gedeelde tijdlijn die de editor opslaat). Zo is
+  // de render EXACT gelijk aan wat Mo in de editor ziet: de juiste zin op zijn gemeten tijd, i.p.v.
+  // de hele alinea uitgesmeerd over de scène. Terugval op het oude caption-gedrag als er geen
+  // tijdlijn is (bestand ontbreekt of een scène staat er niet in) -> nooit een regressie.
+  async function loadSceneSents(scenes) {
+    try {
+      const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
+      const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
+      if (!m) return null;
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", m[1], m[2], "_timeline.json");
+      const tl = JSON.parse(await fs.readFile(p, "utf8"));
+      if (!tl || !Array.isArray(tl.scenes)) return null;
+      return scenes.map((s, i) => {
+        const ts = tl.scenes[i] || tl.scenes.find((x) => x.scene === i + 1);
+        return ts && Array.isArray(ts.sentences) && ts.sentences.length ? ts.sentences : null;
+      });
+    } catch { return null; }
+  }
+  // de actieve zin op een tijdstip binnen de scène (seconden): de laatst-begonnen zin, zodat de
+  // ondertitel doorloopt tot de volgende begint (geen knippergaten). null -> geen tijdlijn, val terug.
+  function activeSentText(sents, localTime) {
+    if (!sents || !sents.length) return null;
+    let cur = sents[0];
+    for (const se of sents) { if (localTime >= se.start) cur = se; else break; }
+    return cur ? cur.text : null;
+  }
+
   // techniek-register: naam -> fn
   const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart, beeld: techBeeld };
 
@@ -813,6 +840,11 @@ export function makeBrand({ ROOT = "." } = {}) {
     const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
     const total = acc;
 
+    // ondertitel-bron: de gedeelde tijdlijn (per-zin-tijden). subAt kiest de juiste zin op tijd,
+    // of valt terug op de hele caption als er geen tijdlijn is.
+    const sentsByIndex = await loadSceneSents(scenes);
+    const subAt = (i, p) => { const tx = sentsByIndex && activeSentText(sentsByIndex[i], p * durs[i]); return tx != null ? ondertitelMee(tx, W, H, 1) : ondertitelMee(scenes[i].caption, W, H, p); };
+
     // De CHROME-overlay van een scène (kader, logo, ondertitel, flits, CTA/missie). Los van de
     // achtergrond, zodat we dezelfde overlay OVER een video kunnen leggen (video-modus) of over
     // de techniek-SVG (gewone modus). Geeft de overlay-SVG-string terug.
@@ -827,7 +859,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const ctaOpen = ctaOp > 0.01;
       return flash + kader(W, H)
         + (showLogo ? logoChrome(W, H) : "")
-        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? "" : subAt(i, p))
         + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
     }
 
@@ -934,6 +966,10 @@ export function makeBrand({ ROOT = "." } = {}) {
     const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
     const total = acc;
 
+    // ondertitel-bron: de gedeelde tijdlijn (per-zin-tijden), gelijk aan de editor.
+    const sentsByIndex = await loadSceneSents(scenes);
+    const subAt = (i, p) => { const tx = sentsByIndex && activeSentText(sentsByIndex[i], p * durs[i]); return tx != null ? ondertitelMee(tx, W, H, 1) : ondertitelMee(scenes[i].caption, W, H, p); };
+
     // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
     function overlaySVG(i, p) {
       const s = scenes[i];
@@ -945,7 +981,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const ctaOpen = ctaOp > 0.01;
       const body = flash + kader(W, H)
         + (isFirst ? logoChrome(W, H) : "")
-        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? "" : subAt(i, p))
         + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
       // transparante SVG (geen achtergrond-rect) zodat de video/techniek eronder doorschijnt
       return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
@@ -968,7 +1004,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const ctaOpen = ctaOp > 0.01;
       return flash + kader(W, H)
         + (isFirst ? logoChrome(W, H) : "")
-        + (ctaOpen ? "" : ondertitelMee(s.caption, W, H, p))
+        + (ctaOpen ? "" : subAt(i, p))
         + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : "");
     }
 
