@@ -828,6 +828,24 @@ export function makeBrand({ ROOT = "." } = {}) {
       });
     } catch { return null; }
   }
+  // muziek-per-blok + effecten-per-moment uit dezelfde tijdlijn. music = [{start,end,file}],
+  // sfxByIndex[i] = [{t,file}] per scène. null -> geen tijdlijn (val terug op het oude gedrag).
+  async function loadTimelineAudio(scenes) {
+    try {
+      const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
+      const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
+      if (!m) return null;
+      const p = path.resolve(ROOT, "assets/ummaunited/voice", m[1], m[2], "_timeline.json");
+      const tl = JSON.parse(await fs.readFile(p, "utf8"));
+      if (!tl || !Array.isArray(tl.scenes)) return null;
+      const music = Array.isArray(tl.music) ? tl.music.filter((b) => b && b.file) : [];
+      const sfxByIndex = scenes.map((s, i) => {
+        const ts = tl.scenes[i] || tl.scenes.find((x) => x.scene === i + 1);
+        return ts && Array.isArray(ts.sfx) ? ts.sfx.filter((x) => x && x.file) : [];
+      });
+      return { music, sfxByIndex };
+    } catch { return null; }
+  }
 
   // techniek-register: naam -> fn
   const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart, beeld: techBeeld };
@@ -870,7 +888,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const showLogo = isFirst;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
       const flashDur = 0.12;
-      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flashOp = 0; // witte flits uit: de zachte in/uit-fade in de render vervangt 'm
       const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
       const ctaOpen = ctaOp > 0.01;
       return flash + kader(W, H)
@@ -987,8 +1005,11 @@ export function makeBrand({ ROOT = "." } = {}) {
     const subAt = (i, p) => { const tx = sentsByIndex && activeSentText(sentsByIndex[i], p * durs[i]); return tx != null ? ondertitelMee(tx, W, H, 1) : ondertitelMee(scenes[i].caption, W, H, p); };
     // beeld-beats uit dezelfde tijdlijn -> per beat een eigen achtergrond binnen de scène.
     const beatsByIndex = await loadSceneBeats(scenes);
+    // muziek-per-blok + effecten-per-moment uit dezelfde tijdlijn.
+    const tlAudio = await loadTimelineAudio(scenes);
     // media-pad oplossen: een volledig pad (met /) valt onder ROOT, anders onder de video-map.
     const resolveMedia = (x) => !x ? "" : (String(x).includes("/") ? path.resolve(ROOT, x) : path.resolve(ROOT, "assets/ummaunited/video", x));
+    const resolveAudio = (x) => !x ? "" : path.resolve(ROOT, x);
 
     // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
     function overlaySVG(i, p) {
@@ -996,7 +1017,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const isFirst = i === 0, isLast = i === scenes.length - 1;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
       const flashDur = 0.12;
-      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flashOp = 0; // witte flits uit: de zachte in/uit-fade in de render vervangt 'm
       const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
       const ctaOpen = ctaOp > 0.01;
       const body = flash + kader(W, H)
@@ -1019,7 +1040,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const isFirst = i === 0, isLast = i === scenes.length - 1;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
       const flashDur = 0.12;
-      const flashOp = (!isFirst && p < flashDur) ? (1 - p / flashDur) * 0.5 : 0;
+      const flashOp = 0; // witte flits uit: de zachte in/uit-fade in de render vervangt 'm
       const flash = flashOp > 0.01 ? `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.cream}" opacity="${flashOp.toFixed(2)}"/>` : "";
       const ctaOpen = ctaOp > 0.01;
       return flash + kader(W, H)
@@ -1059,6 +1080,16 @@ export function makeBrand({ ROOT = "." } = {}) {
           const segDur = +(seg.end - seg.start).toFixed(3);
           if (segDur <= 0.03) { segIdx++; continue; }
           const nF = Math.max(1, Math.round(segDur * FPS));
+          // ZACHTE OVERGANG: de EERSTE beat van een scène vloeit in, de LAATSTE vloeit uit (korte
+          // dip), zodat scènes niet hard van scherm naar scherm knallen. Binnen een scène wisselt
+          // het beeld onder de doorlopende chrome door (geen dip midden in een zin).
+          const FD = 0.22;
+          const fo = Math.max(0, segDur - FD).toFixed(2);
+          const vf = [];
+          if (segIdx === 0) vf.push(`fade=t=in:st=0:d=${FD}`);
+          if (segIdx === segs.length - 1) vf.push(`fade=t=out:st=${fo}:d=${FD}`);
+          const fadeChain = vf.length ? "," + vf.join(",") : "";
+          const fadeVf = vf.join(",");
           const vidFile = resolveMedia(seg.b.vid);
           const imgFile = resolveMedia(seg.b.img);
           const hasVid = vidFile && await exists(vidFile);
@@ -1084,7 +1115,7 @@ export function makeBrand({ ROOT = "." } = {}) {
               await ff(["-y", "-stream_loop", "-1", "-i", vidFile,
                 "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
                 "-filter_complex",
-                `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+                `[0:v]scale=${OW}:${OH}:force_original_aspect_ratio=increase,crop=${OW}:${OH},eq=brightness=-0.10:saturation=1.05,fps=${FPS}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
                 "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
             } else {
               // foto: langzame Ken Burns zoom + overlay
@@ -1092,7 +1123,7 @@ export function makeBrand({ ROOT = "." } = {}) {
               await ff(["-y", "-loop", "1", "-t", segDur.toFixed(2), "-i", imgFile,
                 "-framerate", String(FPS), "-i", path.join(segdir, "o%04d.png"),
                 "-filter_complex",
-                `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+                `[0:v]scale=${OW * 1.15}:${OH * 1.15}:force_original_aspect_ratio=increase,crop=${OW}:${OH},zoompan=z='min(zoom+0.0006,1.12)':d=${zf}:s=${OW}x${OH}:fps=${FPS},eq=brightness=-0.08[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1${fadeChain}[v]`,
                 "-map", "[v]", "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", "-an", clip]);
             }
           } else {
@@ -1104,6 +1135,7 @@ export function makeBrand({ ROOT = "." } = {}) {
             }
             await rasterizeFrames(jobs, onProg);
             await ff(["-y", "-framerate", String(FPS), "-i", path.join(segdir, "f%04d.png"),
+              ...(fadeVf ? ["-vf", fadeVf] : []),
               "-r", String(FPS), "-t", segDur.toFixed(2), "-pix_fmt", "yuv420p", clip]);
           }
           sceneClips.push(clip);
@@ -1126,16 +1158,30 @@ export function makeBrand({ ROOT = "." } = {}) {
       //  2) De STEM is de ster: die mengen we los op vol niveau; muziek is een ZACHTE bodem eronder;
       //     SFX kort op de kantels. Zo komt de spreker duidelijk boven de muziek uit.
       say(`  audio mixen (stem boven, muziek zacht eronder, dan loudnorm)...`);
-      const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
       const inputs = ["-i", silent];
       const aFilters = [];
       const aFiltersPush = (x) => aFilters.push(x);
       let idx = 1; // 0 = de stille video
       const voiceLabels = [], bedLabels = [];
-      // muziek = zachte bodem
-      if (music && await exists(music)) {
-        inputs.push("-stream_loop", "-1", "-i", music);
-        aFiltersPush(`[${idx}:a]volume=0.35,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
+      // MUZIEK: per blok (uit de tijdlijn) met overvloei op de blok-grenzen (afade in/out), zachte
+      // bodem. Geen tijdlijn-muziek -> terugval op één doorlopende track (oud gedrag).
+      const blocks = (tlAudio && tlAudio.music && tlAudio.music.length) ? tlAudio.music : null;
+      if (blocks) {
+        for (const b of blocks) {
+          const bf = resolveAudio(b.file); if (!(bf && await exists(bf))) continue;
+          const bdur = Math.max(0.5, (Number(b.end) || 0) - (Number(b.start) || 0));
+          const ms = Math.round((Number(b.start) || 0) * 1000);
+          const fo = Math.max(0, bdur - 0.6).toFixed(2);
+          inputs.push("-stream_loop", "-1", "-i", bf);
+          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=0.32,afade=t=in:st=0:d=0.6,afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
+          bedLabels.push(`[m${idx}]`); idx++;
+        }
+      } else {
+        const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
+        if (music && await exists(music)) {
+          inputs.push("-stream_loop", "-1", "-i", music);
+          aFiltersPush(`[${idx}:a]volume=0.35,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
+        }
       }
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
@@ -1143,10 +1189,14 @@ export function makeBrand({ ROOT = "." } = {}) {
           inputs.push("-i", vf);
           aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)}[v${i}]`); voiceLabels.push(`[v${i}]`); idx++;
         }}
-        if (s && s.sfx) { const xf = path.resolve(ROOT, s.sfx); if (await exists(xf)) {
+        // SFX: op hun moment (scène-start + t) uit de tijdlijn; anders de oude enkele s.sfx.
+        const sfxList = (tlAudio && tlAudio.sfxByIndex && tlAudio.sfxByIndex[i]) || (s && s.sfx ? [{ t: 0, file: s.sfx }] : []);
+        for (const fx of sfxList) {
+          const xf = resolveAudio(fx.file); if (!(xf && await exists(xf))) continue;
+          const at = Math.round((starts[i] + (Number(fx.t) || 0)) * 1000);
           inputs.push("-i", xf);
-          aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=0.6[x${i}]`); bedLabels.push(`[x${i}]`); idx++;
-        }}
+          aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=0.6[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
+        }
       }
       const out = path.join(work, "final.mp4");
       const allLabels = [...voiceLabels, ...bedLabels];
