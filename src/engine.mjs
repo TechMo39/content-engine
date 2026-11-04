@@ -4,7 +4,7 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, execFile } from "node:child_process";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.mjs";
@@ -500,6 +500,31 @@ const server = http.createServer(async (req, res) => {
       if (!f.startsWith(base)) { res.writeHead(403); res.end("nee"); return; }
       if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" }); res.end(await fs.readFile(f)); return; }
       res.writeHead(404); res.end(""); return;
+    }
+    // UMMA POSTER — één stilstaand frame (jpg) uit een videobestand, zodat de studio-preview video's
+    // als afbeelding kan tonen. De ingebouwde app-browser schildert mp4-frames niet betrouwbaar; een
+    // jpg rendert altijd. Frames worden gecachet in assets/ummaunited/video/.posters/.
+    if (u.pathname === "/api/umma-poster" && req.method === "GET") {
+      const f = (u.searchParams.get("f") || "").split(/[\\/]/).pop();
+      if (!/^[\w.\- ]+\.(mp4|webm|mov|mkv|m4v)$/i.test(f)) { res.writeHead(404); res.end(""); return; }
+      const base = path.resolve(ROOT, "assets/ummaunited/video");
+      const src = path.resolve(base, f);
+      if (!src.startsWith(base) || !existsSync(src)) { res.writeHead(404); res.end(""); return; }
+      const pdir = path.join(base, ".posters");
+      const out = path.join(pdir, f.replace(/\.[^.]+$/, ".jpg"));
+      const draw = (ss) => new Promise((resolve) => {
+        execFile(ffmpegPath, ["-y", "-v", "error", "-ss", String(ss), "-i", src, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", out], { windowsHide: true }, (e) => resolve(!e && existsSync(out)));
+      });
+      try {
+        if (!existsSync(out)) {
+          await fs.mkdir(pdir, { recursive: true });
+          if (!(await draw(1))) await draw(0);   // korte clip? pak frame 0
+        }
+        if (!existsSync(out)) { res.writeHead(404); res.end(""); return; }
+        res.writeHead(200, { "content-type": "image/jpeg", "cache-control": "no-cache" });
+        res.end(await fs.readFile(out));
+      } catch (e) { res.writeHead(500); res.end(""); return; }
+      return;
     }
     // UMMA BEELD — lijst van alle opgehaalde/geüploade bestanden in assets/ummaunited/video/,
     // zodat de studio een weggegooid beeld terug kan koppelen en lege beats kan vullen.
