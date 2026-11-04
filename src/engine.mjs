@@ -461,6 +461,8 @@ const server = http.createServer(async (req, res) => {
     // UMMA — muziek UITSLUITEND uit de eigen map assets/ummaunited/muziek/ (gescheiden van Tale of Tiles).
     if (u.pathname === "/api/umma-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
     if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
+    // UMMA SFX — serveer een effect-bestand uit assets/ummaunited/sfx/ zodat de studio-preview de SFX kan afspelen
+    if (u.pathname === "/api/umma-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/sfx", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
     // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
     // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
     if (u.pathname === "/api/umma-timeline" && req.method === "GET") {
