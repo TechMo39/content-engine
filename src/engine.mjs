@@ -599,6 +599,27 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { "content-type": "image/png", "cache-control": "no-cache" }); res.end(png); return;
       } catch (e) { json(res, { error: e.message }, 500); return; }
     }
+    // UMMA — OVERZICHT-FRAME: rendert ÉÉN echt frame van een scène/beat uit dezelfde tekencode als
+    // de video-render (techniek + chrome + ondertitel). Zo toont de studio ELKE scène zoals hij in
+    // de video komt (ook de getekende, die vroeger alleen een grijs labeltje gaven). Video-beats
+    // geven 204 terug -> de studio toont die rechtstreeks met het echte videobestand.
+    if (u.pathname === "/api/umma-frame" && req.method === "GET") {
+      const brand = reg.byId["ummaunited"];
+      if (!brand || !brand.previewFrameSVG) { res.writeHead(404); res.end(""); return; }
+      try {
+        const r = await brand.previewFrameSVG({
+          story: u.searchParams.get("story") || "sword",
+          voice: u.searchParams.get("voice") || "man",
+          sceneNum: Number(u.searchParams.get("scene")) || 1,
+          beatIndex: Number(u.searchParams.get("beat")) || 0,
+          p: u.searchParams.has("p") ? Number(u.searchParams.get("p")) : 0.6,
+          format: u.searchParams.get("format") || "9:16",
+        });
+        if (!r || r.video) { res.writeHead(204); res.end(""); return; }
+        const png = new Resvg(r.svg, { fitTo: { mode: "width", value: (r.W || 540) * 2 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
+        res.writeHead(200, { "content-type": "image/png", "cache-control": "no-cache" }); res.end(png); return;
+      } catch (e) { res.writeHead(404); res.end(""); return; }
+    }
     if (u.pathname === "/api/images") {
       const b = reg.byId[u.searchParams.get("brand")];
       const pool = u.searchParams.get("pool") || "images";   // images | mockups | sfeer
