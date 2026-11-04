@@ -268,24 +268,35 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  const im=$('pv-img'),vd=$('pv-vid'),nm=$('pv-nomedia');
  const key=b.vid?'v:'+b.vid:(b.img?'i:'+b.img:'none:'+(b.label||''));
  if(key!==curMediaKey){curMediaKey=key;
-   if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.autoplay=true;vd.oncanplay=()=>{vd.play().catch(()=>{});};vd.src=mediaUrl(b.vid);vd.play().catch(()=>{});}
-   else if(b.img){im.onload=im.onerror=null;im.src=mediaUrl(b.img);im.style.display='block';vd.style.display='none';nm.style.display='none';vd.pause();vd.removeAttribute('src');}
+   // Bij een NIEUWE video: alleen de bron zetten en op 'canplay' wachten met afspelen. NOOIT hier
+   // meteen vd.play() aanroepen; de video is nog niet geladen en die play-belofte botst dan met de
+   // pause() van de volgende beat -> "AbortError: play() interrupted by pause()" (de 45x-fout die
+   // het beeld liet stilstaan). De oncanplay-handler start netjes zodra er data is.
+   if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.autoplay=false;vd.oncanplay=()=>{if(playing&&curMediaKey===key)vd.play().catch(()=>{});};vd.src=mediaUrl(b.vid);}
+   else if(b.img){im.onload=im.onerror=null;im.src=mediaUrl(b.img);im.style.display='block';vd.style.display='none';nm.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');}
    else{ // geen foto/video -> toon het ECHTE getekende frame uit de engine (zelfde tekencode als de render)
-     nm.textContent='scène tekenen…';nm.style.display='flex';vd.style.display='none';vd.removeAttribute('src');
+     nm.textContent='scène tekenen…';nm.style.display='flex';vd.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');
      im.onload=()=>{nm.style.display='none';im.style.display='block';};
      im.onerror=()=>{im.style.display='none';nm.style.display='flex';nm.textContent=isDrawnLabel(b.label)?('getekend beeld — '+(b.label||'')):('nog geen beeld — '+(b.label||''));};
      im.src=frameURL(s,bi,0.6);}}
- if(b.vid){const want=Math.max(0,local-(b.start||0));
-   if(playing){if(vd.readyState>=1&&Math.abs(vd.currentTime-want)>0.35){try{vd.currentTime=want;}catch(e){}}if(vd.paused)vd.play().catch(()=>{});}
-   else{if(vd.paused)vd.play().catch(()=>{});}}
- else if(!vd.paused){vd.pause();}}
+ // Per frame: play()/pause() ALLEEN aanroepen als de video genoeg data heeft (readyState>=2),
+ // zodat we nooit op een halfgeladen element knallen. play() is async -> alleen bij vd.paused.
+ if(b.vid){
+   if(playing){if(vd.readyState>=2&&vd.paused)vd.play().catch(()=>{});}
+   else{if(!vd.paused){try{vd.pause();}catch(e){}}}}
+ else if(!vd.paused){try{vd.pause();}catch(e){}}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}}
  manageMusic();fireSfx();}
 function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
  if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
- if(bi>=0&&playing){const b=musicBlocks[bi];if(b.audio.paused){try{const d=b.audio.duration||0;b.audio.currentTime=d?((t-b.start)%d):(t-b.start);b.audio.play();}catch(e){}}}}
-function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;x.audio.play();}catch(e){}}}}
+ if(bi>=0&&playing){const b=musicBlocks[bi];if(b.audio.paused){
+   // EERST afspelen (zodat de muziek daadwerkelijk start), DAARNA pas seeken als het element genoeg
+   // data heeft en de afwijking groot is. currentTime zetten vóór play() op een nog-niet-geladen
+   // mp3 kan het element blijven laten seeken; daarom andersom. .catch om geen losse promise-fout.
+   b.audio.play().then(()=>{const d=b.audio.duration||0,want=d?((t-b.start)%d):(t-b.start);
+     if(b.audio.readyState>=2&&Math.abs(b.audio.currentTime-want)>0.5){try{b.audio.currentTime=want;}catch(e){}}}).catch(()=>{});}}}
+function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;}catch(e){}x.audio.play().catch(()=>{});}}}
 function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=total){t=total;stop();}placePlayhead();syncAudio();
  const card=cardOf(sceneAt(t));if(card&&card.offsetParent){const r=card.getBoundingClientRect();if(r.top<60||r.bottom>innerHeight)card.scrollIntoView({block:'center'});}raf=requestAnimationFrame(tick);}
