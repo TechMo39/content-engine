@@ -48,13 +48,13 @@ LABELS = {
  0:["intro (merk)"],
  1:["het zwaard / de beschuldiging","geschiedenis op tafel"],
  2:["de druk / de test","Rome en Europa vooruit"],
- 3:["Rome, de supermacht","Theodosius 380 (foto)","tempels neergehaald"],
+ 3:["kaart: Romeinse Rijk","Theodosius 380 (foto)","tempels neergehaald"],
  4:["verdreven Joden (gravure)","dezelfde schaduw (gravure)","de wereld ervoor"],
- 5:["twee rijken vallen (kaart)","Perzisch rijk valt","op het hoogtepunt"],
+ 5:["kaart: twee rijken","Perzisch rijk (video)","op het hoogtepunt"],
  6:["kerk blijft open","synagoge / vuurtempel","moskee, vrij gebed","Umar in Jeruzalem","geleefde rechtvaardigheid"],
  7:["de echte vraag","vrij, generatie na generatie","het hart beweegt eerst","Rome's geloof valt weg"],
  8:["meer dan 1000 jaar","dieper geworteld"],
- 9:["Europa vaart uit","koloniale greep (kaart)","het zwaard, echt"],
+ 9:["Europa vaart uit","kaart: koloniale greep","het zwaard, echt"],
  10:["moskee tot kathedraal","Quran uit de scholen","alles geprobeerd"],
  11:["het hield stand","Indonesie","Bosnie","Noord-Afrika"],
  12:["cijfers voor en na","geen leger neemt een hart"],
@@ -90,13 +90,13 @@ PLAN = {
  0:[("drawn","")],
  1:[("video","ancient sword blade dark dramatic slow"),("video","old library ancient books candlelight")],
  2:[("video","dark storm clouds dramatic time lapse"),("video","ancient roman ruins columns")],
- 3:[("video","roman forum colosseum rome aerial"),("photo","Theodosius I Roman emperor"),("video","ancient temple ruins stone")],
+ 3:[("drawn",""),("photo","Theodosius I Roman emperor"),("video","ancient temple ruins stone")],
  4:[("photo","expulsion of the jews historical engraving"),("photo","medieval persecution jews engraving"),("video","dark medieval stone hall torch")],
- 5:[("photo","map early muslim conquests 7th century"),("video","ancient persian ruins ctesiphon arch"),("video","sunrise over old city skyline")],
+ 5:[("drawn",""),("video","ancient persian ruins ctesiphon arch"),("video","sunrise over old city skyline")],
  6:[("video","old church interior candles"),("video","synagogue interior menorah"),("video","mosque interior arches prayer"),("video","jerusalem old city dome of the rock"),("video","muslim men praying in mosque")],
  7:[("video","crowd people silhouette walking"),("video","old medina street life morocco"),("video","single candle flame dark"),("video","abandoned ruined church overgrown")],
  8:[("video","historic mosque minaret sunset"),("video","mosque courtyard people prayer")],
- 9:[("video","old tall sailing ship ocean"),("photo","european colonial empires world map"),("video","colonial soldiers marching archival")],
+ 9:[("video","old tall sailing ship ocean"),("drawn",""),("video","colonial soldiers marching archival")],
  10:[("photo","Ketchaoua Mosque Algiers"),("photo","french colonial algeria historical"),("video","dark dramatic storm sky")],
  11:[("video","mosque crowd prayer aerial"),("video","istiqlal mosque jakarta indonesia"),("video","mosque sarajevo bosnia"),("video","morocco mosque minaret medina")],
  12:[("video","mass prayer crowd aerial mosque"),("video","muslim man praying hands raised close up")],
@@ -107,6 +107,48 @@ PLAN = {
  17:[("video","long straight empty road horizon"),("video","person walking path sunrise silhouette")],
  18:[("drawn","")],
 }
+
+# GETEKENDE KAART per scène: aparte kleur + label per gebied, plus een jaartal/periode-badge, zodat
+# de kaart het verhaal vertelt (niet alleen een kaart tonen). Landgroepen staan als LANDNAMEN; de
+# engine zet ze om naar kaart-id's. Kleuren: red/blue/orange/green/cream. Namen die niet in de
+# kaart voorkomen worden simpelweg overgeslagen.
+GROUPS = {
+ "rome":      ["Morocco","Algeria","Tunisia","Libya","Egypt","Israel","Lebanon","Syria","Jordan","Turkey","Greece","Italy","Spain","Portugal","France"],
+ "byz":       ["Syria","Egypt","Turkey","Lebanon","Jordan","Israel","Greece"],
+ "persia":    ["Iran","Iraq","Afghanistan","Turkmenistan"],
+ "colonised": ["Morocco","Algeria","Tunisia","Libya","Egypt","Indonesia","Malaysia","Bosnia and Herz.","Pakistan","Nigeria","Senegal"],
+ "europe":    ["France","Spain","Portugal","United Kingdom","Netherlands","Belgium","Italy","Germany"],
+}
+# per scène: welke beat de kaart is (beat-index), de uitsnede (view), kleuren per groep (fills),
+# labels per groep (tekst op het gebied), en de info-badge (jaartal/periode).
+KAART = {
+ 3: {"beat": 0, "view": "mena", "kaartInfo": "Rome rules, from 380 AD",
+     "fills": {"rome": "red"}, "labels": {"rome": "Roman Empire"}},
+ 5: {"beat": 0, "view": "mena", "kaartInfo": "The 630s: both empires fall",
+     "fills": {"byz": "red", "persia": "blue"}, "labels": {"byz": "Roman Empire", "persia": "Persian Empire"}},
+ 9: {"beat": 1, "view": "belt", "kaartInfo": "Colonisation, 1500s to 1900s",
+     "fills": {"europe": "red", "colonised": "orange"}, "labels": {"europe": "European empires", "colonised": "Muslim lands"}},
+}
+
+def apply_kaart(tl):
+    # zet de kaart-velden op de juiste scènes en de landgroepen bovenin de tijdlijn; maakt de kaart-
+    # beat leeg (geen foto/video) zodat de engine daar de getekende kaart tekent.
+    tl["groups"] = GROUPS
+    by = {s.get("scene"): s for s in tl.get("scenes", [])}
+    for num, cfg in KAART.items():
+        sc = by.get(num)
+        if not sc:
+            continue
+        sc["tech"] = "kaart"
+        sc["view"] = cfg["view"]
+        sc["fills"] = cfg["fills"]
+        sc["labels"] = cfg["labels"]
+        sc["kaartInfo"] = cfg["kaartInfo"]
+        beats = sc.get("beats") or []
+        bi = cfg["beat"]
+        if 0 <= bi < len(beats):
+            beats[bi]["img"] = ""; beats[bi]["vid"] = ""   # getekend, geen media
+        print(f"kaart scène {num}: {', '.join(cfg['labels'].values())}  [{cfg['kaartInfo']}]")
 
 def _get(url, tries=4):
     # robuust tegen 429/503 (snelheidslimiet): lees Retry-After of gebruik oplopende backoff en
@@ -310,6 +352,9 @@ def main():
             print(f"    -> {fname}  ({'video' if is_video else 'foto'}, {hit['license']})")
             n_done += 1
             time.sleep(1.3)  # beleefd tegen de API's (voorkomt de 429-snelheidslimiet)
+
+    # getekende kaarten (Rome / twee rijken / kolonisatie) in de tijdlijn zetten
+    apply_kaart(tl)
 
     with open(tlpath, "w", encoding="utf-8") as f:
         json.dump(tl, f, ensure_ascii=False, indent=2)
