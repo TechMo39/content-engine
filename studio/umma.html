@@ -184,6 +184,7 @@ function beatsOf(s){const edges=[s.speech_start||s.sentences[0].start,...s.beatB
  const out=[];for(let i=0;i<edges.length-1;i++){const m=(s.beatMedia&&s.beatMedia[i])||{};
    out.push({start:edges[i],end:edges[i+1],label:s.imgLabels[i]||('beeld '+(i+1)),img:m.img||'',vid:m.vid||''});}return out;}
 function mediaUrl(p){return '/umma-media/'+String(p).split('/').pop();}
+function posterURL(v){return '/api/umma-poster?f='+encodeURIComponent(String(v).split('/').pop());}
 function isDrawnLabel(l){return /getekend|tekst|kaart|CTA|logo/i.test(l||'');}
 function subsOf(s){const starts=[s.sentences[0].start,...s.subBounds];const ends=[...s.subBounds,s.speech_end||s.dur];
  return s.sentences.map((se,i)=>({text:se.text,start:starts[i],end:ends[i]}));}
@@ -266,17 +267,17 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  const im=$('pv-img'),vd=$('pv-vid'),nm=$('pv-nomedia');
  const key=b.vid?'v:'+b.vid:(b.img?'i:'+b.img:'none:'+(b.label||''));
  if(key!==curMediaKey){curMediaKey=key;
-   if(b.vid){im.onload=im.onerror=null;vd.src=mediaUrl(b.vid);vd.style.display='block';im.style.display='none';nm.style.display='none';im.removeAttribute('src');}
+   if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.src=mediaUrl(b.vid);vd.play().catch(()=>{});}
    else if(b.img){im.onload=im.onerror=null;im.src=mediaUrl(b.img);im.style.display='block';vd.style.display='none';nm.style.display='none';vd.pause();vd.removeAttribute('src');}
    else{ // geen foto/video -> toon het ECHTE getekende frame uit de engine (zelfde tekencode als de render)
      nm.textContent='scène tekenen…';nm.style.display='flex';vd.style.display='none';vd.removeAttribute('src');
      im.onload=()=>{nm.style.display='none';im.style.display='block';};
      im.onerror=()=>{im.style.display='none';nm.style.display='flex';nm.textContent=isDrawnLabel(b.label)?('getekend beeld — '+(b.label||'')):('nog geen beeld — '+(b.label||''));};
      im.src=frameURL(s,bi,0.6);}}
- if(b.vid&&vd.readyState>=1){const want=Math.max(0,local-(b.start||0));
-   if(playing){if(vd.paused)vd.play().catch(()=>{});}
-   else{if(!vd.paused)vd.pause();if(Math.abs(vd.currentTime-(want%(vd.duration||1)))>0.3){try{vd.currentTime=want%(vd.duration||1);}catch(e){}}}}
- else if(!b.vid&&!vd.paused){vd.pause();}}
+ if(b.vid){const want=Math.max(0,local-(b.start||0));
+   if(playing){if(vd.readyState>=1&&Math.abs(vd.currentTime-want)>0.35){try{vd.currentTime=want;}catch(e){}}if(vd.paused)vd.play().catch(()=>{});}
+   else{if(vd.paused)vd.play().catch(()=>{});}}
+ else if(!vd.paused){vd.pause();}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}}
  if(musicAudio.a&&playing&&musicAudio.a.paused){try{musicAudio.a.currentTime=t%(musicAudio.dur||1);musicAudio.a.play();}catch(e){}}}
@@ -308,8 +309,10 @@ function buildPayload(){
  const scenes=SC.map(s=>{const subs=subsOf(s);const sentences=s.sentences.map((se,i)=>({i,text:se.text,start:+subs[i].start.toFixed(3),dur:+(subs[i].end-subs[i].start).toFixed(3),abs_start:+(s.start+subs[i].start).toFixed(3)}));
    const beats=beatsOf(s).map(b=>({start:+b.start.toFixed(3),dur:+(b.end-b.start).toFixed(3),label:b.label,img:b.img||"",vid:b.vid||""}));
    const sfx=s.sfx.map(f=>({t:+f.t.toFixed(3),name:f.name||'sfx'}));
-   return {scene:s.scene,tone:s.tone,wav:s.wav,start:s.start,dur:s.dur,speech_start:s.speech_start,speech_end:s.speech_end,sentences,beats,sfx};});
- return {story:TL.story,voice:TL.voice,title:TL.title,total_seconds:TL.total_seconds,total_mmss:TL.total_mmss,music:(TL.music||[]),approved:[...approved],scenes};
+   // kaart-/techniekvelden MEEschrijven, anders stript een opslag ze eruit en verdwijnt de kaart
+   const tech=s.tech?{tech:s.tech}:{}, view=s.view?{view:s.view}:{}, fills=s.fills?{fills:s.fills}:{}, rule=s.rule?{rule:s.rule}:{}, labels=s.labels?{labels:s.labels}:{}, kinfo=s.kaartInfo?{kaartInfo:s.kaartInfo}:{};
+   return {scene:s.scene,tone:s.tone,wav:s.wav,start:s.start,dur:s.dur,speech_start:s.speech_start,speech_end:s.speech_end,...tech,...view,...fills,...rule,...labels,...kinfo,sentences,beats,sfx};});
+ return {story:TL.story,voice:TL.voice,title:TL.title,total_seconds:TL.total_seconds,total_mmss:TL.total_mmss,music:(TL.music||[]),...(TL.groups?{groups:TL.groups}:{}),approved:[...approved],scenes};
 }
 async function save(){$('savemsg').textContent='opslaan...';$('savemsg').style.color='var(--mut)';
  try{const r=await fetch('/api/umma-timeline-save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(buildPayload())});
@@ -359,7 +362,7 @@ $('bt-pick').addEventListener('click',()=>{if(!selBeat){alert('Kies eerst een be
 function openPicker(){const g=$('pick-grid');g.innerHTML='';
  if(!MEDIA.length){g.innerHTML='<div style="color:var(--mut)">Nog geen opgehaalde beelden gevonden (draai eerst python tools/umma_beeld.py).</div>';}
  MEDIA.forEach(f=>{const it=document.createElement('div');it.className='it';const isV=/\.(mp4|webm)$/i.test(f);
-   it.innerHTML=(isV?'<video class="th" src="/umma-media/'+encodeURIComponent(f)+'#t=0.3" muted></video>':'<img class="th" src="/umma-media/'+encodeURIComponent(f)+'">')+'<div class="nm">'+f+'</div>';
+   it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/umma-poster?f='+encodeURIComponent(f)+'">':'<img class="th" src="/umma-media/'+encodeURIComponent(f)+'">')+'<div class="nm">'+f+'</div>';
    it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/ummaunited/video/'+f,isV?'vid':'img');closePicker();});g.appendChild(it);});
  $('picker').classList.add('on');}
 function closePicker(){$('picker').classList.remove('on');}
@@ -392,7 +395,7 @@ function buildOverview(){
  SC.forEach((s,si)=>{beatsOf(s).forEach((b,bi)=>{nTiles++;
    const it=document.createElement('div');it.className='ovtile';it.dataset.si=si;it.dataset.bi=bi;
    let media,kind,kcls;
-   if(b.vid){media='<video class="th" src="'+mediaUrl(b.vid)+'#t=0.4" muted preload="metadata"></video>';kind='video';kcls='vid';}
+   if(b.vid){media='<video class="th" poster="'+posterURL(b.vid)+'" src="'+mediaUrl(b.vid)+'" muted loop playsinline preload="none" onmouseenter="this.play()" onmouseleave="this.pause()"></video>';kind='video';kcls='vid';}
    else if(b.img){media='<img class="th" loading="lazy" src="'+mediaUrl(b.img)+'">';kind='foto';kcls='foto';}
    else{media='<img class="th" loading="lazy" src="'+frameURL(s,bi,0.6)+'" onerror="this.style.opacity=.25">';kind='getekend';kcls='get';}
    it.innerHTML=media+'<span class="kind '+kcls+'">'+kind+'</span><div class="cap">S'+s.scene+'.'+(bi+1)+' '+(b.label||'')+'</div>';

@@ -67,18 +67,22 @@ LABELS = {
 }
 
 def ensure_beats(sc):
-    # bouw de beeld-beats als ze nog niet in de scene staan (zelfde indeling als de editor).
-    if sc.get("beats"):
-        return
+    # Herbouw de beeld-beats ELKE run uit SPLITS/LABELS — dat is de enige bron van waarheid voor de
+    # beat-indeling. Media (img/vid) die al bij een beat met HETZELFDE label hoorde nemen we mee, zodat
+    # gekozen/vervangen beeld niet verdwijnt bij een herbouw. Hierdoor blijft de keten na een
+    # scriptwijziging altijd kloppen: oude beats/labels blijven niet meer hangen (dat was de bug).
     num = sc.get("scene"); sents = sc.get("sentences") or []
+    old = {b.get("label"): b for b in (sc.get("beats") or []) if b.get("label")}
     if not sents:
         sc["beats"] = []; return
     splits = SPLITS.get(num, []); labs = LABELS.get(num, [])
     edges = [sents[0]["start"]] + [sents[i]["start"] for i in splits if i < len(sents)] + [sc.get("speech_end", sc.get("dur", 0))]
     beats = []
     for i in range(len(edges) - 1):
+        lab = labs[i] if i < len(labs) else f"beeld {i+1}"
+        prev = old.get(lab) or {}
         beats.append({"start": round(edges[i], 3), "dur": round(edges[i+1]-edges[i], 3),
-                      "label": labs[i] if i < len(labs) else f"beeld {i+1}", "img": ""})
+                      "label": lab, "img": prev.get("img", ""), "vid": prev.get("vid", "")})
     sc["beats"] = beats
 
 # ZOEKPLAN per scene -> per beat (in volgorde). kind: 'photo' = ophalen, 'drawn' = overslaan
