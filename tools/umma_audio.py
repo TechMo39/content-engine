@@ -39,8 +39,20 @@ BLOCKS = [
  {"from":15, "to":18, "track":"triumph"},
 ]
 
-# SFX pas in de laatste stap (special effects). Nu leeg.
-SFX = []
+# GELUIDSEFFECTEN op de kantelpunten van het verhaal. Gekoppeld aan de ZIN-index (sent), niet aan
+# een gegokte seconde: de tool leest de gemeten starttijd van die zin uit de tijdlijn, zodat het
+# effect precies op die zin valt. Bewust weinig en subtiel; op de montagetafel schuif/verwijder je ze.
+SFX = [
+ {"scene":1,  "sent":3,  "q":"deep cinematic impact boom"},     # "Convert, or die."
+ {"scene":3,  "sent":4,  "q":"heavy stone impact low"},         # "...became the law."
+ {"scene":4,  "sent":1,  "q":"dark low ominous hit"},           # verbannen uit Jeruzalem
+ {"scene":5,  "sent":3,  "q":"epic cinematic riser impact"},    # "They faced two."
+ {"scene":6,  "sent":11, "q":"warm soft swell shimmer"},        # "Guidance comes from Allah alone."
+ {"scene":9,  "sent":7,  "q":"dramatic tension impact"},        # het zwaard, op het geloof gericht
+ {"scene":11, "sent":0,  "q":"uplifting cinematic swell"},      # "It was not." (het hield stand)
+ {"scene":12, "sent":6,  "q":"deep resolving low note"},        # "no army... has ever taken a heart."
+ {"scene":16, "sent":8,  "q":"epic emotional swell rise"},      # payoff: "the living proof"
+]
 
 def load_key(root):
     k = os.environ.get("FREESOUND_API_KEY", "")
@@ -195,26 +207,31 @@ def main():
         print(f"blok scène {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
     tl["music"] = music
 
-    # ---- SFX op de kantelpunten ----
+    # ---- SFX op de kantelpunten (op de GEMETEN zin, niet op een gegokte seconde) ----
     for sx in SFX:
         s = by_num.get(sx["scene"])
         if not s: continue
+        sents = s.get("sentences") or []
+        si = sx.get("sent", 0)
+        if si >= len(sents):
+            print(f"scène {sx['scene']}: zin {si} bestaat niet, sfx overgeslagen"); continue
+        t = round(float(sents[si].get("start", 0)), 3)   # starttijd van die zin binnen de scène
         beats = s.setdefault("sfx", [])
-        fname = f"s{sx['scene']:02d}_{int(sx['t'])}.mp3"; fpath = os.path.join(sdir, fname)
-        already = any(f.get("file") for f in beats if abs(float(f.get("t", -9)) - sx["t"]) < 0.2)
+        fname = f"s{sx['scene']:02d}_z{si}.mp3"; fpath = os.path.join(sdir, fname)
+        already = any(f.get("file") for f in beats if abs(float(f.get("t", -9)) - t) < 0.2)
         if already and not args.force:
-            print(f"scène {sx['scene']} sfx @ {sx['t']}s: staat al"); continue
-        print(f"scène {sx['scene']} sfx @ {sx['t']}s: zoek '{sx['q']}'")
+            print(f"scène {sx['scene']} sfx @ zin {si} ({t:.1f}s): staat al"); continue
+        print(f"scène {sx['scene']} sfx @ zin {si} ({t:.1f}s): zoek '{sx['q']}'")
         hit = search_cc0(sx["q"], key)
         if not hit:
-            print("    geen bruikbaar effect gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+            print("    geen bruikbaar effect gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
         print(f"    treffer: {hit['name'][:42]} ({hit['lic']}), downloaden...")
         try:
             download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-        beats[:] = [f for f in beats if abs(float(f.get("t", -9)) - sx["t"]) >= 0.2]
-        beats.append({"t": sx["t"], "name": sx["q"].split()[0], "file": "assets/ummaunited/sfx/" + fname})
+        beats[:] = [f for f in beats if abs(float(f.get("t", -9)) - t) >= 0.2]
+        beats.append({"t": t, "name": sx["q"].split()[0], "file": "assets/ummaunited/sfx/" + fname})
         credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
 
