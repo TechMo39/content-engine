@@ -38,25 +38,32 @@ def load_keys(root):
 # plus het label per beat. Zo kan deze tool de beats zelf aanmaken als ze nog niet in het
 # tijdlijn-bestand staan (bv. je hebt de editor nog niet geopend/opgeslagen). Staat de editor-versie
 # er wel, dan gebruiken we die (jouw sleep-correcties winnen).
-SPLITS = {1:[2,5],2:[2,6],3:[2],4:[2,4],5:[1,3],6:[2,5,8],7:[3,6],8:[2,8],9:[2,6],10:[1,2,3],
-          11:[3,4],12:[4,6],13:[2,5,7],14:[3,6],15:[2,4],16:[1,3,5]}
+# Beeld-beats per scène voor het NIEUWE script (19 scènes, 0=intro ... 18=outro). SPLITS = na
+# welke zin-index een nieuwe beeld-beat begint. Beeld wisselt op een nieuw idee/plek, niet per zin.
+SPLITS = {
+ 0:[], 1:[4], 2:[5], 3:[3,5], 4:[2,4], 5:[4,6], 6:[2,4,5,8], 7:[4,7,9], 8:[2], 9:[2,6],
+ 10:[2,4], 11:[2,3,4], 12:[4], 13:[5,8], 14:[3,6], 15:[2,4], 16:[5,7], 17:[4], 18:[],
+}
 LABELS = {
- 1:["donkere verovering","de regel (tekst)","horizon vooruit"],
- 2:["de regel bevestigd (tekst)","een kling, de echte vraag","overgang: op pad"],
- 3:["kaart: Rome (getekend)","Romeins staatsgezag"],
- 4:["vervolgde Joden onder Rome","bredere vervolging","Baptism or ruin (tekst)"],
- 5:["moslims komen","verlichting, last valt weg","Joden vinden beschutting"],
- 6:["christen blijft christen","synagoge en kerk open","hidayah (tekst)","de boodschap geleefd"],
- 7:["eeuwenlang (tekst)","kaart: bestuur (getekend)","vrij, generatie na generatie"],
- 8:["Europa koloniseert","kaart: koloniale greep (getekend)","de test van hun regel"],
- 9:["niet zacht geregeerd","Quran verboden, verdeeld","alles gedaan, werkte het?"],
- 10:["Nee, het bleef","Indonesie","Bosnie","Noord-Afrika"],
- 11:["cijfers voor/na (getekend)","machtigste rijken","in het hart"],
- 12:["hun regel is waar (getekend)","kaart Europa (getekend)","lege kerken"],
- 13:["waarom? een wond","afkeer van geloof","hand om de keel (getekend)","het bewijs"],
- 14:["nooit gedwongen","het zwaard viel niet","twee einden (getekend)"],
- 15:["stem niet verheffen (tekst)","waarheid gezien (tekst)","gebed: jij bent het bewijs"],
- 16:["dit doen we hier (tekst)","leugen reist krom (tekst)","waarheid loopt recht (tekst)","CTA logo (getekend)"],
+ 0:["intro (merk)"],
+ 1:["het zwaard / de beschuldiging","geschiedenis op tafel"],
+ 2:["de druk / de test","Rome en Europa vooruit"],
+ 3:["Rome, de supermacht","Theodosius 380 (foto)","tempels neergehaald"],
+ 4:["verdreven Joden (gravure)","dezelfde schaduw (gravure)","de wereld ervoor"],
+ 5:["twee rijken vallen (kaart)","Perzisch rijk valt","op het hoogtepunt"],
+ 6:["kerk blijft open","synagoge / vuurtempel","moskee, vrij gebed","Umar in Jeruzalem","geleefde rechtvaardigheid"],
+ 7:["de echte vraag","vrij, generatie na generatie","het hart beweegt eerst","Rome's geloof valt weg"],
+ 8:["meer dan 1000 jaar","dieper geworteld"],
+ 9:["Europa vaart uit","koloniale greep (kaart)","het zwaard, echt"],
+ 10:["moskee tot kathedraal","Quran uit de scholen","alles geprobeerd"],
+ 11:["het hield stand","Indonesie","Bosnie","Noord-Afrika"],
+ 12:["cijfers voor en na","geen leger neemt een hart"],
+ 13:["de verkeerde religie","gedwongen geloof (gravure)","lege kathedralen"],
+ 14:["een wond","afkeer van geloof","hun verhaal, niet het onze"],
+ 15:["geregeerd met recht","beschermde gebedshuizen","recht opende de harten"],
+ 16:["wiens hand aan het zwaard","de waarheid gezien","jij bent het bewijs"],
+ 17:["de waarheid loopt recht","volg ons (CTA)"],
+ 18:["outro (merk)"],
 }
 
 def ensure_beats(sc):
@@ -80,22 +87,25 @@ def ensure_beats(sc):
 #       'photo' = alleen foto (historisch/gravure, daar bestaat geen video van);
 #       'drawn' = overslaan (engine tekent tekst/kaart/CTA zelf).
 PLAN = {
- 1:[("video","ancient sword blade dramatic dark"),("drawn",""),("video","desert road horizon sunrise")],
- 2:[("drawn",""),("video","antique sword blade close up"),("drawn","")],
- 3:[("drawn",""),("video","roman forum ruins rome")],
- 4:[("photo","expulsion of the jews history engraving"),("video","dark storm clouds dramatic sky"),("drawn","")],
- 5:[("video","old medina gate morocco"),("video","sunrise over old city"),("video","synagogue interior")],
- 6:[("video","old church interior candles"),("video","synagogue interior menorah"),("drawn",""),("video","muslims praying in mosque")],
- 7:[("drawn",""),("drawn",""),("video","medina street life morocco")],
- 8:[("video","colonial troops marching archive"),("drawn",""),("drawn","")],
- 9:[("photo","colonial era north africa historical"),("photo","french colonial algeria historical"),("drawn","")],
- 10:[("drawn",""),("video","istiqlal mosque jakarta indonesia"),("video","mosque sarajevo bosnia"),("video","mosque morocco minaret")],
- 11:[("drawn",""),("drawn",""),("video","muslim man praying close up")],
- 12:[("drawn",""),("drawn",""),("video","empty european church interior")],
- 13:[("video","modern european city street"),("photo","empty cathedral europe"),("drawn",""),("drawn","")],
- 14:[("video","muslim prayer sujood"),("video","crowd praying mosque"),("drawn","")],
- 15:[("drawn",""),("drawn",""),("video","mass prayer mosque aerial crowd")],
- 16:[("drawn",""),("drawn",""),("drawn",""),("drawn","")],
+ 0:[("drawn","")],
+ 1:[("video","ancient sword blade dark dramatic slow"),("video","old library ancient books candlelight")],
+ 2:[("video","dark storm clouds dramatic time lapse"),("video","ancient roman ruins columns")],
+ 3:[("video","roman forum colosseum rome aerial"),("photo","Theodosius I Roman emperor"),("video","ancient temple ruins stone")],
+ 4:[("photo","expulsion of the jews historical engraving"),("photo","medieval persecution jews engraving"),("video","dark medieval stone hall torch")],
+ 5:[("photo","map early muslim conquests 7th century"),("video","ancient persian ruins ctesiphon arch"),("video","sunrise over old city skyline")],
+ 6:[("video","old church interior candles"),("video","synagogue interior menorah"),("video","mosque interior arches prayer"),("video","jerusalem old city dome of the rock"),("video","muslim men praying in mosque")],
+ 7:[("video","crowd people silhouette walking"),("video","old medina street life morocco"),("video","single candle flame dark"),("video","abandoned ruined church overgrown")],
+ 8:[("video","historic mosque minaret sunset"),("video","mosque courtyard people prayer")],
+ 9:[("video","old tall sailing ship ocean"),("photo","european colonial empires world map"),("video","colonial soldiers marching archival")],
+ 10:[("photo","Ketchaoua Mosque Algiers"),("photo","french colonial algeria historical"),("video","dark dramatic storm sky")],
+ 11:[("video","mosque crowd prayer aerial"),("video","istiqlal mosque jakarta indonesia"),("video","mosque sarajevo bosnia"),("video","morocco mosque minaret medina")],
+ 12:[("video","mass prayer crowd aerial mosque"),("video","muslim man praying hands raised close up")],
+ 13:[("video","dark dramatic clouds sky"),("photo","medieval european cathedral engraving"),("video","empty european cathedral interior wide")],
+ 14:[("video","cracked stone wall dark"),("video","modern european city street empty"),("video","empty church pews interior")],
+ 15:[("video","alhambra islamic architecture arches"),("video","andalusian courtyard fountain old city"),("video","muslim prayer sujood warm light")],
+ 16:[("video","ancient sword blade close up"),("video","sunrise light over old city mosque"),("video","mass prayer crowd aerial sunset")],
+ 17:[("video","long straight empty road horizon"),("video","person walking path sunrise silhouette")],
+ 18:[("drawn","")],
 }
 
 def _get(url, tries=4):
@@ -169,32 +179,45 @@ def _getj(url, headers=None):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 def search_video(query, keys, min_dur=0):
-    # Pexels eerst (als sleutel), anders Pixabay. Geeft {url, ext, credit, license} of None.
-    try:
-        if keys.get("pexels"):
-            d = _getj("https://api.pexels.com/videos/search?" + urllib.parse.urlencode({"query": query, "per_page": 8, "orientation": "portrait"}),
-                      headers={"Authorization": keys["pexels"]})
-            for v in d.get("videos", []):
-                if min_dur and v.get("duration", 0) < min_dur:
-                    continue
-                files = sorted(v.get("video_files", []), key=lambda f: (f.get("height") or 0), reverse=True)
-                hd = next((f for f in files if (f.get("height") or 0) >= 1080), files[0] if files else None)
-                if hd and hd.get("link"):
-                    return {"url": hd["link"], "ext": ".mp4", "credit": (v.get("user", {}) or {}).get("name", "Pexels"), "license": "Pexels License (free)"}
-    except Exception as e:
-        print(f"    pexels-fout: {e}")
+    # LANDSCAPE (16:9) video. Pixabay heeft de sleutel; kies de eerste bruikbare LIGGENDE clip
+    # (breedte >= hoogte, >= 1280px) van voldoende lengte. Pexels als terugval (zelden een sleutel).
     try:
         if keys.get("pixabay"):
-            d = _getj("https://pixabay.com/api/videos/?" + urllib.parse.urlencode({"key": keys["pixabay"], "q": query, "per_page": 8}))
+            d = _getj("https://pixabay.com/api/videos/?" + urllib.parse.urlencode({"key": keys["pixabay"], "q": query, "per_page": 20}))
+            fallback = None
             for h in d.get("hits", []):
                 if min_dur and h.get("duration", 0) < min_dur:
                     continue
                 vids = h.get("videos", {})
-                pick = vids.get("large") or vids.get("medium") or vids.get("small")
-                if pick and pick.get("url"):
+                # kies de grootste LIGGENDE variant (breedte >= hoogte)
+                pick = None
+                for size in ("large", "medium", "small"):
+                    v = vids.get(size)
+                    if v and v.get("url") and (v.get("width", 0) >= v.get("height", 0)) and v.get("width", 0) >= 1280:
+                        pick = v; break
+                if pick:
                     return {"url": pick["url"], "ext": ".mp4", "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}
+                if fallback is None:
+                    v = vids.get("large") or vids.get("medium")
+                    if v and v.get("url") and v.get("width", 0) >= v.get("height", 0):
+                        fallback = {"url": v["url"], "ext": ".mp4", "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}
+            if fallback:
+                return fallback
     except Exception as e:
         print(f"    pixabay-fout: {e}")
+    try:
+        if keys.get("pexels"):
+            d = _getj("https://api.pexels.com/videos/search?" + urllib.parse.urlencode({"query": query, "per_page": 10, "orientation": "landscape"}),
+                      headers={"Authorization": keys["pexels"]})
+            for v in d.get("videos", []):
+                if min_dur and v.get("duration", 0) < min_dur:
+                    continue
+                files = sorted(v.get("video_files", []), key=lambda f: (f.get("width") or 0), reverse=True)
+                hd = next((f for f in files if (f.get("width") or 0) >= 1280 and (f.get("width", 0) >= f.get("height", 0))), files[0] if files else None)
+                if hd and hd.get("link"):
+                    return {"url": hd["link"], "ext": ".mp4", "credit": (v.get("user", {}) or {}).get("name", "Pexels"), "license": "Pexels License (free)"}
+    except Exception as e:
+        print(f"    pexels-fout: {e}")
     return None
 
 def main():
