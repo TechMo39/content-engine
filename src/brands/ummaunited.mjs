@@ -786,6 +786,21 @@ export function makeBrand({ ROOT = "." } = {}) {
       + `</g>`;
   }
 
+  // -- INTRO/OUTRO-achtergrond (het gemerkte UMMA UNITED-veld). Nu op makeBrand-niveau zodat ZOWEL
+  // de video-render ALS het studio-voorbeeld exact dezelfde intro/outro tekenen (één bron, geen
+  // divergentie). kind wordt niet meer onderscheiden (intro==outro-veld); de ondertitel loopt
+  // er net als overal via subAt overheen.
+  function brandInner(kind, W, H) {
+    const logoSz = Math.round(W * 0.26);
+    const lx = Math.round((W - logoSz) / 2), ly = Math.round(H * 0.30);
+    const logo = LOGO_URI
+      ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
+      : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`
+        + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
+    const wm = `<text x="${W / 2}" y="${Math.round(H * 0.62)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(W * 0.085)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
+    return `<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy2 || COL.navy}" opacity="0.35"/>` + logo + wm;
+  }
+
   // -- PER-ZIN-ONDERTITEL uit _timeline.json (de gedeelde tijdlijn die de editor opslaat). Zo is
   // de render EXACT gelijk aan wat Mo in de editor ziet: de juiste zin op zijn gemeten tijd, i.p.v.
   // de hele alinea uitgesmeerd over de scène. Terugval op het oude caption-gedrag als er geen
@@ -1027,19 +1042,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       // transparante SVG (geen achtergrond-rect) zodat de video/techniek eronder doorschijnt
       return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
     }
-    // INTRO/OUTRO-achtergrond: de gemerkte UMMA UNITED-kaart (logo groot + woordmerk). De scène
-    // is een gewone scène (nr 0 / 17) met toon "intro"/"outro"; de ondertitel (de gesproken regel)
-    // loopt er net als overal via subAt overheen. Zo is intro/outro geen bolt-on maar deel van het script.
-    function brandInner(kind) {
-      const logoSz = Math.round(W * 0.26);
-      const lx = Math.round((W - logoSz) / 2), ly = Math.round(H * 0.30);
-      const logo = LOGO_URI
-        ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
-        : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`
-          + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
-      const wm = `<text x="${W / 2}" y="${Math.round(H * 0.62)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(W * 0.085)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
-      return `<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy2 || COL.navy}" opacity="0.35"/>` + logo + wm;
-    }
+    // (INTRO/OUTRO-achtergrond `brandInner` staat nu op makeBrand-niveau, gedeeld met het voorbeeld.)
     // CONTENT-GESTUURD VISUEEL EFFECT per scène, bepaald door de TOON (die is hier uit de inhoud
     // gekozen). nadruk = zwaarder/dramatischer (vignet + contrast); warm = warmer; hook = meer punch;
     // rustig = iets rustiger. Een leeg resultaat = geen extra behandeling. Komt als ffmpeg-filterketen
@@ -1057,7 +1060,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     function fullSceneSVG(i, p) {
       const s = scenes[i];
       const isBrand = s.tone === "intro" || s.tone === "outro";
-      const inner = isBrand ? brandInner(s.tone) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups });
+      const inner = isBrand ? brandInner(s.tone, W, H) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups });
       const ovl = overlayBody(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
@@ -1291,8 +1294,65 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
   }
 
+  // ====================================================================================
+  // STUDIO-VOORBEELD: één echt frame van een scène/beat, uit EXACT dezelfde tekencode als de
+  // video-render (techniek + chrome + ondertitel), zodat het voorbeeld in de studio nooit meer
+  // afwijkt van de uiteindelijke video. De studio toont hiermee ELKE scène (ook de getekende, die
+  // vroeger alleen een grijs labeltje gaven). Video-beats geven we niet terug ({video:true}); die
+  // toont de studio rechtstreeks met het echte videobestand. Puur resvg-veilig: geen ffmpeg nodig.
+  async function previewFrameSVG({ story = "sword", voice = "man", sceneNum, beatIndex = 0, p = 0.6, format = "9:16" } = {}) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const tlPath = path.resolve(ROOT, "assets/ummaunited/voice", String(story), String(voice), "_timeline.json");
+    const tl = JSON.parse(await fs.readFile(tlPath, "utf8"));
+    const tlScenes = Array.isArray(tl.scenes) ? tl.scenes : [];
+    if (!tlScenes.length) throw new Error("lege tijdlijn");
+    // scène opzoeken op nummer, anders op volgorde
+    let i = tlScenes.findIndex((s) => Number(s.scene) === Number(sceneNum));
+    if (i < 0) i = Math.max(0, Math.min(tlScenes.length - 1, (Number(sceneNum) || 1) - 1));
+    const s = tlScenes[i];
+    const dur = Number(s.dur) || 3;
+    const isBrand = s.tone === "intro" || s.tone === "outro";
+    const isFirst = i === 0, isLast = i === tlScenes.length - 1;
+    const beats = Array.isArray(s.beats) ? s.beats : [];
+    const beat = beats[beatIndex] || beats[0] || {};
+
+    // video-beat -> de studio toont het echte bestand zelf (resvg kan geen mp4)
+    if (beat.vid) return { video: true, W, H };
+
+    // ONDERTITEL op tijdstip p (gelijk aan de render: de actieve zin uit de tijdlijn)
+    const sents = Array.isArray(s.sentences) ? s.sentences : null;
+    const subTxt = activeSentText(sents, p * dur);
+    const subSVG = subTxt != null ? ondertitelMee(subTxt, W, H, 1) : ondertitelMee((sents || []).map((x) => x.text).join(" "), W, H, p);
+
+    // ACHTERGROND (inner): intro/outro-merkveld, foto-beat (Ken Burns-stilstaand) of de getekende
+    // techniek (standaard statement = sterrenveld, exact zoals de render die nu tekent).
+    let inner;
+    if (isBrand) {
+      inner = brandInner(s.tone, W, H);
+    } else if (beat.img) {
+      const abs = String(beat.img).includes("/") ? path.resolve(ROOT, beat.img) : path.resolve(ROOT, "assets/ummaunited/video", beat.img);
+      const uri = await loadImageURI(abs);
+      inner = techBeeld({ W, H, p, scene: { imgURI: uri } });
+    } else {
+      const fn = TECHS[s.tech || "statement"] || techStatement;
+      inner = fn({ W, H, p, scene: s, groups: (tl.groups || {}) });
+    }
+
+    // CHROME (gelijk aan overlayBody in de render): kader + logo (1e scène) + ondertitel, of CTA op
+    // de laatste scène. p=0.6 valt vóór het CTA-venster, dus normaal zien we de ondertitel.
+    const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
+    const ctaOpen = ctaOp > 0.01;
+    const overlay = kader(W, H)
+      + (isFirst ? logoChrome(W, H) : "")
+      + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : subSVG);
+
+    const svg = composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: "" });
+    return { svg, W, H, scene: s.scene, beats: beats.length };
+  }
+
   return {
     id: "ummaunited", name: "Umma United", branding, init, listSubjects, templates, makeRender,
+    previewFrameSVG,
     options: ["type", "title", "durationSec", "mapView", "groups", "scenes"],
   };
 }
