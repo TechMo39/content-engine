@@ -267,7 +267,7 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  const im=$('pv-img'),vd=$('pv-vid'),nm=$('pv-nomedia');
  const key=b.vid?'v:'+b.vid:(b.img?'i:'+b.img:'none:'+(b.label||''));
  if(key!==curMediaKey){curMediaKey=key;
-   if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.src=mediaUrl(b.vid);vd.play().catch(()=>{});}
+   if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.autoplay=true;vd.oncanplay=()=>{vd.play().catch(()=>{});};vd.src=mediaUrl(b.vid);vd.play().catch(()=>{});}
    else if(b.img){im.onload=im.onerror=null;im.src=mediaUrl(b.img);im.style.display='block';vd.style.display='none';nm.style.display='none';vd.pause();vd.removeAttribute('src');}
    else{ // geen foto/video -> toon het ECHTE getekende frame uit de engine (zelfde tekencode als de render)
      nm.textContent='scène tekenen…';nm.style.display='flex';vd.style.display='none';vd.removeAttribute('src');

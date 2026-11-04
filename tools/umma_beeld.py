@@ -12,7 +12,7 @@
 #   python tools/umma_beeld.py --force         # ook beats die al beeld hebben opnieuw ophalen
 #
 # Geen API-sleutel nodig. Alles via de open Wikimedia Commons API.
-import argparse, os, json, time, urllib.parse, urllib.request, urllib.error, re
+import argparse, os, json, time, urllib.parse, urllib.request, urllib.error, re, subprocess
 
 UA = "UmmaUnited-content-engine/1.0 (local research use; contact via app)"
 API = "https://commons.wikimedia.org/w/api.php"
@@ -65,6 +65,39 @@ LABELS = {
  17:["de waarheid loopt recht","volg ons (CTA)"],
  18:["outro (merk)"],
 }
+
+# VIDEO NORMALISEREN — opgehaalde clips zijn vaak 4K en soms 50fps; een laptop zonder losse GPU
+# kan dat niet vlot in een videovak afspelen (preview blijft zwart). We zetten elke video om naar
+# maximaal 1080p en 30fps, zelfde codec (H.264/yuv420p). Klein en overal afspeelbaar; de render
+# leest hetzelfde bestand.
+_FFMPEG_CACHE = {}
+def _ffmpeg_bin(root):
+    if "bin" not in _FFMPEG_CACHE:
+        try:
+            _FFMPEG_CACHE["bin"] = subprocess.check_output(
+                ["node", "-e", "process.stdout.write(require('ffmpeg-static'))"],
+                cwd=root, text=True, stderr=subprocess.DEVNULL).strip()
+        except Exception:
+            _FFMPEG_CACHE["bin"] = "ffmpeg"
+    return _FFMPEG_CACHE["bin"]
+
+def normalize_video(path, root):
+    ff = _ffmpeg_bin(root)
+    tmp = path + ".norm.mp4"
+    cmd = [ff, "-y", "-v", "error", "-i", path,
+           "-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,fps=30",
+           "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-crf", "20",
+           "-preset", "veryfast", "-movflags", "+faststart", "-an", tmp]
+    try:
+        subprocess.run(cmd, check=True)
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        if os.path.exists(tmp):
+            try: os.remove(tmp)
+            except Exception: pass
+        print(f"    normaliseren mislukt: {e}")
+        return False
 
 def ensure_beats(sc):
     # Herbouw de beeld-beats ELKE run uit SPLITS/LABELS — dat is de enige bron van waarheid voor de
@@ -349,6 +382,8 @@ def main():
                 with open(fpath, "wb") as f: f.write(data)
             except Exception as e:
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(0.5); continue
+            if is_video and normalize_video(fpath, args.root):
+                print("    genormaliseerd -> max 1080p30 (app-afspeelbaar)")
             rel = "assets/ummaunited/video/" + fname
             beat["vid" if is_video else "img"] = rel
             beat.pop("img" if is_video else "vid", None)  # oude tegenpool opruimen
