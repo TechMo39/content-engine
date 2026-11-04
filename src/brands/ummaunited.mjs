@@ -310,13 +310,15 @@ function onderschrift(txt, W, H, op = 1) {
 // Herbruikbaar over ELK type. op = 0..1 (schuift omhoog + fade).
 function ctaFoldout(W, H, op) {
   if (op <= 0.01) return "";
+  const S = Math.min(W, H);
   const e = sm(op);
-  const panelH = H * 0.26, panelW = W * 0.84;
+  // paneel-maat op de korte zijde zodat het in 16:9 niet loodrecht uitrekt; in 9:16 identiek (S==W).
+  const panelH = S * 0.26, panelW = Math.min(W * 0.84, S * 1.5);
   const x = (W - panelW) / 2;
-  const yRest = H * 0.52;                  // eindpositie
-  const y = yRest + (1 - e) * H * 0.2;     // schuift omhoog in
-  const r = Math.round(W * 0.05);
-  const fs1 = Math.round(W * 0.05), fs2 = Math.round(W * 0.044);
+  const yRest = (H - panelH) / 2 + H * 0.02;   // rond het midden, orientatie-onafhankelijk
+  const y = yRest + (1 - e) * H * 0.2;         // schuift omhoog in
+  const r = Math.round(S * 0.05);
+  const fs1 = Math.round(S * 0.05), fs2 = Math.round(S * 0.044);
   let g = `<g opacity="${e.toFixed(2)}">`;
   // scrim over het hele beeld zodat de CTA de schone focus is
   g += `<rect x="0" y="0" width="${W}" height="${H}" fill="${COL.ink}" opacity="${(0.45 * e).toFixed(2)}"/>`;
@@ -328,7 +330,7 @@ function ctaFoldout(W, H, op) {
   // regel 2: de missie-CTA
   g += `<text x="${W / 2}" y="${y + panelH * 0.52}" text-anchor="middle" font-family="${SANS}" font-size="${fs2}" fill="${COL.mute}">Subscribe so we can go deeper.</text>`;
   // subscribe-chip (oranje pil)
-  const chipW = W * 0.4, chipH = panelH * 0.26, cx = (W - chipW) / 2, cy = y + panelH * 0.64;
+  const chipW = Math.min(W * 0.4, S * 0.6), chipH = panelH * 0.26, cx = (W - chipW) / 2, cy = y + panelH * 0.64;
   g += `<rect x="${cx}" y="${cy}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="${COL.orange}"/>`;
   g += `<text x="${W / 2}" y="${cy + chipH * 0.70}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(chipH * 0.5)}" fill="${COL.ink}">SUBSCRIBE</text>`;
   g += `</g>`;
@@ -338,6 +340,10 @@ function ctaFoldout(W, H, op) {
 export function makeBrand({ ROOT = "." } = {}) {
   const branding = {
     name: "Umma United", footer: "",   // GEEN footer-tekst onderaan (logo staat rechtsboven)
+    // GEEN automatisch woordmerk bovenin: composeChrome tekent anders b.name als tekst boven ELKE
+    // scène, wat botste met het logo rechtsboven en (op intro/outro) met het grote woordmerk. De
+    // merk-identiteit komt nu alleen van logoChrome (klein rechtsboven, 1e scène) + de intro/outro.
+    markSvg: () => "",
     bg: COL.ink, bg2: COL.navy2, gold: COL.orange, cream: COL.cream, plate: COL.navy,
   };
   let MAP = null;        // { viewBox:[x,y,w,h], countries:{id:path}, names:{id:name} }
@@ -596,8 +602,9 @@ export function makeBrand({ ROOT = "." } = {}) {
 
   // -- TECHNIEK: statement (grote woord-voor-woord kernzin, merk-achtergrond) --
   function techStatement({ W, H, p, scene }) {
+    const S = Math.min(W, H);
     const txt = scene.text || "";
-    const fs = fitFs(txt, Math.round(W * 0.11), W * 0.80, 0.56);
+    const fs = fitFs(txt, Math.round(S * 0.11), W * 0.80, 0.56);
     let g = bgField(W, H, (txt.length * 7) % 97);
     // zachte oranje gloed achter de tekst
     g += `<ellipse cx="${W / 2}" cy="${H * 0.46}" rx="${W * 0.44}" ry="${H * 0.14}" fill="${COL.orange}" opacity="${(0.10 * sm(p)).toFixed(2)}"/>`;
@@ -605,7 +612,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     // kicker onder de zin (scene.kick), rustig
     if (scene.kick) {
       const ko = clamp01((p - 0.5) / 0.3);
-      g += `<text x="${W / 2}" y="${H * 0.60}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.045)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+      g += `<text x="${W / 2}" y="${H * 0.60}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(S * 0.045)}" letter-spacing="2" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
     }
     return g;
   }
@@ -615,10 +622,11 @@ export function makeBrand({ ROOT = "." } = {}) {
   // grond heeft en uit elkaar valt). Daaronder RIJST de waarheid op in warm oranje. Stijlvol,
   // volwassen, past bij een serieus statement.
   function techMythe({ W, H, p, scene }) {
+    const S = Math.min(W, H);
     const claim = scene.text || "";               // de leugen/beschuldiging
     const truth = scene.truth || scene.kick || ""; // wat er echt is
     let g = bgField(W, H, (claim.length * 13) % 89);
-    const fsC = fitFs(claim, Math.round(W * 0.082), W * 0.84, 0.56);
+    const fsC = fitFs(claim, Math.round(S * 0.082), W * 0.84, 0.56);
     const cy = truth ? H * 0.38 : H * 0.46;
 
     // fasen: verschijnen 0..0.28, vasthouden 0.28..0.5, oplossen 0.5..0.82
@@ -646,7 +654,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const tp = clamp01((p - 0.58) / 0.4);
       const te = sm(tp);
       const ty = H * 0.56 + (1 - te) * H * 0.04;
-      const fsT = fitFs(truth, Math.round(W * 0.072), W * 0.84, 0.56);
+      const fsT = fitFs(truth, Math.round(S * 0.072), W * 0.84, 0.56);
       g += `<g opacity="${te.toFixed(2)}"><text x="${W / 2}" y="${ty.toFixed(0)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${fsT}" fill="${COL.orange}">${escapeXml(truth)}</text></g>`;
     }
     return g;
@@ -711,14 +719,15 @@ export function makeBrand({ ROOT = "." } = {}) {
     // Alleen de kicker (bv. "PART 2") blijft als los accent toegestaan.
     if (scene.kick) {
       const ko = clamp01((p - 0.4) / 0.3);
-      g += `<text x="${W / 2}" y="${H * 0.20}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(W * 0.05)}" letter-spacing="3" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
+      g += `<text x="${W / 2}" y="${H * 0.20}" text-anchor="middle" font-family="${SANS}" font-weight="700" font-size="${Math.round(Math.min(W, H) * 0.05)}" letter-spacing="3" fill="${COL.orange}" opacity="${ko.toFixed(2)}">${escapeXml(scene.kick.toUpperCase())}</text>`;
     }
     return g;
   }
 
   // -- CHROME: het logo-embleem KLEIN RECHTSBOVEN (geen merknaam-tekst erbij). Discreet watermerk.
   function logoChrome(W, H) {
-    const sz = Math.round(W * 0.11);
+    const S = Math.min(W, H);                    // korte zijde: zelfde maat in 9:16 en 16:9
+    const sz = Math.round(S * 0.11);
     const x = W - sz - Math.round(W * 0.065);   // rechterhoek, binnen het kader
     const y = Math.round(H * 0.045);
     if (!LOGO_URI) {
@@ -733,8 +742,9 @@ export function makeBrand({ ROOT = "." } = {}) {
   function ondertitelMee(caption, W, H, p) {
     const txt = String(caption || "").trim();
     if (!txt) return "";
+    const S = Math.min(W, H);                    // korte zijde: ondertitel even groot in 9:16 en 16:9
     const words = txt.split(/\s+/);
-    const fs = Math.round(W * 0.044), lh = fs * 1.3;
+    const fs = Math.round(S * 0.044), lh = fs * 1.3;
     // Breedte-fit: schat tekenbreedte (~0.56*fs per teken) en vul regels tot ~86% van W.
     const maxLineW = W * 0.86, charW = fs * 0.56;
     const lines = []; let cur = [];
@@ -776,9 +786,10 @@ export function makeBrand({ ROOT = "." } = {}) {
   // Umma United voor staat, zodat de allereerste video het kanaal meteen plaatst.
   function missieRegel(W, H, op) {
     if (op <= 0.01) return "";
+    const S = Math.min(W, H);
     const l1 = "UMMA UNITED";
     const l2 = "Our history. Our pride. Our present.";
-    const fs1 = Math.round(W * 0.052), fs2 = Math.round(W * 0.040);
+    const fs1 = Math.round(S * 0.052), fs2 = Math.round(S * 0.040);
     const y = H * 0.135;
     return `<g opacity="${op.toFixed(2)}">`
       + `<text x="${W / 2}" y="${y}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${fs1}" letter-spacing="3" fill="${COL.orange}">${l1}</text>`
@@ -791,13 +802,21 @@ export function makeBrand({ ROOT = "." } = {}) {
   // divergentie). kind wordt niet meer onderscheiden (intro==outro-veld); de ondertitel loopt
   // er net als overal via subAt overheen.
   function brandInner(kind, W, H) {
-    const logoSz = Math.round(W * 0.26);
-    const lx = Math.round((W - logoSz) / 2), ly = Math.round(H * 0.30);
+    // logo + woordmerk als één gecentreerd blok, gemeten op de KORTE zijde zodat ze in ZOWEL 9:16
+    // ALS 16:9 passen en nooit overlappen (in landscape botsten ze vroeger op elkaar).
+    const S = Math.min(W, H);
+    const logoSz = Math.round(S * 0.26);
+    const wmFs = Math.round(S * 0.085);
+    const gap = Math.round(S * 0.06);
+    const blockH = logoSz + gap + wmFs;
+    const top = Math.round((H - blockH) / 2);     // verticaal gecentreerd, orientatie-onafhankelijk
+    const lx = Math.round((W - logoSz) / 2), ly = top;
+    const wmY = top + logoSz + gap + Math.round(wmFs * 0.8);
     const logo = LOGO_URI
       ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
       : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`
         + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
-    const wm = `<text x="${W / 2}" y="${Math.round(H * 0.62)}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(W * 0.085)}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
+    const wm = `<text x="${W / 2}" y="${wmY}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${wmFs}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
     return `<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy2 || COL.navy}" opacity="0.35"/>` + logo + wm;
   }
 
