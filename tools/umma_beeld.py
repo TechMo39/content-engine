@@ -139,16 +139,31 @@ def _ok_license(ext):
     lic = ((ext.get("LicenseShortName", {}) or {}).get("value", "") or "").lower()
     return any(k in lic for k in ["public domain", "cc0", "cc by", "cc-by", "pdm", "no restrictions"])
 
-def search_image(query):
-    # zoek bestanden (namespace 6) op Commons; pak de eerste met bruikbare licentie + goede breedte.
+# RELEVANTIE: niet blind het eerste resultaat pakken, maar de treffer waarvan de tags (video) of
+# de titel (foto) het best matchen met de zoekterm. Generieke woorden (dark/old/...) tellen licht,
+# specifieke woorden (mosque/persian/jerusalem/...) tellen zwaar. Zo vallen rare/ongerelateerde
+# treffers af en kiezen we het beeld dat echt bij de scène hoort.
+_GENERIC = {"the", "a", "of", "and", "in", "on", "to", "at", "over", "with", "dark", "old",
+            "ancient", "dramatic", "slow", "close", "up", "wide", "great", "real", "historical"}
+def _relevance(text, query):
+    t = " " + re.sub(r"[^a-z0-9]+", " ", (text or "").lower()) + " "
+    qs = [w for w in re.findall(r"[a-z]+", query.lower()) if len(w) > 2]
+    score = 0
+    for w in qs:
+        if (" " + w + " ") in t or (w + "s ") in t:
+            score += 1 if w in _GENERIC else 3
+    return score
+
+def _search_image_once(gsrsearch, query):
+    # één Commons-zoekopdracht -> lijst kandidaten (bruikbare licentie, bitmap).
     try:
         d = _api({
             "action": "query", "generator": "search",
-            "gsrsearch": query + " filetype:bitmap", "gsrnamespace": "6", "gsrlimit": "8",
+            "gsrsearch": gsrsearch + " filetype:bitmap", "gsrnamespace": "6", "gsrlimit": "12",
             "prop": "imageinfo", "iiprop": "url|extmetadata|mime|size", "iiurlwidth": "1920",
         })
     except Exception as e:
-        print(f"    zoekfout: {e}"); return None
+        print(f"    zoekfout: {e}"); return []
     pages = ((d.get("query") or {}).get("pages") or {})
     cands = []
     for p in pages.values():
@@ -166,8 +181,19 @@ def search_image(query):
         lic = ((ext.get("LicenseShortName", {}) or {}).get("value", "") or "")
         cands.append({"url": url, "mime": mime, "w": w, "credit": cred, "license": lic,
                       "title": p.get("title", "")})
-    # grootste eerst (scherper beeld)
-    cands.sort(key=lambda c: c["w"], reverse=True)
+    return cands
+
+def search_image(query):
+    # Commons-foto, GERANGSCHIKT OP RELEVANTIE (titel matcht de zoekterm), dan op breedte. Vindt de
+    # volle zoekterm niks, dan nog een poging met alleen de SPECIFIEKE woorden (generieke eruit),
+    # zodat historische termen als "expulsion jews" niet stil op niets uitlopen.
+    cands = _search_image_once(query, query)
+    if not cands:
+        specific = " ".join(w for w in query.split() if w.lower() not in _GENERIC)
+        if specific and specific != query:
+            print(f"    (geen treffer, opnieuw met '{specific}')")
+            cands = _search_image_once(specific, query)
+    cands.sort(key=lambda c: (_relevance(c["title"], query), c["w"]), reverse=True)
     return cands[0] if cands else None
 
 def ext_for(mime):
@@ -179,30 +205,33 @@ def _getj(url, headers=None):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 def search_video(query, keys, min_dur=0):
-    # LANDSCAPE (16:9) video. Pixabay heeft de sleutel; kies de eerste bruikbare LIGGENDE clip
-    # (breedte >= hoogte, >= 1280px) van voldoende lengte. Pexels als terugval (zelden een sleutel).
+    # LANDSCAPE (16:9) video, GERANGSCHIKT OP RELEVANTIE: niet de bovenste treffer, maar de
+    # liggende clip waarvan de Pixabay-tags het best bij de zoekterm passen (tie-break op resolutie).
+    # Zo vallen rare/ongerelateerde clips af. Pexels als terugval (zelden een sleutel).
     try:
         if keys.get("pixabay"):
-            d = _getj("https://pixabay.com/api/videos/?" + urllib.parse.urlencode({"key": keys["pixabay"], "q": query, "per_page": 20}))
-            fallback = None
+            d = _getj("https://pixabay.com/api/videos/?" + urllib.parse.urlencode({"key": keys["pixabay"], "q": query, "per_page": 30}))
+            scored = []
             for h in d.get("hits", []):
                 if min_dur and h.get("duration", 0) < min_dur:
                     continue
                 vids = h.get("videos", {})
-                # kies de grootste LIGGENDE variant (breedte >= hoogte)
-                pick = None
+                best = None
                 for size in ("large", "medium", "small"):
                     v = vids.get(size)
                     if v and v.get("url") and (v.get("width", 0) >= v.get("height", 0)) and v.get("width", 0) >= 1280:
-                        pick = v; break
-                if pick:
-                    return {"url": pick["url"], "ext": ".mp4", "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}
-                if fallback is None:
-                    v = vids.get("large") or vids.get("medium")
-                    if v and v.get("url") and v.get("width", 0) >= v.get("height", 0):
-                        fallback = {"url": v["url"], "ext": ".mp4", "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}
-            if fallback:
-                return fallback
+                        best = v; break
+                if not best:
+                    continue
+                rel = _relevance(h.get("tags", ""), query)
+                scored.append((rel, best.get("width", 0), {"url": best["url"], "ext": ".mp4",
+                               "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}))
+            if scored:
+                # hoogste relevantie eerst, dan hoogste resolutie
+                scored.sort(key=lambda s: (s[0], s[1]), reverse=True)
+                if scored[0][0] == 0:
+                    print("    (geen tag-match, beste gok)")
+                return scored[0][2]
     except Exception as e:
         print(f"    pixabay-fout: {e}")
     try:
