@@ -19,23 +19,28 @@ API = "https://freesound.org/apiv2"
 
 # MUZIEK PER BLOK: scène-bereik (van..t/m) + stemming/zoekterm. Een blok krijgt één doorlopend
 # muziekje; op de blok-grenzen laat de render het overvloeien.
+# 5 muziek-SFEREN (elk één track), verdeeld over 7 blokken van het verhaal zodat het NIET één track
+# voor de hele film is. Eén sfeer mag in niet-aangrenzende blokken terugkomen (donker: Rome + de wond;
+# triomf: het-hield-stand + de payoff). De render laat de muziek op de blok-grenzen overvloeien.
+TRACKS = {
+ "opening": "cinematic ambient mysterious tension",   # intro + haak + test
+ "dark":    "dark cinematic drone ominous",            # Rome / dwang, en de wond
+ "hope":    "emotional cinematic strings uplifting",   # vrijheid / rechtvaardigheid
+ "tension": "tense cinematic drums dramatic",          # koloniale test
+ "triumph": "epic emotional cinematic uplifting",      # het hield stand / payoff / CTA
+}
 BLOCKS = [
- {"from":1,  "to":4,  "mood":"dark cinematic ambient"},
- {"from":5,  "to":7,  "mood":"emotional strings"},
- {"from":8,  "to":11, "mood":"tense cinematic drums"},
- {"from":12, "to":16, "mood":"uplifting cinematic"},
+ {"from":0,  "to":2,  "track":"opening"},
+ {"from":3,  "to":4,  "track":"dark"},
+ {"from":5,  "to":8,  "track":"hope"},
+ {"from":9,  "to":10, "track":"tension"},
+ {"from":11, "to":12, "track":"triumph"},
+ {"from":13, "to":14, "track":"dark"},
+ {"from":15, "to":18, "track":"triumph"},
 ]
 
-# SFX OP DE KANTELPUNTEN: (scène, seconde-binnen-de-scène, zoekterm). Bewust weinig, alleen waar het
-# verhaal kantelt. De seconde mag ruw; op de montagetafel schuif je hem exact goed.
-SFX = [
- {"scene":4,  "t":25.8, "q":"stomp impact"},     # "A boot."
- {"scene":8,  "t":0.4,  "q":"riser whoosh"},      # the tide turned
- {"scene":9,  "t":7.9,  "q":"impact hit"},        # They killed. They humiliated.
- {"scene":10, "t":0.4,  "q":"deep impact"},       # "No."
- {"scene":12, "t":20.0, "q":"hollow drone"},      # lege kerken
- {"scene":15, "t":23.9, "q":"uplifting swell"},   # payoff: you are the proof
-]
+# SFX pas in de laatste stap (special effects). Nu leeg.
+SFX = []
 
 def load_key(root):
     k = os.environ.get("FREESOUND_API_KEY", "")
@@ -156,29 +161,38 @@ def main():
     credits = []
     n_mus = n_sfx = n_fail = 0
 
-    # ---- MUZIEK per blok ----
-    music = []
-    for bi, blk in enumerate(BLOCKS):
-        a = by_num.get(blk["from"]); b = by_num.get(blk["to"])
-        if not a or not b: continue
-        start = round(a.get("start", 0), 3)
-        end = round(b.get("start", 0) + b.get("dur", 0), 3)
-        fname = f"blok{bi+1}.mp3"; fpath = os.path.join(mdir, fname)
+    # ---- MUZIEK per sfeer: haal elke track ÉÉN keer op (umma-<sfeer>.mp3) ----
+    track_file = {}
+    for name, query in TRACKS.items():
+        fname = f"umma-{name}.mp3"; fpath = os.path.join(mdir, fname)
+        rel = "assets/ummaunited/muziek/" + fname
         if os.path.exists(fpath) and not args.force:
-            music.append({"start": start, "end": end, "file": "assets/ummaunited/muziek/" + fname, "mood": blk["mood"]})
-            print(f"blok {bi+1} (scène {blk['from']}-{blk['to']}): muziek staat al"); continue
-        print(f"blok {bi+1} (scène {blk['from']}-{blk['to']}): zoek muziek '{blk['mood']}'")
-        hit = search_cc0(blk["mood"], key, prefer_long=True)
+            track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
+        print(f"sfeer '{name}': zoek muziek '{query}'")
+        hit = search_cc0(query, key, prefer_long=True)
         if not hit:
-            print("    geen bruikbare muziek gevonden -> laat leeg (zoek jij)"); n_fail += 1; time.sleep(1.2); continue
+            print("    geen bruikbare muziek gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
         print(f"    treffer: {hit['name'][:42]} ({hit['lic']}, {hit['dur']:.0f}s), downloaden...")
         try:
             download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-        music.append({"start": start, "end": end, "file": "assets/ummaunited/muziek/" + fname, "mood": blk["mood"]})
-        credits.append(f"muziek blok {bi+1}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
+        track_file[name] = rel
+        credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
+
+    # ---- blokken op de tijdlijn zetten met de bijbehorende sfeer-track ----
+    music = []
+    for blk in BLOCKS:
+        a = by_num.get(blk["from"]); b = by_num.get(blk["to"])
+        if not a or not b: continue
+        rel = track_file.get(blk["track"])
+        if not rel:
+            print(f"blok scène {blk['from']}-{blk['to']}: sfeer '{blk['track']}' mist, overgeslagen"); continue
+        start = round(a.get("start", 0), 3)
+        end = round(b.get("start", 0) + b.get("dur", 0), 3)
+        music.append({"start": start, "end": end, "file": rel, "mood": blk["track"]})
+        print(f"blok scène {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
     tl["music"] = music
 
     # ---- SFX op de kantelpunten ----

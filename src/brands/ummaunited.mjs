@@ -690,7 +690,42 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
     let g = `<rect width="${W}" height="${H}" fill="${COL.ink}"/>` + starfield(W, H, 11);
     g += `<g transform="translate(${offX.toFixed(2)} ${offY.toFixed(2)}) scale(${scale.toFixed(4)})">${paths}${rulerPaths}</g>`;
-    // GEEN onderschrift meer: de meelopende ondertiteling onderaan is de enige tekst (geen dubbel).
+    // LABELS OP DE KAART: per gekleurde groep de naam op het zwaartepunt van dat gebied, met de
+    // groepskleur als rand, zodat de kijker ziet WAT elk gekleurd gebied is (bv. "Roman Empire",
+    // "Muslim world"). De tekst verschijnt mee met de inkleuring. Zwaartepunt = gemiddelde van de
+    // path-coordinaten van de landen in die groep (ruw maar genoeg om het label op het gebied te zetten).
+    const labCfg = scene.labels || {};
+    const S = Math.min(W, H), labFs = Math.round(S * 0.033);
+    for (const [grp, text] of Object.entries(labCfg)) {
+      const ids = (groups[grp] || []); if (!ids.length || !MAP || !text) continue;
+      let sx = 0, sy = 0, n = 0;
+      for (const id of ids) {
+        const d = MAP.countries[id]; if (!d) continue;
+        const nums = d.match(/-?\d+(?:\.\d+)?/g); if (!nums) continue;
+        for (let k = 0; k + 1 < nums.length; k += 2) { sx += +nums[k]; sy += +nums[k + 1]; n++; }
+      }
+      if (!n) continue;
+      let px = offX + (sx / n) * scale, py = offY + (sy / n) * scale;
+      px = Math.max(W * 0.12, Math.min(W * 0.88, px));
+      py = Math.max(H * 0.20, Math.min(H * 0.80, py));
+      const col = resolveColor((scene.fills || {})[grp]) || COL.orange;
+      const op = clamp01((p - 0.2) / 0.3);
+      const tw = Math.max(labFs * 3, text.length * labFs * 0.56);
+      g += `<g opacity="${op.toFixed(2)}">`
+        + `<rect x="${(px - tw / 2 - 12).toFixed(0)}" y="${(py - labFs * 0.85).toFixed(0)}" width="${(tw + 24).toFixed(0)}" height="${(labFs * 1.7).toFixed(0)}" rx="${(labFs * 0.6).toFixed(0)}" fill="#0b1020" opacity="0.8" stroke="${col}" stroke-width="2.5"/>`
+        + `<text x="${px.toFixed(0)}" y="${(py + labFs * 0.33).toFixed(0)}" text-anchor="middle" font-family="${SANS}" font-weight="800" font-size="${labFs}" letter-spacing="0.5" fill="${COL.cream}">${escapeXml(text)}</text>`
+        + `</g>`;
+    }
+    // SCENE-INFO (bv. een jaartal/periode die bij deze scène hoort) als badge bovenaan de kaart,
+    // los van de ondertitel onderaan en de gebied-labels in het midden. Geeft de kaart context.
+    if (scene.kaartInfo) {
+      const iFs = Math.round(S * 0.044), iy = H * 0.12, io = clamp01((p - 0.1) / 0.3);
+      const iw = Math.max(iFs * 4, String(scene.kaartInfo).length * iFs * 0.58);
+      g += `<g opacity="${io.toFixed(2)}">`
+        + `<rect x="${(W / 2 - iw / 2 - 14).toFixed(0)}" y="${(iy - iFs).toFixed(0)}" width="${(iw + 28).toFixed(0)}" height="${(iFs * 1.7).toFixed(0)}" rx="${(iFs * 0.55).toFixed(0)}" fill="#0b1020" opacity="0.74" stroke="${COL.orange}" stroke-width="2"/>`
+        + `<text x="${(W / 2).toFixed(0)}" y="${(iy + iFs * 0.33).toFixed(0)}" text-anchor="middle" font-family="${SANS}" font-weight="800" font-size="${iFs}" letter-spacing="1" fill="${COL.orange}">${escapeXml(scene.kaartInfo)}</text>`
+        + `</g>`;
+    }
     return g;
   }
 
@@ -881,6 +916,48 @@ export function makeBrand({ ROOT = "." } = {}) {
     } catch { return null; }
   }
 
+  // KAART-DATA uit de gedeelde tijdlijn: per scène tech/fills/view (welke scène een getekende,
+  // inkleurende wereldkaart is en met welke kleuren), plus de landgroepen. De groepen staan in de
+  // tijdlijn als LANDNAMEN; hier zetten we ze om naar de kaart-id's (via NAME2ID uit de kaart-asset),
+  // want techKaart werkt met id's. Geen tijdlijn/geen kaart -> null -> gewoon het oude gedrag.
+  function resolveGroupsNames(gobj) {
+    if (!gobj || typeof gobj !== "object" || Array.isArray(gobj)) return null;
+    const out = {};
+    for (const [name, arr] of Object.entries(gobj)) {
+      if (!Array.isArray(arr)) continue;
+      const ids = [];
+      for (const nm of arr) {
+        const id = NAME2ID[String(nm).toLowerCase().trim()];
+        if (id) ids.push(id);
+      }
+      out[name] = ids;
+    }
+    return out;
+  }
+  async function _readTL(scenes) {
+    const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
+    const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
+    if (!m) return null;
+    const p = path.resolve(ROOT, "assets/ummaunited/voice", m[1], m[2], "_timeline.json");
+    const tl = JSON.parse(await fs.readFile(p, "utf8"));
+    return (tl && Array.isArray(tl.scenes)) ? tl : null;
+  }
+  async function loadSceneTech(scenes) {
+    try {
+      const tl = await _readTL(scenes); if (!tl) return null;
+      return scenes.map((s, i) => {
+        const ts = tl.scenes[i] || tl.scenes.find((x) => x.scene === i + 1);
+        return (ts && ts.tech) ? { tech: ts.tech, fills: ts.fills || {}, rule: ts.rule || {}, labels: ts.labels || {}, kaartInfo: ts.kaartInfo || "", view: ts.view } : null;
+      });
+    } catch { return null; }
+  }
+  async function loadTimelineGroups(scenes) {
+    try {
+      const tl = await _readTL(scenes); if (!tl) return null;
+      return resolveGroupsNames(tl.groups);
+    } catch { return null; }
+  }
+
   // techniek-register: naam -> fn
   const TECHS = { statement: techStatement, mythe: techMythe, kaart: techKaart, beeld: techBeeld };
 
@@ -1041,6 +1118,9 @@ export function makeBrand({ ROOT = "." } = {}) {
     const beatsByIndex = await loadSceneBeats(scenes);
     // muziek-per-blok + effecten-per-moment uit dezelfde tijdlijn.
     const tlAudio = await loadTimelineAudio(scenes);
+    // KAART per scène (getekende inkleurende wereldkaart) + landgroepen uit de tijdlijn.
+    const techByIndex = await loadSceneTech(scenes);
+    const tlGroups = await loadTimelineGroups(scenes);
     // media-pad oplossen: een volledig pad (met /) valt onder ROOT, anders onder de video-map.
     const resolveMedia = (x) => !x ? "" : (String(x).includes("/") ? path.resolve(ROOT, x) : path.resolve(ROOT, "assets/ummaunited/video", x));
     const resolveAudio = (x) => !x ? "" : path.resolve(ROOT, x);
@@ -1077,9 +1157,13 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
     // volledige scène-SVG (mét techniek-achtergrond) voor scènes zonder video/foto (kaart/statement/mythe)
     function fullSceneSVG(i, p) {
-      const s = scenes[i];
+      const base = scenes[i];
+      // kaart-scène? dan tech/fills/view uit de tijdlijn over de scène heen leggen en de kaart tekenen.
+      const st = (techByIndex && techByIndex[i]) || null;
+      const s = (st && st.tech) ? { ...base, tech: st.tech, fills: st.fills, rule: st.rule, labels: st.labels, kaartInfo: st.kaartInfo, view: st.view } : base;
+      const grps = tlGroups || groups;
       const isBrand = s.tone === "intro" || s.tone === "outro";
-      const inner = isBrand ? brandInner(s.tone, W, H) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups });
+      const inner = isBrand ? brandInner(s.tone, W, H) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups: grps });
       const ovl = overlayBody(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
@@ -1354,7 +1438,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       inner = techBeeld({ W, H, p, scene: { imgURI: uri } });
     } else {
       const fn = TECHS[s.tech || "statement"] || techStatement;
-      inner = fn({ W, H, p, scene: s, groups: (tl.groups || {}) });
+      inner = fn({ W, H, p, scene: s, groups: (resolveGroupsNames(tl.groups) || {}) });
     }
 
     // CHROME (gelijk aan overlayBody in de render): kader + logo (1e scène) + ondertitel, of CTA op
