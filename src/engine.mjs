@@ -2,7 +2,7 @@
 // Weet zelf niks van tegels; dat zit in de merk-modules. Start: npm run engine
 import http from "node:http";
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync, createReadStream } from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync, execFile } from "node:child_process";
 import os from "node:os";
@@ -359,6 +359,40 @@ async function runOne(job) {
   catch { log(`✓ klaar: /out/${r.outName}`); return { url: "/out/" + r.outName }; }
 }
 
+// MEDIA SERVEREN MET RANGE-ONDERSTEUNING. Een <audio>/<video>-element in de app vraagt een
+// mediabestand per byte-range op en wil het als SEEKBAAR openen. Als de server altijd 200 + de
+// hele buffer terugstuurt zonder "Accept-Ranges", blijft het element wachten (de mp3-muziek/SFX
+// hingen daardoor en speelden nooit; de video in de preview kon niet seeken). Deze helper leest de
+// bestandsgrootte, honoreert een "Range: bytes=.."-verzoek met 206 Partial Content + stream, en
+// zet op elk antwoord "Accept-Ranges: bytes". Streamt (createReadStream) i.p.v. alles in geheugen.
+function serveMedia(req, res, filePath, contentType) {
+  let st;
+  try { st = statSync(filePath); } catch { res.writeHead(404); res.end(""); return; }
+  const total = st.size;
+  const baseHeaders = { "content-type": contentType, "accept-ranges": "bytes", "cache-control": "max-age=3600" };
+  const range = req.headers.range;
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(range);
+    let start = m && m[1] ? parseInt(m[1], 10) : 0;
+    let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    if (Number.isNaN(start) || start < 0) start = 0;
+    if (Number.isNaN(end) || end >= total) end = total - 1;
+    if (start > end || start >= total) {
+      res.writeHead(416, { ...baseHeaders, "content-range": `bytes */${total}` });
+      res.end(""); return;
+    }
+    res.writeHead(206, { ...baseHeaders, "content-range": `bytes ${start}-${end}/${total}`, "content-length": (end - start + 1) });
+    const stream = createReadStream(filePath, { start, end });
+    stream.on("error", () => { try { res.end(); } catch {} });
+    stream.pipe(res);
+    return;
+  }
+  res.writeHead(200, { ...baseHeaders, "content-length": total });
+  const stream = createReadStream(filePath);
+  stream.on("error", () => { try { res.end(); } catch {} });
+  stream.pipe(res);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
@@ -460,9 +494,9 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
     // UMMA — muziek UITSLUITEND uit de eigen map assets/ummaunited/muziek/ (gescheiden van Tale of Tiles).
     if (u.pathname === "/api/umma-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
-    if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
+    if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
     // UMMA SFX — serveer een effect-bestand uit assets/ummaunited/sfx/ zodat de studio-preview de SFX kan afspelen
-    if (u.pathname === "/api/umma-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/sfx", f); if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; } res.writeHead(404); res.end(""); return; }
+    if (u.pathname === "/api/umma-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/sfx", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
     // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
     // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
     if (u.pathname === "/api/umma-timeline" && req.method === "GET") {
@@ -491,7 +525,7 @@ const server = http.createServer(async (req, res) => {
       const n = (u.searchParams.get("n") || "").replace(/[^\d]/g, "");
       if (!n) { res.writeHead(404); res.end(""); return; }
       const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, n.padStart(2, "0") + ".wav");
-      if (existsSync(p)) { res.writeHead(200, { "content-type": "audio/wav", "cache-control": "max-age=3600" }); res.end(await fs.readFile(p)); return; }
+      if (existsSync(p)) { serveMedia(req, res, p, "audio/wav"); return; }
       res.writeHead(404); res.end(""); return;
     }
     // UMMA BEELD — serveer het opgehaalde beeld/video per beat (uit assets/ummaunited/video/) zodat
@@ -500,7 +534,7 @@ const server = http.createServer(async (req, res) => {
       const base = path.resolve(ROOT, "assets/ummaunited/video");
       const f = path.resolve(base, decodeURIComponent(u.pathname.slice("/umma-media/".length)));
       if (!f.startsWith(base)) { res.writeHead(403); res.end("nee"); return; }
-      if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" }); res.end(await fs.readFile(f)); return; }
+      if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; serveMedia(req, res, f, ct); return; }
       res.writeHead(404); res.end(""); return;
     }
     // UMMA POSTER — één stilstaand frame (jpg) uit een videobestand, zodat de studio-preview video's
