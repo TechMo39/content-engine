@@ -249,7 +249,8 @@ addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}}
 host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);dirty();layout();return;}});
 let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
 
-let t=0,playing=false,raf=null,last=0;const voiceAudio={},musicAudio={a:null,dur:0};let curScene=-1;
+let t=0,playing=false,raf=null,last=0;const voiceAudio={};let musicBlocks=[],sfxList=[],curScene=-1,curBlock=-1;
+function bn(p){return String(p).split('/').pop();}
 function sceneAt(tt){let a=0;SC.forEach((s,i)=>{if(tt>=s.start)a=i;});return a;}
 function activeBeat(s,local){const bs=beatsOf(s);let i=0;bs.forEach((b,k)=>{if(local>=b.start)i=k;});return i;}
 function curSub(){const s=SC[sceneAt(t)];const local=t-s.start;for(const u of subsOf(s)){if(local>=u.start&&local<u.end)return u.text;}return'';}
@@ -280,14 +281,19 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  else if(!vd.paused){vd.pause();}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}}
- if(musicAudio.a&&playing&&musicAudio.a.paused){try{musicAudio.a.currentTime=t%(musicAudio.dur||1);musicAudio.a.play();}catch(e){}}}
+ manageMusic();fireSfx();}
+function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
+ if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
+ if(bi>=0&&playing){const b=musicBlocks[bi];if(b.audio.paused){try{const d=b.audio.duration||0;b.audio.currentTime=d?((t-b.start)%d):(t-b.start);b.audio.play();}catch(e){}}}}
+function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;x.audio.play();}catch(e){}}}}
+function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=total){t=total;stop();}placePlayhead();syncAudio();
  const card=cardOf(sceneAt(t));if(card&&card.offsetParent){const r=card.getBoundingClientRect();if(r.top<60||r.bottom>innerHeight)card.scrollIntoView({block:'center'});}raf=requestAnimationFrame(tick);}
-function play(){if(playing)return;playing=true;last=0;curScene=-1;$('btn-play').textContent='❚❚ pauze';
+function play(){if(playing)return;playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
  const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}
- if(musicAudio.a){try{musicAudio.a.currentTime=t%(musicAudio.dur||1);musicAudio.a.play();}catch(e){}}raf=requestAnimationFrame(tick);}
+ manageMusic();raf=requestAnimationFrame(tick);}
 function stop(){playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
- for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}if(musicAudio.a){try{musicAudio.a.pause();}catch(e){}}}
+ for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}musicBlocks.forEach(b=>{try{b.audio.pause();}catch(e){}});}
 $('btn-play').addEventListener('click',()=>playing?stop():play());
 $('btn-rew').addEventListener('click',()=>{stop();t=0;placePlayhead();scrollTo({top:0,behavior:'smooth'});});
 
@@ -295,20 +301,22 @@ $('btn-rew').addEventListener('click',()=>{stop();t=0;placePlayhead();scrollTo({
 function autoAudio(){
  SC.forEach(s=>{const a=new Audio('/api/umma-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0'));
    a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
- fetch('/api/umma-music').then(r=>r.json()).then(d=>{if(d.files&&d.files.length){const f=d.files[0];const a=new Audio('/api/umma-audio?f='+encodeURIComponent(f));a.loop=true;
-   a.addEventListener('loadedmetadata',()=>{musicAudio.dur=a.duration;updAudioLabel();});a.addEventListener('error',()=>{});musicAudio.a=a;}}).catch(()=>{});
+ // MUZIEK PER BLOK uit de tijdlijn (TL.music = [{start,end,file,mood}]); elk blok z'n eigen track
+ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/umma-audio?f='+encodeURIComponent(bn(b.file)));a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
+ // SFX op de gemeten momenten (scene.start + f.t); alleen effecten met een bestand
+ sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/umma-sfx?f='+encodeURIComponent(bn(f.file)));a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
  updAudioLabel();
 }
 $('ld-voice').addEventListener('change',e=>{for(const f of e.target.files){const m=f.name.match(/(\d+)/);if(!m)continue;voiceAudio[+m[1]]=new Audio(URL.createObjectURL(f));}updAudioLabel();});
-$('ld-music').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));a.loop=true;a.addEventListener('loadedmetadata',()=>{musicAudio.dur=a.duration;updAudioLabel();});musicAudio.a=a;});
-function updAudioLabel(){const nv=Object.keys(voiceAudio).length;$('pv-audio').textContent='audio: '+(nv?nv+' stem':'geen stem')+(musicAudio.a?' + muziek':'');}
+$('ld-music').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));musicBlocks=[{start:0,end:total,audio:a}];updAudioLabel();});
+function updAudioLabel(){const nv=Object.keys(voiceAudio).length;$('pv-audio').textContent='audio: '+(nv?nv+' stem':'geen stem')+(musicBlocks.length?' + '+musicBlocks.length+' muziek':'')+(sfxList.length?' + '+sfxList.length+' sfx':'');}
 
 // opslaan: bouw de bewerkte tijdlijn terug in het _timeline.json-schema en POST naar de engine
 let isDirty=false;function dirty(){isDirty=true;$('savemsg').textContent='niet opgeslagen';$('savemsg').style.color='var(--sfx)';}
 function buildPayload(){
  const scenes=SC.map(s=>{const subs=subsOf(s);const sentences=s.sentences.map((se,i)=>({i,text:se.text,start:+subs[i].start.toFixed(3),dur:+(subs[i].end-subs[i].start).toFixed(3),abs_start:+(s.start+subs[i].start).toFixed(3)}));
    const beats=beatsOf(s).map(b=>({start:+b.start.toFixed(3),dur:+(b.end-b.start).toFixed(3),label:b.label,img:b.img||"",vid:b.vid||""}));
-   const sfx=s.sfx.map(f=>({t:+f.t.toFixed(3),name:f.name||'sfx'}));
+   const sfx=s.sfx.map(f=>({t:+f.t.toFixed(3),name:f.name||'sfx',...(f.file?{file:f.file}:{})}));
    // kaart-/techniekvelden MEEschrijven, anders stript een opslag ze eruit en verdwijnt de kaart
    const tech=s.tech?{tech:s.tech}:{}, view=s.view?{view:s.view}:{}, fills=s.fills?{fills:s.fills}:{}, rule=s.rule?{rule:s.rule}:{}, labels=s.labels?{labels:s.labels}:{}, kinfo=s.kaartInfo?{kaartInfo:s.kaartInfo}:{};
    return {scene:s.scene,tone:s.tone,wav:s.wav,start:s.start,dur:s.dur,speech_start:s.speech_start,speech_end:s.speech_end,...tech,...view,...fills,...rule,...labels,...kinfo,sentences,beats,sfx};});
