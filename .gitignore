@@ -28,3 +28,20 @@ assets/ummaunited/beeld/
 assets/music-umma/
 
 assets/ummaunited/_oud-*/
+
+# geen media in git
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.gif
