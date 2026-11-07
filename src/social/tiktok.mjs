@@ -132,6 +132,7 @@ export function makeTikTok({ ROOT, suggest } = {}) {
         client_key: key, response_type: "code", scope: SCOPES,
         redirect_uri: REDIRECT, state,
         code_challenge: challenge, code_challenge_method: "S256",
+        disable_auto_auth: "1",   // forceer altijd het TikTok-toestemmingsscherm, ook als de app al gekoppeld was
       });
       const url = `${AUTH}?${params}`;
       log(`TikTok ${lang.toUpperCase()}: open de browser om te koppelen…`);

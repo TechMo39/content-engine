@@ -54,18 +54,20 @@ def to_phonetic(text):
 # de intonatie doorloopt als een verhaal.
 MAX_CHARS = 490
 
+# Stilte VOORAAN de intro-wav (seconden): het logo staat zo eerst rustig in beeld voordat de stem
+# begint. Pas dit getal aan voor een langere/kortere logo-hold aan het begin.
+LEAD_SILENCE = 3.0
+
 # Toon-presets voor Kokoro: speed (tempo, <1 = trager/zwaarder, >1 = sneller) en sil = extra
 # STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte kan landen (adem,
 # niet bam-bam-bam). De engine voegt tussen scenes ook nog een adempauze toe (VOICE_PAD).
 TONE = {
-    "rustig": dict(speed=0.86, sil=0.45),   # verhalend, vlot met een beetje rust
-    "nadruk": dict(speed=0.82, sil=0.70),   # statement, zwaarder, laat de klap hangen
-    "warm":   dict(speed=0.82, sil=0.85),   # payoff, rustig, laat het bezinken
-    "hook":   dict(speed=0.84, sil=0.55),
-    "intro":  dict(speed=0.88, sil=0.60),
-    "outro":  dict(speed=0.86, sil=0.80),
-    "intro":  dict(speed=0.88, sil=0.60),
-    "outro":  dict(speed=0.86, sil=0.80),   # opening, pakkend maar met lucht
+    "rustig": dict(speed=0.79, sil=0.45),   # verhalend, iets vlotter
+    "nadruk": dict(speed=0.75, sil=0.70),   # statement, zwaarder, laat de klap hangen
+    "warm":   dict(speed=0.75, sil=0.85),   # payoff, rustig, laat het bezinken
+    "hook":   dict(speed=0.77, sil=0.55),   # haak
+    "intro":  dict(speed=0.79, sil=0.60),   # opening
+    "outro":  dict(speed=0.77, sil=0.80),   # afsluiter, met lucht
 }
 
 # Kokoro-synthesizer wordt per (stem, snelheid) één keer opgezet (model laadt dan één keer per
@@ -136,8 +138,15 @@ def _concat_wavs(paths, out_wav):
     with open(out_wav, "wb") as f:
         f.write(new)
 
+def _sentence_breaks(text):
+    # RUST TUSSEN ZINNEN: zet een regeleinde NA elke punt/uitroep/vraagteken, zodat Kokoro daar
+    # ZELF ademt (in de juiste woorden, geen geknipt geluid). De stem doet de pauze, wij knippen
+    # niets in de opname. Dubbele enter = iets langere adem.
+    return re.sub(r'([.!?])\s+', r'\1\n\n', text.strip())
+
 def _synthesize(voice_model, text, speed, sil, out_wav):
     synth = _get_synth(voice_model, speed)
+    text = _sentence_breaks(text)   # adem na elke zin via regeleindes (natuurlijke pauze)
     chunks = _split_for_tokens(text)
     if len(chunks) == 1:
         rendered = synth.synthesize_text(chunks[0], language="en-us", voice=voice_model)
@@ -319,6 +328,41 @@ def _append_silence(wav_path, seconds):
     except Exception:
         pass
 
+def _prepend_silence(wav_path, seconds):
+    # Plak stilte VOORAAN de wav (vóór de eerste zin). Gebruikt voor de intro: zo staat het logo
+    # een paar seconden rustig in beeld voordat de stem begint. Zelfde RIFF-logica als _append_silence,
+    # maar de stilte komt direct NA de data-chunk-header (vóór de audio) i.p.v. aan het eind.
+    try:
+        import struct
+        with open(wav_path, "rb") as f:
+            data = bytearray(f.read())
+        if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
+            return
+        byte_rate = struct.unpack_from("<I", data, 28)[0]
+        if byte_rate <= 0:
+            return
+        i = 12; data_off = None; data_len = None
+        while i + 8 <= len(data):
+            cid = bytes(data[i:i+4]); clen = struct.unpack_from("<I", data, i+4)[0]
+            if cid == b"data":
+                data_off = i + 8; data_len = clen; break
+            i += 8 + clen + (clen & 1)
+        if data_off is None:
+            return
+        block_align = struct.unpack_from("<H", data, 32)[0] or 1
+        nbytes = int(byte_rate * seconds); nbytes -= (nbytes % block_align)
+        if nbytes <= 0:
+            return
+        silence = b"\x00" * nbytes
+        # stilte VOOR de audio-data invoegen (bij data_off), audio schuift op
+        new = data[:data_off] + silence + data[data_off:]
+        struct.pack_into("<I", new, data_off - 4, data_len + nbytes)
+        struct.pack_into("<I", new, 4, len(new) - 8)
+        with open(wav_path, "wb") as f:
+            f.write(new)
+    except Exception:
+        pass
+
 # Het script "sword" (idee 1), per scene: nummer, toon, on-screen-tekst, en de VOICE-zin.
 # De voice-zin is wat ingesproken wordt; de on-screen-tekst is de korte zin in beeld.
 # TWEE DELEN. Knip op de natuurlijke breuk: deel 1 = HOE de islam opkwam (zonder dwang),
@@ -402,6 +446,11 @@ def build_story(story_id, voice, root, only=0):
             _synthesize(model, to_phonetic(voiceline), t["speed"], t["sil"], wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
+        # INTRO: stilte VOORAAN zodat het logo eerst rustig in beeld staat voordat de stem begint
+        # (geen gelijk-op-seconde-1-praten). De zin-meting hieronder meet op de verschoven wav, dus
+        # speech_start schuift mee en de ondertiteling blijft op tijd.
+        if tone == "intro":
+            _prepend_silence(wav, LEAD_SILENCE)
         d = _wav_duration(wav)
         durs[num] = d
         # knip de vloeiende alinea in zinnen met exacte tijden (ruggengraat voor ondertitel + beeld)

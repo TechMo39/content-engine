@@ -163,6 +163,33 @@ const FMT='16:9';   // de LANGE video is liggend (YouTube long). De losse short 
  document.documentElement.style.setProperty('--ar',ar);document.documentElement.style.setProperty('--screenw',sw);})();
 let VER=Date.now();   // cache-bust: na opslaan/nieuw beeld bumpen zodat de frames verversen
 function frameURL(sc,bi,p){return '/api/umma-frame?story='+STORY+'&voice='+VOICE+'&scene='+sc.scene+'&beat='+bi+'&p='+(p==null?0.6:p)+'&format='+encodeURIComponent(FMT)+'&v='+VER;}
+// GETEKENDE frames worden bij het openen van de studio ÉÉN keer vooraf gerenderd en in het geheugen
+// bewaard, zodat de preview ze tijdens afspelen DIRECT toont. BELANGRIJK: we vragen de engine PER
+// getekende scène maar WEINIG frames (merk-scène = 2: logo + achtergrond-na-fade; kaart/overig = 1).
+// De engine draait op één draad; tientallen frame-verzoeken zouden de AUDIO blokkeren (stem/muziek
+// hingen daardoor). De vloeiende fade zit in de echte video-render; de preview toont logo vóór de stem
+// en de achtergrond+ondertitel daarna (één wissel, geen stroom van verzoeken).
+const drawnFrames={};                       // "scene:beat" -> Image (stilstaand getekend beeld, 1 per beat)
+const brandPair={};                         // scene -> {logo:Image, bg:Image} (2 frames per merk-scène)
+function drawnKey(sc,bi){return sc.scene+':'+bi;}
+function speechStartOf(s){return (s.speech_start!=null)?s.speech_start:((s.sentences&&s.sentences[0])?s.sentences[0].start:0);}
+function brandLogoURL(s){const p=Math.max(0,Math.min(1,1.0/(s.dur||1)));return frameURL(s,0,+p.toFixed(4));}       // logo vol in beeld (begin-stilte)
+function brandBgURL(s){const p=Math.max(0,Math.min(1,(speechStartOf(s)+3)/(s.dur||1)));return frameURL(s,0,+p.toFixed(4));} // na de fade: alleen achtergrond
+function predrawAll(){
+  for(const k in brandPair)delete brandPair[k];
+  SC.forEach(s=>{const isBrand=(s.tone==='intro'||s.tone==='outro');
+    if(isBrand){
+      const logo=new Image();logo.src=brandLogoURL(s);
+      const bg=new Image();bg.src=(s.tone==='intro')?brandBgURL(s):brandLogoURL(s); // outro houdt het logo
+      brandPair[s.scene]={logo,bg};
+    } else {
+      beatsOf(s).forEach((b,bi)=>{
+        if(b.vid||b.img)return;              // heeft al echt beeld -> niet tekenen
+        const img=new Image();img.src=frameURL(s,bi,0.6);drawnFrames[drawnKey(s,bi)]=img;
+      });
+    }});
+  curMediaKey='__predrawn__';               // forceer dat de preview het verse voorgetekende frame oppakt
+}
 const fmt=t=>{const m=Math.floor(t/60),s=(t%60);return m+':'+s.toFixed(1).padStart(4,'0')};
 const fmts=t=>{const m=Math.floor(t/60),s=Math.round(t%60);return m+':'+String(s).padStart(2,'0')};
 let TL=EMBED, SC=[], total=0, host=$('scenes');
@@ -177,6 +204,11 @@ function buildState(){
    // als er al opgeslagen beats/sfx in het timeline-bestand staan, die voorrang geven
    if(Array.isArray(s.beats)&&s.beats.length){ st.beatBounds=s.beats.slice(1).map(b=>b.start); if(s.beats.every(b=>b.label)) st.imgLabels=s.beats.map(b=>b.label);
      st.beatMedia=s.beats.map(b=>({img:b.img||'',vid:b.vid||''})); }
+   // GETEKENDE beat (kaart/intro/outro/tekst/CTA/logo) mag NOOIT media hebben: een eerder opgeslagen
+   // tijdlijn of een oud bestand kan er per ongeluk een video op gezet hebben -> dan zie je zwart i.p.v.
+   // de getekende kaart. Hier forceren we die beats leeg, zodat de engine ze altijd tekent.
+   const brand=(s.tone==='intro'||s.tone==='outro');
+   st.imgLabels.forEach((lab,i)=>{ if((brand||isDrawnLabel(lab))&&st.beatMedia[i]){st.beatMedia[i]={img:'',vid:''};} });
    return st;});
  total=TL.total_seconds;
 }
@@ -264,9 +296,18 @@ let curMediaKey='\u0000';
 function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t);
  const bi=activeBeat(s,local);const b=beatsOf(s)[bi]||{};
  $('pv-scene').textContent='scène '+s.scene+' · '+s.tone+(b.label?' · '+b.label:'');
- $('pv-sub').textContent=curSub();$('pv-scn').textContent=s.scene;$('pv-bn').textContent=(bi+1);
+ const isBrandScene=(s.tone==='intro'||s.tone==='outro');
+ // ONDERTITEL: op een merk-scène pas tonen NADAT het logo is weggefade (na speech_start); tijdens de
+ // logo-hold geen tekst. Andere scènes: normaal de meelopende zin.
+ const sp0=(s.speech_start!=null)?s.speech_start:((s.sentences&&s.sentences[0])?s.sentences[0].start:0);
+ const showIntroSub=isBrandScene&&s.tone==='intro'&&local>=sp0;
+ $('pv-sub').textContent=(isBrandScene&&!showIntroSub)?'':curSub();$('pv-scn').textContent=s.scene;$('pv-bn').textContent=(bi+1);
  const im=$('pv-img'),vd=$('pv-vid'),nm=$('pv-nomedia');
- const key=b.vid?'v:'+b.vid:(b.img?'i:'+b.img:'none:'+(b.label||''));
+ // MERK-scène: twee voorgetekende frames. Vóór de stem = LOGO; vanaf speech_start = ACHTERGROND (logo
+ // weg) + ondertitel. Eén wissel, beide al in het geheugen -> geen stroom van engine-verzoeken (dat
+ // blokkeerde de audio). De vloeiende fade zit in de echte video-render.
+ const brandPhase=isBrandScene?((s.tone==='intro'&&local>=sp0)?'bg':'logo'):'';
+ const key=b.vid?'v:'+b.vid:(b.img?'i:'+b.img:(isBrandScene?('bphase:'+s.scene+':'+brandPhase):'drawn:'+drawnKey(s,bi)));
  if(key!==curMediaKey){curMediaKey=key;
    // Bij een NIEUWE video: alleen de bron zetten en op 'canplay' wachten met afspelen. NOOIT hier
    // meteen vd.play() aanroepen; de video is nog niet geladen en die play-belofte botst dan met de
@@ -274,11 +315,24 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
    // het beeld liet stilstaan). De oncanplay-handler start netjes zodra er data is.
    if(b.vid){im.onload=im.onerror=null;im.style.display='none';im.removeAttribute('src');nm.style.display='none';vd.style.display='block';vd.muted=true;vd.loop=true;vd.playsInline=true;vd.autoplay=false;vd.oncanplay=()=>{if(playing&&curMediaKey===key)vd.play().catch(()=>{});};vd.src=mediaUrl(b.vid);}
    else if(b.img){im.onload=im.onerror=null;im.src=mediaUrl(b.img);im.style.display='block';vd.style.display='none';nm.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');}
-   else{ // geen foto/video -> toon het ECHTE getekende frame uit de engine (zelfde tekencode als de render)
-     nm.textContent='scène tekenen…';nm.style.display='flex';vd.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');
-     im.onload=()=>{nm.style.display='none';im.style.display='block';};
-     im.onerror=()=>{im.style.display='none';nm.style.display='flex';nm.textContent=isDrawnLabel(b.label)?('getekend beeld — '+(b.label||'')):('nog geen beeld — '+(b.label||''));};
-     im.src=frameURL(s,bi,0.6);}}
+   else if(isBrandScene){ // MERK-FRAME: logo (vóór stem) of achtergrond (na fade), beide voorgetekend
+     vd.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');
+     const pair=brandPair[s.scene]||{};const img=(brandPhase==='bg')?pair.bg:pair.logo;
+     const url=img?img.src:((brandPhase==='bg')?brandBgURL(s):brandLogoURL(s));
+     if(img&&img.complete&&img.naturalWidth){im.onload=im.onerror=null;im.src=url;im.style.display='block';nm.style.display='none';}
+     else{im.onload=()=>{nm.style.display='none';im.style.display='block';};im.onerror=()=>{};
+       if(!im.getAttribute('src'))nm.style.display='none';
+       im.src=url;}}
+   else{ // KAART/overig getekend: toon het voorgetekende stilstaande frame uit het geheugen
+     vd.style.display='none';vd.oncanplay=null;try{vd.pause();}catch(e){}vd.removeAttribute('src');
+     let cached=drawnFrames[drawnKey(s,bi)];const url=frameURL(s,bi,0.6);
+     if(cached&&cached.complete&&cached.naturalWidth){im.onload=im.onerror=null;im.src=cached.src;im.style.display='block';nm.style.display='none';}
+     else{
+       if(!im.getAttribute('src')){nm.textContent='scène tekenen…';nm.style.display='flex';}
+       im.onload=()=>{nm.style.display='none';im.style.display='block';};
+       im.onerror=()=>{im.style.display='none';nm.style.display='flex';nm.textContent=isDrawnLabel(b.label)?('getekend beeld — '+(b.label||'')):('nog geen beeld — '+(b.label||''));};
+       im.src=url;if(!cached){const ni=new Image();ni.src=url;drawnFrames[drawnKey(s,bi)]=ni;}
+     }}}
  // Per frame: play()/pause() ALLEEN aanroepen als de video genoeg data heeft (readyState>=2),
  // zodat we nooit op een halfgeladen element knallen. play() is async -> alleen bij vd.paused.
  if(b.vid){
@@ -286,7 +340,7 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
    else{if(!vd.paused){try{vd.pause();}catch(e){}}}}
  else if(!vd.paused){try{vd.pause();}catch(e){}}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
- if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}}
+ if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}}
  manageMusic();fireSfx();}
 function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
  if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
@@ -301,7 +355,7 @@ function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=total){t=total;stop();}placePlayhead();syncAudio();
  const card=cardOf(sceneAt(t));if(card&&card.offsetParent){const r=card.getBoundingClientRect();if(r.top<60||r.bottom>innerHeight)card.scrollIntoView({block:'center'});}raf=requestAnimationFrame(tick);}
 function play(){if(playing)return;playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
- const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);a.play();}catch(e){}}
+ const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}
  manageMusic();raf=requestAnimationFrame(tick);}
 function stop(){playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
  for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}musicBlocks.forEach(b=>{try{b.audio.pause();}catch(e){}});}
@@ -313,9 +367,9 @@ function autoAudio(){
  SC.forEach(s=>{const a=new Audio('/api/umma-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0'));
    a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
  // MUZIEK PER BLOK uit de tijdlijn (TL.music = [{start,end,file,mood}]); elk blok z'n eigen track
- musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/umma-audio?f='+encodeURIComponent(bn(b.file)));a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
+ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/umma-audio?f='+encodeURIComponent(bn(b.file)));a.volume=0.22;a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
  // SFX op de gemeten momenten (scene.start + f.t); alleen effecten met een bestand
- sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/umma-sfx?f='+encodeURIComponent(bn(f.file)));a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
+ sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/umma-sfx?f='+encodeURIComponent(bn(f.file)));a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
  updAudioLabel();
 }
 $('ld-voice').addEventListener('change',e=>{for(const f of e.target.files){const m=f.name.match(/(\d+)/);if(!m)continue;voiceAudio[+m[1]]=new Audio(URL.createObjectURL(f));}updAudioLabel();});
@@ -335,7 +389,7 @@ function buildPayload(){
 }
 async function save(){$('savemsg').textContent='opslaan...';$('savemsg').style.color='var(--mut)';
  try{const r=await fetch('/api/umma-timeline-save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(buildPayload())});
-   const d=await r.json();if(d.ok){isDirty=false;$('savemsg').textContent='opgeslagen ✓';$('savemsg').style.color='var(--ok)';VER=Date.now();buildOverview();}
+   const d=await r.json();if(d.ok){isDirty=false;$('savemsg').textContent='opgeslagen ✓';$('savemsg').style.color='var(--ok)';VER=Date.now();buildOverview();predrawAll();}
    else{$('savemsg').textContent='opslaan mislukt: '+(d.error||'?');$('savemsg').style.color='var(--sfx)';}}
  catch(e){$('savemsg').textContent='geen engine? (lokaal openen slaat niet op)';$('savemsg').style.color='var(--sfx)';}}
 $('btn-save').addEventListener('click',save);
@@ -388,7 +442,13 @@ function closePicker(){$('picker').classList.remove('on');}
 $('pick-close').addEventListener('click',closePicker);
 $('picker').addEventListener('click',e=>{if(e.target.id==='picker')closePicker();});
 // lege beats automatisch koppelen aan al opgehaalde bestanden (s01b1.jpg -> scène 1, beat 1)
-function autoHeal(){let n=0;SC.forEach((s,si)=>{beatsOf(s).forEach((b,bi)=>{if(b.img||b.vid)return;
+function autoHeal(){let n=0;SC.forEach((s,si)=>{
+   // GETEKENDE scènes/beats (intro, outro, kaart, tekst, CTA, logo) krijgen NOOIT media. Anders plakt
+   // een oud videobestand dat toevallig s<NN>b<bi+1> heet zich op bv. de kaart-beat en overschrijft de
+   // getekende kaart (dan zie je zwart i.p.v. de kaart). Die beats slaan we hier over.
+   const isBrand=(s.tone==='intro'||s.tone==='outro');
+   beatsOf(s).forEach((b,bi)=>{if(b.img||b.vid)return;
+   if(isBrand||isDrawnLabel(b.label))return;
    const base='s'+String(s.scene).padStart(2,'0')+'b'+(bi+1);const hit=MEDIA.find(f=>f.replace(/\.[^.]+$/,'')===base);
    if(hit){const m=ensureBM(si,bi);m[/\.(mp4|webm)$/i.test(hit)?'vid':'img']='assets/ummaunited/video/'+hit;n++;}});});return n;}
 
@@ -434,7 +494,7 @@ $('ovgrid').addEventListener('click',e=>{const it=e.target.closest('.ovtile');if
 
 function boot(){
  buildState();if(Array.isArray(TL.approved))TL.approved.forEach(n=>approved.add(n));
- buildCards();layout();placeApproval();placePlayhead();autoAudio();buildOverview();
+ buildCards();layout();placeApproval();placePlayhead();autoAudio();buildOverview();predrawAll();
  fetch('/api/umma-media-list').then(r=>r.json()).then(d=>{if(d&&Array.isArray(d.files)){MEDIA=d.files;if(autoHeal()){layout();buildOverview();}}}).catch(()=>{});
  $('hdrtitle').textContent='“'+TL.title+'”';$('hdrsub').textContent=SC.length+' scènes · '+TL.total_mmss+' · stem '+TL.voice;
  $('pv-total').textContent=TL.total_mmss;

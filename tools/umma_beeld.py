@@ -363,6 +363,25 @@ def main():
                 continue
             if (beat.get("img") or beat.get("vid")) and not args.force:
                 n_skip += 1; continue
+            # HERGEBRUIK: staat het beeld voor deze beat al op schijf (s<NN>b<bi+1>.<ext>)? Dan koppelen
+            # we dat terug ZONDER iets te downloaden. De tijdlijn was vers/leeg, maar de bestanden staan
+            # er nog; zo herstellen we de koppeling op naam i.p.v. nieuw te zoeken. Alleen als er echt
+            # geen bestand is (of --force), gaan we daaronder pas zoeken.
+            if not args.force:
+                base = f"s{num:02d}b{bi+1}"
+                found = None
+                for ext in (".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp"):
+                    cand = os.path.join(outdir, base + ext)
+                    if os.path.exists(cand):
+                        found = (base + ext, ext); break
+                if found:
+                    fname, ext = found
+                    rel = "assets/ummaunited/video/" + fname
+                    isv = ext.lower() in (".mp4", ".webm")
+                    beat["vid" if isv else "img"] = rel
+                    beat.pop("img" if isv else "vid", None)
+                    print(f"scene {num} beat {bi+1}: hergebruik {fname} ({'video' if isv else 'foto'})")
+                    n_skip += 1; continue
             print(f"scene {num} beat {bi+1}: zoek '{query}' ({kind})")
             hit = None; is_video = False
             # 'video'-beat + sleutel -> eerst video proberen (lang genoeg voor de beat)

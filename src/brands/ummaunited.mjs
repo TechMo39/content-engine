@@ -836,23 +836,86 @@ export function makeBrand({ ROOT = "." } = {}) {
   // de video-render ALS het studio-voorbeeld exact dezelfde intro/outro tekenen (één bron, geen
   // divergentie). kind wordt niet meer onderscheiden (intro==outro-veld); de ondertitel loopt
   // er net als overal via subAt overheen.
-  function brandInner(kind, W, H) {
-    // logo + woordmerk als één gecentreerd blok, gemeten op de KORTE zijde zodat ze in ZOWEL 9:16
-    // ALS 16:9 passen en nooit overlappen (in landscape botsten ze vroeger op elkaar).
+  function brandInner(kind, W, H, p = 0.6, opts = {}) {
+    // PREMIUM intro/outro: diepe gradient-achtergrond met zachte gloed + sierlijnen, kleiner logo
+    // bovenin, woordmerk met dunne lijnen eronder, een tagline, en op de outro een abonneer-CTA.
+    // INTRO: het merk-blok (logo+tekst) staat tijdens de begin-stilte vol in beeld en FAADT WEG zodra
+    // de stem begint (opts.t = seconden in de scène, opts.speechStart = wanneer de stem begint); daarna
+    // blijft alleen de heelal-achtergrond, waar de ondertiteling overheen loopt. Gemeten op de korte
+    // zijde zodat 9:16 en 16:9 allebei kloppen.
     const S = Math.min(W, H);
-    const logoSz = Math.round(S * 0.26);
-    const wmFs = Math.round(S * 0.085);
-    const gap = Math.round(S * 0.06);
-    const blockH = logoSz + gap + wmFs;
-    const top = Math.round((H - blockH) / 2);     // verticaal gecentreerd, orientatie-onafhankelijk
-    const lx = Math.round((W - logoSz) / 2), ly = top;
-    const wmY = top + logoSz + gap + Math.round(wmFs * 0.8);
-    const logo = LOGO_URI
+    const pp = clamp01(p);
+    const e = sm(pp);
+    const isOutro = kind === "outro";
+    // zoom: begint op 0.94 (iets uitgezoomd) -> 1.03 (iets ingezoomd), gecentreerd; + fade-in
+    const scale = 0.94 + 0.09 * e;
+    // merk-blok zichtbaarheid: op de INTRO vol in beeld tot de stem begint, dan ~0.8s uitfaden.
+    // Op de outro blijft het merk gewoon staan (korte scène, CTA moet blijven).
+    const t = Number(opts.t);
+    const sp = Number(opts.speechStart);
+    let blockVis = clamp01(pp / 0.25);   // standaard: infaden (outro / als er geen timing is)
+    if (kind === "intro" && Number.isFinite(t) && Number.isFinite(sp)) {
+      const fadeIn = clamp01(t / 0.6);                 // logo komt op in de eerste 0.6s
+      const fadeOut = 1 - clamp01((t - sp) / 0.8);     // vanaf speech_start in 0.8s weg
+      blockVis = Math.min(fadeIn, fadeOut);
+    }
+    const fade = blockVis;
+    const cx = W / 2, cy = H / 2;
+
+    // --- achtergrond: diepe verticale gradient + radiale gloed achter het logo ---
+    let g = `<defs>`
+      + `<linearGradient id="bgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${COL.navy}"/><stop offset="0.55" stop-color="${COL.ink}"/><stop offset="1" stop-color="#070b14"/></linearGradient>`
+      + `<radialGradient id="glow" cx="50%" cy="42%" r="55%"><stop offset="0" stop-color="${COL.orange}" stop-opacity="0.18"/><stop offset="1" stop-color="${COL.orange}" stop-opacity="0"/></radialGradient>`
+      + `</defs>`;
+    g += `<rect width="${W}" height="${H}" fill="url(#bgrad)"/>`;
+    g += `<rect width="${W}" height="${H}" fill="url(#glow)"/>`;
+    // subtiel sterrenveld voor diepte (deterministisch), heel zacht
+    g += starfield(W, H, isOutro ? 29 : 13);
+
+    // alles wat volgt zoomt + faadt als één blok
+    g += `<g transform="translate(${cx} ${cy}) scale(${scale.toFixed(4)}) translate(${-cx} ${-cy})" opacity="${fade.toFixed(2)}">`;
+
+    // maatvoering van het merk-blok (logo kleiner dan voorheen: 0.18 i.p.v. 0.26)
+    const logoSz = Math.round(S * 0.18);
+    const wmFs = Math.round(S * 0.072);
+    const tagFs = Math.round(S * 0.034);
+    const gap = Math.round(S * 0.045);
+    // verticaal centreren: logo + gap + woordmerk + lijn + tagline (+ CTA bij outro)
+    const ctaH = isOutro ? Math.round(S * 0.11) : 0;
+    const blockH = logoSz + gap + wmFs + Math.round(S * 0.02) + tagFs + (isOutro ? Math.round(S * 0.05) + ctaH : 0);
+    const top = Math.round((H - blockH) / 2);
+    const lx = Math.round(W / 2 - logoSz / 2), ly = top;
+
+    // logo (of UU-cirkel als fallback)
+    g += LOGO_URI
       ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
-      : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`
+      : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="3"/>`
         + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
-    const wm = `<text x="${W / 2}" y="${wmY}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${wmFs}" letter-spacing="4" fill="${COL.orange}">UMMA UNITED</text>`;
-    return `<rect width="${W}" height="${H}" fill="${COL.ink}"/><rect width="${W}" height="${H}" fill="${COL.navy2 || COL.navy}" opacity="0.35"/>` + logo + wm;
+
+    // woordmerk
+    const wmY = ly + logoSz + gap + Math.round(wmFs * 0.8);
+    g += `<text x="${W / 2}" y="${wmY}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${wmFs}" letter-spacing="${Math.round(wmFs * 0.14)}" fill="${COL.cream}">UMMA UNITED</text>`;
+    // dunne sierlijnen links+rechts van een klein ruitje onder het woordmerk
+    const lineY = wmY + Math.round(wmFs * 0.55);
+    const lineW = Math.round(W * 0.14), lineGap = Math.round(S * 0.03);
+    g += `<line x1="${W / 2 - lineGap - lineW}" y1="${lineY}" x2="${W / 2 - lineGap}" y2="${lineY}" stroke="${COL.orange}" stroke-width="1.6" opacity="0.85"/>`;
+    g += `<line x1="${W / 2 + lineGap}" y1="${lineY}" x2="${W / 2 + lineGap + lineW}" y2="${lineY}" stroke="${COL.orange}" stroke-width="1.6" opacity="0.85"/>`;
+    g += `<rect x="${W / 2 - 4}" y="${lineY - 4}" width="8" height="8" fill="${COL.orange}" transform="rotate(45 ${W / 2} ${lineY})"/>`;
+
+    // tagline (intro = missie; outro = korte volg-regel). Mo's richting: over de Umma verheffen.
+    const tagY = lineY + Math.round(tagFs * 1.5);
+    const tag = isOutro ? "Follow us, and rise with the Ummah" : "Raising the Ummah, one story at a time";
+    g += `<text x="${W / 2}" y="${tagY}" text-anchor="middle" font-family="${SANS}" font-weight="600" font-size="${tagFs}" letter-spacing="1" fill="${COL.mute}">${escapeXml(tag)}</text>`;
+
+    // outro: abonneer-pil (oranje), premium, onder de tagline
+    if (isOutro) {
+      const chipW = Math.min(W * 0.42, S * 0.62), chipH = ctaH, cxp = W / 2 - chipW / 2, cyp = tagY + Math.round(S * 0.05);
+      g += `<rect x="${cxp}" y="${cyp}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="${COL.orange}"/>`;
+      g += `<text x="${W / 2}" y="${cyp + chipH * 0.64}" text-anchor="middle" font-family="${SANS}" font-weight="800" font-size="${Math.round(chipH * 0.42)}" letter-spacing="2" fill="${COL.ink}">SUBSCRIBE</text>`;
+    }
+
+    g += `</g>`;
+    return g;
   }
 
   // -- PER-ZIN-ONDERTITEL uit _timeline.json (de gedeelde tijdlijn die de editor opslaat). Zo is
@@ -995,6 +1058,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     // de techniek-SVG (gewone modus). Geeft de overlay-SVG-string terug.
     function sceneOverlay(i, p) {
       const s = scenes[i];
+      if (s.tone === "intro" || s.tone === "outro") return "";   // merk-scherm: geen chrome-overlay
       const isFirst = i === 0, isLast = i === scenes.length - 1;
       const showLogo = isFirst;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
@@ -1025,7 +1089,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     // voiceGain 1.6 default zodat het gesprokene duidelijk boven de achtergrondmuziek uitkomt.
     const tracks = [];
     scenes.forEach((s, i) => {
-      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.6 : s.voiceGain });
+      if (s && s.voice) tracks.push({ file: path.resolve(ROOT, s.voice), atSec: starts[i], gain: s.voiceGain == null ? 1.8 : s.voiceGain });
       if (s && s.sfx) tracks.push({ file: path.resolve(ROOT, s.sfx), atSec: starts[i], gain: s.sfxGain == null ? 0.5 : s.sfxGain });
     });
 
@@ -1128,6 +1192,14 @@ export function makeBrand({ ROOT = "." } = {}) {
     // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
     function overlaySVG(i, p) {
       const s = scenes[i];
+      // OUTRO = schoon merk-scherm, geen overlay. INTRO = wel de ondertiteling (over de achtergrond
+      // nadat het logo weg is), geen kader/hoek-logo.
+      if (s.tone === "outro") {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"></svg>`;
+      }
+      if (s.tone === "intro") {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${subAt(i, p)}</svg>`;
+      }
       const isFirst = i === 0, isLast = i === scenes.length - 1;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
       const flashDur = 0.12;
@@ -1155,6 +1227,8 @@ export function makeBrand({ ROOT = "." } = {}) {
         default:       return "";
       }
     }
+    // eerste-zin-starttijd (= speech_start) per scène uit de tijdlijn, voor de intro-fade
+    const speechStartOf = (i) => { const ss = sentsByIndex && sentsByIndex[i]; return ss && ss.length ? Number(ss[0].start) || 0 : 0; };
     // volledige scène-SVG (mét techniek-achtergrond) voor scènes zonder video/foto (kaart/statement/mythe)
     function fullSceneSVG(i, p) {
       const base = scenes[i];
@@ -1163,12 +1237,18 @@ export function makeBrand({ ROOT = "." } = {}) {
       const s = (st && st.tech) ? { ...base, tech: st.tech, fills: st.fills, rule: st.rule, labels: st.labels, kaartInfo: st.kaartInfo, view: st.view } : base;
       const grps = tlGroups || groups;
       const isBrand = s.tone === "intro" || s.tone === "outro";
-      const inner = isBrand ? brandInner(s.tone, W, H) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups: grps });
+      const tsec = p * durs[i];
+      const inner = isBrand ? brandInner(s.tone, W, H, p, { t: tsec, speechStart: speechStartOf(i) }) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups: grps });
       const ovl = overlayBody(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
     function overlayBody(i, p) {
       const s = scenes[i];
+      // OUTRO: schoon merk-beeld, geen chrome. INTRO: geen kader/hoek-logo, maar WEL de ondertiteling
+      // (die loopt over de heelal-achtergrond nadat het logo is weggefade); de ondertitel verschijnt
+      // vanzelf pas na speech_start omdat de zinnen daar beginnen.
+      if (s.tone === "outro") return "";
+      if (s.tone === "intro") return subAt(i, p);
       const isFirst = i === 0, isLast = i === scenes.length - 1;
       const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
       const flashDur = 0.12;
@@ -1309,14 +1389,14 @@ export function makeBrand({ ROOT = "." } = {}) {
           const ms = Math.round((Number(b.start) || 0) * 1000);
           const fo = Math.max(0, bdur - 0.6).toFixed(2);
           inputs.push("-stream_loop", "-1", "-i", bf);
-          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=0.32,afade=t=in:st=0:d=0.6,afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
+          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=0.22,afade=t=in:st=0:d=0.6,afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
           bedLabels.push(`[m${idx}]`); idx++;
         }
       } else {
         const music = opts.music ? path.resolve(ROOT, "assets/ummaunited/muziek", opts.music) : await pickUmmaMusic(total);
         if (music && await exists(music)) {
           inputs.push("-stream_loop", "-1", "-i", music);
-          aFiltersPush(`[${idx}:a]volume=0.35,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
+          aFiltersPush(`[${idx}:a]volume=0.22,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
         }
       }
       for (let i = 0; i < scenes.length; i++) {
@@ -1331,7 +1411,7 @@ export function makeBrand({ ROOT = "." } = {}) {
           const xf = resolveAudio(fx.file); if (!(xf && await exists(xf))) continue;
           const at = Math.round((starts[i] + (Number(fx.t) || 0)) * 1000);
           inputs.push("-i", xf);
-          aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=0.6[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
+          aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=0.4[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
         }
       }
       const out = path.join(work, "final.mp4");
@@ -1429,9 +1509,14 @@ export function makeBrand({ ROOT = "." } = {}) {
 
     // ACHTERGROND (inner): intro/outro-merkveld, foto-beat (Ken Burns-stilstaand) of de getekende
     // techniek (standaard statement = sterrenveld, exact zoals de render die nu tekent).
+    const sp0 = (sents && sents.length) ? (Number(sents[0].start) || 0) : 0;   // speech_start voor de intro-fade
     let inner;
     if (isBrand) {
-      inner = brandInner(s.tone, W, H);
+      // PREVIEW van een merk-scène: de studio stuurt p = het ECHTE tijdstip in de scène (local/dur),
+      // dus t = p * dur. Zo toont het frame het logo tijdens de begin-stilte en de fade zodra de stem
+      // begint, exact meelopend met de afspeelkop (geen vast moment meer).
+      const brandT = p * dur;
+      inner = brandInner(s.tone, W, H, 0.6, { t: brandT, speechStart: sp0 });
     } else if (beat.img) {
       const abs = String(beat.img).includes("/") ? path.resolve(ROOT, beat.img) : path.resolve(ROOT, "assets/ummaunited/video", beat.img);
       const uri = await loadImageURI(abs);
@@ -1442,12 +1527,15 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
 
     // CHROME (gelijk aan overlayBody in de render): kader + logo (1e scène) + ondertitel, of CTA op
-    // de laatste scène. p=0.6 valt vóór het CTA-venster, dus normaal zien we de ondertitel.
+    // de laatste scène. INTRO/OUTRO = schoon merk-beeld, GEEN chrome eroverheen (brandInner tekent al
+    // alles). p=0.6 valt vóór het CTA-venster, dus normaal zien we de ondertitel.
     const ctaOp = isLast ? clamp01((p - 0.55) / 0.3) : 0;
     const ctaOpen = ctaOp > 0.01;
-    const overlay = kader(W, H)
-      + (isFirst ? logoChrome(W, H) : "")
-      + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : subSVG);
+    // PREVIEW-frame: intro EN outro tonen het schone merk-moment, GEEN ondertitel/kader eroverheen.
+    // (In de echte render loopt de ondertitel pas ná de logo-fade mee; op dit stilstaande
+    // preview-frame tonen we het logo-moment, dus geen tekst erover.)
+    const overlay = (s.tone === "outro" || s.tone === "intro") ? ""
+      : (kader(W, H) + (isFirst ? logoChrome(W, H) : "") + (ctaOpen ? ctaFoldout(W, H, ctaOp) + missieRegel(W, H, ctaOp) : subSVG));
 
     const svg = composeChrome({ branding, W, H, panel: null, innerField: inner, overlay, logoUri: "" });
     return { svg, W, H, scene: s.scene, beats: beats.length };

@@ -671,7 +671,7 @@ const server = http.createServer(async (req, res) => {
         const r = await brand.previewFrameSVG({
           story: u.searchParams.get("story") || "sword",
           voice: u.searchParams.get("voice") || "man",
-          sceneNum: Number(u.searchParams.get("scene")) || 1,
+          sceneNum: u.searchParams.has("scene") ? Number(u.searchParams.get("scene")) : 1,
           beatIndex: Number(u.searchParams.get("beat")) || 0,
           p: u.searchParams.has("p") ? Number(u.searchParams.get("p")) : 0.6,
           format: u.searchParams.get("format") || "9:16",
