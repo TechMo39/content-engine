@@ -280,10 +280,12 @@ function parseStory(text, name2id) {
 }
 
 // ---------------------------------------------------------------- gedeelde chrome
+// DE ORANJE KADER IS UIT (8 nov, Mo's eis): de dikke oranje+creme rand om elke scene stamde uit de
+// oude verticale filmpjes en hoort niet in deze video. kader() geeft nu LEEG terug, zodat de rand
+// overal verdwijnt (render, video, foto, getekend, kaart, preview) zonder elke call-site te raken.
+// De merk-identiteit blijft via het logo rechtsboven (1e scene) + de intro/outro.
 function kader(W, H) {
-  const m = Math.round(W * 0.035), r = Math.round(W * 0.04);
-  return `<rect x="${m}" y="${m}" width="${W - 2 * m}" height="${H - 2 * m}" rx="${r}" fill="none" stroke="${COL.orange}" stroke-width="${Math.round(W * 0.012)}"/>`
-    + `<rect x="${m + 7}" y="${m + 7}" width="${W - 2 * m - 14}" height="${H - 2 * m - 14}" rx="${r - 5}" fill="none" stroke="${COL.cream}" stroke-width="2" opacity="0.45"/>`;
+  return "";
 }
 // lettergrootte die binnen maxW past (ruwe breedte-schatting per teken)
 function fitFs(txt, baseFs, maxW, perChar = 0.56) {

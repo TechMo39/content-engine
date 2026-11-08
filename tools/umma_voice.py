@@ -9,6 +9,12 @@
 #   python tools/umma_voice.py                 # beide delen, beide stemmen
 #   python tools/umma_voice.py --voice man      # alleen de mannenstem
 #   python tools/umma_voice.py --only 3         # alleen scene 3 opnieuw
+#   python tools/umma_voice.py --story fitra --voice man --format 16:9   # NIEUW project
+#   python tools/umma_voice.py --story fitra --voice man --format 9:16   # de afgeleide short
+#
+# PROJECT = <story>/<voice>. Elk project krijgt een eigen map en een eigen _timeline.json, dus
+# een nieuw project overschrijft NOOIT een bestaand project. Het FORMAAT (16:9 lang / 9:16 short)
+# wordt in de tijdlijn opgeslagen zodat de studio het per project onthoudt.
 #
 # De TOON per scene staat in STORIES hieronder. Een zin die niet goed valt: alleen die regel
 # wijzigen en opnieuw draaien met --only <nn>.
@@ -429,7 +435,7 @@ STORIES["sword"]["map"] = [
   (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["sword"]["scenes"]
 ]
 
-def build_story(story_id, voice, root, only=0):
+def build_story(story_id, voice, root, only=0, fmt="16:9"):
     story = STORIES[story_id]
     model = VOICES[voice]
     outdir = os.path.join(root, "assets", "ummaunited", "voice", story_id, voice)
@@ -488,6 +494,7 @@ def build_story(story_id, voice, root, only=0):
         meta = {
             "story": story_id,
             "voice": voice,
+            "format": fmt,
             "title": story["title"],
             "total_seconds": total,
             "total_mmss": f"{int(total)//60}:{int(total)%60:02d}",
@@ -505,6 +512,7 @@ def build_story(story_id, voice, root, only=0):
         # GEDEELDE TIJDLIJN (fase 1): de ene databron die straks preview EN eindrender voedt.
         # Per scene: absolute starttijd + duur in de hele video, plus het per-zin-meetrooster
         # (start/dur binnen de scene-wav). Beeld-beats en effecten worden hier later in gevuld.
+        # Het FORMAAT (16:9 lang / 9:16 short) staat hier zodat de studio het per project onthoudt.
         tl_scenes = []
         abs_t = 0.0
         for num, _wav in made:
@@ -537,6 +545,7 @@ def build_story(story_id, voice, root, only=0):
         timeline = {
             "story": story_id,
             "voice": voice,
+            "format": fmt,
             "title": story["title"],
             "total_seconds": round(abs_t, 3),
             "total_mmss": f"{int(abs_t)//60}:{int(abs_t)%60:02d}",
@@ -545,7 +554,7 @@ def build_story(story_id, voice, root, only=0):
         tj = os.path.join(outdir, "_timeline.json")
         with open(tj, "w", encoding="utf-8") as f:
             json.dump(timeline, f, ensure_ascii=False, indent=2)
-        print(f"  tijdlijn:     {tj}  ({len(tl_scenes)} scenes, {sum(len(s['sentences']) for s in tl_scenes)} zinnen)")
+        print(f"  tijdlijn:     {tj}  ({len(tl_scenes)} scenes, {sum(len(s['sentences']) for s in tl_scenes)} zinnen, formaat {fmt})")
     print(f"  klaar: {len(made)} fragment(en)")
 
 def _ensure_espeak():
@@ -565,9 +574,11 @@ def _ensure_espeak():
 def main():
     _ensure_espeak()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", default="sword", help="sword (het lange verhaal, default)")
+    ap.add_argument("--story", default="sword", help="projectnaam (= verhaal-slug, eigen map)")
     ap.add_argument("--voice", default="beide", choices=list(VOICES.keys()) + ["beide"])
     ap.add_argument("--only", type=int, default=0, help="alleen scene-nummer N opnieuw maken")
+    ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"],
+                    help="16:9 = lange video, 9:16 = afgeleide short; reist mee in de tijdlijn")
     ap.add_argument("--root", default=".", help="content-engine root")
     args = ap.parse_args()
 
@@ -584,8 +595,8 @@ def main():
         if sid not in STORIES:
             print("onbekend verhaal:", sid); continue
         for voice in voices:
-            print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) ===")
-            build_story(sid, voice, args.root, args.only)
+            print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) · FORMAAT: {args.fmt} ===")
+            build_story(sid, voice, args.root, args.only, args.fmt)
 
     # synthesizers netjes afsluiten
     for synth in _SYNTH_CACHE.values():
