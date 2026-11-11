@@ -28,26 +28,39 @@ const ENGINE_ENTRY = path.join(ENGINE_DIR, "src", "engine.mjs");
 const BRAND = "taleoftiles";
 const OUT_LOG_DIR = path.join(ENGINE_DIR, "out", "logs");
 const MARKER = path.join(OUT_LOG_DIR, "render_dag.txt");   // inhaal.bat checkt de datum hiervan
-const SWEEP_DAGEN = 7;   // kandidaten die zo lang ongebruikt in out/ staan -> out/archief/
+const SWEEP_DAGEN = 7;   // kandidaten die zo lang ongebruikt in een bedrijfsmap staan -> out/archief/
 const ARCHIEF_DAGEN = 30;   // video's die zo lang in out/archief/ staan -> definitief verwijderd
 
-// Opruimen: verse pool klein houden. Geposte video's staan al in out/geplaatst/ (door de poster),
-// dus wat hier nog in out/ staat en ouder is dan SWEEP_DAGEN is ongebruikt -> naar out/archief/.
+// BEDRIJVEN met de wegwerp-lifecycle (ToT + UncleRank). Channels (out/channels/*, handgemaakt)
+// blijven staan en worden NOOIT geveegd. De losse out/-root wordt ook meegenomen voor oude
+// (legacy) renders van vóór de mappen-ordening.
+const BEDRIJVEN = ["taleoftiles", "unclerank"];
+// Veiligheidsklep voor de legacy-root: channel-video's die daar nog los staan (bv. ummaunited-*)
+// NIET archiveren — die horen bij een kanaal en blijven bewaard.
+const KANAAL_PREFIX = [/^ummaunited-/i];
+
+// Opruimen: verse pool klein houden. Wat in een bedrijfsmap (of los in out/) ouder is dan
+// SWEEP_DAGEN is ongebruikt -> naar out/archief/. Geposte video's die al naar out/geplaatst/ zijn
+// verplaatst blijven veilig (die map wordt niet geveegd), net als alles onder out/channels/.
 async function sweepArchief() {
   const outDir = path.join(ENGINE_DIR, "out");
   const archief = path.join(outDir, "archief");
   const grens = Date.now() - SWEEP_DAGEN * 24 * 3600 * 1000;
   let verplaatst = 0;
-  try {
-    for (const f of await fs.promises.readdir(outDir)) {
+  const bronnen = [outDir, ...BEDRIJVEN.map((b) => path.join(outDir, b))];
+  for (const bron of bronnen) {
+    let files; try { files = await fs.promises.readdir(bron); } catch { continue; }
+    const isRoot = bron === outDir;
+    for (const f of files) {
       if (!/\.mp4$/i.test(f)) continue;
-      const src = path.join(outDir, f);
+      if (isRoot && KANAAL_PREFIX.some((re) => re.test(f))) continue;   // channel-video in legacy-root -> bewaren
+      const src = path.join(bron, f);
       let st; try { st = await fs.promises.stat(src); } catch { continue; }
       if (!st.isFile() || st.mtimeMs > grens) continue;
       await fs.promises.mkdir(archief, { recursive: true });
       try { await fs.promises.rename(src, path.join(archief, f)); verplaatst++; } catch (_) {}
     }
-  } catch (_) {}
+  }
   if (verplaatst) log(`archief: ${verplaatst} ongebruikte video('s) ouder dan ${SWEEP_DAGEN} dagen -> out/archief/`);
   // ARCHIEF ZELF OOK LEGEN: zodat out/archief/ niet eeuwig groeit. Alles daar ouder dan
   // ARCHIEF_DAGEN wordt definitief verwijderd (geposte video's staan veilig in out/geplaatst/).

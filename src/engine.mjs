@@ -36,6 +36,40 @@ try {
   }
 } catch {}
 
+// ---- OUTPUT-ORDENING (kanaal-as, stap 1) -------------------------------------------------
+// Renders landen per merk in een eigen submap van out/, i.p.v. allemaal plat in out/.
+//  - BEDRIJVEN (planner, wegwerp): out/<merk>/  -> met de archief->prullenbak-lifecycle (render_dag.mjs)
+//  - CHANNELS (handgemaakt): blijven voorlopig plat in out/ en verhuizen in stap 2 naar out/channels/<kanaal>/
+// Alles backwards-compatible: oude losse mp4's in out/ worden nog gewoon gelezen én opgeruimd.
+const BUSINESS_BRANDS = new Set(["taleoftiles", "unclerank"]);
+function outSubFor(brandId) { return BUSINESS_BRANDS.has(brandId) ? brandId : ""; }
+// Mappen in out/ die GEEN renders zijn (nooit als video tonen/opruimen).
+const OUT_SKIP_DIRS = new Set(["archief", "geplaatst", "mail-stills", "carrousel", "logs"]);
+// Alle afgewerkte renders onder out/ (losse out/ + bedrijfsmappen + later channels/<kanaal>/),
+// tot 2 niveaus diep. Geeft per video het rel-pad t.o.v. out/ (= de sleutel overal: url, store, delete).
+async function listRenderFiles() {
+  const found = [];
+  async function walk(dir, rel, depth) {
+    let ents; try { ents = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (e.isDirectory()) {
+        if (depth >= 2 || e.name.startsWith(".") || OUT_SKIP_DIRS.has(e.name)) continue;
+        await walk(path.join(dir, e.name), rel ? rel + "/" + e.name : e.name, depth + 1);
+      } else if (/\.mp4$/i.test(e.name)) {
+        if (/-\d{12,}\.mp4$/i.test(e.name)) continue;   // tijdelijke render-output, nog niet hernoemd
+        const abs = path.join(dir, e.name);
+        let st; try { st = await fs.stat(abs); } catch { continue; }
+        if (st.size < 4096) continue;
+        found.push({ rel: rel ? rel + "/" + e.name : e.name, base: e.name, abs, mtimeMs: st.mtimeMs, size: st.size });
+      }
+    }
+  }
+  await walk(OUT, "", 0);
+  return found;
+}
+// Rel-pad -> veilige /out/-URL (elk segment apart ge-encodeerd).
+function outUrl(rel) { return "/out/" + String(rel).split("/").map(encodeURIComponent).join("/"); }
+
 const logClients = new Set();
 function log(msg) { const line = String(msg); process.stdout.write("  " + line + "\n"); for (const c of logClients) { try { c.write(`data: ${JSON.stringify(line)}\n\n`); } catch {} } }
 
@@ -84,16 +118,15 @@ async function writePlan(p) { try { await fs.writeFile(PLAN_FILE, JSON.stringify
 // Verse video-kandidaten uit out/ (zelfde bron als de Bibliotheek).
 async function planCandidates() {
   const out = [];
+  // PLANNER = de BEDRIJVEN (semi-automatisch): alleen renders van bedrijf-merken komen in de
+  // kandidatenpool. Channels (handgemaakt) plan je niet, die horen hier niet thuis.
   try {
-    for (const f of await fs.readdir(OUT)) {
-      if (!/\.mp4$/i.test(f)) continue;
-      if (/-\d{12,}\.mp4$/i.test(f)) continue;
-      let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
-      if (st.size < 4096) continue;
-      const m = parseOutName(f.replace(/\.mp4$/i, ""));
-      const _d = new Date(st.mtimeMs), _p = (n) => String(n).padStart(2, "0");
+    for (const r of await listRenderFiles()) {
+      const m = parseOutName(r.base.replace(/\.mp4$/i, ""));
+      if (!BUSINESS_BRANDS.has(m.brand)) continue;
+      const _d = new Date(r.mtimeMs), _p = (n) => String(n).padStart(2, "0");
       const datum = _p(_d.getDate()) + "-" + _p(_d.getMonth() + 1) + " " + _p(_d.getHours()) + ":" + _p(_d.getMinutes());
-      out.push({ file: f, url: "/out/" + encodeURIComponent(f), type: m.template || null, typeName: m.template ? (TEMPLATE_NAME[m.template] || titleCase(m.template)) : "Video", lang: ["en", "fr"].includes(m.lang) ? m.lang : "nl", name: m.name || "", datum, mtime: st.mtimeMs });
+      out.push({ file: r.rel, url: outUrl(r.rel), type: m.template || null, typeName: m.template ? (TEMPLATE_NAME[m.template] || titleCase(m.template)) : "Video", lang: ["en", "fr"].includes(m.lang) ? m.lang : "nl", name: m.name || "", datum, mtime: r.mtimeMs });
     }
   } catch {}
   out.sort((a, b) => b.mtime - a.mtime);
@@ -338,12 +371,16 @@ async function runOne(job) {
   const base = outBase(job);
   // kant-en-klare mp4 (bv. website-walkthrough) -> direct met nette naam neerzetten
   if (render && render.prebuilt && existsSync(render.prebuilt)) {
+    const sub = outSubFor(job.brand);
+    const subDir = sub ? path.resolve(OUT, sub) : OUT;
+    await fs.mkdir(subDir, { recursive: true });
     const outName = base + ".mp4";
-    await fs.copyFile(render.prebuilt, path.resolve(OUT, outName));
+    await fs.copyFile(render.prebuilt, path.resolve(subDir, outName));
     // werkmap van de walkthrough (.walk-*) meteen opruimen -> out blijft netjes
     if (render.cleanup) { try { await fs.rm(render.cleanup, { recursive: true, force: true }); } catch {} }
-    log(`✓ klaar: /out/${outName}`);
-    return { url: "/out/" + outName };
+    const relUrl = sub ? sub + "/" + outName : outName;
+    log(`✓ klaar: /out/${relUrl}`);
+    return { url: "/out/" + relUrl };
   }
   const music = job.music ? path.resolve(ROOT, config.audioDir, job.music) : (render.music || "");
   if (music) log(`♪ muziek: ${path.basename(music)}${job.music ? "" : " (automatisch)"}`);
@@ -354,8 +391,12 @@ async function runOne(job) {
     try { await overlayAudio({ mp4: r.outPath, tracks: render.audio.tracks, hasBaseAudio: !!music, log }); }
     catch (e) { log("audio-overlay overgeslagen: " + e.message); }
   }
+  const sub = outSubFor(job.brand);
+  const subDir = sub ? path.resolve(OUT, sub) : OUT;
+  await fs.mkdir(subDir, { recursive: true });
   const nice = base + ".mp4";
-  try { await fs.rename(r.outPath, path.resolve(OUT, nice)); log(`✓ klaar: /out/${nice}`); return { url: "/out/" + nice }; }
+  const relUrl = sub ? sub + "/" + nice : nice;
+  try { await fs.rename(r.outPath, path.resolve(subDir, nice)); log(`✓ klaar: /out/${relUrl}`); return { url: "/out/" + relUrl }; }
   catch { log(`✓ klaar: /out/${r.outName}`); return { url: "/out/" + r.outName }; }
 }
 
@@ -485,9 +526,9 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/candidate/delete" && req.method === "POST") {
       const bd = await readBody(req);
       const f = String(bd.file || "");
-      if (!f || f.includes("/") || f.includes("\\") || !/\.mp4$/i.test(f)) { json(res, { error: "ongeldige bestandsnaam" }, 400); return; }
-      const p = path.join(OUT, f);
-      if (!p.startsWith(OUT)) { json(res, { error: "nee" }, 403); return; }
+      if (!f || f.includes("..") || path.isAbsolute(f) || !/\.mp4$/i.test(f)) { json(res, { error: "ongeldige bestandsnaam" }, 400); return; }
+      const p = path.resolve(OUT, f);
+      if (p !== OUT && !p.startsWith(OUT + path.sep)) { json(res, { error: "nee" }, 403); return; }
       try { await fs.unlink(p); json(res, { ok: true }); } catch (e) { json(res, { error: e.message }, 500); }
       return;
     }
@@ -696,20 +737,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname === "/api/library") {
       const items = [];
-      // 1) video's: losse mp4's in de out-map
+      // 1) video's: alle afgewerkte mp4's onder out/ (losse out/ + bedrijfsmappen + channels/<kanaal>/)
       try {
-        for (const f of await fs.readdir(OUT)) {
-          if (!/\.mp4$/i.test(f)) continue;
-          if (/-\d{12,}\.mp4$/i.test(f)) continue;   // tijdelijke render-output (naam = Date.now()), nog niet hernoemd
-          let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
-          if (st.size < 4096) continue;              // halve/onvoltooide render overslaan
-          const meta = parseOutName(f.replace(/\.mp4$/i, ""));
+        for (const r of await listRenderFiles()) {
+          const meta = parseOutName(r.base.replace(/\.mp4$/i, ""));
           items.push({
-            kind: "video", url: "/out/" + encodeURIComponent(f), file: f,
+            kind: "video", url: outUrl(r.rel), file: r.rel,
             brand: meta.brand, brandName: meta.brand ? (BRAND_NAME[meta.brand] || meta.brand) : "—",
             type: meta.template, typeName: meta.template ? (TEMPLATE_NAME[meta.template] || titleCase(meta.template)) : "Video",
             name: meta.name || "", lang: meta.lang, date: meta.date,
-            kb: Math.round(st.size / 1024), mtime: st.mtimeMs,
+            kb: Math.round(r.size / 1024), mtime: r.mtimeMs,
           });
         }
       } catch {}
@@ -869,20 +906,16 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/social/videos") {
       const items = [];
       try {
-        for (const f of await fs.readdir(OUT)) {
-          if (!/\.mp4$/i.test(f)) continue;
-          if (/-\d{12,}\.mp4$/i.test(f)) continue;   // tijdelijke render-output, nog niet hernoemd
-          let st; try { st = await fs.stat(path.join(OUT, f)); } catch { continue; }
-          if (st.size < 4096) continue;
-          const meta = parseOutName(f.replace(/\.mp4$/i, ""));
+        for (const r of await listRenderFiles()) {
+          const meta = parseOutName(r.base.replace(/\.mp4$/i, ""));
           const lang = ["en", "fr"].includes(meta.lang) ? meta.lang : "nl";
           items.push({
-            url: "/out/" + encodeURIComponent(f), file: f,
+            url: outUrl(r.rel), file: r.rel,
             brand: meta.brand, brandName: meta.brand ? (BRAND_NAME[meta.brand] || meta.brand) : "—",
             type: meta.template, typeName: meta.template ? (TEMPLATE_NAME[meta.template] || titleCase(meta.template)) : "Video",
             name: meta.name || "", lang, date: meta.date,
-            kb: Math.round(st.size / 1024), mtime: st.mtimeMs,
-            posts: await socialStore.forFile(f),
+            kb: Math.round(r.size / 1024), mtime: r.mtimeMs,
+            posts: await socialStore.forFile(r.rel),
           });
         }
       } catch {}
