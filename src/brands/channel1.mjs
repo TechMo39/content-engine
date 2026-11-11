@@ -1,4 +1,4 @@
-// MERK-MODULE: Umma United — faceless YouTube-kanaal (moslim van nu, trots/humor).
+// MERK-MODULE: Truthward (channel1) — faceless YouTube-kanaal, grote vragen eerlijk bekeken.
 // Parallel aan Tale of Tiles; raakt de kern en de tegel-logica NIET aan.
 //
 // TYPE 1 — "kaart" (de kaart-door-de-tijd):
@@ -328,7 +328,7 @@ function ctaFoldout(W, H, op) {
   g += `<rect x="${x}" y="${y}" width="${panelW}" height="${panelH}" rx="${r}" fill="${COL.ink}" opacity="0.98"/>`;
   g += `<rect x="${x}" y="${y}" width="${panelW}" height="${panelH}" rx="${r}" fill="none" stroke="${COL.orange}" stroke-width="4"/>`;
   // regel 1: wie we zijn
-  g += `<text x="${W / 2}" y="${y + panelH * 0.30}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fs1}" fill="${COL.cream}">We are Umma United.</text>`;
+  g += `<text x="${W / 2}" y="${y + panelH * 0.30}" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="${fs1}" fill="${COL.cream}">We are Truthward.</text>`;
   // regel 2: de missie-CTA
   g += `<text x="${W / 2}" y="${y + panelH * 0.52}" text-anchor="middle" font-family="${SANS}" font-size="${fs2}" fill="${COL.mute}">Subscribe so we can go deeper.</text>`;
   // subscribe-chip (oranje pil)
@@ -342,7 +342,7 @@ function ctaFoldout(W, H, op) {
 export function makeBrand({ ROOT = "." } = {}) {
   let CURRENT_CH = "channel1";   // actief kanaal; makeRender/previewFrameSVG zetten het per render (wachtrij = 1 tegelijk, dus veilig)
   const branding = {
-    name: "Umma United", footer: "",   // GEEN footer-tekst onderaan (logo staat rechtsboven)
+    name: "Truthward", footer: "",   // GEEN footer-tekst onderaan (logo staat rechtsboven)
     // GEEN automatisch woordmerk bovenin: composeChrome tekent anders b.name als tekst boven ELKE
     // scène, wat botste met het logo rechtsboven en (op intro/outro) met het grote woordmerk. De
     // merk-identiteit komt nu alleen van logoChrome (klein rechtsboven, 1e scène) + de intro/outro.
@@ -825,8 +825,8 @@ export function makeBrand({ ROOT = "." } = {}) {
   function missieRegel(W, H, op) {
     if (op <= 0.01) return "";
     const S = Math.min(W, H);
-    const l1 = "UMMA UNITED";
-    const l2 = "Our history. Our pride. Our present.";
+    const l1 = "TRUTHWARD";
+    const l2 = "Big questions, looked at honestly.";
     const fs1 = Math.round(S * 0.052), fs2 = Math.round(S * 0.040);
     const y = H * 0.135;
     return `<g opacity="${op.toFixed(2)}">`
@@ -893,11 +893,11 @@ export function makeBrand({ ROOT = "." } = {}) {
     g += LOGO_URI
       ? `<image href="${LOGO_URI}" x="${lx}" y="${ly}" width="${logoSz}" height="${logoSz}" preserveAspectRatio="xMidYMid meet"/>`
       : `<circle cx="${W / 2}" cy="${ly + logoSz / 2}" r="${logoSz / 2}" fill="none" stroke="${COL.orange}" stroke-width="3"/>`
-        + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">UU</text>`;
+        + `<text x="${W / 2}" y="${ly + logoSz / 2 + logoSz * 0.14}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${Math.round(logoSz * 0.4)}" fill="${COL.orange}">TW</text>`;
 
     // woordmerk
     const wmY = ly + logoSz + gap + Math.round(wmFs * 0.8);
-    g += `<text x="${W / 2}" y="${wmY}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${wmFs}" letter-spacing="${Math.round(wmFs * 0.14)}" fill="${COL.cream}">UMMA UNITED</text>`;
+    g += `<text x="${W / 2}" y="${wmY}" text-anchor="middle" font-family="${SERIF}" font-weight="800" font-size="${wmFs}" letter-spacing="${Math.round(wmFs * 0.14)}" fill="${COL.cream}">TRUTHWARD</text>`;
     // dunne sierlijnen links+rechts van een klein ruitje onder het woordmerk
     const lineY = wmY + Math.round(wmFs * 0.55);
     const lineW = Math.round(W * 0.14), lineGap = Math.round(S * 0.03);
@@ -907,7 +907,7 @@ export function makeBrand({ ROOT = "." } = {}) {
 
     // tagline (intro = missie; outro = korte volg-regel). Mo's richting: over de Umma verheffen.
     const tagY = lineY + Math.round(tagFs * 1.5);
-    const tag = isOutro ? "Follow us, and rise with the Ummah" : "Raising the Ummah, one story at a time";
+    const tag = isOutro ? "Subscribe, and find out with us" : "Toward the truth, one question at a time";
     g += `<text x="${W / 2}" y="${tagY}" text-anchor="middle" font-family="${SANS}" font-weight="600" font-size="${tagFs}" letter-spacing="1" fill="${COL.mute}">${escapeXml(tag)}</text>`;
 
     // outro: abonneer-pil (oranje), premium, onder de tagline
@@ -1034,7 +1034,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     const picked = (subjectId && STORIES[subjectId] && STORIES[subjectId].scenes.length) ? STORIES[subjectId] : null;
     const scenes = opts.scenes || (picked && picked.scenes) || [];
     const groups = opts.groups || (picked && picked.groups) || {};
-    const title = opts.title || (picked && picked.title) || "Umma United";
+    const title = opts.title || (picked && picked.title) || "Truthward";
 
     // duur per scène: stem stuurt (wav-lengte + marge), anders dur of 3s.
     // VOICE_PAD = ADEMPAUZE na de stem binnen elke scène: na de laatste zin loopt alleen de
