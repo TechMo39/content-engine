@@ -37,7 +37,7 @@ const ARCHIEF_DAGEN = 30;   // video's die zo lang in out/archief/ staan -> defi
 const BEDRIJVEN = ["taleoftiles", "unclerank"];
 // Veiligheidsklep voor de legacy-root: channel-video's die daar nog los staan (bv. ummaunited-*)
 // NIET archiveren — die horen bij een kanaal en blijven bewaard.
-const KANAAL_PREFIX = [/^ummaunited-/i];
+const KANAAL_PREFIX = [/^ummaunited-/i, /^channel1-/i];
 
 // Opruimen: verse pool klein houden. Wat in een bedrijfsmap (of los in out/) ouder is dan
 // SWEEP_DAGEN is ongebruikt -> naar out/archief/. Geposte video's die al naar out/geplaatst/ zijn

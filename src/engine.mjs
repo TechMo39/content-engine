@@ -42,7 +42,7 @@ try {
 //  - CHANNELS (handgemaakt): blijven voorlopig plat in out/ en verhuizen in stap 2 naar out/channels/<kanaal>/
 // Alles backwards-compatible: oude losse mp4's in out/ worden nog gewoon gelezen én opgeruimd.
 const BUSINESS_BRANDS = new Set(["taleoftiles", "unclerank"]);
-function outSubFor(brandId) { return BUSINESS_BRANDS.has(brandId) ? brandId : ""; }
+function outSubFor(brandId) { return BUSINESS_BRANDS.has(brandId) ? brandId : "channels/" + brandId; }
 // Mappen in out/ die GEEN renders zijn (nooit als video tonen/opruimen).
 const OUT_SKIP_DIRS = new Set(["archief", "geplaatst", "mail-stills", "carrousel", "logs"]);
 // Alle afgewerkte renders onder out/ (losse out/ + bedrijfsmappen + later channels/<kanaal>/),
@@ -439,7 +439,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
     // TWEEDE STUDIO — Umma United scène-editor (eigen pagina, los van de tegel-studio).
-    if (u.pathname === "/umma") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/umma.html"))); return; }
+    if (u.pathname === "/channels") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/channel.html"))); return; }
     if (u.pathname.startsWith("/out/")) {
       const f = path.resolve(OUT, decodeURIComponent(u.pathname.slice(5)));
       if (!f.startsWith(OUT)) { res.writeHead(403); res.end("nee"); return; }   // geen pad-uitbraak
@@ -533,59 +533,59 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
-    // UMMA — muziek UITSLUITEND uit de eigen map assets/ummaunited/muziek/ (gescheiden van Tale of Tiles).
-    if (u.pathname === "/api/umma-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
-    if (u.pathname === "/api/umma-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/muziek", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
-    // UMMA SFX — serveer een effect-bestand uit assets/ummaunited/sfx/ zodat de studio-preview de SFX kan afspelen
-    if (u.pathname === "/api/umma-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/ummaunited/sfx", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
+    // UMMA — muziek UITSLUITEND uit de eigen map assets/channels/channel1/muziek/ (gescheiden van Tale of Tiles).
+    if (u.pathname === "/api/channel-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/channels/channel1/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    if (u.pathname === "/api/channel-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels/channel1/muziek", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
+    // UMMA SFX — serveer een effect-bestand uit assets/channels/channel1/sfx/ zodat de studio-preview de SFX kan afspelen
+    if (u.pathname === "/api/channel-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels/channel1/sfx", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
     // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
     // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
-    if (u.pathname === "/api/umma-timeline" && req.method === "GET") {
+    if (u.pathname === "/api/channel-timeline" && req.method === "GET") {
       const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
-      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, "_timeline.json");
       if (existsSync(p)) { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" }); res.end(await fs.readFile(p)); return; }
-      json(res, { error: "geen _timeline.json gevonden; draai eerst python tools/umma_voice.py --voice " + voice }, 404); return;
+      json(res, { error: "geen _timeline.json gevonden; draai eerst python tools/channel_voice.py --voice " + voice }, 404); return;
     }
     // UMMA TIJDLIJN — de bewerkte tijdlijn opslaan (sleep-correcties, beeld-beats, sfx), terug naar
     // hetzelfde _timeline.json zodat de render exact deze tijdlijn leest (geen afwijking meer).
-    if (u.pathname === "/api/umma-timeline-save" && req.method === "POST") {
+    if (u.pathname === "/api/channel-timeline-save" && req.method === "POST") {
       const bd = await readBody(req);
       if (!bd || !Array.isArray(bd.scenes)) { json(res, { error: "ongeldige tijdlijn" }, 400); return; }
       const story = String(bd.story || "sword").replace(/[^\w-]/g, "");
       const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
-      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, "_timeline.json");
       try { await fs.writeFile(p, JSON.stringify(bd, null, 2), "utf8"); json(res, { ok: true, saved: path.relative(ROOT, p).replace(/\\/g, "/") }); }
       catch (e) { json(res, { error: e.message }, 500); }
       return;
     }
     // UMMA STEM — een scène-wav teruggeven voor de audio-preview in de editor (01.wav .. 16.wav).
-    if (u.pathname === "/api/umma-voice" && req.method === "GET") {
+    if (u.pathname === "/api/channel-voice" && req.method === "GET") {
       const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
       const n = (u.searchParams.get("n") || "").replace(/[^\d]/g, "");
       if (!n) { res.writeHead(404); res.end(""); return; }
-      const p = path.resolve(ROOT, "assets/ummaunited/voice", story, voice, n.padStart(2, "0") + ".wav");
+      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, n.padStart(2, "0") + ".wav");
       if (existsSync(p)) { serveMedia(req, res, p, "audio/wav"); return; }
       res.writeHead(404); res.end(""); return;
     }
-    // UMMA BEELD — serveer het opgehaalde beeld/video per beat (uit assets/ummaunited/video/) zodat
+    // UMMA BEELD — serveer het opgehaalde beeld/video per beat (uit assets/channels/channel1/video/) zodat
     // de editor een thumbnail per beat kan tonen en je de missers direct ziet.
-    if (u.pathname.startsWith("/umma-media/")) {
-      const base = path.resolve(ROOT, "assets/ummaunited/video");
-      const f = path.resolve(base, decodeURIComponent(u.pathname.slice("/umma-media/".length)));
+    if (u.pathname.startsWith("/channel-media/")) {
+      const base = path.resolve(ROOT, "assets/channels/channel1/video");
+      const f = path.resolve(base, decodeURIComponent(u.pathname.slice("/channel-media/".length)));
       if (!f.startsWith(base)) { res.writeHead(403); res.end("nee"); return; }
       if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; serveMedia(req, res, f, ct); return; }
       res.writeHead(404); res.end(""); return;
     }
     // UMMA POSTER — één stilstaand frame (jpg) uit een videobestand, zodat de studio-preview video's
     // als afbeelding kan tonen. De ingebouwde app-browser schildert mp4-frames niet betrouwbaar; een
-    // jpg rendert altijd. Frames worden gecachet in assets/ummaunited/video/.posters/.
-    if (u.pathname === "/api/umma-poster" && req.method === "GET") {
+    // jpg rendert altijd. Frames worden gecachet in assets/channels/channel1/video/.posters/.
+    if (u.pathname === "/api/channel-poster" && req.method === "GET") {
       // f = optioneel één submap (verhaal) + bestandsnaam, bv. "chose/s01b1.mp4" of "s01b1.mp4"
       const raw = (u.searchParams.get("f") || "").replace(/\\/g, "/");
       if (raw.includes("..") || !/^(?:[\w-]+\/)?[\w.\- ]+\.(mp4|webm|mov|mkv|m4v)$/i.test(raw)) { res.writeHead(404); res.end(""); return; }
-      const base = path.resolve(ROOT, "assets/ummaunited/video");
+      const base = path.resolve(ROOT, "assets/channels/channel1/video");
       const src = path.resolve(base, raw);
       if ((src !== base && !src.startsWith(base + path.sep)) || !existsSync(src)) { res.writeHead(404); res.end(""); return; }
       const pdir = path.join(base, ".posters");
@@ -604,9 +604,9 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { res.writeHead(500); res.end(""); return; }
       return;
     }
-    // UMMA BEELD — lijst van alle opgehaalde/geüploade bestanden in assets/ummaunited/video/,
+    // UMMA BEELD — lijst van alle opgehaalde/geüploade bestanden in assets/channels/channel1/video/,
     // zodat de studio een weggegooid beeld terug kan koppelen en lege beats kan vullen.
-    if (u.pathname === "/api/umma-media-list" && req.method === "GET") {
+    if (u.pathname === "/api/channel-media-list" && req.method === "GET") {
       // Beeld PER PROJECT: heeft dit verhaal een eigen beeldmap, dan tonen we alleen díé bestanden
       // (als verhaal/bestand). Bestaat die map nog niet (oud, plat project), dan de losse map — zo
       // blijft een bestaand plat project werken en ziet een nieuw project alleen z'n eigen beeld.
@@ -614,50 +614,50 @@ const server = http.createServer(async (req, res) => {
       const rx = /\.(mp4|webm|jpg|jpeg|png|webp)$/i;
       let files = [];
       try {
-        const sdir = story && path.resolve(ROOT, "assets/ummaunited/video", story);
+        const sdir = story && path.resolve(ROOT, "assets/channels/channel1/video", story);
         if (sdir && existsSync(sdir)) files = (await fs.readdir(sdir)).filter((f) => rx.test(f)).map((f) => story + "/" + f);
-        else files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/video"))).filter((f) => rx.test(f));
+        else files = (await fs.readdir(path.resolve(ROOT, "assets/channels/channel1/video"))).filter((f) => rx.test(f));
       } catch {}
       json(res, { files });
       return;
     }
-    // UMMA BEELD — upload: zet een eigen plaatje/video per beat neer in assets/ummaunited/video/
+    // UMMA BEELD — upload: zet een eigen plaatje/video per beat neer in assets/channels/channel1/video/
     // en geef het relatieve pad terug; de studio zet dat in beat.img of beat.vid.
-    if (u.pathname === "/api/umma-beeld-upload" && req.method === "POST") {
+    if (u.pathname === "/api/channel-beeld-upload" && req.method === "POST") {
       const bd = await readBody(req);
       const story = String(bd.story || "").replace(/[^\w-]/g, "");   // upload in de map van dit project
       let safe = String(bd.name || "beeld").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 60);
       const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
       if (!b64) { json(res, { error: "geen beeld ontvangen" }, 400); return; }
       if (!/\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(safe)) safe += ".jpg";
-      const sub = story ? "assets/ummaunited/video/" + story : "assets/ummaunited/video";
+      const sub = story ? "assets/channels/channel1/video/" + story : "assets/channels/channel1/video";
       const dir = path.resolve(ROOT, sub); await fs.mkdir(dir, { recursive: true });
       const fname = Date.now() + "-" + safe;
       await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
       const isVid = /\.(mp4|webm)$/i.test(fname);
       const rel = (story ? story + "/" : "") + fname;
-      json(res, { path: "assets/ummaunited/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
+      json(res, { path: "assets/channels/channel1/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
       return;
     }
-    // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het
+    // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
-    if (u.pathname === "/api/umma-upload" && req.method === "POST") {
+    if (u.pathname === "/api/channel-upload" && req.method === "POST") {
       const bd = await readBody(req);
       const safe = String(bd.name || "clip").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 50);
       const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
       if (!b64) { json(res, { error: "geen audio ontvangen" }, 400); return; }
-      const dir = path.resolve(ROOT, "assets/ummaunited/audio"); await fs.mkdir(dir, { recursive: true });
+      const dir = path.resolve(ROOT, "assets/channels/channel1/audio"); await fs.mkdir(dir, { recursive: true });
       const fname = Date.now() + "-" + (/\.(mp3|wav|m4a|aac|ogg)$/i.test(safe) ? safe : safe + ".mp3");
       await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
-      json(res, { path: "assets/ummaunited/audio/" + fname });
+      json(res, { path: "assets/channels/channel1/audio/" + fname });
       return;
     }
     // UMMA — nieuwste klaarstaande import-script teruggeven, zodat de studio bij openen vanzelf
-    // de scènes toont (geen plakken). Zoekt in assets/ummaunited/voice/<verhaal>/<stem>/_import-*.txt,
+    // de scènes toont (geen plakken). Zoekt in assets/channels/channel1/voice/<verhaal>/<stem>/_import-*.txt,
     // pakt het meest recent gewijzigde. Puur lezen, raakt niets aan.
-    if (u.pathname === "/api/umma-latest-script" && req.method === "GET") {
+    if (u.pathname === "/api/channel-latest-script" && req.method === "GET") {
       try {
-        const base = path.resolve(ROOT, "assets/ummaunited/voice");
+        const base = path.resolve(ROOT, "assets/channels/channel1/voice");
         let best = null;
         for (const story of await fs.readdir(base).catch(() => [])) {
           const sdir = path.join(base, story);
@@ -679,10 +679,10 @@ const server = http.createServer(async (req, res) => {
     // UMMA — ALLE klaarstaande import-scripts als lijst (voor "render alle delen"). Per deel+stem
     // één item met id (verhaal/stem), titel en de scripttekst. De studio kan ze zo achter elkaar
     // in de render-wachtrij zetten (de engine-wachtrij verwerkt ze één voor één).
-    if (u.pathname === "/api/umma-scripts" && req.method === "GET") {
+    if (u.pathname === "/api/channel-scripts" && req.method === "GET") {
       const items = [];
       try {
-        const base = path.resolve(ROOT, "assets/ummaunited/voice");
+        const base = path.resolve(ROOT, "assets/channels/channel1/voice");
         for (const story of (await fs.readdir(base).catch(() => [])).sort()) {
           const sdir = path.join(base, story);
           for (const voice of (await fs.readdir(sdir).catch(() => [])).sort()) {
@@ -701,9 +701,9 @@ const server = http.createServer(async (req, res) => {
     }
     // UMMA — live voorbeeld: rendert ÉÉN frame (midden in de gekozen scène) als PNG, zodat de
     // studio toont wat je maakt terwijl je bouwt. Geen video, dus snel. Alleen voor Umma.
-    if (u.pathname === "/api/umma-preview" && req.method === "POST") {
+    if (u.pathname === "/api/channel-preview" && req.method === "POST") {
       const bd = await readBody(req);
-      const brand = reg.byId["ummaunited"];
+      const brand = reg.byId["channel1"];
       if (!brand) { json(res, { error: "umma niet geladen" }, 400); return; }
       try {
         const render = await brand.makeRender({ subjectId: null, templateId: "kaart", opts: bd.opts || {}, format: bd.format || "9:16", log: () => {} });
@@ -718,8 +718,8 @@ const server = http.createServer(async (req, res) => {
     // de video-render (techniek + chrome + ondertitel). Zo toont de studio ELKE scène zoals hij in
     // de video komt (ook de getekende, die vroeger alleen een grijs labeltje gaven). Video-beats
     // geven 204 terug -> de studio toont die rechtstreeks met het echte videobestand.
-    if (u.pathname === "/api/umma-frame" && req.method === "GET") {
-      const brand = reg.byId["ummaunited"];
+    if (u.pathname === "/api/channel-frame" && req.method === "GET") {
+      const brand = reg.byId["channel1"];
       if (!brand || !brand.previewFrameSVG) { res.writeHead(404); res.end(""); return; }
       try {
         const r = await brand.previewFrameSVG({

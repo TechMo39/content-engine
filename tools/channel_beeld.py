@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # umma_beeld.py — vult automatisch beeld per beeld-beat, net zoals umma_voice.py de stem vult.
-# Draait LOKAAL op Mo's laptop (internet nodig). Leest assets/ummaunited/voice/<story>/<voice>/
+# Draait LOKAAL op Mo's laptop (internet nodig). Leest assets/channels/channel1/voice/<story>/<voice>/
 # _timeline.json, en zoekt per beat rechtenvrij beeld (Wikimedia Commons: publiek domein + CC),
-# downloadt het naar assets/ummaunited/video/ en zet het pad op de beat (beat.img). Daarna kijk je
+# downloadt het naar assets/channels/channel1/video/ en zet het pad op de beat (beat.img). Daarna kijk je
 # het na in de studio en vervang je alleen de missers. De "getekend"-beats (tekst/kaart/CTA) slaat
 # hij over; die tekent de engine zelf.
 #
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/umma_beeld.py                 # alle lege beats vullen
-#   python tools/umma_beeld.py --only 10       # alleen scene 10
-#   python tools/umma_beeld.py --force         # ook beats die al beeld hebben opnieuw ophalen
+#   python tools/channel_beeld.py                 # alle lege beats vullen
+#   python tools/channel_beeld.py --only 10       # alleen scene 10
+#   python tools/channel_beeld.py --force         # ook beats die al beeld hebben opnieuw ophalen
 #
 # Geen API-sleutel nodig. Alles via de open Wikimedia Commons API.
 import argparse, os, json, time, urllib.parse, urllib.request, urllib.error, re, subprocess
@@ -19,12 +19,12 @@ API = "https://commons.wikimedia.org/w/api.php"
 
 # VIDEO-bronnen (optioneel, gratis sleutel). Zonder sleutel pakt de tool gewoon foto's van
 # Wikimedia; mét sleutel haalt hij CC0-video van Pexels/Pixabay voor de 'video'-beats, en valt
-# alleen terug op een foto als er geen video is. Zet je sleutel in een bestand tools/umma-keys.json
+# alleen terug op een foto als er geen video is. Zet je sleutel in een bestand tools/channel-keys.json
 #   { "pexels": "JOUW_PEXELS_SLEUTEL", "pixabay": "JOUW_PIXABAY_SLEUTEL" }
 # of als omgevingsvariabele PEXELS_API_KEY / PIXABAY_API_KEY. Allebei mag, één is genoeg.
 def load_keys(root):
     keys = {"pexels": os.environ.get("PEXELS_API_KEY", ""), "pixabay": os.environ.get("PIXABAY_API_KEY", "")}
-    kf = os.path.join(root, "tools", "umma-keys.json")
+    kf = os.path.join(root, "tools", "channel-keys.json")
     try:
         if os.path.exists(kf):
             d = json.load(open(kf, encoding="utf-8"))
@@ -166,6 +166,64 @@ KAART = {
  9: {"beat": 1, "view": "belt", "kaartInfo": "Colonisation, 1500s to 1900s",
      "fills": {"europe": "red", "colonised": "orange"}, "labels": {"europe": "European empires", "colonised": "Muslim lands"}},
 }
+
+# ============================================================================================
+# BEELDPLAN PER VERHAAL. SPLITS/LABELS/PLAN/KAART hierboven zijn van "sword". Een nieuw verhaal
+# krijgt zijn EIGEN blok; de tool kiest op --story (valt terug op sword voor bestaand gedrag).
+# Zo plakt sword's beeld (zwaarden/Rome/moskeeën/kaarten) nooit meer op een ander verhaal.
+SPLITS_BY = {"sword": SPLITS}
+LABELS_BY = {"sword": LABELS}
+PLAN_BY   = {"sword": PLAN}
+KAART_BY  = {"sword": KAART}
+GROUPS_BY = {"sword": GROUPS}
+
+# chose = "The Answer You Never Chose" (video 1). 12 scenes, GEEN kaarten (geen geografie).
+SPLITS_BY["chose"] = {
+ 1:[3,6], 2:[5], 3:[3], 4:[4], 5:[3,5], 6:[5,8],
+ 7:[4], 8:[3,6,9,12], 9:[4], 10:[5,9,13], 11:[5,9], 12:[5,9,13],
+}
+LABELS_BY["chose"] = {
+ 1:["de chirurg checkt","reviews op je telefoon","alleen onder de sterrenhemel"],
+ 2:["vogels, geprogrammeerd","de mens weegt en kiest"],
+ 3:["de lucht, een jas"," duizend kleine keuzes"],
+ 4:["de dokter = de rationele daad","de scan, wie het wel weet"],
+ 5:["recht: de advocaat","de brug, jaren doorgerekend","de medicijndoos"],
+ 6:["de grootste vraag: de kosmos","een enkele kaars in het donker","de stille kamer"],
+ 7:["ik betrapte mezelf (bij het raam)","de barst in de muur"],
+ 8:["thuis","een enkel moment","de omgeving, meelopen","de wereld, de schermen","de pijn, weglopen"],
+ 9:["kijk naar die vijf deuren","vier van buiten, een duwt weg"],
+ 10:["ik ben nu volwassen (spiegel)","verweven met wie je bent","je verdedigt het (muur)","de scherpe geest (schaak)"],
+ 11:["nooit een leeg vel","het antwoord lag al klaar","eerlijk: misschien een zesde"],
+ 12:["de drempel, de opening","de mist: ieder zijn waarheid?","de horizon, de open vraag","de weg naar video 2"],
+}
+PLAN_BY["chose"] = {
+ 1:[("video","surgeon scrubbing hands operating room"),("video","hands holding smartphone online shopping"),("video","silhouette person looking up starry night sky")],
+ 2:[("video","flock of birds migrating sky slow motion"),("video","silhouette person standing alone contemplative")],
+ 3:[("video","grey cloudy overcast sky before rain"),("video","hands putting on jacket coat by door")],
+ 4:[("video","doctor examining patient hospital corridor"),("video","x-ray scan medical lightbox stethoscope")],
+ 5:[("video","old law books library shelves"),("video","steel bridge structure engineering low angle"),("video","pharmacy medicine box close up hands")],
+ 6:[("video","deep space stars galaxy slow drift"),("video","single candle flame in darkness"),("video","empty quiet room light beam dust floating")],
+ 7:[("video","person sitting alone by window pensive back"),("video","crack in old plaster wall close up")],
+ 8:[("video","warm family home interior evening silhouette"),("video","light flare bokeh abstract dreamy memory"),("video","crowd of people walking same direction street"),("video","television screens glowing dark room"),("video","person walking away alone in rain street")],
+ 9:[("video","row of old wooden doors dim hallway"),("video","forked path diverging two ways forest")],
+ 10:[("video","person reflection in mirror low light"),("video","interwoven threads rope macro texture"),("video","old stone fortress wall defensive"),("video","chess pieces board strategy close up")],
+ 11:[("video","blank sheet of paper on desk with pen"),("video","closed door with light behind it"),("video","hand writing in notebook close up")],
+ 12:[("video","figure standing in doorway bright light"),("video","foggy misty path early morning"),("video","vast dawn horizon open landscape"),("video","long empty road leading to horizon")],
+}
+KAART_BY["chose"]  = {}   # geen kaarten voor chose
+GROUPS_BY["chose"] = {}
+
+def select_story_plan(story):
+    # Zet het actieve beeldplan op dat van <story> (valt terug op sword). Geeft True als het
+    # verhaal een eigen plan heeft, anders False (dan draait het op het sword-plan).
+    global SPLITS, LABELS, PLAN, KAART, GROUPS
+    SPLITS = SPLITS_BY.get(story, SPLITS_BY["sword"])
+    LABELS = LABELS_BY.get(story, LABELS_BY["sword"])
+    PLAN   = PLAN_BY.get(story,   PLAN_BY["sword"])
+    KAART  = KAART_BY.get(story,  KAART_BY["sword"])
+    GROUPS = GROUPS_BY.get(story, GROUPS_BY["sword"])
+    return story in SPLITS_BY
+
 
 def apply_kaart(tl):
     # zet de kaart-velden op de juiste scènes en de landgroepen bovenin de tijdlijn; maakt de kaart-
@@ -337,14 +395,17 @@ def main():
     ap.add_argument("--force", action="store_true", help="ook beats die al beeld hebben opnieuw ophalen")
     args = ap.parse_args()
 
-    tlpath = os.path.join(args.root, "assets", "ummaunited", "voice", args.story, args.voice, "_timeline.json")
+    # kies het beeldplan van DIT verhaal (sword/chose/...); val terug op sword als het onbekend is
+    if not select_story_plan(args.story):
+        print(f"let op: geen eigen beeldplan voor '{args.story}' -> val terug op sword-plan")
+    tlpath = os.path.join(args.root, "assets", "channels", "channel1", "voice", args.story, args.voice, "_timeline.json")
     if not os.path.exists(tlpath):
-        print("geen _timeline.json:", tlpath, "\n-> draai eerst: python tools/umma_voice.py --voice", args.voice); return
+        print("geen _timeline.json:", tlpath, "\n-> draai eerst: python tools/channel_voice.py --voice", args.voice); return
     tl = json.load(open(tlpath, encoding="utf-8"))
 
     # BEELD PER PROJECT: elke video (verhaal) krijgt zijn eigen beeldmap, zodat scène+beat van het ene
     # verhaal nooit het beeld van een ander verhaal pakt. (Oud: één gedeelde map -> kruisbesmetting.)
-    outdir = os.path.join(args.root, "assets", "ummaunited", "video", args.story)
+    outdir = os.path.join(args.root, "assets", "channels", "channel1", "video", args.story)
     os.makedirs(outdir, exist_ok=True)
     keys = load_keys(args.root)
     have_video = bool(keys.get("pexels") or keys.get("pixabay"))
@@ -367,7 +428,7 @@ def main():
             # oude gedeelde map (of een ander verhaal), dan halen we het opnieuw op in deze map, zodat
             # elk project zijn eigen beeld krijgt (auto-migratie, geen --force nodig).
             cur = (beat.get("vid") or beat.get("img") or "").replace("\\", "/")
-            own_prefix = "assets/ummaunited/video/" + args.story + "/"
+            own_prefix = "assets/channels/channel1/video/" + args.story + "/"
             if cur and own_prefix in cur and not args.force:
                 n_skip += 1; continue
             # HERGEBRUIK: staat het beeld voor deze beat al op schijf (s<NN>b<bi+1>.<ext>)? Dan koppelen
@@ -383,7 +444,7 @@ def main():
                         found = (base + ext, ext); break
                 if found:
                     fname, ext = found
-                    rel = "assets/ummaunited/video/" + args.story + "/" + fname
+                    rel = "assets/channels/channel1/video/" + args.story + "/" + fname
                     isv = ext.lower() in (".mp4", ".webm")
                     beat["vid" if isv else "img"] = rel
                     beat.pop("img" if isv else "vid", None)
@@ -410,7 +471,7 @@ def main():
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(0.5); continue
             if is_video and normalize_video(fpath, args.root):
                 print("    genormaliseerd -> max 1080p30 (app-afspeelbaar)")
-            rel = "assets/ummaunited/video/" + args.story + "/" + fname
+            rel = "assets/channels/channel1/video/" + args.story + "/" + fname
             beat["vid" if is_video else "img"] = rel
             beat.pop("img" if is_video else "vid", None)  # oude tegenpool opruimen
             credits.append(f"scene {num} beat {bi+1}: {hit.get('title','')} | {hit['license']} | {hit['credit']}")

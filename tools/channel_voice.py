@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # umma_voice.py — genereert per scene een voice-over-fragment met KOKORO (lokaal, CPU, geen GPU),
 # met de TOON per scene (rustig / nadruk / warm), zodat de stem klopt met wat er gezegd wordt.
-# Draait LOKAAL op Mo's laptop. Schrijft assets/ummaunited/voice/<story>/<stem>/<nn>.wav + een
+# Draait LOKAAL op Mo's laptop. Schrijft assets/channels/channel1/voice/<story>/<stem>/<nn>.wav + een
 # import-script met de voice-paden. (Piper is vervangen door Kokoro; klinkt veel natuurlijker.)
 #
 # Eenmalig installeren:  pip install "pykokoro[cpu]"
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/umma_voice.py                 # beide delen, beide stemmen
-#   python tools/umma_voice.py --voice man      # alleen de mannenstem
-#   python tools/umma_voice.py --only 3         # alleen scene 3 opnieuw
-#   python tools/umma_voice.py --story fitra --voice man --format 16:9   # NIEUW project
-#   python tools/umma_voice.py --story fitra --voice man --format 9:16   # de afgeleide short
+#   python tools/channel_voice.py                 # beide delen, beide stemmen
+#   python tools/channel_voice.py --voice man      # alleen de mannenstem
+#   python tools/channel_voice.py --only 3         # alleen scene 3 opnieuw
+#   python tools/channel_voice.py --story fitra --voice man --format 16:9   # NIEUW project
+#   python tools/channel_voice.py --story fitra --voice man --format 9:16   # de afgeleide short
 #
 # PROJECT = <story>/<voice>. Elk project krijgt een eigen map en een eigen _timeline.json, dus
 # een nieuw project overschrijft NOOIT een bestaand project. Het FORMAAT (16:9 lang / 9:16 short)
@@ -479,7 +479,7 @@ STORIES["sword"]["map"] = [
 def build_story(story_id, voice, root, only=0, fmt="16:9"):
     story = STORIES[story_id]
     model = VOICES[voice]
-    outdir = os.path.join(root, "assets", "ummaunited", "voice", story_id, voice)
+    outdir = os.path.join(root, "assets", "channels", "channel1", "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
     durs = {}   # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)

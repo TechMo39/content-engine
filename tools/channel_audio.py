@@ -5,11 +5,11 @@
 # Bron: Freesound, gefilterd op CC0 (mag commercieel, geen naamsvermelding nodig). We downloaden de
 # voorbeeld-mp3 (geen OAuth nodig). Limiet Freesound: 60/min, 2000/dag -> ruim; we pacen + retryen.
 # Eenmalig een gratis sleutel halen op https://freesound.org/apiv2/apply en zetten in
-# tools/umma-keys.json :  { "freesound": "JOUW_SLEUTEL" }   (of env FREESOUND_API_KEY)
+# tools/channel-keys.json :  { "freesound": "JOUW_SLEUTEL" }   (of env FREESOUND_API_KEY)
 #
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/umma_audio.py            # muziek per blok + sfx op de kantelpunten
-#   python tools/umma_audio.py --force    # ook al-gevulde opnieuw ophalen
+#   python tools/channel_audio.py            # muziek per blok + sfx op de kantelpunten
+#   python tools/channel_audio.py --force    # ook al-gevulde opnieuw ophalen
 #
 # MUZIEK staat per BLOK (groep scènes), niet per scène -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
@@ -55,7 +55,7 @@ SFX = [
 
 def load_key(root):
     k = os.environ.get("FREESOUND_API_KEY", "")
-    kf = os.path.join(root, "tools", "umma-keys.json")
+    kf = os.path.join(root, "tools", "channel-keys.json")
     try:
         if os.path.exists(kf):
             d = json.load(open(kf, encoding="utf-8")); k = k or d.get("freesound", "")
@@ -157,17 +157,17 @@ def main():
     key = load_key(args.root)
     if not key:
         print("Geen Freesound-sleutel. Haal er gratis een op https://freesound.org/apiv2/apply en zet"
-              " 'freesound' in tools/umma-keys.json. Dan draai je dit opnieuw."); return
+              " 'freesound' in tools/channel-keys.json. Dan draai je dit opnieuw."); return
 
-    tlpath = os.path.join(args.root, "assets", "ummaunited", "voice", args.story, args.voice, "_timeline.json")
+    tlpath = os.path.join(args.root, "assets", "channels", "channel1", "voice", args.story, args.voice, "_timeline.json")
     if not os.path.exists(tlpath):
         print("geen _timeline.json:", tlpath); return
     tl = json.load(open(tlpath, encoding="utf-8"))
     scenes = tl.get("scenes", [])
     by_num = {s.get("scene"): s for s in scenes}
 
-    mdir = os.path.join(args.root, "assets", "ummaunited", "muziek")
-    sdir = os.path.join(args.root, "assets", "ummaunited", "sfx")
+    mdir = os.path.join(args.root, "assets", "channels", "channel1", "muziek")
+    sdir = os.path.join(args.root, "assets", "channels", "channel1", "sfx")
     os.makedirs(mdir, exist_ok=True); os.makedirs(sdir, exist_ok=True)
     credits = []
     n_mus = n_sfx = n_fail = 0
@@ -176,7 +176,7 @@ def main():
     track_file = {}
     for name, query in TRACKS.items():
         fname = f"umma-{name}.mp3"; fpath = os.path.join(mdir, fname)
-        rel = "assets/ummaunited/muziek/" + fname
+        rel = "assets/channels/channel1/muziek/" + fname
         if os.path.exists(fpath) and not args.force:
             track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
         print(f"sfeer '{name}': zoek muziek '{query}'")
@@ -225,7 +225,7 @@ def main():
             download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-        s["sfx"].append({"t": t, "name": "end", "file": "assets/ummaunited/sfx/" + fname})
+        s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/channel1/sfx/" + fname})
         credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
 
