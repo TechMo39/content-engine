@@ -45,3 +45,4 @@ assets/ummaunited/_oud-*/
 *.png
 *.webp
 *.gif
+__pycache__/
