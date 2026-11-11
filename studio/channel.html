@@ -489,7 +489,7 @@ async function doRender(){if(rendering)return;
  if(isDirty){rm.textContent='eerst opslaan…';await save();}
  rendering=true;$('btn-render').textContent='… video wordt gemaakt';rm.textContent='render gestart — dit kan enkele minuten duren (stem + beeld + muziek + effecten).';$('rendervid').style.display='none';
  const scenes=SC.map(s=>({voice:s.wav,caption:s.sentences.map(x=>x.text).join(' '),tone:s.tone}));
- try{const res=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'channel1',template:'mix',format:FMT,opts:{type:'mix',scenes,title:TL.title}})});
+ try{const res=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'channel1',template:'mix',format:FMT,opts:{type:'mix',scenes,title:TL.title,channel:CHANNEL}})});
    const d=await res.json();
    if(d.url){rm.style.color='var(--ok)';rm.innerHTML='klaar ✓ — <a href="'+d.url+'" target="_blank" style="color:var(--beeld)">open de video</a>';const v=$('rendervid');v.src=d.url;v.style.display='block';}
    else{rm.style.color='var(--sfx)';rm.textContent='render mislukt: '+(d.error||'onbekende fout');}}

@@ -177,38 +177,44 @@ PLAN_BY   = {"sword": PLAN}
 KAART_BY  = {"sword": KAART}
 GROUPS_BY = {"sword": GROUPS}
 
-# chose = "The Answer You Never Chose" (video 1). 12 scenes, GEEN kaarten (geen geografie).
+# chose = "The Answer You Never Chose" (video 1). 14 scènes: 0=intro (getekend merk),
+# 1..12 = inhoud (beeld ophalen), 13=outro (getekend merk). GEEN kaarten (geen geografie).
+# Afgestemd op de GEGENEREERDE stem-tijdlijn (14 scènes), niet op de oude 12-scène-versie.
 SPLITS_BY["chose"] = {
- 1:[3,6], 2:[5], 3:[3], 4:[4], 5:[3,5], 6:[5,8],
- 7:[4], 8:[3,6,9,12], 9:[4], 10:[5,9,13], 11:[5,9], 12:[5,9,13],
+ 0:[], 1:[2,5], 2:[4,9], 3:[2], 4:[2,5], 5:[2,4], 6:[4,8],
+ 7:[4], 8:[2,4,6,11], 9:[3], 10:[4,8,11], 11:[4,9], 12:[2,8,13], 13:[],
 }
 LABELS_BY["chose"] = {
- 1:["de chirurg checkt","reviews op je telefoon","alleen onder de sterrenhemel"],
- 2:["vogels, geprogrammeerd","de mens weegt en kiest"],
- 3:["de lucht, een jas"," duizend kleine keuzes"],
- 4:["de dokter = de rationele daad","de scan, wie het wel weet"],
- 5:["recht: de advocaat","de brug, jaren doorgerekend","de medicijndoos"],
- 6:["de grootste vraag: de kosmos","een enkele kaars in het donker","de stille kamer"],
- 7:["ik betrapte mezelf (bij het raam)","de barst in de muur"],
- 8:["thuis","een enkel moment","de omgeving, meelopen","de wereld, de schermen","de pijn, weglopen"],
- 9:["kijk naar die vijf deuren","vier van buiten, een duwt weg"],
- 10:["ik ben nu volwassen (spiegel)","verweven met wie je bent","je verdedigt het (muur)","de scherpe geest (schaak)"],
- 11:["nooit een leeg vel","het antwoord lag al klaar","eerlijk: misschien een zesde"],
- 12:["de drempel, de opening","de mist: ieder zijn waarheid?","de horizon, de open vraag","de weg naar video 2"],
+ 0:["intro (merk)"],
+ 1:["de chirurg / geen vreemde opereert","de reviews → de grootste vraag","dus: laten we kijken"],
+ 2:["de vogel: ingebouwd programma","jij weegt, redeneert, kiest","de hond vraagt nooit waarom"],
+ 3:["een blik op de lucht, een jas","duizend keuzes per dag"],
+ 4:["de pijn die niet weggaat","je gaat naar wie het wél weet","je eigen grens zien = rationeel"],
+ 5:["de rechtszaak: de wet","de brug, jaren doorgerekend","de medicijndoos → eerst weten"],
+ 6:["op één vraag gaat het licht uit","groter dan alles: waarom ben je hier","ze hebben gewoon een antwoord"],
+ 7:["ik had mijn antwoord ook","de barst in de muur: nooit onderzocht"],
+ 8:["deur 1: thuis / je ouders","deur 2: één moment","deur 3: de mensen om je heen","deur 4: de wereld / de schermen","deur 5: de pijn"],
+ 9:["vijf deuren: vier van buiten, één duwt weg","en beiden zeker dat ze kozen"],
+ 10:["'ik ben nu volwassen' (spiegel)","verweven met wie je bent","je verdedigt het i.p.v. te toetsen","de scherpste geest verdedigt het best"],
+ 11:["waarom denkt het denkende wezen niet?","er lag al een antwoord klaar","misschien een zesde deur"],
+ 12:["hoe weet je of het waar is?","sommigen gaan wél terug","de stem: 'alles is maar mening'","bestaat er blijvende waarheid? → video 2"],
+ 13:["outro (merk)"],
 }
 PLAN_BY["chose"] = {
- 1:[("video","surgeon scrubbing hands operating room"),("video","hands holding smartphone online shopping"),("video","silhouette person looking up starry night sky")],
- 2:[("video","flock of birds migrating sky slow motion"),("video","silhouette person standing alone contemplative")],
- 3:[("video","grey cloudy overcast sky before rain"),("video","hands putting on jacket coat by door")],
- 4:[("video","doctor examining patient hospital corridor"),("video","x-ray scan medical lightbox stethoscope")],
+ 0:[("drawn","")],
+ 1:[("video","surgeon operating room hands close up"),("video","hands holding smartphone reviews screen"),("video","close up human eye looking searching")],
+ 2:[("video","flock of birds migrating sky slow motion"),("video","silhouette person thinking by window contemplative"),("video","dog sitting looking calm close up")],
+ 3:[("video","grey cloudy overcast sky before rain"),("video","busy people walking city street daily life")],
+ 4:[("video","person holding side in pain discomfort"),("video","doctor consulting patient clinic corridor"),("video","x-ray scan medical lightbox stethoscope")],
  5:[("video","old law books library shelves"),("video","steel bridge structure engineering low angle"),("video","pharmacy medicine box close up hands")],
- 6:[("video","deep space stars galaxy slow drift"),("video","single candle flame in darkness"),("video","empty quiet room light beam dust floating")],
- 7:[("video","person sitting alone by window pensive back"),("video","crack in old plaster wall close up")],
+ 6:[("video","light switch turning off dark room"),("video","deep space stars galaxy slow drift"),("video","person sitting alone silent contemplative")],
+ 7:[("video","man sitting alone pensive looking down"),("video","crack in old plaster wall close up")],
  8:[("video","warm family home interior evening silhouette"),("video","light flare bokeh abstract dreamy memory"),("video","crowd of people walking same direction street"),("video","television screens glowing dark room"),("video","person walking away alone in rain street")],
- 9:[("video","row of old wooden doors dim hallway"),("video","forked path diverging two ways forest")],
+ 9:[("video","row of old wooden doors dim hallway"),("video","two people facing opposite directions silhouette")],
  10:[("video","person reflection in mirror low light"),("video","interwoven threads rope macro texture"),("video","old stone fortress wall defensive"),("video","chess pieces board strategy close up")],
- 11:[("video","blank sheet of paper on desk with pen"),("video","closed door with light behind it"),("video","hand writing in notebook close up")],
- 12:[("video","figure standing in doorway bright light"),("video","foggy misty path early morning"),("video","vast dawn horizon open landscape"),("video","long empty road leading to horizon")],
+ 11:[("video","person thinking hand on chin pensive"),("video","blank sheet of paper on desk with pen"),("video","closed door with light behind it")],
+ 12:[("video","foggy misty path early morning uncertain"),("video","person walking back along path returning"),("video","fog mist obscuring figure silhouette"),("video","vast dawn horizon open landscape road")],
+ 13:[("drawn","")],
 }
 KAART_BY["chose"]  = {}   # geen kaarten voor chose
 GROUPS_BY["chose"] = {}
@@ -393,19 +399,20 @@ def main():
     ap.add_argument("--root", default=".")
     ap.add_argument("--only", type=int, default=0, help="alleen scene N")
     ap.add_argument("--force", action="store_true", help="ook beats die al beeld hebben opnieuw ophalen")
+    ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
     # kies het beeldplan van DIT verhaal (sword/chose/...); val terug op sword als het onbekend is
     if not select_story_plan(args.story):
         print(f"let op: geen eigen beeldplan voor '{args.story}' -> val terug op sword-plan")
-    tlpath = os.path.join(args.root, "assets", "channels", "channel1", "voice", args.story, args.voice, "_timeline.json")
+    tlpath = os.path.join(args.root, "assets", "channels", args.channel, "voice", args.story, args.voice, "_timeline.json")
     if not os.path.exists(tlpath):
         print("geen _timeline.json:", tlpath, "\n-> draai eerst: python tools/channel_voice.py --voice", args.voice); return
     tl = json.load(open(tlpath, encoding="utf-8"))
 
     # BEELD PER PROJECT: elke video (verhaal) krijgt zijn eigen beeldmap, zodat scène+beat van het ene
     # verhaal nooit het beeld van een ander verhaal pakt. (Oud: één gedeelde map -> kruisbesmetting.)
-    outdir = os.path.join(args.root, "assets", "channels", "channel1", "video", args.story)
+    outdir = os.path.join(args.root, "assets", "channels", args.channel, "video", args.story)
     os.makedirs(outdir, exist_ok=True)
     keys = load_keys(args.root)
     have_video = bool(keys.get("pexels") or keys.get("pixabay"))
@@ -428,7 +435,7 @@ def main():
             # oude gedeelde map (of een ander verhaal), dan halen we het opnieuw op in deze map, zodat
             # elk project zijn eigen beeld krijgt (auto-migratie, geen --force nodig).
             cur = (beat.get("vid") or beat.get("img") or "").replace("\\", "/")
-            own_prefix = "assets/channels/channel1/video/" + args.story + "/"
+            own_prefix = "assets/channels/" + args.channel + "/video/" + args.story + "/"
             if cur and own_prefix in cur and not args.force:
                 n_skip += 1; continue
             # HERGEBRUIK: staat het beeld voor deze beat al op schijf (s<NN>b<bi+1>.<ext>)? Dan koppelen
@@ -444,7 +451,7 @@ def main():
                         found = (base + ext, ext); break
                 if found:
                     fname, ext = found
-                    rel = "assets/channels/channel1/video/" + args.story + "/" + fname
+                    rel = "assets/channels/" + args.channel + "/video/" + args.story + "/" + fname
                     isv = ext.lower() in (".mp4", ".webm")
                     beat["vid" if isv else "img"] = rel
                     beat.pop("img" if isv else "vid", None)
@@ -471,7 +478,7 @@ def main():
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(0.5); continue
             if is_video and normalize_video(fpath, args.root):
                 print("    genormaliseerd -> max 1080p30 (app-afspeelbaar)")
-            rel = "assets/channels/channel1/video/" + args.story + "/" + fname
+            rel = "assets/channels/" + args.channel + "/video/" + args.story + "/" + fname
             beat["vid" if is_video else "img"] = rel
             beat.pop("img" if is_video else "vid", None)  # oude tegenpool opruimen
             credits.append(f"scene {num} beat {bi+1}: {hit.get('title','')} | {hit['license']} | {hit['credit']}")

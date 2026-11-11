@@ -1,0 +1,1298 @@
+{
+  "story": "chose",
+  "voice": "man",
+  "format": "16:9",
+  "title": "The Answer You Never Chose",
+  "total_seconds": 639.325,
+  "total_mmss": "10:39",
+  "scenes": [
+    {
+      "scene": 0,
+      "tone": "intro",
+      "wav": "assets/channels/channel1/voice/chose/man/00.wav",
+      "start": 0.0,
+      "dur": 50.075,
+      "speech_start": 3.34,
+      "speech_end": 48.76,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "Welcome to Truthward.",
+          "start": 3.34,
+          "dur": 1.65,
+          "abs_start": 3.34
+        },
+        {
+          "i": 1,
+          "text": "Quick version of what we do here, because your time matters.",
+          "start": 4.99,
+          "dur": 3.99,
+          "abs_start": 4.99
+        },
+        {
+          "i": 2,
+          "text": "Most channels hand you an answer and a reason to be angry about it.",
+          "start": 8.98,
+          "dur": 5.33,
+          "abs_start": 8.98
+        },
+        {
+          "i": 3,
+          "text": "We do the opposite.",
+          "start": 14.31,
+          "dur": 1.833,
+          "abs_start": 14.31
+        },
+        {
+          "i": 4,
+          "text": "We take one big question, the kind you are not really supposed to poke at, and we just look at it.",
+          "start": 16.143,
+          "dur": 7.198,
+          "abs_start": 16.143
+        },
+        {
+          "i": 5,
+          "text": "Honestly.",
+          "start": 23.341,
+          "dur": 1.036,
+          "abs_start": 23.341
+        },
+        {
+          "i": 6,
+          "text": "Slowly.",
+          "start": 24.377,
+          "dur": 0.543,
+          "abs_start": 24.377
+        },
+        {
+          "i": 7,
+          "text": "Out loud.",
+          "start": 24.92,
+          "dur": 0.997,
+          "abs_start": 24.92
+        },
+        {
+          "i": 8,
+          "text": "No shouting, no agenda, and no, I am not going to tell you what to think.",
+          "start": 25.917,
+          "dur": 5.764,
+          "abs_start": 25.917
+        },
+        {
+          "i": 9,
+          "text": "Mostly because you would not listen anyway, and honestly, fair enough.",
+          "start": 31.681,
+          "dur": 5.329,
+          "abs_start": 31.681
+        },
+        {
+          "i": 10,
+          "text": "If that sounds like your kind of trouble, subscribe before we start.",
+          "start": 37.01,
+          "dur": 4.74,
+          "abs_start": 37.01
+        },
+        {
+          "i": 11,
+          "text": "Now.",
+          "start": 41.75,
+          "dur": 0.157,
+          "abs_start": 41.75
+        },
+        {
+          "i": 12,
+          "text": "Let us begin with something slightly embarrassing about the human brain.",
+          "start": 41.907,
+          "dur": 5.233,
+          "abs_start": 41.907
+        },
+        {
+          "i": 13,
+          "text": "Yours included.",
+          "start": 47.14,
+          "dur": 1.62,
+          "abs_start": 47.14
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 1,
+      "tone": "hook",
+      "wav": "assets/channels/channel1/voice/chose/man/01.wav",
+      "start": 50.075,
+      "dur": 37.125,
+      "speech_start": 0.36,
+      "speech_end": 36.0,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "There is one thing you would never let a stranger do to you.",
+          "start": 0.36,
+          "dur": 4.283,
+          "abs_start": 50.435
+        },
+        {
+          "i": 1,
+          "text": "Operate on you without first checking who they are.",
+          "start": 4.643,
+          "dur": 3.744,
+          "abs_start": 54.718
+        },
+        {
+          "i": 2,
+          "text": "You will read the reviews on a ten euro phone case before you buy it.",
+          "start": 8.388,
+          "dur": 4.852,
+          "abs_start": 58.463
+        },
+        {
+          "i": 3,
+          "text": "But the biggest question you will ever face, the one about why you are even here, most people answered without looking into it even once.",
+          "start": 13.24,
+          "dur": 10.503,
+          "abs_start": 63.315
+        },
+        {
+          "i": 4,
+          "text": "And they will defend that answer to their last breath.",
+          "start": 23.743,
+          "dur": 3.475,
+          "abs_start": 73.818
+        },
+        {
+          "i": 5,
+          "text": "Does that strike you as strange?",
+          "start": 27.218,
+          "dur": 1.952,
+          "abs_start": 77.293
+        },
+        {
+          "i": 6,
+          "text": "It should.",
+          "start": 29.17,
+          "dur": 0.88,
+          "abs_start": 79.245
+        },
+        {
+          "i": 7,
+          "text": "So let us do the one thing almost nobody does with it.",
+          "start": 30.05,
+          "dur": 4.091,
+          "abs_start": 80.125
+        },
+        {
+          "i": 8,
+          "text": "Let us actually look.",
+          "start": 34.141,
+          "dur": 1.859,
+          "abs_start": 84.216
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 2,
+      "tone": "rustig",
+      "wav": "assets/channels/channel1/voice/chose/man/02.wav",
+      "start": 87.2,
+      "dur": 41.325,
+      "speech_start": 0.32,
+      "speech_end": 40.22,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "Start with what you are.",
+          "start": 0.32,
+          "dur": 1.45,
+          "abs_start": 87.52
+        },
+        {
+          "i": 1,
+          "text": "A bird does not decide to fly south.",
+          "start": 1.77,
+          "dur": 2.93,
+          "abs_start": 88.97
+        },
+        {
+          "i": 2,
+          "text": "It is born with the answer already inside it, where to go, what to eat, what to run from.",
+          "start": 4.7,
+          "dur": 6.41,
+          "abs_start": 91.9
+        },
+        {
+          "i": 3,
+          "text": "It runs its program and never once asks a question.",
+          "start": 11.11,
+          "dur": 3.51,
+          "abs_start": 98.31
+        },
+        {
+          "i": 4,
+          "text": "You are not built like that.",
+          "start": 14.62,
+          "dur": 1.936,
+          "abs_start": 101.82
+        },
+        {
+          "i": 5,
+          "text": "You wake up in front of choices nothing prepared you for, and you have to work them out yourself.",
+          "start": 16.556,
+          "dur": 6.824,
+          "abs_start": 103.756
+        },
+        {
+          "i": 6,
+          "text": "You weigh things.",
+          "start": 23.38,
+          "dur": 0.838,
+          "abs_start": 110.58
+        },
+        {
+          "i": 7,
+          "text": "You reason.",
+          "start": 24.218,
+          "dur": 1.016,
+          "abs_start": 111.418
+        },
+        {
+          "i": 8,
+          "text": "You decide.",
+          "start": 25.235,
+          "dur": 1.016,
+          "abs_start": 112.435
+        },
+        {
+          "i": 9,
+          "text": "A dog is a wonderful thing.",
+          "start": 26.251,
+          "dur": 2.319,
+          "abs_start": 113.451
+        },
+        {
+          "i": 10,
+          "text": "A dog is also never going to lie awake at night wondering why it is a dog.",
+          "start": 28.571,
+          "dur": 5.968,
+          "abs_start": 115.771
+        },
+        {
+          "i": 11,
+          "text": "No other creature on this earth does that.",
+          "start": 34.539,
+          "dur": 2.841,
+          "abs_start": 121.739
+        },
+        {
+          "i": 12,
+          "text": "It is the one thing that is truly yours.",
+          "start": 37.379,
+          "dur": 2.841,
+          "abs_start": 124.579
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 3,
+      "tone": "rustig",
+      "wav": "assets/channels/channel1/voice/chose/man/03.wav",
+      "start": 128.525,
+      "dur": 23.275,
+      "speech_start": 0.34,
+      "speech_end": 22.12,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And you do it so often you do not even notice.",
+          "start": 0.34,
+          "dur": 4.077,
+          "abs_start": 128.865
+        },
+        {
+          "i": 1,
+          "text": "You glance at the sky and grab a jacket.",
+          "start": 4.417,
+          "dur": 2.982,
+          "abs_start": 132.942
+        },
+        {
+          "i": 2,
+          "text": "A tiny moment.",
+          "start": 7.399,
+          "dur": 1.371,
+          "abs_start": 135.924
+        },
+        {
+          "i": 3,
+          "text": "But that tiny moment is the whole thing.",
+          "start": 8.77,
+          "dur": 3.17,
+          "abs_start": 137.295
+        },
+        {
+          "i": 4,
+          "text": "You took in the world, you weighed it, and you made a call.",
+          "start": 11.94,
+          "dur": 4.36,
+          "abs_start": 140.465
+        },
+        {
+          "i": 5,
+          "text": "You do that a thousand times a day without ever once calling it thinking.",
+          "start": 16.3,
+          "dur": 5.82,
+          "abs_start": 144.825
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 4,
+      "tone": "nadruk",
+      "wav": "assets/channels/channel1/voice/chose/man/04.wav",
+      "start": 151.8,
+      "dur": 42.35,
+      "speech_start": 0.36,
+      "speech_end": 41.02,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And when it gets serious, you do something even smarter.",
+          "start": 0.36,
+          "dur": 4.718,
+          "abs_start": 152.16
+        },
+        {
+          "i": 1,
+          "text": "A pain shows up and will not leave.",
+          "start": 5.078,
+          "dur": 2.545,
+          "abs_start": 156.878
+        },
+        {
+          "i": 2,
+          "text": "You do not start cutting into yourself in the kitchen with a bread knife and a confident YouTube tutorial.",
+          "start": 7.623,
+          "dur": 8.107,
+          "abs_start": 159.423
+        },
+        {
+          "i": 3,
+          "text": "You stop, and you think, I do not know enough about this, so I will go to someone who does.",
+          "start": 15.73,
+          "dur": 7.49,
+          "abs_start": 167.53
+        },
+        {
+          "i": 4,
+          "text": "Look at what that is.",
+          "start": 23.22,
+          "dur": 1.702,
+          "abs_start": 175.02
+        },
+        {
+          "i": 5,
+          "text": "You saw the edge of your own knowledge, and you walked toward the person who could fill the gap.",
+          "start": 24.922,
+          "dur": 6.988,
+          "abs_start": 176.722
+        },
+        {
+          "i": 6,
+          "text": "That is not weakness.",
+          "start": 31.91,
+          "dur": 1.704,
+          "abs_start": 183.71
+        },
+        {
+          "i": 7,
+          "text": "Seeing your own limit and acting on it is about the most rational thing a human being can do.",
+          "start": 33.614,
+          "dur": 7.406,
+          "abs_start": 185.414
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 5,
+      "tone": "rustig",
+      "wav": "assets/channels/channel1/voice/chose/man/05.wav",
+      "start": 194.15,
+      "dur": 35.125,
+      "speech_start": 0.34,
+      "speech_end": 34.06,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And it is everywhere.",
+          "start": 0.34,
+          "dur": 2.09,
+          "abs_start": 194.49
+        },
+        {
+          "i": 1,
+          "text": "You do not argue your own court case on a feeling, you find someone who knows the law.",
+          "start": 2.43,
+          "dur": 5.7,
+          "abs_start": 196.58
+        },
+        {
+          "i": 2,
+          "text": "You do not walk onto a bridge because it looks solid, someone spent years proving it holds your weight.",
+          "start": 8.13,
+          "dur": 6.192,
+          "abs_start": 202.28
+        },
+        {
+          "i": 3,
+          "text": "You do not take a medicine because the box looks nice, you want to know what it does.",
+          "start": 14.322,
+          "dur": 5.73,
+          "abs_start": 208.472
+        },
+        {
+          "i": 4,
+          "text": "Anywhere the stakes are real, you do the same thing.",
+          "start": 20.052,
+          "dur": 3.388,
+          "abs_start": 214.202
+        },
+        {
+          "i": 5,
+          "text": "You find out first, and you decide second.",
+          "start": 23.44,
+          "dur": 3.234,
+          "abs_start": 217.59
+        },
+        {
+          "i": 6,
+          "text": "Taking something on blind, just because it was put in front of you, that would be reckless.",
+          "start": 26.674,
+          "dur": 6.138,
+          "abs_start": 220.824
+        },
+        {
+          "i": 7,
+          "text": "And you know it.",
+          "start": 32.812,
+          "dur": 1.248,
+          "abs_start": 226.962
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 6,
+      "tone": "nadruk",
+      "wav": "assets/channels/channel1/voice/chose/man/06.wav",
+      "start": 229.275,
+      "dur": 34.4,
+      "speech_start": 0.34,
+      "speech_end": 32.98,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "Except on one question.",
+          "start": 0.34,
+          "dur": 1.91,
+          "abs_start": 229.615
+        },
+        {
+          "i": 1,
+          "text": "There is exactly one place where most people switch that whole machine off.",
+          "start": 2.25,
+          "dur": 4.295,
+          "abs_start": 231.525
+        },
+        {
+          "i": 2,
+          "text": "And it is not a small one.",
+          "start": 6.545,
+          "dur": 2.06,
+          "abs_start": 235.82
+        },
+        {
+          "i": 3,
+          "text": "It is the biggest there is.",
+          "start": 8.604,
+          "dur": 2.06,
+          "abs_start": 237.879
+        },
+        {
+          "i": 4,
+          "text": "Bigger than your health, bigger than your money, bigger than any case in any court.",
+          "start": 10.664,
+          "dur": 6.116,
+          "abs_start": 239.939
+        },
+        {
+          "i": 5,
+          "text": "Why are you here.",
+          "start": 16.78,
+          "dur": 1.06,
+          "abs_start": 246.055
+        },
+        {
+          "i": 6,
+          "text": "What is this.",
+          "start": 17.84,
+          "dur": 1.05,
+          "abs_start": 247.115
+        },
+        {
+          "i": 7,
+          "text": "What happens when it ends.",
+          "start": 18.89,
+          "dur": 1.889,
+          "abs_start": 248.165
+        },
+        {
+          "i": 8,
+          "text": "On that one, most people never find out first.",
+          "start": 20.779,
+          "dur": 2.931,
+          "abs_start": 250.054
+        },
+        {
+          "i": 9,
+          "text": "They just have an answer.",
+          "start": 23.71,
+          "dur": 1.72,
+          "abs_start": 252.985
+        },
+        {
+          "i": 10,
+          "text": "They carry it their whole life.",
+          "start": 25.43,
+          "dur": 2.27,
+          "abs_start": 254.705
+        },
+        {
+          "i": 11,
+          "text": "And if you ask them when they actually looked into it, the room goes quiet.",
+          "start": 27.7,
+          "dur": 5.28,
+          "abs_start": 256.975
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 7,
+      "tone": "warm",
+      "wav": "assets/channels/channel1/voice/chose/man/07.wav",
+      "start": 263.675,
+      "dur": 35.85,
+      "speech_start": 0.36,
+      "speech_end": 34.22,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And I am not standing above anyone here.",
+          "start": 0.36,
+          "dur": 2.94,
+          "abs_start": 264.035
+        },
+        {
+          "i": 1,
+          "text": "I am telling you this because it was me.",
+          "start": 3.3,
+          "dur": 3.43,
+          "abs_start": 266.975
+        },
+        {
+          "i": 2,
+          "text": "I had my answer too.",
+          "start": 6.73,
+          "dur": 1.75,
+          "abs_start": 270.405
+        },
+        {
+          "i": 3,
+          "text": "I carried it like it was mine, like I had earned it.",
+          "start": 8.48,
+          "dur": 4.246,
+          "abs_start": 272.155
+        },
+        {
+          "i": 4,
+          "text": "Until one day I asked myself a simple thing.",
+          "start": 12.726,
+          "dur": 3.174,
+          "abs_start": 276.401
+        },
+        {
+          "i": 5,
+          "text": "When did I ever sit down with the biggest question there is, and do what I would do for a crack in a wall, find out before I trust it?",
+          "start": 15.9,
+          "dur": 9.71,
+          "abs_start": 279.575
+        },
+        {
+          "i": 6,
+          "text": "And the honest answer was never.",
+          "start": 25.61,
+          "dur": 2.82,
+          "abs_start": 289.285
+        },
+        {
+          "i": 7,
+          "text": "Not once.",
+          "start": 28.43,
+          "dur": 0.86,
+          "abs_start": 292.105
+        },
+        {
+          "i": 8,
+          "text": "It had been handed to me, and I had spent years calling it my own.",
+          "start": 29.29,
+          "dur": 4.93,
+          "abs_start": 292.965
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 8,
+      "tone": "rustig",
+      "wav": "assets/channels/channel1/voice/chose/man/08.wav",
+      "start": 299.525,
+      "dur": 63.75,
+      "speech_start": 0.34,
+      "speech_end": 62.58,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "So I started paying attention to where people actually get this answer, if not from looking into it.",
+          "start": 0.34,
+          "dur": 7.533,
+          "abs_start": 299.865
+        },
+        {
+          "i": 1,
+          "text": "And as far as I can tell, it comes in through about five doors.",
+          "start": 7.873,
+          "dur": 4.527,
+          "abs_start": 307.398
+        },
+        {
+          "i": 2,
+          "text": "The first is home.",
+          "start": 12.4,
+          "dur": 1.85,
+          "abs_start": 311.925
+        },
+        {
+          "i": 3,
+          "text": "Your parents believed something, or believed in nothing, and it was yours before you could even speak.",
+          "start": 14.25,
+          "dur": 7.732,
+          "abs_start": 313.775
+        },
+        {
+          "i": 4,
+          "text": "The second is a single moment.",
+          "start": 21.982,
+          "dur": 2.438,
+          "abs_start": 321.507
+        },
+        {
+          "i": 5,
+          "text": "Something happened you could not explain, and you took it as proof, and never went back to it.",
+          "start": 24.42,
+          "dur": 7.15,
+          "abs_start": 323.945
+        },
+        {
+          "i": 6,
+          "text": "The third is the people around you.",
+          "start": 31.57,
+          "dur": 2.438,
+          "abs_start": 331.095
+        },
+        {
+          "i": 7,
+          "text": "Everyone leaned one way, and leaning with them was easier than standing alone.",
+          "start": 34.008,
+          "dur": 5.89,
+          "abs_start": 333.533
+        },
+        {
+          "i": 8,
+          "text": "The fourth is the world itself.",
+          "start": 39.897,
+          "dur": 2.503,
+          "abs_start": 339.422
+        },
+        {
+          "i": 9,
+          "text": "The films, the shows, the things school handed you as simply true.",
+          "start": 42.4,
+          "dur": 4.23,
+          "abs_start": 341.925
+        },
+        {
+          "i": 10,
+          "text": "A thousand small pushes you never once felt as pushes.",
+          "start": 46.63,
+          "dur": 3.73,
+          "abs_start": 346.155
+        },
+        {
+          "i": 11,
+          "text": "And the fifth is pain.",
+          "start": 50.36,
+          "dur": 1.69,
+          "abs_start": 349.885
+        },
+        {
+          "i": 12,
+          "text": "Someone hurt you in the name of their answer, so you took the opposite one.",
+          "start": 52.05,
+          "dur": 5.6,
+          "abs_start": 351.575
+        },
+        {
+          "i": 13,
+          "text": "Not because you weighed it, but because you were running from them.",
+          "start": 57.65,
+          "dur": 4.93,
+          "abs_start": 357.175
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 9,
+      "tone": "nadruk",
+      "wav": "assets/channels/channel1/voice/chose/man/09.wav",
+      "start": 363.275,
+      "dur": 29.55,
+      "speech_start": 0.34,
+      "speech_end": 28.1,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "Now look at those five.",
+          "start": 0.34,
+          "dur": 1.78,
+          "abs_start": 363.615
+        },
+        {
+          "i": 1,
+          "text": "Four of them are something arriving from outside you.",
+          "start": 2.12,
+          "dur": 4.124,
+          "abs_start": 365.395
+        },
+        {
+          "i": 2,
+          "text": "One is you pushing something away.",
+          "start": 6.244,
+          "dur": 3.094,
+          "abs_start": 369.519
+        },
+        {
+          "i": 3,
+          "text": "And not one of them is you sitting down and reasoning it out.",
+          "start": 9.338,
+          "dur": 4.852,
+          "abs_start": 372.613
+        },
+        {
+          "i": 4,
+          "text": "Yet for most people, this is how they came to hold the most important thing they believe.",
+          "start": 14.19,
+          "dur": 6.048,
+          "abs_start": 377.465
+        },
+        {
+          "i": 5,
+          "text": "One swallowed it whole.",
+          "start": 20.238,
+          "dur": 1.959,
+          "abs_start": 383.513
+        },
+        {
+          "i": 6,
+          "text": "The next spat it out just as fast.",
+          "start": 22.196,
+          "dur": 2.864,
+          "abs_start": 385.471
+        },
+        {
+          "i": 7,
+          "text": "And both of them were certain they had chosen.",
+          "start": 25.06,
+          "dur": 3.04,
+          "abs_start": 388.335
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 10,
+      "tone": "nadruk",
+      "wav": "assets/channels/channel1/voice/chose/man/10.wav",
+      "start": 392.825,
+      "dur": 58.925,
+      "speech_start": 0.34,
+      "speech_end": 57.56,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And here is the part that is harder to shake.",
+          "start": 0.34,
+          "dur": 3.344,
+          "abs_start": 393.165
+        },
+        {
+          "i": 1,
+          "text": "You might be thinking, fine, I was a child, I did not pick it back then.",
+          "start": 3.684,
+          "dur": 5.537,
+          "abs_start": 396.509
+        },
+        {
+          "i": 2,
+          "text": "But I am grown now.",
+          "start": 9.221,
+          "dur": 1.658,
+          "abs_start": 402.046
+        },
+        {
+          "i": 3,
+          "text": "If it were wrong, I would have gone back to check.",
+          "start": 10.879,
+          "dur": 3.513,
+          "abs_start": 403.704
+        },
+        {
+          "i": 4,
+          "text": "Most of us never do.",
+          "start": 14.392,
+          "dur": 2.058,
+          "abs_start": 407.217
+        },
+        {
+          "i": 5,
+          "text": "And it is not because we are not clever enough.",
+          "start": 16.45,
+          "dur": 3.788,
+          "abs_start": 409.275
+        },
+        {
+          "i": 6,
+          "text": "It is that by now the answer is not just something you think.",
+          "start": 20.238,
+          "dur": 4.802,
+          "abs_start": 413.063
+        },
+        {
+          "i": 7,
+          "text": "It is part of who you are.",
+          "start": 25.04,
+          "dur": 2.168,
+          "abs_start": 417.865
+        },
+        {
+          "i": 8,
+          "text": "It is woven into the people you belong to.",
+          "start": 27.208,
+          "dur": 3.762,
+          "abs_start": 420.033
+        },
+        {
+          "i": 9,
+          "text": "And when something sits that close, you do not test it.",
+          "start": 30.97,
+          "dur": 3.938,
+          "abs_start": 423.795
+        },
+        {
+          "i": 10,
+          "text": "You protect it.",
+          "start": 34.908,
+          "dur": 1.682,
+          "abs_start": 427.733
+        },
+        {
+          "i": 11,
+          "text": "You take that same sharp mind that picks the right doctor, and you point it at defending your answer instead of examining it.",
+          "start": 36.59,
+          "dur": 8.829,
+          "abs_start": 429.415
+        },
+        {
+          "i": 12,
+          "text": "That is the strange part.",
+          "start": 45.419,
+          "dur": 1.401,
+          "abs_start": 438.244
+        },
+        {
+          "i": 13,
+          "text": "The sharper the mind, the better it gets at the defending.",
+          "start": 46.82,
+          "dur": 4.67,
+          "abs_start": 439.645
+        },
+        {
+          "i": 14,
+          "text": "It is not the careless who are most stuck here.",
+          "start": 51.49,
+          "dur": 3.68,
+          "abs_start": 444.315
+        },
+        {
+          "i": 15,
+          "text": "Often it is the brightest.",
+          "start": 55.17,
+          "dur": 2.39,
+          "abs_start": 447.995
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 11,
+      "tone": "nadruk",
+      "wav": "assets/channels/channel1/voice/chose/man/11.wav",
+      "start": 451.75,
+      "dur": 65.55,
+      "speech_start": 0.34,
+      "speech_end": 64.08,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "So.",
+          "start": 0.34,
+          "dur": 0.541,
+          "abs_start": 452.09
+        },
+        {
+          "i": 1,
+          "text": "Why does the thinking creature not think, right here, on the one question that matters most?",
+          "start": 0.881,
+          "dur": 6.349,
+          "abs_start": 452.631
+        },
+        {
+          "i": 2,
+          "text": "That is the question I promised to answer, so here it is, plainly.",
+          "start": 7.23,
+          "dur": 5.82,
+          "abs_start": 458.98
+        },
+        {
+          "i": 3,
+          "text": "Not because people are stupid.",
+          "start": 13.05,
+          "dur": 2.1,
+          "abs_start": 464.8
+        },
+        {
+          "i": 4,
+          "text": "Because an answer was already waiting.",
+          "start": 15.15,
+          "dur": 3.16,
+          "abs_start": 466.9
+        },
+        {
+          "i": 5,
+          "text": "Through one of those five doors, there was always something filled in before you arrived.",
+          "start": 18.31,
+          "dur": 6.57,
+          "abs_start": 470.06
+        },
+        {
+          "i": 6,
+          "text": "There was never a blank page in front of you asking to be filled.",
+          "start": 24.88,
+          "dur": 5.47,
+          "abs_start": 476.63
+        },
+        {
+          "i": 7,
+          "text": "And the one time you might have gone back to check, the answer had already become part of you, so you guarded it instead.",
+          "start": 30.35,
+          "dur": 9.088,
+          "abs_start": 482.1
+        },
+        {
+          "i": 8,
+          "text": "That is the answer.",
+          "start": 39.438,
+          "dur": 1.679,
+          "abs_start": 491.188
+        },
+        {
+          "i": 9,
+          "text": "And I will be honest about my own.",
+          "start": 41.117,
+          "dur": 3.423,
+          "abs_start": 492.867
+        },
+        {
+          "i": 10,
+          "text": "These are the five doors I could find.",
+          "start": 44.54,
+          "dur": 2.2,
+          "abs_start": 496.29
+        },
+        {
+          "i": 11,
+          "text": "Maybe there is a sixth.",
+          "start": 46.74,
+          "dur": 1.76,
+          "abs_start": 498.49
+        },
+        {
+          "i": 12,
+          "text": "They are not fixed in stone just because they came out of my head, that is the whole point of this.",
+          "start": 48.5,
+          "dur": 6.901,
+          "abs_start": 500.25
+        },
+        {
+          "i": 13,
+          "text": "But look at them honestly, and ask yourself whether even one of them is a reason to be sure of anything.",
+          "start": 55.401,
+          "dur": 8.679,
+          "abs_start": 507.151
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 12,
+      "tone": "warm",
+      "wav": "assets/channels/channel1/voice/chose/man/12.wav",
+      "start": 517.3,
+      "dur": 72.05,
+      "speech_start": 0.34,
+      "speech_end": 70.56,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And this is where it starts to itch.",
+          "start": 0.34,
+          "dur": 2.56,
+          "abs_start": 517.64
+        },
+        {
+          "i": 1,
+          "text": "If your answer to the biggest question did not come from you, but from where you happened to be born, and who raised you, and what hurt you, then how would you ever know if it is true?",
+          "start": 2.9,
+          "dur": 13.45,
+          "abs_start": 520.2
+        },
+        {
+          "i": 2,
+          "text": "Most people never reach that question.",
+          "start": 16.35,
+          "dur": 2.2,
+          "abs_start": 533.65
+        },
+        {
+          "i": 3,
+          "text": "But most is not all.",
+          "start": 18.55,
+          "dur": 1.563,
+          "abs_start": 535.85
+        },
+        {
+          "i": 4,
+          "text": "Some do go back.",
+          "start": 20.113,
+          "dur": 1.346,
+          "abs_start": 537.413
+        },
+        {
+          "i": 5,
+          "text": "Some do sit down with it.",
+          "start": 21.458,
+          "dur": 1.662,
+          "abs_start": 538.758
+        },
+        {
+          "i": 6,
+          "text": "That is the only reason anyone has ever changed their mind about anything.",
+          "start": 23.12,
+          "dur": 6.247,
+          "abs_start": 540.42
+        },
+        {
+          "i": 7,
+          "text": "So maybe you are one who looks, this time.",
+          "start": 29.367,
+          "dur": 2.863,
+          "abs_start": 546.667
+        },
+        {
+          "i": 8,
+          "text": "And the moment you try, something stands in the doorway.",
+          "start": 32.23,
+          "dur": 4.08,
+          "abs_start": 549.53
+        },
+        {
+          "i": 9,
+          "text": "A voice that says, who cares, it is all just opinion anyway.",
+          "start": 36.31,
+          "dur": 5.56,
+          "abs_start": 553.61
+        },
+        {
+          "i": 10,
+          "text": "Your truth, my truth, nobody is really right.",
+          "start": 41.87,
+          "dur": 3.48,
+          "abs_start": 559.17
+        },
+        {
+          "i": 11,
+          "text": "And if that is true, this whole thing is pointless.",
+          "start": 45.35,
+          "dur": 3.433,
+          "abs_start": 562.65
+        },
+        {
+          "i": 12,
+          "text": "So before we go anywhere near what the answer might be, we have to deal with that one first.",
+          "start": 48.783,
+          "dur": 6.567,
+          "abs_start": 566.083
+        },
+        {
+          "i": 13,
+          "text": "Is there even such a thing as a truth that stays true, whether you believe it or not.",
+          "start": 55.35,
+          "dur": 6.16,
+          "abs_start": 572.65
+        },
+        {
+          "i": 14,
+          "text": "Or is all of it just opinion.",
+          "start": 61.51,
+          "dur": 3.05,
+          "abs_start": 578.81
+        },
+        {
+          "i": 15,
+          "text": "Until we settle that, nothing else has any ground to stand on.",
+          "start": 64.56,
+          "dur": 4.51,
+          "abs_start": 581.86
+        },
+        {
+          "i": 16,
+          "text": "That is the next one.",
+          "start": 69.07,
+          "dur": 1.49,
+          "abs_start": 586.37
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    },
+    {
+      "scene": 13,
+      "tone": "outro",
+      "wav": "assets/channels/channel1/voice/chose/man/13.wav",
+      "start": 589.35,
+      "dur": 49.975,
+      "speech_start": 0.36,
+      "speech_end": 48.5,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "And that question is where we go next.",
+          "start": 0.36,
+          "dur": 2.67,
+          "abs_start": 589.71
+        },
+        {
+          "i": 1,
+          "text": "But before you wander off, let me say the quiet part out loud.",
+          "start": 3.03,
+          "dur": 5.136,
+          "abs_start": 592.38
+        },
+        {
+          "i": 2,
+          "text": "This channel has one job.",
+          "start": 8.166,
+          "dur": 2.024,
+          "abs_start": 597.516
+        },
+        {
+          "i": 3,
+          "text": "To take the big questions, the ones most people flinch away from at the dinner table, and look at them honestly, one at a time.",
+          "start": 10.19,
+          "dur": 9.982,
+          "abs_start": 599.54
+        },
+        {
+          "i": 4,
+          "text": "No preaching.",
+          "start": 20.172,
+          "dur": 1.153,
+          "abs_start": 609.522
+        },
+        {
+          "i": 5,
+          "text": "No being talked down to.",
+          "start": 21.325,
+          "dur": 2.305,
+          "abs_start": 610.675
+        },
+        {
+          "i": 6,
+          "text": "Just an honest look, and the occasional bad joke.",
+          "start": 23.63,
+          "dur": 3.96,
+          "abs_start": 612.98
+        },
+        {
+          "i": 7,
+          "text": "If that is something you have been missing, then come with us.",
+          "start": 27.59,
+          "dur": 4.942,
+          "abs_start": 616.94
+        },
+        {
+          "i": 8,
+          "text": "Subscribe, so the next one actually finds you instead of getting buried under cat videos.",
+          "start": 32.532,
+          "dur": 7.245,
+          "abs_start": 621.882
+        },
+        {
+          "i": 9,
+          "text": "Because the next one asks whether any truth holds at all, and I would genuinely like you there when we find out.",
+          "start": 39.777,
+          "dur": 8.723,
+          "abs_start": 629.127
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    }
+  ]
+}

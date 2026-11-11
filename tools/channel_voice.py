@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# umma_voice.py — genereert per scene een voice-over-fragment met KOKORO (lokaal, CPU, geen GPU),
+# channel_voice.py — genereert per scene een voice-over-fragment met KOKORO (lokaal, CPU, geen GPU),
 # met de TOON per scene (rustig / nadruk / warm), zodat de stem klopt met wat er gezegd wordt.
 # Draait LOKAAL op Mo's laptop. Schrijft assets/channels/channel1/voice/<story>/<stem>/<nn>.wav + een
 # import-script met de voice-paden. (Piper is vervangen door Kokoro; klinkt veel natuurlijker.)
@@ -437,6 +437,8 @@ STORIES = {
   "chose": {
     "title": "The Answer You Never Chose",
     "scenes": [
+      (0,  "intro",  "Truthward",
+           "Welcome to Truthward. Quick version of what we do here, because your time matters. Most channels hand you an answer and a reason to be angry about it. We do the opposite. We take one big question, the kind you are not really supposed to poke at, and we just look at it. Honestly. Slowly. Out loud. No shouting, no agenda, and no, I am not going to tell you what to think. Mostly because you would not listen anyway, and honestly, fair enough. If that sounds like your kind of trouble, subscribe before we start. Now. Let us begin with something slightly embarrassing about the human brain. Yours included."),
       (1,  "hook",   "You check everything.",
            "There is one thing you would never let a stranger do to you. Operate on you without first checking who they are. You will read the reviews on a ten euro phone case before you buy it. But the biggest question you will ever face, the one about why you are even here, most people answered without looking into it even once. And they will defend that answer to their last breath. Does that strike you as strange? It should. So let us do the one thing almost nobody does with it. Let us actually look."),
       (2,  "rustig", "You can think.",
@@ -444,7 +446,7 @@ STORIES = {
       (3,  "rustig", "A thousand small choices.",
            "And you do it so often you do not even notice. You glance at the sky and grab a jacket. A tiny moment. But that tiny moment is the whole thing. You took in the world, you weighed it, and you made a call. You do that a thousand times a day without ever once calling it thinking."),
       (4,  "nadruk", "You go to who knows.",
-           "And when it gets serious, you do something even smarter. A pain shows up and will not leave. You do not start cutting into yourself in the kitchen. You stop, and you think, I do not know enough about this, so I will go to someone who does. Look at what that is. You saw the edge of your own knowledge, and you walked toward the person who could fill the gap. That is not weakness. Seeing your own limit and acting on it is about the most rational thing a human being can do."),
+           "And when it gets serious, you do something even smarter. A pain shows up and will not leave. You do not start cutting into yourself in the kitchen with a bread knife and a confident YouTube tutorial. You stop, and you think, I do not know enough about this, so I will go to someone who does. Look at what that is. You saw the edge of your own knowledge, and you walked toward the person who could fill the gap. That is not weakness. Seeing your own limit and acting on it is about the most rational thing a human being can do."),
       (5,  "rustig", "Find out first.",
            "And it is everywhere. You do not argue your own court case on a feeling, you find someone who knows the law. You do not walk onto a bridge because it looks solid, someone spent years proving it holds your weight. You do not take a medicine because the box looks nice, you want to know what it does. Anywhere the stakes are real, you do the same thing. You find out first, and you decide second. Taking something on blind, just because it was put in front of you, that would be reckless. And you know it."),
       (6,  "nadruk", "Except one question.",
@@ -461,6 +463,8 @@ STORIES = {
            "So. Why does the thinking creature not think, right here, on the one question that matters most? That is the question I promised to answer, so here it is, plainly. Not because people are stupid. Because an answer was already waiting. Through one of those five doors, there was always something filled in before you arrived. There was never a blank page in front of you asking to be filled. And the one time you might have gone back to check, the answer had already become part of you, so you guarded it instead. That is the answer. And I will be honest about my own. These are the five doors I could find. Maybe there is a sixth. They are not fixed in stone just because they came out of my head, that is the whole point of this. But look at them honestly, and ask yourself whether even one of them is a reason to be sure of anything."),
       (12, "warm",   "Is any of it true?",
            "And this is where it starts to itch. If your answer to the biggest question did not come from you, but from where you happened to be born, and who raised you, and what hurt you, then how would you ever know if it is true? Most people never reach that question. But most is not all. Some do go back. Some do sit down with it. That is the only reason anyone has ever changed their mind about anything. So maybe you are one who looks, this time. And the moment you try, something stands in the doorway. A voice that says, who cares, it is all just opinion anyway. Your truth, my truth, nobody is really right. And if that is true, this whole thing is pointless. So before we go anywhere near what the answer might be, we have to deal with that one first. Is there even such a thing as a truth that stays true, whether you believe it or not. Or is all of it just opinion. Until we settle that, nothing else has any ground to stand on. That is the next one."),
+      (13, "outro",  "Truthward",
+           "And that question is where we go next. But before you wander off, let me say the quiet part out loud. This channel has one job. To take the big questions, the ones most people flinch away from at the dinner table, and look at them honestly, one at a time. No preaching. No being talked down to. Just an honest look, and the occasional bad joke. If that is something you have been missing, then come with us. Subscribe, so the next one actually finds you instead of getting buried under cat videos. Because the next one asks whether any truth holds at all, and I would genuinely like you there when we find out."),
     ],
   },
 }
@@ -479,7 +483,7 @@ STORIES["sword"]["map"] = [
 def build_story(story_id, voice, root, only=0, fmt="16:9"):
     story = STORIES[story_id]
     model = VOICES[voice]
-    outdir = os.path.join(root, "assets", "channels", "channel1", "voice", story_id, voice)
+    outdir = os.path.join(root, "assets", "channels", args.channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
     durs = {}   # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
@@ -621,6 +625,7 @@ def main():
     ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"],
                     help="16:9 = lange video, 9:16 = afgeleide short; reist mee in de tijdlijn")
     ap.add_argument("--root", default=".", help="content-engine root")
+    ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
     # vroege check: is Kokoro geinstalleerd?

@@ -152,6 +152,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="sword"); ap.add_argument("--voice", default="man")
     ap.add_argument("--root", default="."); ap.add_argument("--force", action="store_true")
+    ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
     key = load_key(args.root)
@@ -159,15 +160,15 @@ def main():
         print("Geen Freesound-sleutel. Haal er gratis een op https://freesound.org/apiv2/apply en zet"
               " 'freesound' in tools/channel-keys.json. Dan draai je dit opnieuw."); return
 
-    tlpath = os.path.join(args.root, "assets", "channels", "channel1", "voice", args.story, args.voice, "_timeline.json")
+    tlpath = os.path.join(args.root, "assets", "channels", args.channel, "voice", args.story, args.voice, "_timeline.json")
     if not os.path.exists(tlpath):
         print("geen _timeline.json:", tlpath); return
     tl = json.load(open(tlpath, encoding="utf-8"))
     scenes = tl.get("scenes", [])
     by_num = {s.get("scene"): s for s in scenes}
 
-    mdir = os.path.join(args.root, "assets", "channels", "channel1", "muziek")
-    sdir = os.path.join(args.root, "assets", "channels", "channel1", "sfx")
+    mdir = os.path.join(args.root, "assets", "channels", args.channel, "muziek")
+    sdir = os.path.join(args.root, "assets", "channels", args.channel, "sfx")
     os.makedirs(mdir, exist_ok=True); os.makedirs(sdir, exist_ok=True)
     credits = []
     n_mus = n_sfx = n_fail = 0
@@ -176,7 +177,7 @@ def main():
     track_file = {}
     for name, query in TRACKS.items():
         fname = f"umma-{name}.mp3"; fpath = os.path.join(mdir, fname)
-        rel = "assets/channels/channel1/muziek/" + fname
+        rel = "assets/channels/" + args.channel + "/muziek/" + fname
         if os.path.exists(fpath) and not args.force:
             track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
         print(f"sfeer '{name}': zoek muziek '{query}'")
@@ -225,7 +226,7 @@ def main():
             download(hit["url"], fpath)
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-        s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/channel1/sfx/" + fname})
+        s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/" + args.channel + "/sfx/" + fname})
         credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
 

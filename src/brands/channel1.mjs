@@ -340,6 +340,7 @@ function ctaFoldout(W, H, op) {
 }
 
 export function makeBrand({ ROOT = "." } = {}) {
+  let CURRENT_CH = "channel1";   // actief kanaal; makeRender/previewFrameSVG zetten het per render (wachtrij = 1 tegelijk, dus veilig)
   const branding = {
     name: "Umma United", footer: "",   // GEEN footer-tekst onderaan (logo staat rechtsboven)
     // GEEN automatisch woordmerk bovenin: composeChrome tekent anders b.name als tekst boven ELKE
@@ -355,7 +356,7 @@ export function makeBrand({ ROOT = "." } = {}) {
 
   async function init() {
     try {
-      const raw = await fs.readFile(path.resolve(ROOT, "assets/channels/channel1/worldmap.json"), "utf8");
+      const raw = await fs.readFile(path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/worldmap.json"), "utf8");
       MAP = JSON.parse(raw);
     } catch { MAP = null; }
     // naam -> id tabel bouwen zodat verhalen landen op naam mogen schrijven
@@ -364,7 +365,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     // verhalen inladen uit assets/channels/channel1/stories/*.txt (of .story)
     STORIES = {};
     try {
-      const dir = path.resolve(ROOT, "assets/channels/channel1/stories");
+      const dir = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/stories");
       for (const f of await fs.readdir(dir)) {
         if (!/\.(txt|story)$/i.test(f)) continue;
         const text = await fs.readFile(path.join(dir, f), "utf8");
@@ -374,7 +375,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       }
     } catch { /* geen stories-map = alleen het demo-verhaal */ }
     // het echte logo inladen (data-URI), voor de chrome i.p.v. platte tekst
-    LOGO_URI = await loadImageURI(path.resolve(ROOT, "assets/channels/channel1/brand/logo.png"));
+    LOGO_URI = await loadImageURI(path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/brand/logo.png"));
   }
 
   async function listSubjects() {
@@ -929,7 +930,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
       const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
       if (!m) return null;
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", m[1], m[2], "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/voice", m[1], m[2], "_timeline.json");
       const tl = JSON.parse(await fs.readFile(p, "utf8"));
       if (!tl || !Array.isArray(tl.scenes)) return null;
       return scenes.map((s, i) => {
@@ -953,7 +954,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
       const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
       if (!m) return null;
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", m[1], m[2], "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/voice", m[1], m[2], "_timeline.json");
       const tl = JSON.parse(await fs.readFile(p, "utf8"));
       if (!tl || !Array.isArray(tl.scenes)) return null;
       return scenes.map((s, i) => {
@@ -969,7 +970,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
       const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
       if (!m) return null;
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", m[1], m[2], "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/voice", m[1], m[2], "_timeline.json");
       const tl = JSON.parse(await fs.readFile(p, "utf8"));
       if (!tl || !Array.isArray(tl.scenes)) return null;
       const music = Array.isArray(tl.music) ? tl.music.filter((b) => b && b.file) : [];
@@ -1003,7 +1004,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     const vp = (scenes.find((s) => s && s.voice) || {}).voice || "";
     const m = vp.replace(/\\/g, "/").match(/voice\/([^/]+)\/([^/]+)\//);
     if (!m) return null;
-    const p = path.resolve(ROOT, "assets/channels/channel1/voice", m[1], m[2], "_timeline.json");
+    const p = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/voice", m[1], m[2], "_timeline.json");
     const tl = JSON.parse(await fs.readFile(p, "utf8"));
     return (tl && Array.isArray(tl.scenes)) ? tl : null;
   }
@@ -1045,7 +1046,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       let d = Number(s.dur) || 3.0;
       if (s && s.voice) { const wl = await wavDuration(path.resolve(ROOT, s.voice)); if (wl > 0) d = wl + VOICE_PAD; }
       durs.push(d);
-      if (s && s.img) { s.imgURI = await loadImageURI(path.resolve(ROOT, "assets/channels/channel1/beeld", s.img)); }
+      if (s && s.img) { s.imgURI = await loadImageURI(path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/beeld", s.img)); }
     }
     const starts = []; let acc = 0; for (const d of durs) { starts.push(acc); acc += d; }
     const total = acc;
@@ -1099,7 +1100,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     // assets/channels/channel1/muziek/ (nooit uit assets/audio/, waar Tale of Tiles zit). Zo kan onze
     // muziek nooit in een Tale of Tiles-filmpje belanden, en andersom ook niet.
     // Kies de LANGSTE track, zodat de muziek niet korter is dan de video (anders kapt -shortest af).
-    let music = opts.music ? path.resolve(ROOT, "assets/channels/channel1/muziek", opts.music) : await pickUmmaMusic(total);
+    let music = opts.music ? path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/muziek", opts.music) : await pickUmmaMusic(total);
     return { W, H, FPS, SS, durSec: total, sceneAt, music, audio: tracks.length ? { tracks } : undefined };
   }
 
@@ -1188,7 +1189,7 @@ export function makeBrand({ ROOT = "." } = {}) {
     const techByIndex = await loadSceneTech(scenes);
     const tlGroups = await loadTimelineGroups(scenes);
     // media-pad oplossen: een volledig pad (met /) valt onder ROOT, anders onder de video-map.
-    const resolveMedia = (x) => !x ? "" : (String(x).includes("/") ? path.resolve(ROOT, x) : path.resolve(ROOT, "assets/channels/channel1/video", x));
+    const resolveMedia = (x) => !x ? "" : (String(x).includes("/") ? path.resolve(ROOT, x) : path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/video", x));
     const resolveAudio = (x) => !x ? "" : path.resolve(ROOT, x);
 
     // overlay-chrome per scène (zelfde logica als sceneOverlay in de SVG-render).
@@ -1395,7 +1396,7 @@ export function makeBrand({ ROOT = "." } = {}) {
           bedLabels.push(`[m${idx}]`); idx++;
         }
       } else {
-        const music = opts.music ? path.resolve(ROOT, "assets/channels/channel1/muziek", opts.music) : await pickUmmaMusic(total);
+        const music = opts.music ? path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/muziek", opts.music) : await pickUmmaMusic(total);
         if (music && await exists(music)) {
           inputs.push("-stream_loop", "-1", "-i", music);
           aFiltersPush(`[${idx}:a]volume=0.22,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
@@ -1441,7 +1442,7 @@ export function makeBrand({ ROOT = "." } = {}) {
 
   // Kies uit assets/channels/channel1/muziek/ de langste track (>= videolengte als dat kan).
   async function pickUmmaMusic(minSec = 0) {
-    const dir = path.resolve(ROOT, "assets/channels/channel1/muziek");
+    const dir = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/muziek");
     let files = [];
     try { files = (await fs.readdir(dir)).filter((f) => /\.(mp3|wav|m4a|aac|ogg)$/i.test(f)); } catch { return ""; }
     if (!files.length) return "";
@@ -1453,6 +1454,7 @@ export function makeBrand({ ROOT = "." } = {}) {
   }
 
   async function makeRender({ subjectId, opts = {}, format = "9:16", log }) {
+    CURRENT_CH = String(opts.channel || "channel1").replace(/[^A-Za-z0-9_-]/g, "") || "channel1";
     let type = opts.type || opts.template || "kaart";
     // AUTOMATISCH: als het gekozen verhaal (of opts) scènes met een `tech`-veld bevat, gebruik
     // de compositie — zo hoeft de studio geen aparte "mix"-keuze te hebben; Importeer + Render volstaat.
@@ -1485,9 +1487,10 @@ export function makeBrand({ ROOT = "." } = {}) {
   // afwijkt van de uiteindelijke video. De studio toont hiermee ELKE scène (ook de getekende, die
   // vroeger alleen een grijs labeltje gaven). Video-beats geven we niet terug ({video:true}); die
   // toont de studio rechtstreeks met het echte videobestand. Puur resvg-veilig: geen ffmpeg nodig.
-  async function previewFrameSVG({ story = "sword", voice = "man", sceneNum, beatIndex = 0, p = 0.6, format = "9:16" } = {}) {
+  async function previewFrameSVG({ story = "sword", voice = "man", sceneNum, beatIndex = 0, p = 0.6, format = "9:16", channel = "channel1" } = {}) {
+    CURRENT_CH = String(channel || "channel1").replace(/[^A-Za-z0-9_-]/g, "") || "channel1";
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    const tlPath = path.resolve(ROOT, "assets/channels/channel1/voice", String(story), String(voice), "_timeline.json");
+    const tlPath = path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/voice", String(story), String(voice), "_timeline.json");
     const tl = JSON.parse(await fs.readFile(tlPath, "utf8"));
     const tlScenes = Array.isArray(tl.scenes) ? tl.scenes : [];
     if (!tlScenes.length) throw new Error("lege tijdlijn");
@@ -1520,7 +1523,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const brandT = p * dur;
       inner = brandInner(s.tone, W, H, 0.6, { t: brandT, speechStart: sp0 });
     } else if (beat.img) {
-      const abs = String(beat.img).includes("/") ? path.resolve(ROOT, beat.img) : path.resolve(ROOT, "assets/channels/channel1/video", beat.img);
+      const abs = String(beat.img).includes("/") ? path.resolve(ROOT, beat.img) : path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/video", beat.img);
       const uri = await loadImageURI(abs);
       inner = techBeeld({ W, H, p, scene: { imgURI: uri } });
     } else {

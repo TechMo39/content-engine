@@ -371,7 +371,7 @@ async function runOne(job) {
   const base = outBase(job);
   // kant-en-klare mp4 (bv. website-walkthrough) -> direct met nette naam neerzetten
   if (render && render.prebuilt && existsSync(render.prebuilt)) {
-    const sub = outSubFor(job.brand);
+    const sub = (job.opts && job.opts.channel) ? "channels/" + String(job.opts.channel).replace(/[^A-Za-z0-9_-]/g, "") : outSubFor(job.brand);
     const subDir = sub ? path.resolve(OUT, sub) : OUT;
     await fs.mkdir(subDir, { recursive: true });
     const outName = base + ".mp4";
@@ -391,7 +391,7 @@ async function runOne(job) {
     try { await overlayAudio({ mp4: r.outPath, tracks: render.audio.tracks, hasBaseAudio: !!music, log }); }
     catch (e) { log("audio-overlay overgeslagen: " + e.message); }
   }
-  const sub = outSubFor(job.brand);
+  const sub = (job.opts && job.opts.channel) ? "channels/" + String(job.opts.channel).replace(/[^A-Za-z0-9_-]/g, "") : outSubFor(job.brand);
   const subDir = sub ? path.resolve(OUT, sub) : OUT;
   await fs.mkdir(subDir, { recursive: true });
   const nice = base + ".mp4";
@@ -698,6 +698,7 @@ const server = http.createServer(async (req, res) => {
         const base = path.resolve(ROOT, "assets/channels", CH, "voice");
         let best = null;
         for (const story of await fs.readdir(base).catch(() => [])) {
+          if (story.startsWith("_")) continue;   // test-/systeemmappen (_tests, _kokoro_test) niet tonen
           const sdir = path.join(base, story);
           for (const voice of await fs.readdir(sdir).catch(() => [])) {
             const vdir = path.join(sdir, voice);
@@ -722,6 +723,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const base = path.resolve(ROOT, "assets/channels", CH, "voice");
         for (const story of (await fs.readdir(base).catch(() => [])).sort()) {
+          if (story.startsWith("_")) continue;   // test-/systeemmappen (_tests, _kokoro_test) niet tonen
           const sdir = path.join(base, story);
           for (const voice of (await fs.readdir(sdir).catch(() => [])).sort()) {
             const vdir = path.join(sdir, voice);
@@ -744,7 +746,7 @@ const server = http.createServer(async (req, res) => {
       const brand = reg.byId["channel1"];
       if (!brand) { json(res, { error: "umma niet geladen" }, 400); return; }
       try {
-        const render = await brand.makeRender({ subjectId: null, templateId: "kaart", opts: bd.opts || {}, format: bd.format || "9:16", log: () => {} });
+        const render = await brand.makeRender({ subjectId: null, templateId: "kaart", opts: { ...(bd.opts || {}), channel: CH }, format: bd.format || "9:16", log: () => {} });
         const i = Math.max(0, Math.min((render.scenesCount || 1) - 1, Number(bd.scene) || 0));
         const frame = render.previewFrameFor ? render.previewFrameFor(i) : 0;
         const svg = render.sceneAt(frame);
@@ -766,7 +768,7 @@ const server = http.createServer(async (req, res) => {
           sceneNum: u.searchParams.has("scene") ? Number(u.searchParams.get("scene")) : 1,
           beatIndex: Number(u.searchParams.get("beat")) || 0,
           p: u.searchParams.has("p") ? Number(u.searchParams.get("p")) : 0.6,
-          format: u.searchParams.get("format") || "9:16",
+          format: u.searchParams.get("format") || "9:16", channel: CH,
         });
         if (!r || r.video) { res.writeHead(204); res.end(""); return; }
         const png = new Resvg(r.svg, { fitTo: { mode: "width", value: (r.W || 540) * 2 }, font: { loadSystemFonts: true, fontFiles: FONT_FILES } }).render().asPng();
