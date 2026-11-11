@@ -436,6 +436,7 @@ function serveMedia(req, res, filePath, contentType) {
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
+  const CH = ((u.searchParams.get("channel")) || "channel1").replace(/[^A-Za-z0-9_-]/g, "") || "channel1";
   try {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
     // TWEEDE STUDIO — Umma United scène-editor (eigen pagina, los van de tegel-studio).
@@ -533,17 +534,54 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (u.pathname === "/api/music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, config.audioDir))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    // CHANNELS — lijst van beschikbare kanalen (mappen onder assets/channels/). De studio toont dit
+    // als kanaal-kiezer; je kiest eerst een kanaal en ziet dan de projecten van dat kanaal.
+    if (u.pathname === "/api/channels" && req.method === "GET") {
+      // elk kanaal = een map onder assets/channels/. De NAAM staat in <map>/_naam.txt (valt terug op
+      // de map-id). De studio toont de naam; de id blijft de map onder de motorkap.
+      let channels = [];
+      try {
+        const base = path.resolve(ROOT, "assets/channels");
+        for (const e of await fs.readdir(base, { withFileTypes: true })) {
+          if (!e.isDirectory() || e.name.startsWith(".")) continue;
+          let name = e.name;
+          try { const t = (await fs.readFile(path.join(base, e.name, "_naam.txt"), "utf8")).trim(); if (t) name = t; } catch {}
+          channels.push({ id: e.name, name });
+        }
+        channels.sort((a, b) => a.id.localeCompare(b.id));
+      } catch {}
+      if (!channels.length) channels = [{ id: "channel1", name: "channel1" }];
+      json(res, { channels });
+      return;
+    }
+    // CHANNELS — een nieuw kanaal aanmaken (zoals "+ nieuw" bij projecten). Maakt de map +
+    // submappen + schrijft de naam; geeft de nieuwe id terug zodat de studio ernaartoe springt.
+    if (u.pathname === "/api/channel-create" && req.method === "POST") {
+      const bd = await readBody(req);
+      const name = String(bd.name || "").trim();
+      if (!name) { json(res, { error: "geen naam opgegeven" }, 400); return; }
+      let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "kanaal";
+      const base = path.resolve(ROOT, "assets/channels");
+      let uid = id, n = 2; while (existsSync(path.join(base, uid))) { uid = id + "-" + (n++); }
+      const dir = path.join(base, uid);
+      try {
+        for (const sub of ["voice", "video", "muziek", "sfx", "audio"]) await fs.mkdir(path.join(dir, sub), { recursive: true });
+        await fs.writeFile(path.join(dir, "_naam.txt"), name, "utf8");
+        json(res, { id: uid, name });
+      } catch (e) { json(res, { error: e.message }, 500); }
+      return;
+    }
     // UMMA — muziek UITSLUITEND uit de eigen map assets/channels/channel1/muziek/ (gescheiden van Tale of Tiles).
-    if (u.pathname === "/api/channel-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/channels/channel1/muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
-    if (u.pathname === "/api/channel-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels/channel1/muziek", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
+    if (u.pathname === "/api/channel-music") { let files = []; try { files = (await fs.readdir(path.resolve(ROOT, "assets/channels", CH, "muziek"))).filter((f) => /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)); } catch {} json(res, { files }); return; }
+    if (u.pathname === "/api/channel-audio") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels", CH, "muziek", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
     // UMMA SFX — serveer een effect-bestand uit assets/channels/channel1/sfx/ zodat de studio-preview de SFX kan afspelen
-    if (u.pathname === "/api/channel-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels/channel1/sfx", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
+    if (u.pathname === "/api/channel-sfx") { const f = u.searchParams.get("f") || ""; if (!/^[\w.\- ]+\.(mp3|wav|m4a|aac|ogg)$/i.test(f)) { res.writeHead(404); res.end(""); return; } const p = path.resolve(ROOT, "assets/channels", CH, "sfx", f); if (existsSync(p)) { serveMedia(req, res, p, "audio/mpeg"); return; } res.writeHead(404); res.end(""); return; }
     // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
     // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
     if (u.pathname === "/api/channel-timeline" && req.method === "GET") {
       const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels", CH, "voice", story, voice, "_timeline.json");
       if (existsSync(p)) { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" }); res.end(await fs.readFile(p)); return; }
       json(res, { error: "geen _timeline.json gevonden; draai eerst python tools/channel_voice.py --voice " + voice }, 404); return;
     }
@@ -554,7 +592,7 @@ const server = http.createServer(async (req, res) => {
       if (!bd || !Array.isArray(bd.scenes)) { json(res, { error: "ongeldige tijdlijn" }, 400); return; }
       const story = String(bd.story || "sword").replace(/[^\w-]/g, "");
       const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, "_timeline.json");
+      const p = path.resolve(ROOT, "assets/channels", CH, "voice", story, voice, "_timeline.json");
       try { await fs.writeFile(p, JSON.stringify(bd, null, 2), "utf8"); json(res, { ok: true, saved: path.relative(ROOT, p).replace(/\\/g, "/") }); }
       catch (e) { json(res, { error: e.message }, 500); }
       return;
@@ -565,14 +603,14 @@ const server = http.createServer(async (req, res) => {
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
       const n = (u.searchParams.get("n") || "").replace(/[^\d]/g, "");
       if (!n) { res.writeHead(404); res.end(""); return; }
-      const p = path.resolve(ROOT, "assets/channels/channel1/voice", story, voice, n.padStart(2, "0") + ".wav");
+      const p = path.resolve(ROOT, "assets/channels", CH, "voice", story, voice, n.padStart(2, "0") + ".wav");
       if (existsSync(p)) { serveMedia(req, res, p, "audio/wav"); return; }
       res.writeHead(404); res.end(""); return;
     }
     // UMMA BEELD — serveer het opgehaalde beeld/video per beat (uit assets/channels/channel1/video/) zodat
     // de editor een thumbnail per beat kan tonen en je de missers direct ziet.
     if (u.pathname.startsWith("/channel-media/")) {
-      const base = path.resolve(ROOT, "assets/channels/channel1/video");
+      const base = path.resolve(ROOT, "assets/channels", CH, "video");
       const f = path.resolve(base, decodeURIComponent(u.pathname.slice("/channel-media/".length)));
       if (!f.startsWith(base)) { res.writeHead(403); res.end("nee"); return; }
       if (existsSync(f)) { const ct = CT[path.extname(f).toLowerCase()] || "application/octet-stream"; serveMedia(req, res, f, ct); return; }
@@ -585,7 +623,7 @@ const server = http.createServer(async (req, res) => {
       // f = optioneel één submap (verhaal) + bestandsnaam, bv. "chose/s01b1.mp4" of "s01b1.mp4"
       const raw = (u.searchParams.get("f") || "").replace(/\\/g, "/");
       if (raw.includes("..") || !/^(?:[\w-]+\/)?[\w.\- ]+\.(mp4|webm|mov|mkv|m4v)$/i.test(raw)) { res.writeHead(404); res.end(""); return; }
-      const base = path.resolve(ROOT, "assets/channels/channel1/video");
+      const base = path.resolve(ROOT, "assets/channels", CH, "video");
       const src = path.resolve(base, raw);
       if ((src !== base && !src.startsWith(base + path.sep)) || !existsSync(src)) { res.writeHead(404); res.end(""); return; }
       const pdir = path.join(base, ".posters");
@@ -614,9 +652,9 @@ const server = http.createServer(async (req, res) => {
       const rx = /\.(mp4|webm|jpg|jpeg|png|webp)$/i;
       let files = [];
       try {
-        const sdir = story && path.resolve(ROOT, "assets/channels/channel1/video", story);
+        const sdir = story && path.resolve(ROOT, "assets/channels", CH, "video", story);
         if (sdir && existsSync(sdir)) files = (await fs.readdir(sdir)).filter((f) => rx.test(f)).map((f) => story + "/" + f);
-        else files = (await fs.readdir(path.resolve(ROOT, "assets/channels/channel1/video"))).filter((f) => rx.test(f));
+        else files = (await fs.readdir(path.resolve(ROOT, "assets/channels", CH, "video"))).filter((f) => rx.test(f));
       } catch {}
       json(res, { files });
       return;
@@ -630,13 +668,13 @@ const server = http.createServer(async (req, res) => {
       const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
       if (!b64) { json(res, { error: "geen beeld ontvangen" }, 400); return; }
       if (!/\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(safe)) safe += ".jpg";
-      const sub = story ? "assets/channels/channel1/video/" + story : "assets/channels/channel1/video";
+      const sub = story ? "assets/channels/" + CH + "/video/" + story : "assets/channels/" + CH + "/video";
       const dir = path.resolve(ROOT, sub); await fs.mkdir(dir, { recursive: true });
       const fname = Date.now() + "-" + safe;
       await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
       const isVid = /\.(mp4|webm)$/i.test(fname);
       const rel = (story ? story + "/" : "") + fname;
-      json(res, { path: "assets/channels/channel1/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
+      json(res, { path: "assets/channels/" + CH + "/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
       return;
     }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
@@ -646,10 +684,10 @@ const server = http.createServer(async (req, res) => {
       const safe = String(bd.name || "clip").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 50);
       const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
       if (!b64) { json(res, { error: "geen audio ontvangen" }, 400); return; }
-      const dir = path.resolve(ROOT, "assets/channels/channel1/audio"); await fs.mkdir(dir, { recursive: true });
+      const dir = path.resolve(ROOT, "assets/channels", CH, "audio"); await fs.mkdir(dir, { recursive: true });
       const fname = Date.now() + "-" + (/\.(mp3|wav|m4a|aac|ogg)$/i.test(safe) ? safe : safe + ".mp3");
       await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
-      json(res, { path: "assets/channels/channel1/audio/" + fname });
+      json(res, { path: "assets/channels/" + CH + "/audio/" + fname });
       return;
     }
     // UMMA — nieuwste klaarstaande import-script teruggeven, zodat de studio bij openen vanzelf
@@ -657,7 +695,7 @@ const server = http.createServer(async (req, res) => {
     // pakt het meest recent gewijzigde. Puur lezen, raakt niets aan.
     if (u.pathname === "/api/channel-latest-script" && req.method === "GET") {
       try {
-        const base = path.resolve(ROOT, "assets/channels/channel1/voice");
+        const base = path.resolve(ROOT, "assets/channels", CH, "voice");
         let best = null;
         for (const story of await fs.readdir(base).catch(() => [])) {
           const sdir = path.join(base, story);
@@ -682,7 +720,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/channel-scripts" && req.method === "GET") {
       const items = [];
       try {
-        const base = path.resolve(ROOT, "assets/channels/channel1/voice");
+        const base = path.resolve(ROOT, "assets/channels", CH, "voice");
         for (const story of (await fs.readdir(base).catch(() => [])).sort()) {
           const sdir = path.join(base, story);
           for (const voice of (await fs.readdir(sdir).catch(() => [])).sort()) {
