@@ -582,13 +582,14 @@ const server = http.createServer(async (req, res) => {
     // als afbeelding kan tonen. De ingebouwde app-browser schildert mp4-frames niet betrouwbaar; een
     // jpg rendert altijd. Frames worden gecachet in assets/ummaunited/video/.posters/.
     if (u.pathname === "/api/umma-poster" && req.method === "GET") {
-      const f = (u.searchParams.get("f") || "").split(/[\\/]/).pop();
-      if (!/^[\w.\- ]+\.(mp4|webm|mov|mkv|m4v)$/i.test(f)) { res.writeHead(404); res.end(""); return; }
+      // f = optioneel één submap (verhaal) + bestandsnaam, bv. "chose/s01b1.mp4" of "s01b1.mp4"
+      const raw = (u.searchParams.get("f") || "").replace(/\\/g, "/");
+      if (raw.includes("..") || !/^(?:[\w-]+\/)?[\w.\- ]+\.(mp4|webm|mov|mkv|m4v)$/i.test(raw)) { res.writeHead(404); res.end(""); return; }
       const base = path.resolve(ROOT, "assets/ummaunited/video");
-      const src = path.resolve(base, f);
-      if (!src.startsWith(base) || !existsSync(src)) { res.writeHead(404); res.end(""); return; }
+      const src = path.resolve(base, raw);
+      if ((src !== base && !src.startsWith(base + path.sep)) || !existsSync(src)) { res.writeHead(404); res.end(""); return; }
       const pdir = path.join(base, ".posters");
-      const out = path.join(pdir, f.replace(/\.[^.]+$/, ".jpg"));
+      const out = path.join(pdir, raw.replace(/\//g, "__").replace(/\.[^.]+$/, ".jpg"));
       const draw = (ss) => new Promise((resolve) => {
         execFile(ffmpegPath, ["-y", "-v", "error", "-ss", String(ss), "-i", src, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", out], { windowsHide: true }, (e) => resolve(!e && existsSync(out)));
       });
@@ -606,8 +607,17 @@ const server = http.createServer(async (req, res) => {
     // UMMA BEELD — lijst van alle opgehaalde/geüploade bestanden in assets/ummaunited/video/,
     // zodat de studio een weggegooid beeld terug kan koppelen en lege beats kan vullen.
     if (u.pathname === "/api/umma-media-list" && req.method === "GET") {
+      // Beeld PER PROJECT: heeft dit verhaal een eigen beeldmap, dan tonen we alleen díé bestanden
+      // (als verhaal/bestand). Bestaat die map nog niet (oud, plat project), dan de losse map — zo
+      // blijft een bestaand plat project werken en ziet een nieuw project alleen z'n eigen beeld.
+      const story = (u.searchParams.get("story") || "").replace(/[^\w-]/g, "");
+      const rx = /\.(mp4|webm|jpg|jpeg|png|webp)$/i;
       let files = [];
-      try { files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/video"))).filter((f) => /\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(f)); } catch {}
+      try {
+        const sdir = story && path.resolve(ROOT, "assets/ummaunited/video", story);
+        if (sdir && existsSync(sdir)) files = (await fs.readdir(sdir)).filter((f) => rx.test(f)).map((f) => story + "/" + f);
+        else files = (await fs.readdir(path.resolve(ROOT, "assets/ummaunited/video"))).filter((f) => rx.test(f));
+      } catch {}
       json(res, { files });
       return;
     }
@@ -615,15 +625,18 @@ const server = http.createServer(async (req, res) => {
     // en geef het relatieve pad terug; de studio zet dat in beat.img of beat.vid.
     if (u.pathname === "/api/umma-beeld-upload" && req.method === "POST") {
       const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");   // upload in de map van dit project
       let safe = String(bd.name || "beeld").replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 60);
       const b64 = String(bd.dataB64 || "").replace(/^data:[^,]*,/, "");
       if (!b64) { json(res, { error: "geen beeld ontvangen" }, 400); return; }
       if (!/\.(mp4|webm|jpg|jpeg|png|webp)$/i.test(safe)) safe += ".jpg";
-      const dir = path.resolve(ROOT, "assets/ummaunited/video"); await fs.mkdir(dir, { recursive: true });
+      const sub = story ? "assets/ummaunited/video/" + story : "assets/ummaunited/video";
+      const dir = path.resolve(ROOT, sub); await fs.mkdir(dir, { recursive: true });
       const fname = Date.now() + "-" + safe;
       await fs.writeFile(path.join(dir, fname), Buffer.from(b64, "base64"));
       const isVid = /\.(mp4|webm)$/i.test(fname);
-      json(res, { path: "assets/ummaunited/video/" + fname, file: fname, kind: isVid ? "vid" : "img" });
+      const rel = (story ? story + "/" : "") + fname;
+      json(res, { path: "assets/ummaunited/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
       return;
     }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/ummaunited/audio/ en geeft het

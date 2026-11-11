@@ -239,8 +239,10 @@ function beatsOf(s){const s0=(s.sentences&&s.sentences[0])?s.sentences[0].start:
    out.push({start:edges[i],end:edges[i+1],label:s.imgLabels[i]||('beeld '+(i+1)),img:m.img||'',vid:m.vid||''});}
  if(!out.length)out.push({start:0,end:s.dur,label:(s.imgLabels&&s.imgLabels[0])||'beeld 1',img:'',vid:''});
  return out;}
-function mediaUrl(p){return '/umma-media/'+String(p).split('/').pop();}
-function posterURL(v){return '/api/umma-poster?f='+encodeURIComponent(String(v).split('/').pop());}
+// Beeld PER PROJECT: bewaar de submap (verhaal) ná assets/ummaunited/video/, niet alleen de
+// bestandsnaam — anders toont de studio altijd het platte bestand van een ander verhaal.
+function mediaUrl(p){var s=String(p).replace(/^assets\/ummaunited\/video\//,'');return '/umma-media/'+s.split('/').map(encodeURIComponent).join('/');}
+function posterURL(v){return '/api/umma-poster?f='+encodeURIComponent(String(v).replace(/^assets\/ummaunited\/video\//,''));}
 function isDrawnLabel(l){return /getekend|tekst|kaart|CTA|logo/i.test(l||'');}
 function subsOf(s){if(!s.sentences||!s.sentences.length)return [];
  const starts=[s.sentences[0].start,...s.subBounds];const ends=[...s.subBounds,s.speech_end||s.dur];
@@ -452,7 +454,7 @@ $('bt-upload').addEventListener('click',()=>{if(!selBeat){alert('Kies eerst een 
 $('ld-beeld').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f||!selBeat)return;
  $('rendermsg').textContent='beeld uploaden…';const si=selBeat.si,bi=selBeat.bi;
  const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
- try{const res=await fetch('/api/umma-beeld-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64:b64})});
+ try{const res=await fetch('/api/umma-beeld-upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:f.name,dataB64:b64,story:STORY})});
    const d=await res.json();if(d.path){MEDIA.push(d.file);setBeatMedia(si,bi,d.path,d.kind);$('rendermsg').textContent='beeld toegevoegd ✓';}
    else $('rendermsg').textContent='upload mislukt: '+(d.error||'?');}
  catch(err){$('rendermsg').textContent='upload mislukt (engine aan?)';}});
@@ -474,7 +476,7 @@ function autoHeal(){let n=0;SC.forEach((s,si)=>{
    const isBrand=(s.tone==='intro'||s.tone==='outro');
    beatsOf(s).forEach((b,bi)=>{if(b.img||b.vid)return;
    if(isBrand||isDrawnLabel(b.label))return;
-   const base='s'+String(s.scene).padStart(2,'0')+'b'+(bi+1);const hit=MEDIA.find(f=>f.replace(/\.[^.]+$/,'')===base);
+   const base='s'+String(s.scene).padStart(2,'0')+'b'+(bi+1);const hit=MEDIA.find(f=>f.split('/').pop().replace(/\.[^.]+$/,'')===base);
    if(hit){const m=ensureBM(si,bi);m[/\.(mp4|webm)$/i.test(hit)?'vid':'img']='assets/ummaunited/video/'+hit;n++;}});});return n;}
 
 // ---- renderen: stuur de tijdlijn-scènes naar de engine-render en speel de mp4 af ------------
@@ -522,7 +524,7 @@ function boot(){
  if(TL.format==='9:16'||TL.format==='16:9'){FMT=TL.format;applyFormat();}
  buildState();if(Array.isArray(TL.approved))TL.approved.forEach(n=>approved.add(n));
  buildCards();layout();placeApproval();placePlayhead();autoAudio();buildOverview();predrawAll();
- fetch('/api/umma-media-list').then(r=>r.json()).then(d=>{if(d&&Array.isArray(d.files)){MEDIA=d.files;if(autoHeal()){layout();buildOverview();}}}).catch(()=>{});
+ fetch('/api/umma-media-list?story='+encodeURIComponent(STORY)).then(r=>r.json()).then(d=>{if(d&&Array.isArray(d.files)){MEDIA=d.files;if(autoHeal()){layout();buildOverview();}}}).catch(()=>{});
  $('hdrtitle').textContent='“'+TL.title+'”';$('hdrsub').textContent=SC.length+' scènes · '+TL.total_mmss+' · '+STORY+'/'+VOICE+' · '+FMT;
  $('pv-total').textContent=TL.total_mmss;
 }

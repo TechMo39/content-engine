@@ -342,7 +342,9 @@ def main():
         print("geen _timeline.json:", tlpath, "\n-> draai eerst: python tools/umma_voice.py --voice", args.voice); return
     tl = json.load(open(tlpath, encoding="utf-8"))
 
-    outdir = os.path.join(args.root, "assets", "ummaunited", "video")
+    # BEELD PER PROJECT: elke video (verhaal) krijgt zijn eigen beeldmap, zodat scène+beat van het ene
+    # verhaal nooit het beeld van een ander verhaal pakt. (Oud: één gedeelde map -> kruisbesmetting.)
+    outdir = os.path.join(args.root, "assets", "ummaunited", "video", args.story)
     os.makedirs(outdir, exist_ok=True)
     keys = load_keys(args.root)
     have_video = bool(keys.get("pexels") or keys.get("pixabay"))
@@ -361,7 +363,12 @@ def main():
             kind, query = spec
             if kind == "drawn" or not query:
                 continue
-            if (beat.get("img") or beat.get("vid")) and not args.force:
+            # Alleen overslaan als het beeld AL in de eigen verhaal-map staat. Wijst het nog naar de
+            # oude gedeelde map (of een ander verhaal), dan halen we het opnieuw op in deze map, zodat
+            # elk project zijn eigen beeld krijgt (auto-migratie, geen --force nodig).
+            cur = (beat.get("vid") or beat.get("img") or "").replace("\\", "/")
+            own_prefix = "assets/ummaunited/video/" + args.story + "/"
+            if cur and own_prefix in cur and not args.force:
                 n_skip += 1; continue
             # HERGEBRUIK: staat het beeld voor deze beat al op schijf (s<NN>b<bi+1>.<ext>)? Dan koppelen
             # we dat terug ZONDER iets te downloaden. De tijdlijn was vers/leeg, maar de bestanden staan
@@ -376,7 +383,7 @@ def main():
                         found = (base + ext, ext); break
                 if found:
                     fname, ext = found
-                    rel = "assets/ummaunited/video/" + fname
+                    rel = "assets/ummaunited/video/" + args.story + "/" + fname
                     isv = ext.lower() in (".mp4", ".webm")
                     beat["vid" if isv else "img"] = rel
                     beat.pop("img" if isv else "vid", None)
@@ -403,7 +410,7 @@ def main():
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(0.5); continue
             if is_video and normalize_video(fpath, args.root):
                 print("    genormaliseerd -> max 1080p30 (app-afspeelbaar)")
-            rel = "assets/ummaunited/video/" + fname
+            rel = "assets/ummaunited/video/" + args.story + "/" + fname
             beat["vid" if is_video else "img"] = rel
             beat.pop("img" if is_video else "vid", None)  # oude tegenpool opruimen
             credits.append(f"scene {num} beat {bi+1}: {hit.get('title','')} | {hit['license']} | {hit['credit']}")
