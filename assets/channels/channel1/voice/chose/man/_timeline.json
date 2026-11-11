@@ -114,7 +114,15 @@
           "abs_start": 47.14
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 3.34,
+          "dur": 45.42,
+          "label": "intro (merk)",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -190,8 +198,33 @@
           "abs_start": 84.216
         }
       ],
-      "beats": [],
-      "sfx": []
+      "beats": [
+        {
+          "start": 0.36,
+          "dur": 8.028,
+          "label": "de chirurg / geen vreemde opereert",
+          "vid": "assets/channels/channel1/video/chose/s01b1.mp4"
+        },
+        {
+          "start": 8.388,
+          "dur": 18.83,
+          "label": "de reviews → de grootste vraag",
+          "vid": "assets/channels/channel1/video/chose/s01b2.mp4"
+        },
+        {
+          "start": 27.218,
+          "dur": 8.782,
+          "label": "dus: laten we kijken",
+          "vid": "assets/channels/channel1/video/chose/s01b3.mp4"
+        }
+      ],
+      "sfx": [
+        {
+          "t": 36.0,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/s01_end.mp3"
+        }
+      ]
     },
     {
       "scene": 2,
@@ -294,7 +327,26 @@
           "abs_start": 124.579
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.32,
+          "dur": 14.3,
+          "label": "de vogel: ingebouwd programma",
+          "vid": "assets/channels/channel1/video/chose/s02b1.mp4"
+        },
+        {
+          "start": 14.62,
+          "dur": 11.631,
+          "label": "jij weegt, redeneert, kiest",
+          "vid": "assets/channels/channel1/video/chose/s02b2.mp4"
+        },
+        {
+          "start": 26.251,
+          "dur": 13.969,
+          "label": "de hond vraagt nooit waarom",
+          "vid": "assets/channels/channel1/video/chose/s02b3.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -349,7 +401,20 @@
           "abs_start": 144.825
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 7.059,
+          "label": "een blik op de lucht, een jas",
+          "vid": "assets/channels/channel1/video/chose/s03b1.mp4"
+        },
+        {
+          "start": 7.399,
+          "dur": 14.721,
+          "label": "duizend keuzes per dag",
+          "vid": "assets/channels/channel1/video/chose/s03b2.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -418,8 +483,33 @@
           "abs_start": 185.414
         }
       ],
-      "beats": [],
-      "sfx": []
+      "beats": [
+        {
+          "start": 0.36,
+          "dur": 7.263,
+          "label": "de pijn die niet weggaat",
+          "vid": "assets/channels/channel1/video/chose/s04b1.mp4"
+        },
+        {
+          "start": 7.623,
+          "dur": 17.299,
+          "label": "je gaat naar wie het wél weet",
+          "vid": "assets/channels/channel1/video/chose/s04b2.mp4"
+        },
+        {
+          "start": 24.922,
+          "dur": 16.098,
+          "label": "je eigen grens zien = rationeel",
+          "vid": "assets/channels/channel1/video/chose/s04b3.mp4"
+        }
+      ],
+      "sfx": [
+        {
+          "t": 41.02,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/s04_end.mp3"
+        }
+      ]
     },
     {
       "scene": 5,
@@ -487,8 +577,33 @@
           "abs_start": 226.962
         }
       ],
-      "beats": [],
-      "sfx": []
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 7.79,
+          "label": "de rechtszaak: de wet",
+          "vid": "assets/channels/channel1/video/chose/s05b1.mp4"
+        },
+        {
+          "start": 8.13,
+          "dur": 11.922,
+          "label": "de brug, jaren doorgerekend",
+          "vid": "assets/channels/channel1/video/chose/s05b2.mp4"
+        },
+        {
+          "start": 20.052,
+          "dur": 14.008,
+          "label": "de medicijndoos → eerst weten",
+          "vid": "assets/channels/channel1/video/chose/s05b3.mp4"
+        }
+      ],
+      "sfx": [
+        {
+          "t": 34.06,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/s05_end.mp3"
+        }
+      ]
     },
     {
       "scene": 6,
@@ -584,7 +699,26 @@
           "abs_start": 256.975
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 10.324,
+          "label": "op één vraag gaat het licht uit",
+          "vid": "assets/channels/channel1/video/chose/s06b1.mp4"
+        },
+        {
+          "start": 10.664,
+          "dur": 10.115,
+          "label": "groter dan alles: waarom ben je hier",
+          "vid": "assets/channels/channel1/video/chose/s06b2.mp4"
+        },
+        {
+          "start": 20.779,
+          "dur": 12.201,
+          "label": "ze hebben gewoon een antwoord",
+          "vid": "assets/channels/channel1/video/chose/s06b3.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -660,7 +794,20 @@
           "abs_start": 292.965
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.36,
+          "dur": 12.366,
+          "label": "ik had mijn antwoord ook",
+          "vid": "assets/channels/channel1/video/chose/s07b1.mp4"
+        },
+        {
+          "start": 12.726,
+          "dur": 21.494,
+          "label": "de barst in de muur: nooit onderzocht",
+          "vid": "assets/channels/channel1/video/chose/s07b2.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -771,7 +918,38 @@
           "abs_start": 357.175
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 12.06,
+          "label": "deur 1: thuis / je ouders",
+          "vid": "assets/channels/channel1/video/chose/s08b1.mp4"
+        },
+        {
+          "start": 12.4,
+          "dur": 9.582,
+          "label": "deur 2: één moment",
+          "vid": "assets/channels/channel1/video/chose/s08b2.mp4"
+        },
+        {
+          "start": 21.982,
+          "dur": 9.588,
+          "label": "deur 3: de mensen om je heen",
+          "vid": "assets/channels/channel1/video/chose/s08b3.mp4"
+        },
+        {
+          "start": 31.57,
+          "dur": 18.79,
+          "label": "deur 4: de wereld / de schermen",
+          "vid": "assets/channels/channel1/video/chose/s08b4.mp4"
+        },
+        {
+          "start": 50.36,
+          "dur": 12.22,
+          "label": "deur 5: de pijn",
+          "vid": "assets/channels/channel1/video/chose/s08b5.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -840,8 +1018,27 @@
           "abs_start": 388.335
         }
       ],
-      "beats": [],
-      "sfx": []
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 8.998,
+          "label": "vijf deuren: vier van buiten, één duwt weg",
+          "vid": "assets/channels/channel1/video/chose/s09b1.mp4"
+        },
+        {
+          "start": 9.338,
+          "dur": 18.762,
+          "label": "en beiden zeker dat ze kozen",
+          "vid": "assets/channels/channel1/video/chose/s09b2.mp4"
+        }
+      ],
+      "sfx": [
+        {
+          "t": 28.1,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/s09_end.mp3"
+        }
+      ]
     },
     {
       "scene": 10,
@@ -965,7 +1162,32 @@
           "abs_start": 447.995
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 14.052,
+          "label": "'ik ben nu volwassen' (spiegel)",
+          "vid": "assets/channels/channel1/video/chose/s10b1.mp4"
+        },
+        {
+          "start": 14.392,
+          "dur": 12.816,
+          "label": "verweven met wie je bent",
+          "vid": "assets/channels/channel1/video/chose/s10b2.mp4"
+        },
+        {
+          "start": 27.208,
+          "dur": 9.382,
+          "label": "je verdedigt het i.p.v. te toetsen",
+          "vid": "assets/channels/channel1/video/chose/s10b3.mp4"
+        },
+        {
+          "start": 36.59,
+          "dur": 20.97,
+          "label": "de scherpste geest verdedigt het best",
+          "vid": "assets/channels/channel1/video/chose/s10b4.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -1076,7 +1298,26 @@
           "abs_start": 507.151
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 14.81,
+          "label": "waarom denkt het denkende wezen niet?",
+          "vid": "assets/channels/channel1/video/chose/s11b1.mp4"
+        },
+        {
+          "start": 15.15,
+          "dur": 25.967,
+          "label": "er lag al een antwoord klaar",
+          "vid": "assets/channels/channel1/video/chose/s11b2.mp4"
+        },
+        {
+          "start": 41.117,
+          "dur": 22.963,
+          "label": "misschien een zesde deur",
+          "vid": "assets/channels/channel1/video/chose/s11b3.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -1208,7 +1449,32 @@
           "abs_start": 586.37
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.34,
+          "dur": 16.01,
+          "label": "hoe weet je of het waar is?",
+          "vid": "assets/channels/channel1/video/chose/s12b1.mp4"
+        },
+        {
+          "start": 16.35,
+          "dur": 15.88,
+          "label": "sommigen gaan wél terug",
+          "vid": "assets/channels/channel1/video/chose/s12b2.mp4"
+        },
+        {
+          "start": 32.23,
+          "dur": 23.12,
+          "label": "de stem: 'alles is maar mening'",
+          "vid": "assets/channels/channel1/video/chose/s12b3.mp4"
+        },
+        {
+          "start": 55.35,
+          "dur": 15.21,
+          "label": "bestaat er blijvende waarheid? → video 2",
+          "vid": "assets/channels/channel1/video/chose/s12b4.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -1291,8 +1557,49 @@
           "abs_start": 629.127
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.36,
+          "dur": 48.14,
+          "label": "outro (merk)",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
+    }
+  ],
+  "groups": {},
+  "music": [
+    {
+      "start": 0.0,
+      "end": 128.525,
+      "file": "assets/channels/channel1/muziek/umma-opening.mp3",
+      "mood": "opening"
+    },
+    {
+      "start": 128.525,
+      "end": 194.15,
+      "file": "assets/channels/channel1/muziek/umma-dark.mp3",
+      "mood": "dark"
+    },
+    {
+      "start": 194.15,
+      "end": 363.275,
+      "file": "assets/channels/channel1/muziek/umma-hope.mp3",
+      "mood": "hope"
+    },
+    {
+      "start": 363.275,
+      "end": 451.75,
+      "file": "assets/channels/channel1/muziek/umma-tension.mp3",
+      "mood": "tension"
+    },
+    {
+      "start": 451.75,
+      "end": 589.35,
+      "file": "assets/channels/channel1/muziek/umma-triumph.mp3",
+      "mood": "triumph"
     }
   ]
 }
