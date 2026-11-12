@@ -677,6 +677,28 @@ const server = http.createServer(async (req, res) => {
       json(res, { path: "assets/channels/" + CH + "/video/" + rel, file: rel, kind: isVid ? "vid" : "img" });
       return;
     }
+    // UMMA BEELD — STUDIO-ZOEK: haal 3 kandidaten voor ÉÉN slot (scene+beat) op via de Python-tool,
+    // sla ze op als s<NN>b<k>__c1..3 en geef de lijst terug. De studio toont de 3; jij kiest er één
+    // (die wordt beat.vid/img), de rest blijft als reserve. Zo hoeft de beeldkeuze niet meer via de
+    // commandoregel.
+    if (u.pathname === "/api/channel-beeld-search" && req.method === "POST") {
+      const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");
+      const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
+      const scene = parseInt(bd.scene, 10), beat = parseInt(bd.beat, 10);
+      if (!story || !Number.isInteger(scene) || !Number.isInteger(beat)) { json(res, { error: "story/scene/beat vereist" }, 400); return; }
+      const py = process.platform === "win32" ? "python" : "python3";
+      const a = ["tools/channel_beeld.py", "--channel", CH, "--story", story, "--voice", voice,
+                 "--candidates", "3", "--only", String(scene), "--beat", String(beat)];
+      execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 180000 }, (err, stdout, stderr) => {
+        let cands = [];
+        const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("CANDIDATES_JSON:"));
+        if (line) { try { cands = (JSON.parse(line.slice("CANDIDATES_JSON:".length)).candidates) || []; } catch {} }
+        if (!cands.length && err) { json(res, { error: "zoeken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
+        json(res, { candidates: cands });
+      });
+      return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/channel-upload" && req.method === "POST") {

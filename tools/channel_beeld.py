@@ -12,7 +12,7 @@
 #   python tools/channel_beeld.py --force         # ook beats die al beeld hebben opnieuw ophalen
 #
 # Geen API-sleutel nodig. Alles via de open Wikimedia Commons API.
-import argparse, os, json, time, urllib.parse, urllib.request, urllib.error, re, subprocess
+import argparse, os, sys, json, time, urllib.parse, urllib.request, urllib.error, re, subprocess
 
 UA = "UmmaUnited-content-engine/1.0 (local research use; contact via app)"
 API = "https://commons.wikimedia.org/w/api.php"
@@ -392,6 +392,101 @@ def search_video(query, keys, min_dur=0):
         print(f"    pexels-fout: {e}")
     return None
 
+def search_video_many(query, keys, n=3, min_dur=0):
+    # Als search_video, maar levert de TOP-N liggende clips (voor de 3-kandidaten-keuze in de studio).
+    out = []
+    try:
+        if keys.get("pixabay"):
+            d = _getj("https://pixabay.com/api/videos/?" + urllib.parse.urlencode({"key": keys["pixabay"], "q": query, "per_page": 30}))
+            scored = []
+            for h in d.get("hits", []):
+                if min_dur and h.get("duration", 0) < min_dur:
+                    continue
+                vids = h.get("videos", {}); best = None
+                for size in ("large", "medium", "small"):
+                    v = vids.get(size)
+                    if v and v.get("url") and (v.get("width", 0) >= v.get("height", 0)) and v.get("width", 0) >= 1280:
+                        best = v; break
+                if not best:
+                    continue
+                rel = _relevance(h.get("tags", ""), query)
+                scored.append((rel, best.get("width", 0), {"url": best["url"], "ext": ".mp4",
+                               "credit": h.get("user", "Pixabay"), "license": "Pixabay License (free)"}))
+            scored.sort(key=lambda s: (s[0], s[1]), reverse=True)
+            out = [s[2] for s in scored[:n]]
+    except Exception as e:
+        print(f"    pixabay-fout: {e}", file=sys.stderr)
+    if len(out) < n:
+        try:
+            if keys.get("pexels"):
+                d = _getj("https://api.pexels.com/videos/search?" + urllib.parse.urlencode({"query": query, "per_page": 10, "orientation": "landscape"}),
+                          headers={"Authorization": keys["pexels"]})
+                for v in d.get("videos", []):
+                    if min_dur and v.get("duration", 0) < min_dur:
+                        continue
+                    files = sorted(v.get("video_files", []), key=lambda f: (f.get("width") or 0), reverse=True)
+                    hd = next((f for f in files if (f.get("width") or 0) >= 1280 and (f.get("width", 0) >= f.get("height", 0))), files[0] if files else None)
+                    if hd and hd.get("link"):
+                        out.append({"url": hd["link"], "ext": ".mp4", "credit": (v.get("user", {}) or {}).get("name", "Pexels"), "license": "Pexels License (free)"})
+                        if len(out) >= n:
+                            break
+        except Exception as e:
+            print(f"    pexels-fout: {e}", file=sys.stderr)
+    return out[:n]
+
+def search_image_many(query, n=3):
+    # Als search_image, maar de TOP-N foto's (voor de 3-kandidaten-keuze in de studio).
+    cands = _search_image_once(query, query)
+    if not cands:
+        specific = " ".join(w for w in query.split() if w.lower() not in _GENERIC)
+        if specific and specific != query:
+            cands = _search_image_once(specific, query)
+    cands.sort(key=lambda c: (_relevance(c["title"], query), c["w"]), reverse=True)
+    return cands[:n]
+
+def fetch_candidates(tl, num, bi, keys, outdir, story, channel, n, root):
+    # STUDIO-MODUS: zoek N kandidaten voor EEN slot (scene num, beat-index bi 0-gebaseerd) en zet ze
+    # klaar als s<NN>b<bi+1>__c<k>.<ext>. Verandert de tijdlijn NIET: de studio toont de N, jij kiest
+    # er één (die wordt beat.vid/img), de rest blijft als reserve staan.
+    sc = next((s for s in tl.get("scenes", []) if s.get("scene") == num), None)
+    if sc is None:
+        return []
+    ensure_beats(sc)
+    plan = PLAN.get(num, [])
+    kind, query = plan[bi] if bi < len(plan) else ("drawn", "")
+    if kind == "drawn" or not query:
+        return []
+    beats = sc.get("beats") or []
+    beat = beats[bi] if bi < len(beats) else {}
+    have_video = bool(keys.get("pexels") or keys.get("pixabay"))
+    hits = []
+    if kind == "video" and have_video:
+        hits = [("vid", h) for h in search_video_many(query, keys, n, min_dur=max(4, int(beat.get("dur", 0))))]
+    if len(hits) < n:   # te weinig video -> aanvullen met foto's zodat je altijd een keuze hebt
+        for h in search_image_many(query, n - len(hits)):
+            hits.append(("img", h))
+    results = []
+    for k, (soort, hit) in enumerate(hits[:n], start=1):
+        ext = hit.get("ext") or ext_for(hit.get("mime", ""))
+        fname = f"s{num:02d}b{bi+1}__c{k}{ext}"
+        fpath = os.path.join(outdir, fname)
+        try:
+            data = _get(hit["url"])
+            with open(fpath, "wb") as f:
+                f.write(data)
+        except Exception as e:
+            print(f"    downloadfout kandidaat {k}: {e}", file=sys.stderr); continue
+        isv = (soort == "vid")
+        if isv:
+            try:
+                normalize_video(fpath, root)
+            except Exception as e:
+                print(f"    normfout kandidaat {k}: {e}", file=sys.stderr)
+        results.append({"file": story + "/" + fname, "kind": "vid" if isv else "img",
+                        "credit": hit.get("credit", ""), "license": hit.get("license", "")})
+        time.sleep(0.6)
+    return results
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="sword")
@@ -400,6 +495,8 @@ def main():
     ap.add_argument("--only", type=int, default=0, help="alleen scene N")
     ap.add_argument("--force", action="store_true", help="ook beats die al beeld hebben opnieuw ophalen")
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
+    ap.add_argument("--candidates", type=int, default=0, help="studio-modus: N kandidaten voor EEN slot (met --only scene --beat index), i.p.v. de hele batch")
+    ap.add_argument("--beat", type=int, default=0, help="0-gebaseerde beat-index binnen de scene (alleen met --candidates)")
     args = ap.parse_args()
 
     # kies het beeldplan van DIT verhaal (sword/chose/...); val terug op sword als het onbekend is
@@ -415,6 +512,11 @@ def main():
     outdir = os.path.join(args.root, "assets", "channels", args.channel, "video", args.story)
     os.makedirs(outdir, exist_ok=True)
     keys = load_keys(args.root)
+    # STUDIO-MODUS: 3 kandidaten voor één slot, als JSON terug (de engine roept dit per slot aan).
+    if args.candidates:
+        res = fetch_candidates(tl, args.only, args.beat, keys, outdir, args.story, args.channel, args.candidates, args.root)
+        print("CANDIDATES_JSON:" + json.dumps({"candidates": res}))
+        return
     have_video = bool(keys.get("pexels") or keys.get("pixabay"))
     print("video-bron:", ("Pexels/Pixabay actief" if have_video else "geen sleutel -> alleen foto's (Wikimedia)"))
     credits = []

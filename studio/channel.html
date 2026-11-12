@@ -104,7 +104,8 @@
  .ovtile .th{width:100%;aspect-ratio:var(--ar,9/16);object-fit:cover;display:block;background:#0b0f18}
  .ovtile .cap{font-size:10px;color:#cfe0ff;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--line);background:var(--panel2)}
  .ovtile .kind{position:absolute;top:4px;right:4px;font-size:8.5px;padding:0 4px;border-radius:3px;background:rgba(0,0,0,.65);color:#9fc0ff}
- .ovtile .kind.vid{color:#9fc0ff}.ovtile .kind.foto{color:#ffd9a6}.ovtile .kind.get{color:#bfeadd}
+ .ovtile .kind.vid{color:#9fc0ff}.ovtile .kind.foto{color:#ffd9a6}.ovtile .kind.get{color:#bfeadd}.ovtile .kind.need{color:#ffcf87}
+ .ovtile.need{outline:2px solid #e0a23a;outline-offset:-2px}
 </style></head><body>
 <header>
  <a href="/" style="font-size:12px;color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel2)">← Tale of Tiles</a>
@@ -122,7 +123,7 @@
  <input id="ld-music" type="file" accept="audio/*" style="display:none">
 </header>
 <input id="ld-beeld" type="file" accept="image/*,video/*" style="display:none">
-<div class="picker" id="picker"><div class="box"><button class="close" id="pick-close">sluiten</button><h3>Kies een opgehaald beeld voor deze beat</h3><div class="grid" id="pick-grid"></div></div></div>
+<div class="picker" id="picker"><div class="box"><button class="close" id="pick-close">sluiten</button><h3 id="pick-title">Kies een opgehaald beeld voor deze beat</h3><div class="grid" id="pick-grid"></div></div></div>
 <div class="preview">
  <div class="screen">
   <img class="media" id="pv-img" style="display:none" alt="">
@@ -139,6 +140,7 @@
   <div class="beattools none" id="beattools">
    <div class="bt-t" id="bt-t">Klik op een beeldblok hierboven om het te kiezen.</div>
    <div class="row">
+    <button id="bt-cand">🔎 Zoek 3 kandidaten</button>
     <button id="bt-pick">📁 Kies uit opgehaald beeld</button>
     <button id="bt-upload">⬆ Eigen beeld uploaden</button>
     <button class="del" id="bt-del">🗑 Beeld weghalen</button>
@@ -471,6 +473,31 @@ function openPicker(){const g=$('pick-grid');g.innerHTML='';
 function closePicker(){$('picker').classList.remove('on');}
 $('pick-close').addEventListener('click',closePicker);
 $('picker').addEventListener('click',e=>{if(e.target.id==='picker')closePicker();});
+// ---- 3 kandidaten zoeken + verplicht kiezen (volledig vanuit de studio, geen commandoregel) ---
+$('bt-cand').addEventListener('click',searchCandidates);
+async function searchCandidates(){
+ if(!selBeat){alert('Kies eerst een beeldblok.');return;}
+ const s=SC[selBeat.si],b=beatsOf(s)[selBeat.bi]||{};
+ if(isDrawnLabel(b.label)){alert('Dit blok tekent de engine zelf — geen beeld nodig.');return;}
+ const btn=$('bt-cand'),old=btn.textContent;btn.disabled=true;btn.textContent='🔎 zoeken…';
+ $('rendermsg').textContent='3 kandidaten zoeken voor scène '+s.scene+' · beeld '+(selBeat.bi+1)+' …';
+ try{
+  const r=await fetch('/api/channel-beeld-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,beat:selBeat.bi})});
+  const d=await r.json();
+  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('rendermsg').textContent='geen kandidaten gevonden — probeer uploaden of pas de zoekterm in het script aan.';return;}
+  openCandidates(d.candidates);$('rendermsg').textContent='';
+ }catch(e){$('rendermsg').textContent='zoeken mislukt (engine aan?): '+e;}
+ finally{btn.disabled=false;btn.textContent=old;}
+}
+function openCandidates(cands){
+ const g=$('pick-grid');g.innerHTML='';const s=SC[selBeat.si];
+ $('pick-title').textContent='Kies 1 van '+cands.length+' — scène '+s.scene+' · beeld '+(selBeat.bi+1)+' ('+((beatsOf(s)[selBeat.bi]||{}).label||'')+')';
+ cands.forEach(c=>{const f=c.file,isV=c.kind==='vid';const it=document.createElement('div');it.className='it';
+  it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+(isV?'video':'foto')+(c.credit?' · '+c.credit:'')+'</div>';
+  it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/channels/'+CHANNEL+'/video/'+f,c.kind);closePicker();$('rendermsg').textContent='gekozen ✓ — vergeet niet op te slaan.';});
+  g.appendChild(it);});
+ $('picker').classList.add('on');
+}
 // lege beats automatisch koppelen aan al opgehaalde bestanden (s01b1.jpg -> scène 1, beat 1)
 function autoHeal(){let n=0;SC.forEach((s,si)=>{
    // GETEKENDE scènes/beats (intro, outro, kaart, tekst, CTA, logo) krijgen NOOIT media. Anders plakt
@@ -500,16 +527,17 @@ $('btn-render').addEventListener('click',doRender);
 // ---- OVERZICHT: contact-sheet van elke scène/beat, zoals hij in de video komt -----------------
 let ovOpen=true;
 function buildOverview(){
- const g=$('ovgrid');if(!g)return;g.innerHTML='';let nTiles=0;
+ const g=$('ovgrid');if(!g)return;g.innerHTML='';let nTiles=0,need=0;
  SC.forEach((s,si)=>{beatsOf(s).forEach((b,bi)=>{nTiles++;
    const it=document.createElement('div');it.className='ovtile';it.dataset.si=si;it.dataset.bi=bi;
    let media,kind,kcls;
    if(b.vid){media='<video class="th" poster="'+posterURL(b.vid)+'" src="'+mediaUrl(b.vid)+'" muted loop playsinline preload="none" onmouseenter="this.play()" onmouseleave="this.pause()"></video>';kind='video';kcls='vid';}
    else if(b.img){media='<img class="th" loading="lazy" src="'+mediaUrl(b.img)+'">';kind='foto';kcls='foto';}
-   else{media='<img class="th" loading="lazy" src="'+frameURL(s,bi,0.6)+'" onerror="this.style.opacity=.25">';kind='getekend';kcls='get';}
+   else{media='<img class="th" loading="lazy" src="'+frameURL(s,bi,0.6)+'" onerror="this.style.opacity=.25">';
+     if(isDrawnLabel(b.label)){kind='getekend';kcls='get';}else{kind='kies nog';kcls='need';need++;it.classList.add('need');}}
    it.innerHTML=media+'<span class="kind '+kcls+'">'+kind+'</span><div class="cap">S'+s.scene+'.'+(bi+1)+' '+(b.label||'')+'</div>';
    g.appendChild(it);});});
- $('ovcnt').textContent=nTiles+' beelden';
+ $('ovcnt').textContent=nTiles+' beelden'+(need?' · '+need+' nog te kiezen':'');
  g.style.display=ovOpen?'grid':'none';$('ovarrow').textContent=ovOpen?'▾':'▸';
  markOverviewActive();
 }
