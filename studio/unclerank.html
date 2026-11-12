@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UncleRank — posts</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#121820;--panel2:#0e141b;--line:#223042;--ink:#e8eef5;--mut:#8aa0b5;
+        --accent:#00b8e6;--accent2:#2a3b50;--green:#19c37d}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .top{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+       position:sticky;top:0;background:var(--bg);z-index:5}
+  .back{color:var(--mut);text-decoration:none;font-size:13px;border:1px solid var(--line);
+        border-radius:9px;padding:7px 12px}
+  .back:hover{color:var(--ink);border-color:var(--accent)}
+  .top h1{font-size:17px;margin:0;font-weight:700}
+  .top h1 small{color:var(--mut);font-weight:400;font-size:13px;margin-left:8px}
+  .wrap{max-width:820px;margin:0 auto;padding:22px}
+  .lead{color:var(--mut);font-size:14px;margin:0 0 18px;max-width:64ch}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .chip{background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:999px;
+        padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600}
+  .chip:hover{color:var(--ink);border-color:var(--accent2)}
+  .chip.on{background:#06222c;border-color:var(--accent);color:var(--accent)}
+  .gen{display:flex;gap:10px;align-items:center;margin-bottom:22px}
+  .gen button{background:var(--accent);border:0;color:#042028;font-weight:800;font-size:15px;
+        border-radius:11px;padding:13px 22px;cursor:pointer}
+  .gen button:hover{filter:brightness(1.08)}
+  .gen .hint{color:var(--mut);font-size:12.5px}
+  .post{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;
+        margin-bottom:14px}
+  .post .lbl{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+        color:var(--accent);background:#06222c;border:1px solid var(--accent2);border-radius:6px;
+        padding:3px 9px;margin-bottom:11px}
+  .post .body{white-space:pre-wrap;font-size:15px;line-height:1.6}
+  .post .row{display:flex;gap:9px;margin-top:13px;border-top:1px solid var(--line);padding-top:12px}
+  .post .row button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;
+        padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .post .row button:hover{border-color:var(--accent)}
+  .post .row button.done{color:var(--green);border-color:var(--green)}
+  .empty{color:var(--mut);font-size:14px;padding:24px 0}
+</style>
+</head>
+<body>
+  <div class="top">
+    <a class="back" href="/">← content-engine</a>
+    <h1>UncleRank · posts <small>reden om te bellen, geen lijst</small></h1>
+  </div>
+  <div class="wrap">
+    <p class="lead">Kies een vak (of de kring), klik genereer, en er staan posts klaar om te kopiëren
+      naar LinkedIn. In de stem uit het portaal: in klanten en geld, geen jargon, nooit het bestaande
+      werk afkraken.</p>
+
+    <div class="chips" id="chips"></div>
+    <div class="gen">
+      <button id="btn-gen">Genereer 3 posts</button>
+      <span class="hint" id="hint">Elke klik geeft andere posts.</span>
+    </div>
+    <div id="out"><div class="empty">Nog niks gegenereerd — kies een vak en klik genereer.</div></div>
+  </div>
+
+<script>
+// De posts, gegroepeerd per vak + de kring. Opgebouwd uit de echte verkoophoek per bureautype
+// (shared/verkooptips.mjs) en het kring-mechanisme (shared/uitdelen.mjs): elk is één scherpe
+// reden om te bellen, in uitkomsten, zonder vakjargon.
+const POSTS = {
+  seo: {naam:'SEO', items:[
+`Ask most business owners how many customers came in through their website last month.
+
+Watch them go quiet.
+
+That silence is the whole opening. They're paying for a site they can't measure, while in their own city people search for exactly what they sell — and land on a competitor.
+
+You're not selling "SEO." You're selling the answer to a question they've been avoiding.`,
+`In every town there's demand nobody is capturing.
+
+A few hundred people a month searching for what a local business does. That business pulls in maybe a handful of them. The rest walk straight to the competitor who shows up first.
+
+The owner doesn't know the number. The moment he hears it, the conversation changes.
+
+That gap is the pitch. Not rankings. The customers already looking for him.`],
+  },
+  sea: {naam:'SEA', items:[
+`"We tried ads once. Just burned money."
+
+Every agency hears it. The reflex is to defend ads. The better move is to ask one thing: what did you measure back then?
+
+Almost always, the answer is nothing.
+
+That's not a failed campaign. It's a campaign with no steering wheel. The reframe was never about budget — it's whether anyone was watching the road.`,
+`Stop pitching ad budgets. Start with one question: what's a new customer worth to you?
+
+Without that number, every conversation about advertising becomes an argument about cost instead of return.
+
+With it, the whole thing flips. Suddenly €500 a month isn't an expense — it's the price of one customer they'd happily pay ten times over.`],
+  },
+  web: {naam:'Web', items:[
+`Never tell a business their website is bad.
+
+Their brother-in-law probably built it. The second you criticise it, you've lost the call.
+
+Ask instead: when was it last changed, and by whom? Nine times out of ten it's someone who's no longer around.
+
+That — not the design — is the real problem. The site isn't the pitch. The fact that nobody can touch it is.`,
+`A website doesn't lose a business customers by looking old.
+
+It loses them on a Sunday night, when someone wants a quote, opens it on their phone, and it falls apart.
+
+Don't sell them a redesign. Ask what happens when a ready-to-buy customer shows up after hours. Let them picture it. The gap sells itself.`],
+  },
+  content: {naam:'Content', items:[
+`Stop asking businesses whether they post enough.
+
+Ask who decides what gets posted.
+
+For most of them, the honest answer is: nobody. And that's a far easier conversation than critiquing their feed.
+
+You're not selling more content. You're selling them not having to think about it anymore.`,
+`Followers are not the argument.
+
+A business owner doesn't care about a number that sits there doing nothing. He cares who called, who booked, who walked in.
+
+So don't lead with reach. Lead with: right now, nobody's steering what you say to the people who already follow you. That's the job. That's the sale.`],
+  },
+  reclame: {naam:'Reclame', items:[
+`Small businesses think advertising isn't for them. Too small, too local.
+
+It's backwards. Smaller means sharper.
+
+They don't need to be seen by the whole country — just by the few hundred people in their own area who should already know them.
+
+Reach isn't the pitch. Precision is. Who, exactly, needs to know this business exists?`,
+`"Branding" and "visibility" are words that make an owner hang up.
+
+Don't use them. Ask who his customer actually is, and where they come from.
+
+Businesses that can't answer that sharply are selling to everyone and convincing no one. Fix that, and the advertising writes itself.`],
+  },
+  kring: {naam:'Kring', items:[
+`The smartest agencies stopped fighting over the same leads.
+
+Here's the mechanic: you pass on the work that isn't yours — the website, the ads, the SEO — and warm leads in your own field come back, already half-sold by the agency that handed them over.
+
+It's not collaboration as a feel-good idea. It's a machine where sharing pays.
+
+Who are you still competing with that you could be trading with?`,
+`One business. Four agencies can sell to it at the same time — the SEO, the web build, the ads, the content — without stepping on each other.
+
+The loser's game: three of them cold-calling the same owner in the same week.
+
+The winner's game: one circle that routes each need to the right desk, and keeps that business exclusive while you work it.
+
+Which game are you playing?`,
+`A list of businesses is worthless. Everyone has one, most are free.
+
+What's scarce is the reason to call: this company, this specific gap, measured this week, that nobody else in your field is phoning about for the next three weeks.
+
+Stop buying lists. Start buying reasons.`],
+  },
+};
+
+const ORDER = ['alles','seo','sea','web','content','reclame','kring'];
+const NAMEN = {alles:'Alles', seo:'SEO', sea:'SEA', web:'Web', content:'Content', reclame:'Reclame', kring:'De kring'};
+let sel = 'alles';
+
+function renderChips(){
+  const wrap = document.getElementById('chips'); wrap.innerHTML='';
+  ORDER.forEach(k=>{
+    const b=document.createElement('button'); b.className='chip'+(k===sel?' on':''); b.textContent=NAMEN[k];
+    b.onclick=()=>{sel=k; renderChips();};
+    wrap.appendChild(b);
+  });
+}
+
+function pool(){
+  if(sel!=='alles') return (POSTS[sel].items).map(t=>({lbl:POSTS[sel].naam,txt:t}));
+  const all=[]; for(const k of Object.keys(POSTS)) for(const t of POSTS[k].items) all.push({lbl:POSTS[k].naam,txt:t});
+  return all;
+}
+
+function pick(arr,n){
+  const c=arr.slice(); const out=[];
+  while(c.length && out.length<n){ out.push(c.splice(Math.floor(Math.random()*c.length),1)[0]); }
+  return out;
+}
+
+function generate(){
+  const posts = pick(pool(),3);
+  const out=document.getElementById('out'); out.innerHTML='';
+  if(!posts.length){ out.innerHTML='<div class="empty">Geen posts voor dit vak.</div>'; return; }
+  posts.forEach(p=>{
+    const card=document.createElement('div'); card.className='post';
+    const lbl=document.createElement('span'); lbl.className='lbl'; lbl.textContent=p.lbl;
+    const body=document.createElement('div'); body.className='body'; body.textContent=p.txt;
+    const row=document.createElement('div'); row.className='row';
+    const copy=document.createElement('button'); copy.textContent='Kopieer';
+    copy.onclick=async()=>{ try{ await navigator.clipboard.writeText(p.txt); copy.textContent='Gekopieerd ✓'; copy.classList.add('done');
+        setTimeout(()=>{copy.textContent='Kopieer'; copy.classList.remove('done');},1600);}catch(e){ copy.textContent='kopiëren mislukt'; } };
+    row.appendChild(copy);
+    card.appendChild(lbl); card.appendChild(body); card.appendChild(row);
+    out.appendChild(card);
+  });
+}
+
+document.getElementById('btn-gen').onclick=generate;
+renderChips();
+</script>
+</body>
+</html>

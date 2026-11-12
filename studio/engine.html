@@ -190,7 +190,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 .planpostinfo{color:#9db8a8;font-size:11px}
 </style></head><body>
 <div class="top"><h1>CONTENT ENGINE</h1><span class="sub" id="topsub">merk → onderwerp → template → render</span>
-  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-social">Socials</button><button id="tab-plan">Planning</button><button id="tab-car">Carrousel</button><button id="tab-umma" style="margin-left:10px;background:#2a1c12;border-color:#ff7a2f;color:#ff7a2f">Channels ›</button></nav></div>
+  <nav class="tabs"><button id="tab-studio" class="on">Studio</button><button id="tab-social">Socials</button><button id="tab-plan">Planning</button><button id="tab-car">Carrousel</button><button id="tab-umma" style="margin-left:10px;background:#2a1c12;border-color:#ff7a2f;color:#ff7a2f">Channels ›</button><button id="tab-ur" style="margin-left:8px;background:#06222c;border-color:#00b8e6;color:#00b8e6">UncleRank ›</button></nav></div>
 <div class="wrap" id="view-studio">
   <div class="col">
     <div class="sec"><h2>1 · Merk</h2><div class="seg" id="brands"></div></div>
@@ -455,6 +455,7 @@ $('#tab-social').onclick=()=>showView('social');
 $('#tab-plan').onclick=()=>showView('plan');
 $('#tab-car').onclick=()=>showView('car');
 $('#tab-umma').onclick=()=>{location.href='/channels';};   // aparte Umma-studio (eigen pagina), geen sectie-wissel
+$('#tab-ur').onclick=()=>{location.href='/unclerank';};    // UncleRank-sectie (eigen pagina)
 
 // ---- Carrousel-tab: before/after per taal -> keuren -> posten naar IG + FB ----
 const car={loaded:false,data:null};
