@@ -441,8 +441,6 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/engine.html"))); return; }
     // TWEEDE STUDIO — Umma United scène-editor (eigen pagina, los van de tegel-studio).
     if (u.pathname === "/channels") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/channel.html"))); return; }
-    if (u.pathname === "/unclerank") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/unclerank.html"))); return; }
-    if (u.pathname === "/unclerank-ads") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(await fs.readFile(path.resolve(ROOT, "studio/unclerank-ads.html"))); return; }
     if (u.pathname.startsWith("/out/")) {
       const f = path.resolve(OUT, decodeURIComponent(u.pathname.slice(5)));
       if (!f.startsWith(OUT)) { res.writeHead(403); res.end("nee"); return; }   // geen pad-uitbraak
