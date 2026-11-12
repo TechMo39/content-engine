@@ -540,53 +540,41 @@ def main():
             own_prefix = "assets/channels/" + args.channel + "/video/" + args.story + "/"
             if cur and own_prefix in cur and not args.force:
                 n_skip += 1; continue
-            # HERGEBRUIK: staat het beeld voor deze beat al op schijf (s<NN>b<bi+1>.<ext>)? Dan koppelen
-            # we dat terug ZONDER iets te downloaden. De tijdlijn was vers/leeg, maar de bestanden staan
-            # er nog; zo herstellen we de koppeling op naam i.p.v. nieuw te zoeken. Alleen als er echt
-            # geen bestand is (of --force), gaan we daaronder pas zoeken.
+            # HERGEBRUIK op naam: staan de kandidaten (of een oud enkel bestand) al op schijf? Dan
+            # koppelen we terug ZONDER te downloaden. Voorkeur voor __c1 (de 3-kandidaten-opzet),
+            # anders het oude enkele bestand s<NN>b<bi+1>.<ext>. Alleen echt niets -> hieronder zoeken.
             if not args.force:
                 base = f"s{num:02d}b{bi+1}"
                 found = None
                 for ext in (".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp"):
-                    cand = os.path.join(outdir, base + ext)
-                    if os.path.exists(cand):
-                        found = (base + ext, ext); break
+                    if os.path.exists(os.path.join(outdir, base + "__c1" + ext)):
+                        found = (base + "__c1" + ext, ext); break
+                if not found:
+                    for ext in (".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp"):
+                        if os.path.exists(os.path.join(outdir, base + ext)):
+                            found = (base + ext, ext); break
                 if found:
                     fname, ext = found
                     rel = "assets/channels/" + args.channel + "/video/" + args.story + "/" + fname
                     isv = ext.lower() in (".mp4", ".webm")
                     beat["vid" if isv else "img"] = rel
                     beat.pop("img" if isv else "vid", None)
-                    print(f"scene {num} beat {bi+1}: hergebruik {fname} ({'video' if isv else 'foto'})")
+                    print(f"scene {num} beat {bi+1}: hergebruik {fname}")
                     n_skip += 1; continue
-            print(f"scene {num} beat {bi+1}: zoek '{query}' ({kind})")
-            hit = None; is_video = False
-            # 'video'-beat + sleutel -> eerst video proberen (lang genoeg voor de beat)
-            if kind == "video" and have_video:
-                hit = search_video(query, keys, min_dur=max(4, int(beat.get("dur", 0))))
-                if hit:
-                    is_video = True
-            if not hit:  # foto-terugval (ook voor video-beats zonder sleutel of zonder treffer)
-                hit = search_image(query)
-            if not hit:
+            # 3 KANDIDATEN METEEN: haal per blok 3 clips/foto's op (__c1/__c2/__c3) en zet __c1 als
+            # standaard op de beat. Zo ziet de studio direct 3 keuzes zonder nog live te zoeken.
+            print(f"scene {num} beat {bi+1}: zoek 3 kandidaten '{query}' ({kind})")
+            res = fetch_candidates(tl, num, bi, keys, outdir, args.story, args.channel, 3, args.root)
+            if not res:
                 print("    niets bruikbaars gevonden -> laat leeg (zoek jij zelf)"); n_fail += 1; time.sleep(0.5); continue
-            ext = hit.get("ext") or ext_for(hit.get("mime", ""))
-            fname = f"s{num:02d}b{bi+1}{ext}"
-            fpath = os.path.join(outdir, fname)
-            try:
-                data = _get(hit["url"])
-                with open(fpath, "wb") as f: f.write(data)
-            except Exception as e:
-                print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(0.5); continue
-            if is_video and normalize_video(fpath, args.root):
-                print("    genormaliseerd -> max 1080p30 (app-afspeelbaar)")
-            rel = "assets/channels/" + args.channel + "/video/" + args.story + "/" + fname
-            beat["vid" if is_video else "img"] = rel
-            beat.pop("img" if is_video else "vid", None)  # oude tegenpool opruimen
-            credits.append(f"scene {num} beat {bi+1}: {hit.get('title','')} | {hit['license']} | {hit['credit']}")
-            print(f"    -> {fname}  ({'video' if is_video else 'foto'}, {hit['license']})")
+            c1 = res[0]
+            isv = c1["kind"] == "vid"
+            beat["vid" if isv else "img"] = "assets/channels/" + args.channel + "/video/" + c1["file"]
+            beat.pop("img" if isv else "vid", None)
+            for c in res:
+                credits.append(f"scene {num} beat {bi+1}: {c.get('file','')} | {c.get('license','')} | {c.get('credit','')}")
+            print(f"    -> {len(res)} kandidaten klaar, standaard: {c1['file'].split('/')[-1]} ({'video' if isv else 'foto'})")
             n_done += 1
-            time.sleep(1.3)  # beleefd tegen de API's (voorkomt de 429-snelheidslimiet)
 
     # getekende kaarten (Rome / twee rijken / kolonisatie) in de tijdlijn zetten
     apply_kaart(tl)

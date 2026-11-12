@@ -80,6 +80,12 @@
  .beattools button{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:12.5px}
  .beattools button.del{border-color:var(--sfx);color:#ffd2da}
  .beattools.none{opacity:.55}
+ .btcands{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;align-items:center}
+ .btcands .cnd{width:96px;height:64px;border:2px solid var(--line);border-radius:7px;overflow:hidden;cursor:pointer;background:#0b0f18;flex:none}
+ .btcands .cnd img{width:100%;height:100%;object-fit:cover;display:block}
+ .btcands .cnd:hover{border-color:var(--beeld)}
+ .btcands .cnd.on{border-color:var(--beeld);box-shadow:0 0 0 2px var(--beeld)}
+ .btcands .cndhint{color:var(--mut);font-size:11.5px}
  .picker{position:fixed;inset:0;background:rgba(6,9,14,.82);z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
  .picker.on{display:flex}
  .picker .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:760px;width:100%;max-height:82vh;overflow:auto;padding:16px}
@@ -140,11 +146,12 @@
   <div class="beattools none" id="beattools">
    <div class="bt-t" id="bt-t">Klik op een beeldblok hierboven om het te kiezen.</div>
    <div class="row">
-    <button id="bt-cand">🔎 Zoek 3 kandidaten</button>
+    <button id="bt-cand">🔎 Zoek opnieuw (3)</button>
     <button id="bt-pick">📁 Kies uit opgehaald beeld</button>
     <button id="bt-upload">⬆ Eigen beeld uploaden</button>
     <button class="del" id="bt-del">🗑 Beeld weghalen</button>
    </div>
+   <div class="btcands" id="bt-cands"></div>
   </div>
   <div class="rendermsg" id="rendermsg"></div>
   <video id="rendervid" controls></video>
@@ -446,7 +453,7 @@ $('apphead').addEventListener('click',()=>{appOpen=!appOpen;placeApproval();});
 
 // ---- beeld per beat: kiezen / uploaden / weghalen -------------------------------------------
 function ensureBM(si,bi){const s=SC[si];if(!s.beatMedia)s.beatMedia=[];while(s.beatMedia.length<=bi)s.beatMedia.push({img:'',vid:''});if(!s.beatMedia[bi])s.beatMedia[bi]={img:'',vid:''};return s.beatMedia[bi];}
-function selectBeat(si,bi){selBeat={si,bi};renderBeatTools();layout();}
+function selectBeat(si,bi){selBeat={si,bi};renderBeatTools();loadCachedCands();layout();}
 function renderBeatTools(){const box=$('beattools'),tt=$('bt-t');
  if(!selBeat){box.classList.add('none');tt.innerHTML='Klik op een beeldblok hierboven om het te kiezen.';return;}
  box.classList.remove('none');const s=SC[selBeat.si],b=beatsOf(s)[selBeat.bi]||{};
@@ -475,28 +482,45 @@ $('pick-close').addEventListener('click',closePicker);
 $('picker').addEventListener('click',e=>{if(e.target.id==='picker')closePicker();});
 // ---- 3 kandidaten zoeken + verplicht kiezen (volledig vanuit de studio, geen commandoregel) ---
 $('bt-cand').addEventListener('click',searchCandidates);
+// DIRECT (geen live zoeken): toon de 3 die de batch al klaarzette (__c1/2/3). Draait bij elke
+// blok-selectie; staan er nog geen, dan een hint. Zo zie je meteen 3 keuzes zonder te wachten.
+async function loadCachedCands(){
+ const box=$('bt-cands'); if(!box) return; box.innerHTML='';
+ if(!selBeat) return;
+ const s=SC[selBeat.si],b=beatsOf(s)[selBeat.bi]||{};
+ if(isDrawnLabel(b.label)) return;
+ try{
+  const r=await fetch('/api/channel-beeld-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,beat:selBeat.bi,cached:1})});
+  const d=await r.json();
+  if(d&&Array.isArray(d.candidates)&&d.candidates.length) renderCands(d.candidates);
+  else box.innerHTML='<span class="cndhint">nog geen kandidaten klaar — draai de beeld-batch, of klik “Zoek opnieuw”.</span>';
+ }catch(e){ box.innerHTML='<span class="cndhint">engine niet bereikbaar.</span>'; }
+}
+// LIVE opnieuw zoeken (verse download) als de 3 niet bevallen.
 async function searchCandidates(){
  if(!selBeat){alert('Kies eerst een beeldblok.');return;}
  const s=SC[selBeat.si],b=beatsOf(s)[selBeat.bi]||{};
  if(isDrawnLabel(b.label)){alert('Dit blok tekent de engine zelf — geen beeld nodig.');return;}
  const btn=$('bt-cand'),old=btn.textContent;btn.disabled=true;btn.textContent='🔎 zoeken…';
- $('rendermsg').textContent='3 kandidaten zoeken voor scène '+s.scene+' · beeld '+(selBeat.bi+1)+' …';
+ $('bt-cands').innerHTML='<span class="cndhint">verse 3 ophalen…</span>';
  try{
-  const r=await fetch('/api/channel-beeld-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,beat:selBeat.bi})});
+  const r=await fetch('/api/channel-beeld-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,beat:selBeat.bi,fresh:1})});
   const d=await r.json();
-  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('rendermsg').textContent='geen kandidaten gevonden — probeer uploaden of pas de zoekterm in het script aan.';return;}
-  openCandidates(d.candidates);$('rendermsg').textContent='';
- }catch(e){$('rendermsg').textContent='zoeken mislukt (engine aan?): '+e;}
+  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('bt-cands').innerHTML='<span class="cndhint">geen kandidaten gevonden — upload zelf of pas de zoekterm aan.</span>';return;}
+  renderCands(d.candidates);
+ }catch(e){$('bt-cands').innerHTML='<span class="cndhint">zoeken mislukt (engine aan?).</span>';}
  finally{btn.disabled=false;btn.textContent=old;}
 }
-function openCandidates(cands){
- const g=$('pick-grid');g.innerHTML='';const s=SC[selBeat.si];
- $('pick-title').textContent='Kies 1 van '+cands.length+' — scène '+s.scene+' · beeld '+(selBeat.bi+1)+' ('+((beatsOf(s)[selBeat.bi]||{}).label||'')+')';
- cands.forEach(c=>{const f=c.file,isV=c.kind==='vid';const it=document.createElement('div');it.className='it';
-  it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+(isV?'video':'foto')+(c.credit?' · '+c.credit:'')+'</div>';
-  it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/channels/'+CHANNEL+'/video/'+f,c.kind);closePicker();$('rendermsg').textContent='gekozen ✓ — vergeet niet op te slaan.';});
-  g.appendChild(it);});
- $('picker').classList.add('on');
+// De 3 inline tonen; de gekozene krijgt een rand. Klik = die wordt het beeld voor dit blok.
+function renderCands(cands){
+ const box=$('bt-cands'); if(!box||!selBeat) return; box.innerHTML='';
+ const cur=beatsOf(SC[selBeat.si])[selBeat.bi]||{}; const curName=((cur.vid||cur.img||'').split('/').pop());
+ cands.forEach(c=>{const f=c.file,isV=c.kind==='vid';const rel='assets/channels/'+CHANNEL+'/video/'+f;
+  const d=document.createElement('div');d.className='cnd'+(curName && curName===f.split('/').pop()?' on':'');
+  d.title=(isV?'video':'foto')+(c.credit?' · '+c.credit:'');
+  d.innerHTML=isV?'<img loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">';
+  d.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,rel,c.kind);renderCands(cands);$('rendermsg').textContent='gekozen ✓ — vergeet niet op te slaan.';});
+  box.appendChild(d);});
 }
 // lege beats automatisch koppelen aan al opgehaalde bestanden (s01b1.jpg -> scène 1, beat 1)
 function autoHeal(){let n=0;SC.forEach((s,si)=>{

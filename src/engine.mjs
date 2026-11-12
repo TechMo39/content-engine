@@ -687,6 +687,21 @@ const server = http.createServer(async (req, res) => {
       const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
       const scene = parseInt(bd.scene, 10), beat = parseInt(bd.beat, 10);
       if (!story || !Number.isInteger(scene) || !Number.isInteger(beat)) { json(res, { error: "story/scene/beat vereist" }, 400); return; }
+      // EERST OP SCHIJF KIJKEN: de batch zet per blok al __c1/__c2/__c3 klaar. Staan die er, geef ze
+      // DIRECT terug (geen wachttijd, geen live zoekopdracht). Alleen als er niets staat (en de klant
+      // niet 'cached'-only vroeg) draaien we de python-kandidaten-zoektocht.
+      // fresh=1 -> altijd verse download (schijf overslaan). Anders eerst de klaargezette __c1/2/3.
+      if (!bd.fresh) {
+        const vdir = path.resolve(ROOT, "assets/channels", CH, "video", story);
+        const cbase = "s" + String(scene).padStart(2, "0") + "b" + (beat + 1) + "__c";
+        let staged = [];
+        try {
+          const files = (await fs.readdir(vdir)).filter((f) => f.startsWith(cbase)).sort();
+          staged = files.map((f) => ({ file: story + "/" + f, kind: /\.(mp4|webm)$/i.test(f) ? "vid" : "img" }));
+        } catch {}
+        if (staged.length) { json(res, { candidates: staged, cached: true }); return; }
+        if (bd.cached) { json(res, { candidates: [], cached: true }); return; }   // alleen-cache: niet live zoeken
+      }
       const py = process.platform === "win32" ? "python" : "python3";
       const a = ["tools/channel_beeld.py", "--channel", CH, "--story", story, "--voice", voice,
                  "--candidates", "3", "--only", String(scene), "--beat", String(beat)];
