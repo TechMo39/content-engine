@@ -527,10 +527,10 @@ STORIES["sword"]["map"] = [
   (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["sword"]["scenes"]
 ]
 
-def build_story(story_id, voice, root, only=0, fmt="16:9"):
+def build_story(story_id, voice, root, channel="channel1", only=0, fmt="16:9"):
     story = STORIES[story_id]
     model = VOICES[voice]
-    outdir = os.path.join(root, "assets", "channels", args.channel, "voice", story_id, voice)
+    outdir = os.path.join(root, "assets", "channels", channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
     durs = {}   # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
@@ -690,7 +690,7 @@ def main():
             print("onbekend verhaal:", sid); continue
         for voice in voices:
             print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) · FORMAAT: {args.fmt} ===")
-            build_story(sid, voice, args.root, args.only, args.fmt)
+            build_story(sid, voice, args.root, args.channel, args.only, args.fmt)
 
     # synthesizers netjes afsluiten
     for synth in _SYNTH_CACHE.values():
