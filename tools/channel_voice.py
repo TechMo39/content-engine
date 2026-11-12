@@ -76,6 +76,18 @@ TONE = {
     "outro":  dict(speed=0.77, sil=0.80),   # afsluiter, met lucht
 }
 
+# --- PAUZES TUSSEN ZINNEN --------------------------------------------------------------------
+# Twee niveaus. (a) BASIS-pauze tussen ALLE zinnen (BASE_PAUSE, seconden) — iets ruimer dan
+# Kokoro's natuurlijke adem, zodat de kijker kan nadenken. (b) EXTRA pauzes op gekozen momenten
+# via PAUSES_BY[story][scene][zin-index] = extra seconden BOVENOP de basis (richtwaarde 1.5-2.5s),
+# bv. direct na de grootste vraag. De zin-index is 0-gebaseerd BINNEN de scene. Een "base"-sleutel
+# per story overschrijft de globale basis voor dat verhaal. De script-kant vult dit per project;
+# standaard leeg = overal alleen de basis-pauze.
+BASE_PAUSE = 0.5
+PAUSES_BY = {
+    # "chose": {"base": 0.55, 6: {7: 2.0}},   # 0.55s basis + 2s extra na zin 7 in scene 6
+}
+
 # Kokoro-synthesizer wordt per (stem, snelheid) één keer opgezet (model laadt dan één keer per
 # combinatie). De snelheid zit in de SynthesisConfig, zodat de toon-per-scene echt doorwerkt.
 _SYNTH_CACHE = {}
@@ -170,6 +182,41 @@ def _synthesize(voice_model, text, speed, sil, out_wav):
             except Exception: pass
     if sil and sil > 0:
         _append_silence(out_wav, sil)
+
+def _synthesize_with_pauses(voice_model, voiceline, speed, base_pause, tail_sil, pauses_scene, out_wav):
+    # Spreekt elke zin APART in en zet ECHTE stilte ertussen: basis-pauze na elke zin + eventueel
+    # extra uit het PAUZE-plan (bv. 2s na de grootste vraag). Knipt nooit in woorden (de stilte is
+    # losse nul-samples tussen twee hele zin-opnames). Levert de EXACTE (start, duur) per zin BINNEN
+    # de scene-wav terug, plus speech_start/-_end — geen schatting meer, want we kennen elke lengte.
+    sents = _sentences(voiceline)
+    if not sents:
+        _synthesize(voice_model, to_phonetic(voiceline), speed, tail_sil, out_wav)
+        return [], 0.0, round(_wav_duration(out_wav), 3)
+    parts, segs = [], []
+    cursor = 0.0
+    N = len(sents)
+    for i, sent in enumerate(sents):
+        tmp = f"{out_wav}.s{i:02d}.wav"
+        _synthesize(voice_model, to_phonetic(sent), speed, 0.0, tmp)   # pure spraak, geen staart
+        sdur = _wav_duration(tmp)
+        segs.append((round(cursor, 3), round(sdur, 3)))
+        # pauze NA deze zin: de laatste zin krijgt de scene-staart-stilte, de rest basis (+ extra)
+        if i < N - 1:
+            extra = pauses_scene.get(i, pauses_scene.get(str(i), 0.0)) or 0.0
+            pause = base_pause + float(extra)
+        else:
+            pause = tail_sil
+        if pause and pause > 0:
+            _append_silence(tmp, pause)
+        parts.append(tmp)
+        cursor += sdur + pause
+    _concat_wavs(parts, out_wav)
+    for p in parts:
+        try: os.remove(p)
+        except Exception: pass
+    sp0 = segs[0][0]
+    sp1 = round(segs[-1][0] + segs[-1][1], 3)   # eind van de laatste spraak (vóór de staart-stilte)
+    return segs, sp0, sp1
 
 # ---------------------------------------------------------------------------------------------
 # PER-ZIN-MEETROOSTER (fase 1). De scene wordt als EEN vloeiende alinea ingesproken (intonatie
@@ -493,23 +540,24 @@ def build_story(story_id, voice, root, only=0, fmt="16:9"):
             continue
         t = TONE[tone]
         wav = os.path.join(outdir, f"{num:02d}.wav")
+        # PAUZES: elke zin apart inspreken en ECHTE stilte ertussen zetten (basis + extra per plan),
+        # zodat de stem niet raast en de climax landt. De zin-tijden zijn hierdoor EXACT bekend
+        # (geen schatting meer), wat de ondertitel + het beeld strakker op de stem zet.
+        pauses_scene = PAUSES_BY.get(story_id, {}).get(num, {})
+        base_pause = PAUSES_BY.get(story_id, {}).get("base", BASE_PAUSE)
         try:
-            _synthesize(model, to_phonetic(voiceline), t["speed"], t["sil"], wav)
+            segs, sp0, sp1 = _synthesize_with_pauses(
+                model, voiceline, t["speed"], base_pause, t["sil"], pauses_scene, wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
-        # INTRO: stilte VOORAAN zodat het logo eerst rustig in beeld staat voordat de stem begint
-        # (geen gelijk-op-seconde-1-praten). De zin-meting hieronder meet op de verschoven wav, dus
-        # speech_start schuift mee en de ondertiteling blijft op tijd.
+        # INTRO: stilte VOORAAN zodat het logo eerst rustig in beeld staat voordat de stem begint.
+        # De zin-tijden schuiven mee, zodat de ondertiteling op tijd blijft.
         if tone == "intro":
             _prepend_silence(wav, LEAD_SILENCE)
+            segs = [(round(st + LEAD_SILENCE, 3), dd) for (st, dd) in segs]
+            sp0 = round(sp0 + LEAD_SILENCE, 3); sp1 = round(sp1 + LEAD_SILENCE, 3)
         d = _wav_duration(wav)
         durs[num] = d
-        # knip de vloeiende alinea in zinnen met exacte tijden (ruggengraat voor ondertitel + beeld)
-        try:
-            segs, sp0, sp1 = split_sentences(wav, voiceline)
-        except Exception as e:
-            segs, sp0, sp1 = None, 0.0, d
-            print(f"  scene {num}: zin-knip overgeslagen ({e})")
         sents_by[num] = (segs, sp0, sp1)
         nz = len(segs) if segs else 0
         made.append((num, wav)); print(f"  scene {num:02d} [{tone}] {d:6.2f}s, {nz} zin(nen) -> {wav}")

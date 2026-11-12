@@ -5,12 +5,46 @@
   "title": "The Answer You Never Chose",
   "total_seconds": 639.325,
   "total_mmss": "10:39",
+  "music": [
+    {
+      "start": 0,
+      "end": 128.525,
+      "file": "assets/channels/channel1/muziek/umma-opening.mp3",
+      "mood": "opening"
+    },
+    {
+      "start": 128.525,
+      "end": 194.15,
+      "file": "assets/channels/channel1/muziek/umma-dark.mp3",
+      "mood": "dark"
+    },
+    {
+      "start": 194.15,
+      "end": 363.275,
+      "file": "assets/channels/channel1/muziek/umma-hope.mp3",
+      "mood": "hope"
+    },
+    {
+      "start": 363.275,
+      "end": 451.75,
+      "file": "assets/channels/channel1/muziek/umma-tension.mp3",
+      "mood": "tension"
+    },
+    {
+      "start": 451.75,
+      "end": 589.35,
+      "file": "assets/channels/channel1/muziek/umma-triumph.mp3",
+      "mood": "triumph"
+    }
+  ],
+  "groups": {},
+  "approved": [],
   "scenes": [
     {
       "scene": 0,
       "tone": "intro",
       "wav": "assets/channels/channel1/voice/chose/man/00.wav",
-      "start": 0.0,
+      "start": 0,
       "dur": 50.075,
       "speech_start": 3.34,
       "speech_end": 48.76,
@@ -132,7 +166,7 @@
       "start": 50.075,
       "dur": 37.125,
       "speech_start": 0.36,
-      "speech_end": 36.0,
+      "speech_end": 36,
       "sentences": [
         {
           "i": 0,
@@ -145,7 +179,7 @@
           "i": 1,
           "text": "Operate on you without first checking who they are.",
           "start": 4.643,
-          "dur": 3.744,
+          "dur": 3.745,
           "abs_start": 54.718
         },
         {
@@ -203,24 +237,27 @@
           "start": 0.36,
           "dur": 8.028,
           "label": "de chirurg / geen vreemde opereert",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s01b1.mp4"
         },
         {
           "start": 8.388,
           "dur": 18.83,
           "label": "de reviews → de grootste vraag",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s01b2.mp4"
         },
         {
           "start": 27.218,
           "dur": 8.782,
           "label": "dus: laten we kijken",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s01b3.mp4"
         }
       ],
       "sfx": [
         {
-          "t": 36.0,
+          "t": 36,
           "name": "end",
           "file": "assets/channels/channel1/sfx/s01_end.mp3"
         }
@@ -288,7 +325,7 @@
           "i": 7,
           "text": "You reason.",
           "start": 24.218,
-          "dur": 1.016,
+          "dur": 1.017,
           "abs_start": 111.418
         },
         {
@@ -302,7 +339,7 @@
           "i": 9,
           "text": "A dog is a wonderful thing.",
           "start": 26.251,
-          "dur": 2.319,
+          "dur": 2.32,
           "abs_start": 113.451
         },
         {
@@ -316,7 +353,7 @@
           "i": 11,
           "text": "No other creature on this earth does that.",
           "start": 34.539,
-          "dur": 2.841,
+          "dur": 2.84,
           "abs_start": 121.739
         },
         {
@@ -332,18 +369,21 @@
           "start": 0.32,
           "dur": 14.3,
           "label": "de vogel: ingebouwd programma",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s02b1.mp4"
         },
         {
           "start": 14.62,
           "dur": 11.631,
           "label": "jij weegt, redeneert, kiest",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s02b2.mp4"
         },
         {
           "start": 26.251,
           "dur": 13.969,
           "label": "de hond vraagt nooit waarom",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s02b3.mp4"
         }
       ],
@@ -406,12 +446,14 @@
           "start": 0.34,
           "dur": 7.059,
           "label": "een blik op de lucht, een jas",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s03b1.mp4"
         },
         {
           "start": 7.399,
           "dur": 14.721,
           "label": "duizend keuzes per dag",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s03b2.mp4"
         }
       ],
@@ -488,18 +530,21 @@
           "start": 0.36,
           "dur": 7.263,
           "label": "de pijn die niet weggaat",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s04b1.mp4"
         },
         {
           "start": 7.623,
           "dur": 17.299,
           "label": "je gaat naar wie het wél weet",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s04b2.mp4"
         },
         {
           "start": 24.922,
           "dur": 16.098,
           "label": "je eigen grens zien = rationeel",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s04b3.mp4"
         }
       ],
@@ -582,18 +627,21 @@
           "start": 0.34,
           "dur": 7.79,
           "label": "de rechtszaak: de wet",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s05b1.mp4"
         },
         {
           "start": 8.13,
           "dur": 11.922,
           "label": "de brug, jaren doorgerekend",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s05b2.mp4"
         },
         {
           "start": 20.052,
           "dur": 14.008,
           "label": "de medicijndoos → eerst weten",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s05b3.mp4"
         }
       ],
@@ -632,7 +680,7 @@
           "i": 2,
           "text": "And it is not a small one.",
           "start": 6.545,
-          "dur": 2.06,
+          "dur": 2.059,
           "abs_start": 235.82
         },
         {
@@ -704,18 +752,21 @@
           "start": 0.34,
           "dur": 10.324,
           "label": "op één vraag gaat het licht uit",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s06b1.mp4"
         },
         {
           "start": 10.664,
           "dur": 10.115,
           "label": "groter dan alles: waarom ben je hier",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s06b2.mp4"
         },
         {
           "start": 20.779,
           "dur": 12.201,
           "label": "ze hebben gewoon een antwoord",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s06b3.mp4"
         }
       ],
@@ -799,12 +850,14 @@
           "start": 0.36,
           "dur": 12.366,
           "label": "ik had mijn antwoord ook",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s07b1.mp4"
         },
         {
           "start": 12.726,
           "dur": 21.494,
           "label": "de barst in de muur: nooit onderzocht",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s07b2.mp4"
         }
       ],
@@ -872,7 +925,7 @@
           "i": 7,
           "text": "Everyone leaned one way, and leaning with them was easier than standing alone.",
           "start": 34.008,
-          "dur": 5.89,
+          "dur": 5.889,
           "abs_start": 333.533
         },
         {
@@ -923,30 +976,35 @@
           "start": 0.34,
           "dur": 12.06,
           "label": "deur 1: thuis / je ouders",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s08b1.mp4"
         },
         {
           "start": 12.4,
           "dur": 9.582,
           "label": "deur 2: één moment",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s08b2.mp4"
         },
         {
           "start": 21.982,
           "dur": 9.588,
           "label": "deur 3: de mensen om je heen",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s08b3.mp4"
         },
         {
           "start": 31.57,
           "dur": 18.79,
           "label": "deur 4: de wereld / de schermen",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s08b4.mp4"
         },
         {
           "start": 50.36,
           "dur": 12.22,
           "label": "deur 5: de pijn",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s08b5.mp4"
         }
       ],
@@ -1000,7 +1058,7 @@
           "i": 5,
           "text": "One swallowed it whole.",
           "start": 20.238,
-          "dur": 1.959,
+          "dur": 1.958,
           "abs_start": 383.513
         },
         {
@@ -1023,12 +1081,14 @@
           "start": 0.34,
           "dur": 8.998,
           "label": "vijf deuren: vier van buiten, één duwt weg",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s09b1.mp4"
         },
         {
           "start": 9.338,
           "dur": 18.762,
           "label": "en beiden zeker dat ze kozen",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s09b2.mp4"
         }
       ],
@@ -1167,24 +1227,28 @@
           "start": 0.34,
           "dur": 14.052,
           "label": "'ik ben nu volwassen' (spiegel)",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s10b1.mp4"
         },
         {
           "start": 14.392,
           "dur": 12.816,
           "label": "verweven met wie je bent",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s10b2.mp4"
         },
         {
           "start": 27.208,
           "dur": 9.382,
           "label": "je verdedigt het i.p.v. te toetsen",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s10b3.mp4"
         },
         {
           "start": 36.59,
           "dur": 20.97,
           "label": "de scherpste geest verdedigt het best",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s10b4.mp4"
         }
       ],
@@ -1303,18 +1367,21 @@
           "start": 0.34,
           "dur": 14.81,
           "label": "waarom denkt het denkende wezen niet?",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s11b1.mp4"
         },
         {
           "start": 15.15,
           "dur": 25.967,
           "label": "er lag al een antwoord klaar",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s11b2.mp4"
         },
         {
           "start": 41.117,
           "dur": 22.963,
           "label": "misschien een zesde deur",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s11b3.mp4"
         }
       ],
@@ -1361,7 +1428,7 @@
           "i": 4,
           "text": "Some do go back.",
           "start": 20.113,
-          "dur": 1.346,
+          "dur": 1.345,
           "abs_start": 537.413
         },
         {
@@ -1454,24 +1521,28 @@
           "start": 0.34,
           "dur": 16.01,
           "label": "hoe weet je of het waar is?",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s12b1.mp4"
         },
         {
           "start": 16.35,
           "dur": 15.88,
           "label": "sommigen gaan wél terug",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s12b2.mp4"
         },
         {
           "start": 32.23,
           "dur": 23.12,
           "label": "de stem: 'alles is maar mening'",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s12b3.mp4"
         },
         {
           "start": 55.35,
           "dur": 15.21,
           "label": "bestaat er blijvende waarheid? → video 2",
+          "img": "",
           "vid": "assets/channels/channel1/video/chose/s12b4.mp4"
         }
       ],
@@ -1567,39 +1638,6 @@
         }
       ],
       "sfx": []
-    }
-  ],
-  "groups": {},
-  "music": [
-    {
-      "start": 0.0,
-      "end": 128.525,
-      "file": "assets/channels/channel1/muziek/umma-opening.mp3",
-      "mood": "opening"
-    },
-    {
-      "start": 128.525,
-      "end": 194.15,
-      "file": "assets/channels/channel1/muziek/umma-dark.mp3",
-      "mood": "dark"
-    },
-    {
-      "start": 194.15,
-      "end": 363.275,
-      "file": "assets/channels/channel1/muziek/umma-hope.mp3",
-      "mood": "hope"
-    },
-    {
-      "start": 363.275,
-      "end": 451.75,
-      "file": "assets/channels/channel1/muziek/umma-tension.mp3",
-      "mood": "tension"
-    },
-    {
-      "start": 451.75,
-      "end": 589.35,
-      "file": "assets/channels/channel1/muziek/umma-triumph.mp3",
-      "mood": "triumph"
     }
   ]
 }
