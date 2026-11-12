@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UncleRank — Ads</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#121820;--panel2:#0e141b;--line:#223042;--ink:#e8eef5;--mut:#8aa0b5;
+        --accent:#c08cff;--accent2:#3a2b50;--green:#19c37d}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .top{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+       position:sticky;top:0;background:var(--bg);z-index:5}
+  .back{color:var(--mut);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:9px;padding:7px 12px}
+  .back:hover{color:var(--ink);border-color:var(--accent)}
+  .top h1{font-size:17px;margin:0;font-weight:700}
+  .top h1 small{color:var(--mut);font-weight:400;font-size:13px;margin-left:8px}
+  .wrap{max-width:820px;margin:0 auto;padding:22px}
+  .lead{color:var(--mut);font-size:14px;margin:0 0 18px;max-width:64ch}
+  .modes{display:flex;gap:8px;margin-bottom:12px}
+  .mode{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:11px;
+        padding:12px;font-size:14px;cursor:pointer;font-weight:700;text-align:center}
+  .mode:hover{color:var(--ink);border-color:var(--accent2)}
+  .mode.on{background:#1a1030;border-color:var(--accent);color:var(--accent)}
+  .mode small{display:block;font-weight:400;font-size:11.5px;color:var(--mut);margin-top:3px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .chip{background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-weight:600}
+  .chip.on{background:#1a1030;border-color:var(--accent);color:var(--accent)}
+  .gen{display:flex;gap:10px;align-items:center;margin-bottom:20px}
+  .gen button{background:var(--accent);border:0;color:#1a0b2e;font-weight:800;font-size:15px;border-radius:11px;padding:13px 22px;cursor:pointer}
+  .gen button:hover{filter:brightness(1.08)}
+  .gen .hint{color:var(--mut);font-size:12.5px}
+  .post{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;margin-bottom:14px}
+  .post .lbl{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+        color:var(--accent);background:#1a1030;border:1px solid var(--accent2);border-radius:6px;padding:3px 9px;margin-bottom:11px}
+  .post .body{white-space:pre-wrap;font-size:15px;line-height:1.6}
+  .post .visual{margin-top:10px;font-size:12.5px;color:var(--mut);border-left:2px solid var(--accent2);padding-left:10px}
+  .post .row{display:flex;gap:9px;margin-top:13px;border-top:1px solid var(--line);padding-top:12px}
+  .post .row button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .post .row button:hover{border-color:var(--accent)}
+  .post .row button.done{color:var(--green);border-color:var(--green)}
+  .empty{color:var(--mut);font-size:14px;padding:24px 0}
+</style>
+</head>
+<body>
+  <div class="top">
+    <a class="back" href="/">← content-engine</a>
+    <h1>UncleRank · Ads <small>IG · Facebook · TikTok — organisch + ads</small></h1>
+  </div>
+  <div class="wrap">
+    <p class="lead">Voor de ads-kant. Kies organisch of ad, klik genereer, en er staat korte, scroll-stoppende
+      tekst klaar om te kopiëren. Doelgroep: eigenaren van marketingbureaus. Toon: exclusief, scherp,
+      geen jargon. Plak de schermopname van het portaal erbij waar het beeld dat vraagt.</p>
+
+    <div class="modes">
+      <div class="mode on" data-mode="organic">Organisch<small>info-content, zacht, merk opbouwen</small></div>
+      <div class="mode" data-mode="ad">Ad<small>hook + CTA, naar de 7 gratis dagen</small></div>
+    </div>
+    <div class="gen">
+      <button id="btn-gen">Genereer 3</button>
+      <span class="hint" id="hint">Elke klik geeft andere teksten.</span>
+    </div>
+    <div id="out"><div class="empty">Nog niks gegenereerd — kies organisch of ad en klik genereer.</div></div>
+  </div>
+
+<script>
+// Ad-content voor UncleRank zelf op social, gericht op bureau-eigenaren. Twee soorten:
+//  - organisch: korte info-content die het merk opbouwt, zacht, pakt met schermopname van het portaal.
+//  - ad: hook -> spanning -> aanbod -> CTA naar de 7 gratis dagen. Scroll-stoppend, exclusief.
+// Opgebouwd uit dezelfde kern als de rest: de kring, de reden-om-te-bellen, de rekensom "1 klant betaalt je jaar".
+const DATA = {
+  organic: [
+   {t:`Most agencies cold-call from a list.\nThe best ones call from a reason.\n\nOne specific company. One specific gap. Measured this week. And for the next three weeks, nobody else in your field is calling them.\n\nThat's the whole difference.`,
+    v:'Beeld: schermopname van een dossier in het portaal (waarom nu + de vondst).'},
+   {t:`There's demand in every town that nobody is capturing.\n\nA few hundred people a month searching for what a local business does — and that business catches almost none of it.\n\nThe agency that shows the owner that number wins the call. We hand you the number.`,
+    v:'Beeld: schermopname van het markt-blok (zoekvraag vs wat het bedrijf pakt).'},
+   {t:`Stop fighting other agencies for the same leads.\n\nTrade them instead. Pass on the work that isn't yours, and warm leads in your own field come back — already half-sold.\n\nA circle beats a cold list. Every time.`,
+    v:'Beeld: de kringloop-animatie (jij geeft door → jij krijgt terug).'},
+   {t:`A list of businesses is free. Everyone has one.\n\nA reason to call is not.\n\nThat's what lands on your screen every morning: not names, but openings — measured, exclusive, ready.`,
+    v:'Beeld: schermopname van het dagscherm (handvol bedrijven met één regel waarom).'},
+  ],
+  ad: [
+   {t:`You're calling strangers who don't pick up.\nYour competitor is calling a business that's already expecting it.\n\nThe difference is a reason — a measured gap, exclusive to you for three weeks.\n\nUncleRank. Try it free for 7 days.`,
+    v:'Beeld: split — koude lijst vs één scherp dossier. CTA-knop: "7 dagen gratis".'},
+   {t:`Cold lists are dead.\nEvery agency has one. Most are free.\n\nWhat they don't have: this company, this gap, measured this week, exclusive to you.\n\nStop dialing blind. Start with UncleRank — 7 days free, nothing charged today.`,
+    v:'Beeld: schermopname van een dossier. CTA: "Start gratis".'},
+   {t:`The smartest agencies stopped competing and started trading leads.\n\nInside the circle, warm leads come to you — already half-sold by the agency that passed them.\nOutside it, you're still cold-calling.\n\nWhich side do you want to be on? First 7 days free.`,
+    v:'Beeld: de kringloop. CTA: "Kom in de kring — 7 dagen gratis".'},
+   {t:`What's one new client worth to you?\n\n€6.000 a year, on the low end.\nA dossier costs a few euros. One signed client pays your entire year — everything after that is profit.\n\nStart free. 7 days, no card charged today.`,
+    v:'Beeld: de rekensom (kosten abonnement → omzet 1 klant → winst). CTA: "7 dagen gratis".'},
+  ],
+};
+
+let mode = 'organic';
+
+function renderModes(){
+  document.querySelectorAll('.mode').forEach(m=>{
+    m.classList.toggle('on', m.dataset.mode===mode);
+    m.onclick=()=>{ mode=m.dataset.mode; renderModes(); };
+  });
+}
+
+function pick(arr,n){const c=arr.slice(),o=[];while(c.length&&o.length<n)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o;}
+
+function generate(){
+  const items = pick(DATA[mode], 3);
+  const out=document.getElementById('out'); out.innerHTML='';
+  items.forEach(p=>{
+    const card=document.createElement('div'); card.className='post';
+    const lbl=document.createElement('span'); lbl.className='lbl'; lbl.textContent = mode==='ad'?'Ad':'Organisch';
+    const body=document.createElement('div'); body.className='body'; body.textContent=p.t;
+    const vis=document.createElement('div'); vis.className='visual'; vis.textContent=p.v;
+    const row=document.createElement('div'); row.className='row';
+    const copy=document.createElement('button'); copy.textContent='Kopieer tekst';
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(p.t);copy.textContent='Gekopieerd ✓';copy.classList.add('done');
+      setTimeout(()=>{copy.textContent='Kopieer tekst';copy.classList.remove('done');},1600);}catch(e){copy.textContent='kopiëren mislukt';}};
+    row.appendChild(copy);
+    card.appendChild(lbl);card.appendChild(body);card.appendChild(vis);card.appendChild(row);
+    out.appendChild(card);
+  });
+}
+
+document.getElementById('btn-gen').onclick=generate;
+renderModes();
+</script>
+</body>
+</html>
