@@ -297,6 +297,121 @@ function buildVoorna({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
+// ---- TYPE: HOEHETWERKT — "Hoe het werkt" (3 stappen) --------------------------------------
+function buildHoehetwerkt({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
+  const cx = W / 2, fsH = Math.round(W * 0.056), fsN = Math.round(W * 0.06), fsR = Math.round(W * 0.04);
+  const steps = [
+    ["1", "Pick your trade", "SEO, SEA, web, content or ads."],
+    ["2", "Get your list", "Every morning, leads that fit you."],
+    ["3", "Call with a reason", "Their flaw, named. Not a cold name."],
+  ];
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.2, ["No lists.", "No scraping."], { fs: fsH, w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    const y0 = H * 0.36, rh = H * 0.16, x0 = W * 0.14;
+    steps.forEach((st, i) => {
+      const op = win(t, 2.2 + i * 2.0, 3.0 + i * 2.0);
+      if (op <= 0.001) return;
+      const y = y0 + i * rh;
+      s += `<circle cx="${x0}" cy="${y - fsN * 0.3}" r="${Math.round(fsN * 0.62)}" fill="none" stroke="${C.accent}" stroke-width="3" opacity="${op.toFixed(3)}"/>`;
+      s += tx(x0, y - fsN * 0.08, st[0], { fs: fsN, w: 800, fill: C.accent, op });
+      s += tx(x0 + W * 0.1, y - fsN * 0.18, st[1], { fs: fsR, w: 800, fill: C.ink, op, anchor: "start" });
+      s += tx(x0 + W * 0.1, y + fsR * 0.6, st[2], { fs: Math.round(fsR * 0.74), w: 500, fill: C.mut, op, anchor: "start" });
+    });
+    s += block(cx, H * 0.9, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.0, 12.0) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: BEZWAAR — "Is dit niet gewoon een lead-lijst?" ---------------------------------
+function buildBezwaar({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.26, ["“Isn't this just", "another lead list?”"], { fs: Math.round(W * 0.055), w: 600, fill: C.mut, op: win(t, 0.4, 1.4, 3.6, 4.4) });
+    s += tx(cx, H * 0.34, "No.", { fs: Math.round(W * 0.14), w: 800, fill: "#ffffff", op: win(t, 4.6, 5.6) });
+    const lines = [
+      ["Every lead comes with its flaw.", 7.0],
+      ["A reason to call — not a name.", 8.6],
+      ["3 weeks, yours alone.", 10.2],
+    ];
+    lines.forEach((l, i) => {
+      s += tx(cx, H * 0.52 + i * H * 0.08, l[0], { fs: Math.round(W * 0.042), w: 700, fill: i === 2 ? C.accent : C.ink, op: win(t, l[1], l[1] + 0.9) });
+    });
+    s += block(cx, H * 0.88, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: MANKEMENT — "Een naam is geen lead" (cyclus van gebreken) -----------------------
+function buildMankement({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
+  const cx = W / 2;
+  const flaws = ["Ranks on page 4.", "No ads in 8 months.", "A template site.", "A blog that died in 2022."];
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.24, ["A name is", "not a lead."], { fs: Math.round(W * 0.062), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    // elk gebrek apart in/uit, midden op het scherm
+    flaws.forEach((f, i) => {
+      const a = 2.6 + i * 1.7;
+      s += tx(cx, H * 0.5, f, { fs: Math.round(W * 0.056), w: 800, fill: C.accent, op: win(t, a, a + 0.5, a + 1.1, a + 1.6) });
+    });
+    s += block(cx, H * 0.72, ["Every one —", "a reason to call."], { fs: Math.round(W * 0.05), w: 800, fill: "#ffffff", op: win(t, 9.8, 10.8) });
+    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.5, 13.3) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: REKENSOM — "Wat kost een warme lead hier?" -------------------------------------
+function buildRekensom({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
+  const kostMnd = Number(opts.kostMnd) || 89;
+  const dossiers = Number(opts.dossiers) || 60;
+  const per = kostMnd / dossiers;
+  const cx = W / 2, fsBig = Math.round(W * 0.1);
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.24, ["What does a warm", "lead cost you here?"], { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    s += tx(cx, H * 0.44, eur(kostMnd) + " / month", { fs: fsBig, w: 800, fill: "#cdd9e6", op: win(t, 2.6, 3.6) });
+    s += tx(cx, H * 0.55, "÷ ~" + dossiers + " dossiers a month", { fs: Math.round(W * 0.04), w: 500, fill: C.mut, op: win(t, 4.4, 5.4) });
+    s += tx(cx, H * 0.68, "under " + eur(Math.ceil(per)) + " a lead", { fs: Math.round(W * 0.09), w: 800, fill: C.green, op: win(t, 6.6, 7.6) });
+    s += block(cx, H * 0.84, ["One call closes.", "The math is already done."], { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: win(t, 9.4, 10.4) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: GRATISWEEK — het aanbod / CTA --------------------------------------------------
+function buildGratisweek({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 12;
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.3, ["A week", "in the circle."], { fs: Math.round(W * 0.08), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    s += tx(cx, H * 0.5, "Free. No card today.", { fs: Math.round(W * 0.05), w: 700, fill: C.accent, op: win(t, 2.6, 3.6) });
+    s += block(cx, H * 0.62, ["See your leads", "before you pay a cent."], { fs: Math.round(W * 0.04), w: 500, fill: C.mut, op: win(t, 4.4, 5.4) });
+    // knop
+    const bOp = win(t, 6.8, 7.8);
+    if (bOp > 0.001) {
+      const bw = W * 0.62, bh = H * 0.082, bx = cx - bw / 2, by = H * 0.76;
+      s += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh * 0.3}" fill="${C.accent}" opacity="${bOp.toFixed(3)}"/>`;
+      s += tx(cx, by + bh * 0.66, "Start free →", { fs: Math.round(W * 0.045), w: 800, fill: "#04121c", op: bOp });
+    }
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
 export function makeBrand({ ROOT, config } = {}) {
   const branding = { navy: C.bg0, accent: C.accent };
   const templates = [
@@ -307,6 +422,11 @@ export function makeBrand({ ROOT, config } = {}) {
     { id: "bureaus", name: "Voor wie: 5 bureautypes", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "exclusief", name: "3 weken exclusief", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "voorna", name: "Koud vs warm (kring)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "hoehetwerkt", name: "Hoe het werkt (3 stappen)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "bezwaar", name: "Is dit niet gewoon een lijst?", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "mankement", name: "Een naam is geen lead", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "rekensom", name: "Wat kost een warme lead", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "gratisweek", name: "Gratis week (aanbod)", music: ["upbeat", "lofi", "calm"], defaults: {} },
   ];
   // De Studio wil een onderwerp kunnen kiezen; UncleRank is type-gedreven, dus één dummy-onderwerp.
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
@@ -376,6 +496,11 @@ export function makeBrand({ ROOT, config } = {}) {
     if (templateId === "bureaus") return buildBureaus({ opts, W, H });
     if (templateId === "exclusief") return buildExclusief({ opts, W, H });
     if (templateId === "voorna") return buildVoorna({ opts, W, H });
+    if (templateId === "hoehetwerkt") return buildHoehetwerkt({ opts, W, H });
+    if (templateId === "bezwaar") return buildBezwaar({ opts, W, H });
+    if (templateId === "mankement") return buildMankement({ opts, W, H });
+    if (templateId === "rekensom") return buildRekensom({ opts, W, H });
+    if (templateId === "gratisweek") return buildGratisweek({ opts, W, H });
     return buildRoi({ opts, W, H });
   }
   return {
