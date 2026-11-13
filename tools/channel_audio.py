@@ -36,16 +36,10 @@ MUSIC_QUERY = {
 }
 MUSIC_QUERY_DEFAULT = "cinematic emotional underscore ambient"
 
-# SFX op de kantelpunten van het verhaal (voor de batch). Gekoppeld aan de ZIN/scène-index; de
-# tool leest de gemeten starttijd uit de tijdlijn. In de studio kun je per punt opnieuw 3 ophalen.
-SFX = [
-    {"scene": 1,  "q": "cinematic orchestral impact hit"},
-    {"scene": 4,  "q": "deep cinematic drum hit"},
-    {"scene": 5,  "q": "epic orchestral stinger"},
-    {"scene": 9,  "q": "dark cinematic impact drum"},
-    {"scene": 12, "q": "emotional cinematic strings swell"},
-    {"scene": 16, "q": "triumphant orchestral swell"},
-]
+# SFX is VOLLEDIG studio-gestuurd. De batch plaatst GEEN effecten meer: de oude sword-lijst
+# (scène 1/4/5/9/12/16) zette ongevraagd orkest-dreunen in kalme video's. Je plaatst een punt in
+# de studio -> die roept de studio-modus hieronder aan voor 3 kandidaten. Deze standaard-zoekterm
+# blijft als fallback wanneer de studio geen eigen zoekterm meegeeft.
 SFX_Q_DEFAULT = "cinematic impact hit sub boom"
 
 # ---- Freesound-plumbing (ongewijzigd t.o.v. de werkende versie) ----------------------------
@@ -262,14 +256,13 @@ def main():
     by_num = {s.get("scene"): s for s in scenes}
     total = _total_seconds(tl)
     credits = []
-    n_mus = n_sfx = n_fail = 0
+    n_fail = 0
 
     # MUZIEK: één doorlopend bed onder de hele video. Haal 3 bedden op (c1 standaard). Reeds gekozen
     # bed NIET overschrijven: staat er al een tl["music"] met een bestaand bestand en geen --force,
     # dan laten we de keuze staan en stagen we alleen de kandidaten.
     beds = fetch_music_candidates(args.story, key, mdir, args.channel, 3, args.force)
     if beds:
-        n_mus = len([b for b in beds if "credit" in b])  # alleen vers-gedownloade tellen
         cur = (tl.get("music") or [{}])[0] if tl.get("music") else {}
         cur_file = (cur.get("file") or "").replace("\\", "/")
         cur_ok = bool(cur_file) and os.path.exists(os.path.join(args.root, *cur_file.split("/")))
@@ -286,36 +279,9 @@ def main():
     else:
         print("geen muziek-bed gevonden -> laat leeg", file=sys.stderr); n_fail += 1
 
-    # SFX op de kantelpunten: per punt 3 kandidaten (c1 standaard). Reeds gekozen effect op dat punt
-    # niet overschrijven (reuse). We plaatsen op het einde van de spraak binnen de scène.
-    for sx in SFX:
-        s = by_num.get(sx["scene"])
-        if not s:
-            continue
-        pid = f"s{sx['scene']:02d}_end"
-        t = round(float(s.get("speech_end", s.get("dur", 0))), 3)
-        existing = s.get("sfx") or []
-        chosen = next((f for f in existing if f.get("name") == "end" and f.get("file")), None)
-        chosen_ok = False
-        if chosen:
-            cf = (chosen.get("file") or "").replace("\\", "/")
-            chosen_ok = bool(cf) and os.path.exists(os.path.join(args.root, *cf.split("/")))
-        res = fetch_sfx_candidates(pid, sx["q"], key, sdir, args.channel, 3, args.force)
-        if not res:
-            print(f"scène {sx['scene']} sfx: niets gevonden", file=sys.stderr); n_fail += 1; continue
-        if chosen_ok and not args.force:
-            print(f"scène {sx['scene']} sfx @ {t:.1f}s: keuze blijft staan; {len(res)} kandidaten klaar")
-        else:
-            c1 = res[0]["file"]
-            rel = "assets/channels/" + args.channel + "/sfx/" + c1
-            others = [f for f in existing if f.get("name") != "end"]
-            others.append({"t": t, "name": "end", "file": rel, "q": sx["q"]})
-            s["sfx"] = others
-            print(f"scène {sx['scene']} sfx @ {t:.1f}s: standaard {c1}, {len(res)} kandidaten klaar")
-            n_sfx += 1
-        for c in res:
-            if "name" in c:
-                credits.append(f"sfx {pid}: {c.get('file','')} | {c.get('license','')} | {c.get('name','')} by {c.get('credit','')}")
+    # SFX: de batch plaatst GEEN effecten (volledig studio-gestuurd). s.sfx blijft onaangeroerd,
+    # zodat de kalme chose-video geen ongevraagde dreunen krijgt. Effecten plaats + kies je per punt
+    # in de studio (die roept de studio-modus '--candidates --what sfx' aan).
 
     with open(tlpath, "w", encoding="utf-8") as f:
         json.dump(tl, f, ensure_ascii=False, indent=2)
@@ -324,8 +290,8 @@ def main():
             f.write("\n".join(credits) + ("\n" if credits else ""))
     except Exception:
         pass
-    print(f"\nklaar: muziek-bed + {n_sfx} effecten gezet, {n_fail} niet gevonden.")
-    print("Open de studio: beluister de 3 muziekbedden en de 3 per SFX-punt, en zet je keuzes vast.")
+    print(f"\nklaar: muziek-bed gezet, {n_fail} niet gevonden.")
+    print("Open de studio: beluister de 3 muziekbedden en zet je keuze vast. SFX plaats + kies je per punt in de studio.")
 
 if __name__ == "__main__":
     main()
