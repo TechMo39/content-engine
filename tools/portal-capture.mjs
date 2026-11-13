@@ -51,9 +51,19 @@ const W     = Number(process.env.UR_W || 1080);
 const H     = Number(process.env.UR_H || 1920);
 const ffmpegBin = process.env.FFMPEG || "ffmpeg";
 
-// Bedrijfsnamen vervagen. Selectors van het UncleRank-portaal (vandaag.mjs: .kaart .naam,
-// dossier.mjs: .dkop h1, ui.mjs balk: .balk .naam). Overschrijfbaar via UR_BLUR.
-const BLUR_SEL = process.env.UR_BLUR || ".kaart .naam, .dkop h1, .balk .naam";
+// ALLE herleidbare bedrijfs-/contactdata vervagen (naam, telefoon, domein, e-mail), in de lijst
+// én het dossier. Selectors uit het UncleRank-portaal (vandaag.mjs / dossier.mjs / ui.mjs).
+// Branche en stad blijven (generiek, niet herleidbaar). Overschrijfbaar via UR_BLUR (komma-lijst).
+const BLUR_SEL = process.env.UR_BLUR || [
+  ".kaart .naam",                                // bedrijfsnaam in de lijst
+  ".kaart .onder .mono",                         // telefoon in de lijst
+  ".kaart .onder span:not(.mono):not(:has(b))",  // domein in de lijst (branche-span heeft <b>, blijft)
+  ".balk .naam",                                 // accountnaam in de balk
+  ".dkop h1",                                    // bedrijfsnaam in het dossier
+  ".bel a",                                      // telefoon + e-mail + domein in het dossier
+  "a[href^='mailto:']",                          // alle e-maillinks, overal
+  "a[href^='tel:']",                             // alle bel-links, overal
+].join(", ");
 // Doorklikken naar een dossier: de hele lead-kaart is een link (<a class="kaart" href="/dossier?…">).
 // Standaard aan; UR_OPEN_DOSSIER=0 zet het uit. De HOT lead herkennen we aan z'n label.
 const OPEN_DOSSIER = process.env.UR_OPEN_DOSSIER !== "0";
@@ -127,8 +137,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // BEDRIJFSNAMEN VERVAGEN + scrollbar weg, via init-script zodat het op ELKE pagina geldt
   // (de lijst én het dossier waar we naartoe klikken), vóór de eerste paint.
   await page.addInitScript((sel) => {
-    const css = sel + "{filter:blur(8px) !important;} "
-      + "::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none}";
+    // Elke selector krijgt z'n EIGEN regel: zo sloopt één niet-ondersteunde selector de rest niet,
+    // en blijft de blur staan ook als het portaal later iets aan de opmaak verandert.
+    const parts = String(sel).split(",").map((s) => s.trim()).filter(Boolean);
+    const css = parts.map((p) => p + "{filter:blur(9px) !important}").join(" ")
+      + " ::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none}";
     const add = () => { const s = document.createElement("style"); s.textContent = css; (document.head || document.documentElement).appendChild(s); };
     if (document.head) add(); else document.addEventListener("DOMContentLoaded", add);
   }, BLUR_SEL);
