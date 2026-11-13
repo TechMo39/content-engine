@@ -27,20 +27,22 @@ import argparse, os, sys, json, time, re, urllib.parse, urllib.request, urllib.e
 
 API = "https://freesound.org/apiv2"
 
-# MUZIEK-BED per verhaal: één zoekterm voor het doorlopende bed onder de hele video. We halen de
-# TOP-3 lange tracks op als kandidaten; jij kiest er één in de studio. Val terug op een nette
-# algemene term als het verhaal niet in de lijst staat.
-MUSIC_QUERY = {
-    "sword": "cinematic emotional documentary underscore",
-    "chose": "ambient contemplative cinematic piano underscore",
+# MUZIEK-BED per verhaal: zoektermen van passend naar breed. Freesound filtert HARD op CC0/CC-BY-
+# met-preview, dus één lange term (bv. "ambient contemplative cinematic piano underscore") geeft al
+# snel 0 treffers en een LEEG paneel. We proberen daarom meerdere termen en vullen altijd aan met
+# brede fallbacks tot we 3 kandidaten hebben.
+MUSIC_QUERIES = {
+    "sword": ["cinematic emotional underscore", "epic cinematic ambient", "dramatic orchestral"],
+    "chose": ["contemplative ambient piano", "calm cinematic ambient", "reflective piano"],
 }
-MUSIC_QUERY_DEFAULT = "cinematic emotional underscore ambient"
+MUSIC_FALLBACKS = ["cinematic ambient", "ambient underscore", "piano background", "soundtrack", "ambient", "cinematic"]
 
-# SFX is VOLLEDIG studio-gestuurd. De batch plaatst GEEN effecten meer: de oude sword-lijst
-# (scène 1/4/5/9/12/16) zette ongevraagd orkest-dreunen in kalme video's. Je plaatst een punt in
-# de studio -> die roept de studio-modus hieronder aan voor 3 kandidaten. Deze standaard-zoekterm
-# blijft als fallback wanneer de studio geen eigen zoekterm meegeeft.
-SFX_Q_DEFAULT = "cinematic impact hit sub boom"
+# SFX is VOLLEDIG studio-gestuurd. De batch plaatst GEEN effecten meer. Je plaatst een punt in de
+# studio -> die roept de studio-modus aan voor 3 kandidaten met jouw zoekterm. Geeft de studio geen
+# term, dan pakken we SFX_Q_DEFAULT; en we vullen altijd aan met brede fallbacks, zodat een smalle
+# term geen leeg paneel geeft (zelfde reden als bij muziek).
+SFX_Q_DEFAULT = "cinematic impact"
+SFX_FALLBACKS = ["impact hit", "cinematic boom", "whoosh transition", "sub drop", "hit", "swoosh"]
 
 # ---- Freesound-plumbing (ongewijzigd t.o.v. de werkende versie) ----------------------------
 
@@ -113,19 +115,29 @@ def _candidates(query, key):
                     "dur": r.get("duration", 0) or 0, "lic": lab})
     return out
 
-def search_cc0_many(query, key, n=3, prefer_long=False):
-    # Als de oude search_cc0, maar levert de TOP-N (voor de 3-kandidaten-keuze). Muziek = langste
-    # bedden (CC0 eerst); SFX = kortste effecten (CC0 eerst).
-    cands = _candidates(query, key)
-    if not cands:
+def _accumulate(queries, key, n, prefer_long=False):
+    # Probeer meerdere zoektermen op volgorde en verzamel bruikbare treffers (CC0/CC-BY met preview)
+    # tot we er genoeg hebben. Zo geeft een te smalle term geen leeg paneel: de bredere vangen 'm op.
+    pool, seen = [], set()
+    for q in queries:
+        if not q:
+            continue
+        for c in _candidates(q, key):
+            k = c.get("hq") or c.get("lq") or c.get("name")
+            if k in seen:
+                continue
+            seen.add(k); pool.append(c)
+        if len(pool) >= max(n * 3, n):   # genoeg om goed op lengte/licentie te sorteren
+            break
+    if not pool:
         return []
     if prefer_long:
-        fit = [c for c in cands if 20 <= c["dur"] <= 240] or cands
+        fit = [c for c in pool if 20 <= c["dur"] <= 240] or pool
         fit.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -min(c["dur"], 240)))
         for c in fit:
             c["url"] = c["lq"] or c["hq"]
         return fit[:n]
-    short = [c for c in cands if c["dur"] <= 15] or cands
+    short = [c for c in pool if c["dur"] <= 15] or pool
     short.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, c["dur"]))
     for c in short:
         c["url"] = c["hq"] or c["lq"]
@@ -162,10 +174,10 @@ def fetch_music_candidates(story, key, mdir, channel, n, force):
         ex = _staged(mdir, prefix)
         if ex:
             return [{"file": f} for f in ex[:max(n, len(ex))]]
-    query = MUSIC_QUERY.get(story, MUSIC_QUERY_DEFAULT)
-    hits = search_cc0_many(query, key, n, prefer_long=True)
+    queries = MUSIC_QUERIES.get(story, []) + MUSIC_FALLBACKS
+    hits = _accumulate(queries, key, n, prefer_long=True)
     if not hits:
-        print(f"    geen bruikbaar muziek-bed voor '{query}'", file=sys.stderr); return []
+        print("    geen bruikbaar muziek-bed gevonden", file=sys.stderr); return []
     out = []
     for k, hit in enumerate(hits[:n], start=1):
         fname = f"{prefix}__c{k}.mp3"; fpath = os.path.join(mdir, fname)
@@ -186,9 +198,10 @@ def fetch_sfx_candidates(pid, query, key, sdir, channel, n, force):
         ex = _staged(sdir, prefix)
         if ex:
             return [{"file": f} for f in ex[:max(n, len(ex))]]
-    hits = search_cc0_many(query or SFX_Q_DEFAULT, key, n, prefer_long=False)
+    queries = ([query] if query else [SFX_Q_DEFAULT]) + SFX_FALLBACKS
+    hits = _accumulate(queries, key, n, prefer_long=False)
     if not hits:
-        print(f"    geen bruikbaar effect voor '{query}'", file=sys.stderr); return []
+        print("    geen bruikbaar effect gevonden", file=sys.stderr); return []
     out = []
     for k, hit in enumerate(hits[:n], start=1):
         fname = f"{prefix}__c{k}.mp3"; fpath = os.path.join(sdir, fname)
@@ -229,7 +242,8 @@ def main():
         print("Geen Freesound-sleutel. Haal er gratis een op https://freesound.org/apiv2/apply en zet"
               " 'freesound' in tools/channel-keys.json. Dan draai je dit opnieuw.", file=sys.stderr)
         if args.candidates:
-            print("CANDIDATES_JSON:" + json.dumps({"candidates": []}))
+            print("CANDIDATES_JSON:" + json.dumps({"candidates": [],
+                  "reason": "Geen Freesound-sleutel. Zet 'freesound' in tools/channel-keys.json (gratis op freesound.org/apiv2/apply) en herstart de engine."}))
         return
 
     mdir = os.path.join(args.root, "assets", "channels", args.channel, "muziek")
@@ -244,7 +258,10 @@ def main():
             res = fetch_sfx_candidates(pid, args.q, key, sdir, args.channel, args.candidates, args.force)
         else:
             res = []
-        print("CANDIDATES_JSON:" + json.dumps({"candidates": res}))
+        out = {"candidates": res}
+        if not res:
+            out["reason"] = "Niets bruikbaars op Freesound gevonden (CC0/CC-BY). Probeer een andere/bredere zoekterm."
+        print("CANDIDATES_JSON:" + json.dumps(out))
         return
 
     # ---------- BATCH: muziek-bed (3) + sfx per kantelpunt (3), __c1 standaard ----------

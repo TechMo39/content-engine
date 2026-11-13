@@ -582,7 +582,7 @@ async function searchMusicCands(){ const btn=$('mt-cand'),old=btn.textContent;bt
  $('mt-cands').innerHTML='<span class="cndhint">verse 3 ophalen…</span>';
  try{ const r=await fetch('/api/channel-music-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,fresh:1})});
   const d=await r.json();
-  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('mt-cands').innerHTML='<span class="cndhint">geen bedden gevonden — of kies een eigen bestand.</span>';return;}
+  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('mt-cands').innerHTML='<span class="cndhint">'+((d&&d.reason)||'geen bedden gevonden — of kies een eigen bestand.')+'</span>';return;}
   renderAudioCands('mt-cands',d.candidates,'/api/channel-audio',curMusicName(),setMusicBed);
  }catch(e){$('mt-cands').innerHTML='<span class="cndhint">zoeken mislukt (engine aan?).</span>';}
  finally{btn.disabled=false;btn.textContent=old;} }
@@ -611,7 +611,7 @@ async function searchSfxCands(){ if(!selSfx){alert('Kies eerst een SFX-blok.');r
  const btn=$('sx-cand'),old=btn.textContent;btn.disabled=true;btn.textContent='🔎 zoeken…'; $('sx-cands').innerHTML='<span class="cndhint">verse 3 ophalen…</span>';
  try{ const r=await fetch('/api/channel-sfx-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,pid:pid,q:q,fresh:1})});
   const d=await r.json();
-  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('sx-cands').innerHTML='<span class="cndhint">geen geluiden gevonden — pas de zoekterm aan.</span>';return;}
+  if(!d||!Array.isArray(d.candidates)||!d.candidates.length){$('sx-cands').innerHTML='<span class="cndhint">'+((d&&d.reason)||'geen geluiden gevonden — pas de zoekterm aan.')+'</span>';return;}
   f.q=q||f.q; renderAudioCands('sx-cands',d.candidates,'/api/channel-sfx',f.file?bn(f.file):'',setSfxFile);
  }catch(e){$('sx-cands').innerHTML='<span class="cndhint">zoeken mislukt (engine aan?).</span>';}
  finally{btn.disabled=false;btn.textContent=old;} }

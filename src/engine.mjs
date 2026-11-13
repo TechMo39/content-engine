@@ -737,11 +737,11 @@ const server = http.createServer(async (req, res) => {
       const a = ["tools/channel_audio.py", "--channel", CH, "--story", story, "--voice", voice,
                  "--candidates", "3", "--what", "music"];
       execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 180000 }, (err, stdout, stderr) => {
-        let cands = [];
+        let cands = [], reason = "";
         const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("CANDIDATES_JSON:"));
-        if (line) { try { cands = (JSON.parse(line.slice("CANDIDATES_JSON:".length)).candidates) || []; } catch {} }
+        if (line) { try { const p = JSON.parse(line.slice("CANDIDATES_JSON:".length)); cands = p.candidates || []; reason = p.reason || ""; } catch {} }
         if (!cands.length && err) { json(res, { error: "zoeken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
-        json(res, { candidates: cands });
+        json(res, { candidates: cands, reason });
       });
       return;
     }
@@ -771,11 +771,11 @@ const server = http.createServer(async (req, res) => {
                  "--candidates", "3", "--what", "sfx", "--pid", pid, "--q", q || ""];
       if (Number.isInteger(scene)) a.push("--scene", String(scene));
       execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 180000 }, (err, stdout, stderr) => {
-        let cands = [];
+        let cands = [], reason = "";
         const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("CANDIDATES_JSON:"));
-        if (line) { try { cands = (JSON.parse(line.slice("CANDIDATES_JSON:".length)).candidates) || []; } catch {} }
+        if (line) { try { const p = JSON.parse(line.slice("CANDIDATES_JSON:".length)); cands = p.candidates || []; reason = p.reason || ""; } catch {} }
         if (!cands.length && err) { json(res, { error: "zoeken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
-        json(res, { candidates: cands });
+        json(res, { candidates: cands, reason });
       });
       return;
     }
