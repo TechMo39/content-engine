@@ -98,6 +98,7 @@
  .picker .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
  .picker .it{border:1px solid var(--line);border-radius:9px;overflow:hidden;cursor:pointer;background:#0b0f18}
  .picker .it:hover{border-color:var(--beeld)}
+ .picker .it.on{border-color:var(--beeld);box-shadow:0 0 0 2px var(--beeld)}
  .picker .it .th{width:100%;height:120px;object-fit:cover;display:block;background:#0b0f18}
  .picker .it .nm{font-size:10px;color:var(--mut);padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .picker .close{float:right;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
@@ -185,7 +186,7 @@
   </div>
  </div>
 </div>
-<div class="ovwrap"><div class="ovhead" id="ovhead"><span>📼 Overzicht — elke scène zoals hij in de video komt</span> <span class="cnt" id="ovcnt"></span><span class="sp"></span><button id="ov-refresh" title="opnieuw tekenen">↻ ververs</button> <span id="ovarrow">▾</span></div><div class="ovgrid" id="ovgrid"></div></div>
+<div class="ovwrap"><div class="ovhead" id="ovhead"><span>📼 Nog te kiezen — klik een beeld om de 3 te zien en te kiezen</span> <span class="cnt" id="ovcnt"></span><span class="sp"></span><button id="ov-refresh" title="opnieuw tekenen">↻ ververs</button> <span id="ovarrow">▾</span></div><div class="ovgrid" id="ovgrid"></div></div>
 <div class="approvedwrap"><div class="apphead" id="apphead"><span>Goedgekeurd</span> <span class="cnt" id="appcnt">0</span> <span id="apparrow">▸</span></div><div class="applist" id="applist"></div></div>
 <div class="scenes" id="scenes"></div>
 <div class="tip" id="tip"></div>
@@ -277,7 +278,7 @@ function beatsOf(s){const s0=(s.sentences&&s.sentences[0])?s.sentences[0].start:
 // bestandsnaam — anders toont de studio altijd het platte bestand van een ander verhaal.
 function mediaUrl(p){var s=String(p).replace(/^assets\/channels\/[^/]+\/video\//,'');return '/channel-media/'+s.split('/').map(encodeURIComponent).join('/')+'?channel='+CHANNEL;}
 function posterURL(v){return '/api/channel-poster?f='+encodeURIComponent(String(v).replace(/^assets\/channels\/[^/]+\/video\//,''))+'&channel='+CHANNEL;}
-function isDrawnLabel(l){return /getekend|tekst|kaart|CTA|logo/i.test(l||'');}
+function isDrawnLabel(l){return /getekend|tekst|kaart|cta|logo|merk|intro|outro/i.test(l||'');}
 function subsOf(s){if(!s.sentences||!s.sentences.length)return [];
  const starts=[s.sentences[0].start,...s.subBounds];const ends=[...s.subBounds,s.speech_end||s.dur];
  return s.sentences.map((se,i)=>({text:se.text,start:starts[i],end:ends[i]}));}
@@ -331,7 +332,7 @@ host.addEventListener('pointerdown',e=>{
  const sf=e.target.closest('.blk.sfx');
  if(sf&&sf.dataset.fi!==undefined){const ssi=+sf.dataset.si,sfi=+sf.dataset.fi;selectSfx(ssi,sfi);const ff=(SC[ssi].sfx||[])[sfi];stop();t=SC[ssi].start+(ff?(+ff.t||0):0);placePlayhead();return;}
  const bb=e.target.closest('.blk.beeld');
- if(bb&&bb.dataset.bi!==undefined){const bsi=+bb.dataset.si,bbi=+bb.dataset.bi;selectBeat(bsi,bbi);const bt=beatsOf(SC[bsi])[bbi];stop();t=SC[bsi].start+(bt?bt.start:0);placePlayhead();return;}
+ if(bb&&bb.dataset.bi!==undefined){const bsi=+bb.dataset.si,bbi=+bb.dataset.bi;selectBeat(bsi,bbi);const bt=beatsOf(SC[bsi])[bbi];stop();t=SC[bsi].start+(bt?bt.start:0);placePlayhead();openPicker(bsi,bbi);return;}
  stop();const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));t=s.start+local;placePlayhead();
 });
 function moveDrag(e){if(!drag)return;const{si,kind,bi,arr}=drag;const s=SC[si];const pps=ppsOf(si);
@@ -495,18 +496,39 @@ $('ld-beeld').addEventListener('change',async e=>{const f=e.target.files[0];e.ta
    const d=await res.json();if(d.path){MEDIA.push(d.file);setBeatMedia(si,bi,d.path,d.kind);$('rendermsg').textContent='beeld toegevoegd ✓';}
    else $('rendermsg').textContent='upload mislukt: '+(d.error||'?');}
  catch(err){$('rendermsg').textContent='upload mislukt (engine aan?)';}});
-$('bt-pick').addEventListener('click',()=>{if(!selBeat){alert('Kies eerst een beeldblok.');return;}openPicker();});
-function openPicker(){const g=$('pick-grid');g.innerHTML='';
- // ALLEEN de kandidaten van DEZE beat tonen, niet de hele fotobak. De bestanden heten
- // <story>/s<NN>b<X>__c1/2/3.<ext> (of het oude losse s<NN>b<X>.<ext>). We filteren op die beat.
- const s=SC[selBeat.si]; const pref=STORY+'/s'+String(s.scene).padStart(2,'0')+'b'+(selBeat.bi+1);
+$('bt-pick').addEventListener('click',()=>{if(!selBeat){alert('Kies eerst een beeldblok.');return;}openPicker(selBeat.si,selBeat.bi);});
+// DE KIEZER. Klik een beeld (tijdlijn of overzicht) -> deze popt op met ALLEEN de kandidaten van DIE
+// beat, plus "Zoek opnieuw" en uploaden. Getekende beats (intro/outro/kaart/tekst) kiezen niks.
+function openPicker(si,bi){
+ if(si!=null)selBeat={si,bi};
+ if(!selBeat)return;
+ const s=SC[selBeat.si],b=beatsOf(s)[selBeat.bi]||{};
+ const g=$('pick-grid');g.innerHTML='';
+ $('pick-title').textContent='Scène '+s.scene+' · beeld-beat '+(selBeat.bi+1)+(b.label?' — '+b.label:'');
+ if(isDrawnLabel(b.label)||s.tone==='intro'||s.tone==='outro'){
+  g.innerHTML='<div style="color:var(--mut);padding:6px 2px">Dit is een <b>getekend merk-beeld</b> (intro/outro/kaart/tekst). Hier kies je niks — de engine tekent dit zelf.</div>';
+  $('picker').classList.add('on');return;}
+ const bar=document.createElement('div');bar.style.cssText='grid-column:1/-1;display:flex;gap:8px;margin-bottom:2px';
+ bar.innerHTML='<button id="pk-fresh">🔎 Zoek opnieuw (3)</button><button id="pk-up">⬆ Eigen beeld uploaden</button>';
+ g.appendChild(bar);
+ const pref=STORY+'/s'+String(s.scene).padStart(2,'0')+'b'+(selBeat.bi+1);
  const list=MEDIA.filter(f=>f.startsWith(pref+'__')||f.startsWith(pref+'.'));
- $('pick-title').textContent='Kies een beeld voor scène '+s.scene+' · beeld-beat '+(selBeat.bi+1);
- if(!list.length){g.innerHTML='<div style="color:var(--mut)">Nog geen opgehaalde beelden voor deze beat. Klik “🔎 Zoek opnieuw (3)”.</div>';}
- list.forEach(f=>{const it=document.createElement('div');it.className='it';const isV=/\.(mp4|webm)$/i.test(f);
-   it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+f+'</div>';
+ const cur=(b.vid||b.img||'').split('/').pop();
+ if(!list.length){const m=document.createElement('div');m.style.cssText='grid-column:1/-1;color:var(--mut)';m.textContent='Nog geen opgehaalde beelden voor deze beat. Klik “Zoek opnieuw (3)”.';g.appendChild(m);}
+ list.forEach(f=>{const it=document.createElement('div');it.className='it'+(cur&&f.split('/').pop()===cur?' on':'');const isV=/\.(mp4|webm)$/i.test(f);
+   it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+f.split('/').pop()+'</div>';
    it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/channels/'+CHANNEL+'/video/'+f,isV?'vid':'img');closePicker();});g.appendChild(it);});
+ $('pk-fresh').addEventListener('click',pickerFresh);
+ $('pk-up').addEventListener('click',()=>$('ld-beeld').click());
  $('picker').classList.add('on');}
+// Verse 3 ophalen vanuit de modal: zoekt live, zet de nieuwe in MEDIA en her-tekent de modal.
+async function pickerFresh(){if(!selBeat)return;const s=SC[selBeat.si];
+ $('pick-grid').innerHTML='<div style="grid-column:1/-1;color:var(--mut)">verse 3 ophalen…</div>';
+ try{const r=await fetch('/api/channel-beeld-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,scene:s.scene,beat:selBeat.bi,fresh:1})});
+  const d=await r.json();const cands=(d&&d.candidates)||[];
+  cands.forEach(c=>{if(c&&c.file&&!MEDIA.includes(c.file))MEDIA.push(c.file);});
+  openPicker(selBeat.si,selBeat.bi);
+ }catch(e){$('pick-grid').innerHTML='<div style="grid-column:1/-1;color:var(--sfx)">zoeken mislukt (engine aan?)</div>';}}
 function closePicker(){$('picker').classList.remove('on');}
 $('pick-close').addEventListener('click',closePicker);
 $('picker').addEventListener('click',e=>{if(e.target.id==='picker')closePicker();});
@@ -655,17 +677,18 @@ $('btn-render').addEventListener('click',doRender);
 // ---- OVERZICHT: contact-sheet van elke scène/beat, zoals hij in de video komt -----------------
 let ovOpen=true;
 function buildOverview(){
- const g=$('ovgrid');if(!g)return;g.innerHTML='';let nTiles=0,need=0;
- SC.forEach((s,si)=>{beatsOf(s).forEach((b,bi)=>{nTiles++;
-   const it=document.createElement('div');it.className='ovtile';it.dataset.si=si;it.dataset.bi=bi;
-   let media,kind,kcls;
-   if(b.vid){media='<video class="th" poster="'+posterURL(b.vid)+'" src="'+mediaUrl(b.vid)+'" muted loop playsinline preload="none" onmouseenter="this.play()" onmouseleave="this.pause()"></video>';kind='video';kcls='vid';}
-   else if(b.img){media='<img class="th" loading="lazy" src="'+mediaUrl(b.img)+'">';kind='foto';kcls='foto';}
-   else{media='<img class="th" loading="lazy" src="'+frameURL(s,bi,0.6)+'" onerror="this.style.opacity=.25">';
-     if(isDrawnLabel(b.label)){kind='getekend';kcls='get';}else{kind='kies nog';kcls='need';need++;it.classList.add('need');}}
-   it.innerHTML=media+'<span class="kind '+kcls+'">'+kind+'</span><div class="cap">S'+s.scene+'.'+(bi+1)+' '+(b.label||'')+'</div>';
+ const g=$('ovgrid');if(!g)return;g.innerHTML='';let need=0;
+ // Alleen beats die je NOG moet kiezen. Gekozen beats (img/vid) en getekende merk/kaart/tekst-beats
+ // vallen weg — zo blijft dit een werklijst, niet de hele fotobak.
+ SC.forEach((s,si)=>{beatsOf(s).forEach((b,bi)=>{
+   if(b.img||b.vid)return;                                   // al gekozen
+   if(isDrawnLabel(b.label)||s.tone==='intro'||s.tone==='outro')return;   // getekend, niks te kiezen
+   need++;
+   const it=document.createElement('div');it.className='ovtile need';it.dataset.si=si;it.dataset.bi=bi;
+   it.innerHTML='<img class="th" loading="lazy" src="'+frameURL(s,bi,0.6)+'" onerror="this.style.opacity=.25">'
+     +'<span class="kind need">kies nog</span><div class="cap">S'+s.scene+'.'+(bi+1)+' '+(b.label||'')+'</div>';
    g.appendChild(it);});});
- $('ovcnt').textContent=nTiles+' beelden'+(need?' · '+need+' nog te kiezen':'');
+ $('ovcnt').textContent=need?(need+' nog te kiezen'):'alles gekozen ✓';
  g.style.display=ovOpen?'grid':'none';$('ovarrow').textContent=ovOpen?'▾':'▸';
  markOverviewActive();
 }
@@ -675,8 +698,7 @@ $('ovhead').addEventListener('click',e=>{if(e.target.id==='ov-refresh')return;ov
 $('ov-refresh').addEventListener('click',e=>{e.stopPropagation();VER=Date.now();buildOverview();});
 $('ovgrid').addEventListener('click',e=>{const it=e.target.closest('.ovtile');if(!it)return;
  const si=+it.dataset.si,bi=+it.dataset.bi,s=SC[si];const bt=beatsOf(s)[bi];
- stop();selectBeat(si,bi);t=s.start+(bt?bt.start:0);placePlayhead();
- const card=cardOf(si);if(card&&card.offsetParent)card.scrollIntoView({block:'center',behavior:'smooth'});});
+ stop();selectBeat(si,bi);t=s.start+(bt?bt.start:0);placePlayhead();openPicker(si,bi);});
 
 function boot(){
  // formaat van DIT project overnemen (9:16 short of 16:9 lang) voordat we tekenen
