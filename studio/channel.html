@@ -497,8 +497,13 @@ $('ld-beeld').addEventListener('change',async e=>{const f=e.target.files[0];e.ta
  catch(err){$('rendermsg').textContent='upload mislukt (engine aan?)';}});
 $('bt-pick').addEventListener('click',()=>{if(!selBeat){alert('Kies eerst een beeldblok.');return;}openPicker();});
 function openPicker(){const g=$('pick-grid');g.innerHTML='';
- if(!MEDIA.length){g.innerHTML='<div style="color:var(--mut)">Nog geen opgehaalde beelden gevonden (draai eerst python tools/channel_beeld.py).</div>';}
- MEDIA.forEach(f=>{const it=document.createElement('div');it.className='it';const isV=/\.(mp4|webm)$/i.test(f);
+ // ALLEEN de kandidaten van DEZE beat tonen, niet de hele fotobak. De bestanden heten
+ // <story>/s<NN>b<X>__c1/2/3.<ext> (of het oude losse s<NN>b<X>.<ext>). We filteren op die beat.
+ const s=SC[selBeat.si]; const pref=STORY+'/s'+String(s.scene).padStart(2,'0')+'b'+(selBeat.bi+1);
+ const list=MEDIA.filter(f=>f.startsWith(pref+'__')||f.startsWith(pref+'.'));
+ $('pick-title').textContent='Kies een beeld voor scène '+s.scene+' · beeld-beat '+(selBeat.bi+1);
+ if(!list.length){g.innerHTML='<div style="color:var(--mut)">Nog geen opgehaalde beelden voor deze beat. Klik “🔎 Zoek opnieuw (3)”.</div>';}
+ list.forEach(f=>{const it=document.createElement('div');it.className='it';const isV=/\.(mp4|webm)$/i.test(f);
    it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+f+'</div>';
    it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/channels/'+CHANNEL+'/video/'+f,isV?'vid':'img');closePicker();});g.appendChild(it);});
  $('picker').classList.add('on');}
