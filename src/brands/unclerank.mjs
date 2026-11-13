@@ -7,10 +7,64 @@
 // Contract dat makeRender teruggeeft, gelijk aan taleoftiles: { W, H, FPS, SS, durSec, sceneAt, music, clicks }.
 // sceneAt(frame) -> volledige <svg> string voor dat frame.
 //
-// Types nu: "roi" (Eén klant betaalt je jaar) en "gat" (Het harde cijfer). Bron-cijfers komen uit
-// opts of vallen terug op nette standaarden; de stem (Engels/Kokoro) en meer types volgen.
+// Types nu: "roi" (Eén klant betaalt je jaar), "gat" (Het harde cijfer) en "portaal" (schermopname
+// van het publieke portaal — de kring). Bron-cijfers komen uit opts of vallen terug op nette
+// standaarden; de stem (Engels/Kokoro) en meer types volgen.
+
+import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 const FORMATS = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] };
+const FFMPEG = process.env.FFMPEG || "ffmpeg";
+
+// Draai een sub-proces en stuur elke uitvoer-regel LIVE door naar log() (zoals taleoftiles),
+// zodat de voortgang in het app-paneel én de terminal verschijnt.
+function runStreamed(node, args, env, log, tag) {
+  return new Promise((resolve) => {
+    const ch = spawn(node, args, { env, windowsHide: true });
+    let buf = "";
+    const flush = (d) => {
+      buf += d.toString(); let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).replace(/\r$/, ""); buf = buf.slice(i + 1);
+        if (!line.trim()) continue;
+        if (log) log((tag ? tag + " " : "") + line); else process.stdout.write(line + "\n");
+      }
+    };
+    ch.stdout.on("data", flush); ch.stderr.on("data", flush);
+    ch.on("close", (code) => { if (buf.trim()) { if (log) log((tag ? tag + " " : "") + buf.trim()); else process.stdout.write(buf); } resolve({ status: code }); });
+    ch.on("error", (e) => { if (log) log((tag ? tag + " " : "") + "fout: " + e.message); resolve({ status: 1 }); });
+  });
+}
+
+// Zorg dat er een UncleRank-logo-png is om op de video te stempelen. finish.mjs valt standaard
+// terug op het Tale-of-Tiles-logo; dat willen we hier NIET. Bestaat er een UR-logo, gebruik dat;
+// anders genereren we ter plekke een nette UR-wordmark (cyaan op transparant) in de work-map.
+function ensureLogo(ROOT, work, opts) {
+  const cands = [
+    opts && opts.logo,
+    path.resolve(ROOT, "assets/unclerank/brand/logo.png"),
+    path.resolve(ROOT, "assets/brand/unclerank.png"),
+    path.resolve(ROOT, "assets/unclerank/logo.png"),
+  ].filter(Boolean);
+  for (const p of cands) { try { if (fs.existsSync(p)) return p; } catch {} }
+  // genereren: wordmark "UncleRank" met ffmpeg drawtext op transparant
+  const out = path.join(work, "ur-logo.png");
+  const fontCands = [
+    path.resolve(ROOT, "assets/fonts/Fraunces-600.ttf"),
+    path.resolve(ROOT, "assets/fonts/CormorantGaramond-600.ttf"),
+  ];
+  let font = ""; for (const f of fontCands) { try { if (fs.existsSync(f)) { font = f; break; } } catch {} }
+  const ff = font ? `:fontfile='${font.replace(/\\/g, "/").replace(/:/g, "\\:")}'` : "";
+  try {
+    const r = spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black@0:s=640x180,format=rgba",
+      "-vf", `drawtext=text='UncleRank'${ff}:fontcolor=0x00b8e6:fontsize=96:x=(w-text_w)/2:y=(h-text_h)/2,format=rgba`,
+      "-frames:v", "1", out], { windowsHide: true });
+    if (r.status === 0 && fs.existsSync(out)) return out;
+  } catch {}
+  return (opts && opts.logo) || "";
+}
 
 // Huisstijl van het portaal: donker navy, cyaan accent, groen voor winst.
 const C = {
@@ -130,12 +184,71 @@ export function makeBrand({ ROOT, config } = {}) {
   const templates = [
     { id: "roi", name: "Eén klant betaalt je jaar", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
+    { id: "portaal", name: "Portaal-opname (de kring)", music: ["upbeat", "lofi", "calm"], defaults: {} },
   ];
   // De Studio wil een onderwerp kunnen kiezen; UncleRank is type-gedreven, dus één dummy-onderwerp.
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
   async function pickMusic() { return null; }   // eerst stil renderen; muziek/stem komt erbij
-  async function makeRender({ templateId = "roi", opts = {}, format = "9:16" } = {}) {
+
+  // PORTAAL-OPNAME (de kring): neemt het PUBLIEKE portaal op als scroll-walkthrough en maakt 'm
+  // content-ready. Draait lokaal (browser + site nodig). Levert een KANT-EN-KLARE mp4 via
+  // { prebuilt } — net als taleoftiles' walkthrough — zodat de engine de SVG-pijplijn overslaat.
+  // Hergebruikt tools/finish.mjs ONGEWIJZIGD via env; de recorder is het aparte tools/portal-capture.mjs.
+  async function makePortalRender({ opts = {}, format = "9:16", log }) {
+    const node = process.execPath;
+    const recorder = path.resolve(ROOT, "tools/portal-capture.mjs");
+    const finisher = path.resolve(ROOT, "tools/finish.mjs");
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const outDir = (config && config.outDir) ? config.outDir : "out";
+    const work = path.resolve(ROOT, outDir, ".portal-" + Date.now());
+    await fs.promises.mkdir(work, { recursive: true });
+    const lang = ["nl", "fr"].includes(opts.lang) ? opts.lang : "en";   // UR = Engels (exclusieve uitstraling)
+
+    // 1) opnemen -> ruwe mp4 + markers. Het portaal zit achter login; we geven een opgeslagen
+    // login-state mee (opts.state, env, of standaard assets/unclerank/portal-state.json).
+    const stateCand = opts.state || process.env.UR_PORTAL_STATE || path.resolve(ROOT, "assets/unclerank/portal-state.json");
+    const recEnv = {
+      ...process.env, FFMPEG,
+      UR_OUT: work, UR_W: String(W), UR_H: String(H),
+      UR_PORTAL_URL: (opts.url || process.env.UR_PORTAL_URL || "https://portaal.unclerank.com"),
+    };
+    try { if (stateCand && fs.existsSync(stateCand)) recEnv.UR_PORTAL_STATE = stateCand; } catch {}
+    if (opts.seconds) recEnv.UR_SECONDS = String(opts.seconds);
+    if (log) log("● portaal-opname van de live site start…");
+    const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
+    if (r1.status !== 0) throw new Error("portaal-opname faalde, draait de engine op de machine met de browser en is het portaal bereikbaar?");
+    const raw = path.join(work, "portal-walkthrough.mp4");
+    const markers = path.join(work, "portal-walkthrough.markers.json");
+
+    // 2) captions kiezen, dan content-ready maken (finish.mjs, ongewijzigd). Muziek blijft leeg:
+    // UR rendert eerst stil, de Engelse stem/muziek komt er in een latere stap bij.
+    const music = opts.music || null;
+    const caps = ({
+      en: [opts.caption || "One client can pay for your whole year.", opts.caption2 || "The circle · UncleRank"],
+      nl: [opts.caption || "Eén klant betaalt je hele jaar.", opts.caption2 || "De kring · UncleRank"],
+    })[lang] || ["", "The circle · UncleRank"];
+    const steps = opts.steps || ({
+      en: ["Agencies share their overflow leads", "One trusted circle", "Each dossier, 3 weeks exclusive", "Claim your spot"],
+      nl: ["Bureaus delen hun overschot aan leads", "Eén vertrouwde kring", "Elk dossier, 3 weken exclusief", "Claim je plek"],
+    })[lang];
+    const logo = ensureLogo(ROOT, work, opts);
+    const finEnv = {
+      ...process.env, FFMPEG,
+      TOT_MARKERS: markers, TOT_CAPTION: caps[0], TOT_CAPTION2: caps[1],
+      TOT_STEPS: JSON.stringify(steps), TOT_FINAL: path.join(work, "portal-final.mp4"),
+    };
+    if (logo) finEnv.TOT_LOGO = logo;
+    if (music) finEnv.TOT_MUSIC = music;
+    if (log) log("● portaal, content-ready (hook, snelheid, caption, muziek)…");
+    const r2 = await runStreamed(node, [finisher, raw], finEnv, log, "· montage:");
+    if (r2.status !== 0) throw new Error("content-ready stap (finish) faalde");
+
+    return { prebuilt: path.join(work, "portal-final.mp4"), music: "", lang, cleanup: work };
+  }
+
+  async function makeRender({ templateId = "roi", opts = {}, format = "9:16", log } = {}) {
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    if (templateId === "portaal") return await makePortalRender({ opts, format, log });
     if (templateId === "gat") return buildGat({ opts, W, H });
     return buildRoi({ opts, W, H });
   }

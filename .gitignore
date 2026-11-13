@@ -46,3 +46,4 @@ assets/ummaunited/_oud-*/
 *.webp
 *.gif
 __pycache__/
+assets/unclerank/portal-state.json
