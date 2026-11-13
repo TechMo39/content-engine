@@ -714,6 +714,71 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    // UMMA MUZIEK — STUDIO-ZOEK: 3 kandidaat-BEDDEN voor de hele video (<story>__muziek__c1/2/3).
+    // Zelfde opzet als de beeld-search: eerst op schijf kijken (direct, geen wachttijd), alleen bij
+    // fresh=1 of niets-gestaged de Python-tool draaien. Eén bed per video -> één keuze.
+    if (u.pathname === "/api/channel-music-search" && req.method === "POST") {
+      const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");
+      const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
+      if (!story) { json(res, { error: "story vereist" }, 400); return; }
+      if (!bd.fresh) {
+        const mdir = path.resolve(ROOT, "assets/channels", CH, "muziek");
+        const cbase = story + "__muziek__c";
+        let staged = [];
+        try {
+          const files = (await fs.readdir(mdir)).filter((f) => f.startsWith(cbase) && /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)).sort();
+          staged = files.map((f) => ({ file: f }));
+        } catch {}
+        if (staged.length) { json(res, { candidates: staged, cached: true }); return; }
+        if (bd.cached) { json(res, { candidates: [], cached: true }); return; }
+      }
+      const py = process.platform === "win32" ? "python" : "python3";
+      const a = ["tools/channel_audio.py", "--channel", CH, "--story", story, "--voice", voice,
+                 "--candidates", "3", "--what", "music"];
+      execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 180000 }, (err, stdout, stderr) => {
+        let cands = [];
+        const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("CANDIDATES_JSON:"));
+        if (line) { try { cands = (JSON.parse(line.slice("CANDIDATES_JSON:".length)).candidates) || []; } catch {} }
+        if (!cands.length && err) { json(res, { error: "zoeken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
+        json(res, { candidates: cands });
+      });
+      return;
+    }
+    // UMMA SFX — STUDIO-ZOEK: 3 kandidaat-GELUIDEN voor ÉÉN punt (sfx__<pid>__c1/2/3). pid = een
+    // stabiele id voor de plek (bv. s04_1234). Zelfde disk-first-opzet als beeld/muziek.
+    if (u.pathname === "/api/channel-sfx-search" && req.method === "POST") {
+      const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");
+      const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
+      const pid = String(bd.pid || "").replace(/[^\w-]/g, "");
+      const scene = parseInt(bd.scene, 10);
+      const q = String(bd.q || "").slice(0, 120);
+      if (!pid) { json(res, { error: "pid vereist" }, 400); return; }
+      if (!bd.fresh) {
+        const sdir = path.resolve(ROOT, "assets/channels", CH, "sfx");
+        const cbase = "sfx__" + pid + "__c";
+        let staged = [];
+        try {
+          const files = (await fs.readdir(sdir)).filter((f) => f.startsWith(cbase) && /\.(mp3|m4a|wav|aac|ogg)$/i.test(f)).sort();
+          staged = files.map((f) => ({ file: f }));
+        } catch {}
+        if (staged.length) { json(res, { candidates: staged, cached: true }); return; }
+        if (bd.cached) { json(res, { candidates: [], cached: true }); return; }
+      }
+      const py = process.platform === "win32" ? "python" : "python3";
+      const a = ["tools/channel_audio.py", "--channel", CH, "--story", story, "--voice", voice,
+                 "--candidates", "3", "--what", "sfx", "--pid", pid, "--q", q || ""];
+      if (Number.isInteger(scene)) a.push("--scene", String(scene));
+      execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 180000 }, (err, stdout, stderr) => {
+        let cands = [];
+        const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("CANDIDATES_JSON:"));
+        if (line) { try { cands = (JSON.parse(line.slice("CANDIDATES_JSON:".length)).candidates) || []; } catch {} }
+        if (!cands.length && err) { json(res, { error: "zoeken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
+        json(res, { candidates: cands });
+      });
+      return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/channel-upload" && req.method === "POST") {
