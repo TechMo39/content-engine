@@ -51,6 +51,13 @@ const W     = Number(process.env.UR_W || 1080);
 const H     = Number(process.env.UR_H || 1920);
 const ffmpegBin = process.env.FFMPEG || "ffmpeg";
 
+// Bedrijfsnamen vervagen. Selectors van het UncleRank-portaal (vandaag.mjs: .kaart .naam,
+// dossier.mjs: .dkop h1, ui.mjs balk: .balk .naam). Overschrijfbaar via UR_BLUR.
+const BLUR_SEL = process.env.UR_BLUR || ".kaart .naam, .dkop h1, .balk .naam";
+// Doorklikken naar een dossier: de hele lead-kaart is een link (<a class="kaart" href="/dossier?…">).
+// Standaard aan; UR_OPEN_DOSSIER=0 zet het uit. De HOT lead herkennen we aan z'n label.
+const OPEN_DOSSIER = process.env.UR_OPEN_DOSSIER !== "0";
+
 const log = (...a) => console.log(...a);
 const ease = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }; // smoothstep
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -117,71 +124,80 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, storageState: haveState ? STATE : undefined });
   const page = await ctx.newPage();
 
+  // BEDRIJFSNAMEN VERVAGEN + scrollbar weg, via init-script zodat het op ELKE pagina geldt
+  // (de lijst én het dossier waar we naartoe klikken), vóór de eerste paint.
+  await page.addInitScript((sel) => {
+    const css = sel + "{filter:blur(8px) !important;} "
+      + "::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none}";
+    const add = () => { const s = document.createElement("style"); s.textContent = css; (document.head || document.documentElement).appendChild(s); };
+    if (document.head) add(); else document.addEventListener("DOMContentLoaded", add);
+  }, BLUR_SEL);
+
   log("portaal-opname: " + URL + (haveState ? " (ingelogd)" : ""));
   await page.goto(URL, { waitUntil: "networkidle", timeout: 60000 }).catch(async () => {
     await page.goto(URL, { waitUntil: "domcontentloaded", timeout: 60000 });
   });
-  // scrollbar verbergen + animaties laten settelen
-  await page.addStyleTag({ content: "::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none}" }).catch(() => {});
   await page.evaluate(() => window.scrollTo(0, 0));
   await sleep(600);
 
-  // paginahoogte + natuurlijke sectiegrenzen ophalen (robuust: valt terug op
-  // gelijke stukken als de pagina geen herkenbare secties heeft).
-  const geo = await page.evaluate((vh) => {
-    const doc = document.documentElement;
-    const full = Math.max(doc.scrollHeight, document.body.scrollHeight);
-    const sel = "section, header, footer, main > div, [class*='section'], [class*='block'], [id]";
-    const seen = new Set();
-    let tops = [];
-    document.querySelectorAll(sel).forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.height < vh * 0.25) return;            // alleen echte blokken
-      const y = Math.round(window.scrollY + r.top);
-      if (y < 0 || y > full) return;
-      const bucket = Math.round(y / 40);           // bijna-duplicaten samenvoegen
-      if (seen.has(bucket)) return; seen.add(bucket);
-      tops.push(y);
-    });
-    tops.sort((a, b) => a - b);
-    return { full, tops };
-  }, H);
+  // Scroll de HUIDIGE pagina vloeiend van boven naar beneden, frame-voor-frame. Robuust:
+  // natuurlijke blokken (kaarten/vakken/secties) als ankers, anders gelijke stappen.
+  const scrollThrough = async (secs) => {
+    const geo = await page.evaluate((vh) => {
+      const full = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      const seen = new Set(); let tops = [];
+      document.querySelectorAll("section, header, footer, main > div, .kaart, .vak, [class*='block']").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.height < vh * 0.18) return;
+        const y = Math.round(window.scrollY + r.top);
+        if (y < 0 || y > full) return;
+        const b = Math.round(y / 40); if (seen.has(b)) return; seen.add(b); tops.push(y);
+      });
+      tops.sort((a, b) => a - b); return { full, tops };
+    }, H);
+    const maxY = Math.max(0, geo.full - H);
+    let stops = (geo.tops || []).filter((y) => y <= maxY);
+    if (stops.length < 3) { stops = []; for (let i = 1; i <= 5; i++) stops.push(Math.round(maxY * i / 5)); }
+    if (stops.length > 6) { const keep = []; const st = (stops.length - 1) / 5; for (let i = 0; i < 6; i++) keep.push(stops[Math.round(i * st)]); stops = keep; }
+    if (stops[stops.length - 1] < maxY - 8) stops.push(maxY);
+    stops = [...new Set(stops)].sort((a, b) => a - b);
+    const per = Math.max(0.7, secs / Math.max(1, stops.length));
+    for (const y of stops) { await scrollToY(page, y, per); await hold(page, 0.4); }
+  };
 
-  const maxY = Math.max(0, geo.full - H);
-  // Stops: natuurlijke secties als die er zijn, anders gelijke stappen. Begrens
-  // op ~6 stops zodat het niet eindeloos hakkelt.
-  let stops = (geo.tops || []).filter((y) => y <= maxY);
-  if (stops.length < 3) {
-    const n = 5; stops = [];
-    for (let i = 1; i <= n; i++) stops.push(Math.round((maxY * i) / n));
-  }
-  // uitdunnen naar max 6 en altijd eindigen op de bodem
-  if (stops.length > 6) {
-    const keep = []; const step = (stops.length - 1) / 5;
-    for (let i = 0; i < 6; i++) keep.push(stops[Math.round(i * step)]);
-    stops = keep;
-  }
-  if (stops[stops.length - 1] < maxY - 8) stops.push(maxY);
-  stops = [...new Set(stops)].sort((a, b) => a - b);
+  // de heetste lead kiezen: een gemeld dossier ("Uit een gesprek") is het sterkst, dan een
+  // "bellen"-label, anders de eerste kaart. Zelfde keuze voor scrollen én klikken.
+  const HOT = ".kaart:has(.label.gesprek), .kaart:has(.label.bellen), a.kaart";
+  const listSecs = OPEN_DOSSIER ? SECS * 0.45 : SECS;
 
-  // perfase scroll-tijd zodat de totale opname ~ SECS duurt
-  const perScroll = Math.max(0.8, SECS / Math.max(1, stops.length));
-  const holdSec = 0.5;
+  // 1) LIJST: wie bel je vandaag, en waarom
+  mark("patternStart");
+  await hold(page, 0.7);
+  mark("colorStart");
+  await scrollThrough(listSecs);
 
-  // --- opnemen: hero even vasthouden, dan sectie voor sectie naar beneden ---
-  mark("patternStart");               // hero / bovenkant
-  await hold(page, 0.8);
-  const total = stops.length;
-  for (let i = 0; i < total; i++) {
-    const frac = (i + 1) / total;
-    // fase-markers op de narratieve punten die finish.mjs gebruikt
-    if (marks.colorStart == null && frac >= 0.25) mark("colorStart");
-    if (marks.nameStart  == null && frac >= 0.50) mark("nameStart");
-    if (marks.preview    == null && frac >= 0.80) mark("preview");
-    await scrollToY(page, stops[i], perScroll);
-    await hold(page, holdSec);
+  // 2) HOT LEAD openen en het dossier laten zien (waarom nu / wat er mis is / wat 't waard is)
+  let opened = false;
+  if (OPEN_DOSSIER) {
+    const hasHot = await page.evaluate((sel) => !!document.querySelector(sel), HOT);
+    if (hasHot) {
+      await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.scrollIntoView({ block: "center" }); }, HOT);
+      await hold(page, 0.5);
+      mark("nameStart");            // overgang naar het dossier
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {}),
+        page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.click(); }, HOT),
+      ]);
+      await sleep(700);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await hold(page, 0.6);
+      mark("preview");             // dossier in beeld
+      await scrollThrough(SECS * 0.55);
+      opened = true;
+    }
   }
-  mark("scenes");                     // onthulling onderaan = payoff voor de hook
+  if (!opened) mark("nameStart");
+  mark("scenes");                  // payoff voor de hook
   await hold(page, 0.9);
   mark("end");
 
