@@ -179,12 +179,134 @@ function buildGat({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
+// Kleine motieven voor de nieuwe types (zelfde stijl: navy/cyaan/groen, kale SVG).
+function ring(cx, cy, r, op) {
+  let g = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.line}" stroke-width="3" opacity="${op.toFixed(3)}"/>`;
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / 5;
+    const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${Math.round(r * 0.11)}" fill="${C.accent}" opacity="${op.toFixed(3)}"/>`;
+  }
+  return g;
+}
+
+// ---- TYPE: KRING — "De kring uitgelegd" ----------------------------------------------------
+function buildKring({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 17;
+  const cx = W / 2, fsH = Math.round(W * 0.06), fsB = Math.round(W * 0.05), fsS = Math.round(W * 0.034);
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    // 1 hook
+    s += block(cx, H * 0.34, ["You only work", "half your market."], { fs: fsH, w: 800, fill: C.ink, op: win(t, 0.4, 1.4, 3.2, 4.0) });
+    // 2 de handel
+    s += block(cx, H * 0.34, ["Every agency sits on leads", "it can't use itself."], { fs: fsB, w: 700, fill: C.ink, op: win(t, 4.2, 5.2, 7.4, 8.2) });
+    // 3 de kring in beeld
+    const ringOp = win(t, 8.4, 9.4, 12.6, 13.4);
+    if (ringOp > 0.001) s += ring(cx, H * 0.40, Math.round(W * 0.2), ringOp);
+    s += block(cx, H * 0.63, ["A closed circle.", "SEO · SEA · web · content · ads."], { fs: fsS, w: 600, fill: C.mut, op: win(t, 9.2, 10.2, 12.6, 13.4) });
+    // 4 exclusiviteit
+    s += block(cx, H * 0.40, ["Each dossier:", "3 weeks, yours alone."], { fs: fsB, w: 800, fill: C.accent, op: win(t, 13.0, 14.0) });
+    // 5 CTA
+    s += block(cx, H * 0.87, ["UncleRank — the circle.", "Try a week, free."], { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: win(t, 15.2, 16.0) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: BUREAUS — "Voor wie: de 5 bureautypes" ------------------------------------------
+function buildBureaus({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
+  const cx = W / 2, fsH = Math.round(W * 0.058), fsR = Math.round(W * 0.044);
+  const rows = [
+    ["SEO", "ranks too low on Google"],
+    ["SEA", "no ads running for months"],
+    ["Web", "a site built on a template"],
+    ["Content", "a blog that died in 2022"],
+    ["Ads", "invisible on every channel"],
+  ];
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.2, ["Five kinds of agency.", "Five kinds of lead."], { fs: fsH, w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    const x0 = W * 0.12, y0 = H * 0.36, rh = H * 0.1;
+    rows.forEach((r, i) => {
+      const op = win(t, 2.0 + i * 1.3, 2.8 + i * 1.3);
+      if (op <= 0.001) return;
+      const y = y0 + i * rh;
+      s += tx(x0, y, r[0], { fs: fsR, w: 800, fill: C.accent, op, anchor: "start" });
+      s += tx(x0 + W * 0.26, y, r[1], { fs: Math.round(fsR * 0.82), w: 500, fill: C.ink, op, anchor: "start" });
+    });
+    s += tx(cx, H * 0.9, "Each sees only the leads that fit them.", { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 9.0, 10.0) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: EXCLUSIEF — "3 weken exclusief" (schaarste) -------------------------------------
+function buildExclusief({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 13;
+  const cx = W / 2, fsBig = Math.round(W * 0.15), fsLbl = Math.round(W * 0.04);
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.28, ["A lead you get,", "no one else gets."], { fs: Math.round(W * 0.056), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    // het grote "3 weken" met een krimpende balk eronder
+    const nOp = win(t, 2.6, 3.6);
+    s += tx(cx, H * 0.5, "3 weeks", { fs: fsBig, w: 800, fill: C.accent, op: nOp });
+    const barOp = win(t, 3.6, 4.2);
+    if (barOp > 0.001) {
+      const bw = W * 0.6, bx = cx - bw / 2, by = H * 0.56, bh = H * 0.018;
+      const fill = clamp(1 - (t - 4.2) / 6);      // loopt langzaam leeg
+      s += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh / 2}" fill="${C.line}" opacity="${barOp.toFixed(3)}"/>`;
+      s += `<rect x="${bx}" y="${by}" width="${(bw * fill).toFixed(1)}" height="${bh}" rx="${bh / 2}" fill="${C.accent}" opacity="${barOp.toFixed(3)}"/>`;
+    }
+    s += tx(cx, H * 0.62, "yours alone", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 4.0, 4.8) });
+    s += block(cx, H * 0.76, ["No bidding war.", "No shared inbox."], { fs: Math.round(W * 0.044), w: 700, fill: C.ink, op: win(t, 6.5, 7.5) });
+    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.038), w: 600, fill: C.mut, op: win(t, 10.5, 11.3) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: VOORNA — "Koude outreach vs warme kring" ---------------------------------------
+function buildVoorna({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
+  const colW = W * 0.42, lx = W * 0.27, rx = W * 0.73;
+  const fsHd = Math.round(W * 0.042), fsLi = Math.round(W * 0.03);
+  function column(x, title, lines, color, op, yTop) {
+    if (op <= 0.001) return "";
+    const bx = x - colW / 2, bh = H * 0.42, by = yTop;
+    let g = `<rect x="${bx}" y="${by}" width="${colW}" height="${bh}" rx="18" fill="${color}" opacity="${(op * 0.1).toFixed(3)}"/>`
+      + `<rect x="${bx}" y="${by}" width="${colW}" height="${bh}" rx="18" fill="none" stroke="${color}" stroke-width="2.5" opacity="${op.toFixed(3)}"/>`;
+    g += tx(x, by + bh * 0.16, title, { fs: fsHd, w: 800, fill: color, op });
+    lines.forEach((l, i) => { g += tx(x, by + bh * 0.36 + i * fsLi * 1.5, l, { fs: fsLi, w: 500, fill: C.ink, op }); });
+    return g;
+  }
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += tx(W / 2, H * 0.2, "Two ways to fill your pipeline.", { fs: Math.round(W * 0.046), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    const yTop = H * 0.3;
+    s += column(lx, "Cold outreach", ["Lists you bought", "No reason to call", "Ignored, every time"], C.mut, win(t, 2.0, 3.0), yTop);
+    s += column(rx, "The circle", ["A real flaw, named", "A reason to call", "3 weeks, yours"], C.accent, win(t, 3.6, 4.6), yTop);
+    s += tx(W / 2, H * 0.84, "One of them actually picks up.", { fs: Math.round(W * 0.04), w: 700, fill: C.green, op: win(t, 7.0, 8.0) });
+    s += tx(W / 2, H * 0.92, "UncleRank — try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.5, 10.3) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
 export function makeBrand({ ROOT, config } = {}) {
   const branding = { navy: C.bg0, accent: C.accent };
   const templates = [
     { id: "roi", name: "Eén klant betaalt je jaar", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "portaal", name: "Portaal-opname (de kring)", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "kring", name: "De kring uitgelegd", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "bureaus", name: "Voor wie: 5 bureautypes", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "exclusief", name: "3 weken exclusief", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "voorna", name: "Koud vs warm (kring)", music: ["calm", "lofi", "upbeat"], defaults: {} },
   ];
   // De Studio wil een onderwerp kunnen kiezen; UncleRank is type-gedreven, dus één dummy-onderwerp.
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
@@ -250,6 +372,10 @@ export function makeBrand({ ROOT, config } = {}) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     if (templateId === "portaal") return await makePortalRender({ opts, format, log });
     if (templateId === "gat") return buildGat({ opts, W, H });
+    if (templateId === "kring") return buildKring({ opts, W, H });
+    if (templateId === "bureaus") return buildBureaus({ opts, W, H });
+    if (templateId === "exclusief") return buildExclusief({ opts, W, H });
+    if (templateId === "voorna") return buildVoorna({ opts, W, H });
     return buildRoi({ opts, W, H });
   }
   return {
