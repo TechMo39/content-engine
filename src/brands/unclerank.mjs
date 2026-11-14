@@ -640,8 +640,11 @@ export function makeBrand({ ROOT, config } = {}) {
     if (templateId === "resultaat") return buildResultaat({ opts, W, H });
     return buildRoi({ opts, W, H });
   }
+  // De engine roept bij het laden brand.init(log) aan (zoals taleoftiles). UncleRank is type-
+  // gedreven en heeft niets te laden, dus init is een no-op — maar moet wél bestaan.
+  async function init() { return; }
   return {
     id: "unclerank", name: "UncleRank", footer: "unclerank.com",
-    branding, templates, options: [], listSubjects, pickMusic, makeRender,
+    branding, templates, options: [], init, listSubjects, pickMusic, makeRender,
   };
 }
