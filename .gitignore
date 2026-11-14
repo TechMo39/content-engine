@@ -47,3 +47,4 @@ assets/ummaunited/_oud-*/
 *.gif
 __pycache__/
 assets/unclerank/portal-state.json
+voice-test/
