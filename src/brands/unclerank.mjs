@@ -214,30 +214,81 @@ function buildKring({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: BUREAUS — "Voor wie: de 5 bureautypes" ------------------------------------------
+// WAT WE PER VAKGEBIED METEN. De echte set signalen uit het dossier (meerdere per vak, niet één
+// regel). Gedeeld door 'bureaus' (overzicht, cyclus) en 'signalen' (diep op één vak).
+const VAK = {
+  seo:     { naam: "SEO", sig: ["Ranks on page 4 for its own service", "Most of its searches go to rivals", "A homepage too thin to rank"] },
+  sea:     { naam: "SEA", sig: ["No Google Ads running, for months", "No tracking — blind to what works", "A pricey-click market he's not in"] },
+  web:     { naam: "Web", sig: ["Loads in 4+ seconds", "Falls apart on mobile", "A dated template build"] },
+  content: { naam: "Content", sig: ["No blog, or one that died in 2022", "A homepage under 300 words", "Market questions left unanswered"] },
+  reclame: { naam: "Ads & brand", sig: ["Advertises nowhere", "Nearly invisible on social", "A handful of weak reviews"] },
+};
+const VAK_ORDER = ["seo", "sea", "web", "content", "reclame"];
+
+// ---- TYPE: BUREAUS — "Wat we per vak zien" (cyclus over de 5 vakgebieden) -------------------
 function buildBureaus({ opts, W, H }) {
-  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
-  const cx = W / 2, fsH = Math.round(W * 0.058), fsR = Math.round(W * 0.044);
-  const rows = [
-    ["SEO", "ranks too low on Google"],
-    ["SEA", "no ads running for months"],
-    ["Web", "a site built on a template"],
-    ["Content", "a blog that died in 2022"],
-    ["Ads", "invisible on every channel"],
-  ];
+  const FPS = 30, SS = 1;
+  const per = 2.6;                                   // tijd per vak op scherm
+  const durSec = Number(opts.durSec) || Math.round(2.0 + VAK_ORDER.length * per + 2.5);
+  const cx = W / 2;
   function sceneAt(frame) {
     const t = frame / FPS;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    s += block(cx, H * 0.2, ["Five kinds of agency.", "Five kinds of lead."], { fs: fsH, w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
-    const x0 = W * 0.12, y0 = H * 0.36, rh = H * 0.1;
-    rows.forEach((r, i) => {
-      const op = win(t, 2.0 + i * 1.3, 2.8 + i * 1.3);
+    s += block(cx, H * 0.2, ["Five trades.", "For each, what we see."], { fs: Math.round(W * 0.056), w: 800, fill: C.ink, op: win(t, 0.4, 1.4, 2.0, 2.6) });
+    VAK_ORDER.forEach((k, i) => {
+      const a = 2.4 + i * per;
+      const op = win(t, a, a + 0.5, a + per - 0.3, a + per + 0.2);
+      if (op <= 0.001) return;
+      const v = VAK[k];
+      s += tx(cx, H * 0.3, v.naam, { fs: Math.round(W * 0.09), w: 800, fill: C.accent, op });
+      v.sig.forEach((line, j) => {
+        s += tx(cx, H * 0.46 + j * H * 0.09, line, { fs: Math.round(W * 0.038), w: 500, fill: C.ink, op });
+      });
+    });
+    s += tx(cx, H * 0.88, "Each sees only the leads that fit them.", { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 2.4 + VAK_ORDER.length * per + 0.2, 2.4 + VAK_ORDER.length * per + 1.2) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: SIGNALEN — diep op ÉÉN vak (opts.vak = seo/sea/web/content/reclame) --------------
+function buildSignalen({ opts, W, H }) {
+  const FPS = 30, SS = 1;
+  const v = VAK[String(opts.vak || "seo").toLowerCase()] || VAK.seo;
+  const durSec = Number(opts.durSec) || Math.round(2.0 + v.sig.length * 1.8 + 4);
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.2, ["What we find", "for " + v.naam + "."], { fs: Math.round(W * 0.058), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    const y0 = H * 0.38, rh = H * 0.1;
+    v.sig.forEach((line, i) => {
+      const op = win(t, 2.2 + i * 1.8, 3.0 + i * 1.8);
       if (op <= 0.001) return;
       const y = y0 + i * rh;
-      s += tx(x0, y, r[0], { fs: fsR, w: 800, fill: C.accent, op, anchor: "start" });
-      s += tx(x0 + W * 0.26, y, r[1], { fs: Math.round(fsR * 0.82), w: 500, fill: C.ink, op, anchor: "start" });
+      // gecentreerd (geen bullet) zodat lange regels netjes binnen beeld blijven
+      s += tx(cx, y, line, { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op });
     });
-    s += tx(cx, H * 0.9, "Each sees only the leads that fit them.", { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 9.0, 10.0) });
+    const endA = 2.2 + v.sig.length * 1.8 + 0.4;
+    s += block(cx, H * 0.78, ["The flaws, already found.", "On every lead."], { fs: Math.round(W * 0.044), w: 800, fill: C.accent, op: win(t, endA, endA + 1.0) });
+    s += block(cx, H * 0.92, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, endA + 1.6, endA + 2.4) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: ACTUEEL — "Altijd actueel" (dagelijkse verversing) ------------------------------
+function buildActueel({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.26, ["Yesterday's lead list", "is already stale."], { fs: Math.round(W * 0.055), w: 800, fill: C.ink, op: win(t, 0.4, 1.4, 3.4, 4.2) });
+    s += block(cx, H * 0.34, ["We re-check every site,", "every single day."], { fs: Math.round(W * 0.055), w: 800, fill: C.accent, op: win(t, 4.4, 5.4) });
+    s += block(cx, H * 0.56, ["So the reason you call", "is today's reason —", "not last month's."], { fs: Math.round(W * 0.044), w: 600, fill: C.ink, op: win(t, 7.4, 8.4) });
+    s += tx(cx, H * 0.82, "Fresh dossiers. Current flaws.", { fs: Math.round(W * 0.04), w: 700, fill: C.green, op: win(t, 10.4, 11.2) });
+    s += tx(cx, H * 0.9, "UncleRank — the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.6, 12.4) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
@@ -412,6 +463,80 @@ function buildGratisweek({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
+// ---- TYPE: OMDRAAI — de pivot (scan-tool -> lead-lijst voor bureaus) ----------------------
+function buildOmdraai({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.3, ["Most tools tell the owner", "what's wrong with his site."], { fs: Math.round(W * 0.05), w: 600, fill: C.mut, op: win(t, 0.4, 1.4, 3.8, 4.6) });
+    s += tx(cx, H * 0.34, "We flipped it.", { fs: Math.round(W * 0.1), w: 800, fill: C.accent, op: win(t, 4.8, 5.8) });
+    s += block(cx, H * 0.56, ["Now the agency gets the list:", "who to call, and why."], { fs: Math.round(W * 0.046), w: 700, fill: C.ink, op: win(t, 7.4, 8.4) });
+    s += block(cx, H * 0.74, ["Their flaw, already found.", "Your opening line, already written."], { fs: Math.round(W * 0.036), w: 500, fill: C.mut, op: win(t, 10.0, 11.0) });
+    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.6, 13.4) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: VOLUME — "elke ochtend nieuwe dossiers" (tellende cijfer) -----------------------
+function buildVolume({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 13;
+  const target = Number(opts.aantal) || 10;
+  const cx = W / 2, fsBig = Math.round(W * 0.2);
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += tx(cx, H * 0.3, "Every morning:", { fs: Math.round(W * 0.056), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    // het getal telt op van 0 naar target
+    const nOp = win(t, 2.0, 2.8);
+    if (nOp > 0.001) {
+      const n = Math.round(target * smooth(clamp((t - 2.2) / 1.6)));
+      s += tx(cx, H * 0.5, String(n), { fs: fsBig, w: 800, fill: "#ffffff", op: nOp });
+    }
+    s += block(cx, H * 0.62, ["new dossiers.", "Already checked."], { fs: Math.round(W * 0.044), w: 600, fill: C.accent, op: win(t, 4.4, 5.4) });
+    s += block(cx, H * 0.8, ["You don't hunt.", "You just pick up the phone."], { fs: Math.round(W * 0.042), w: 700, fill: C.ink, op: win(t, 7.0, 8.0) });
+    s += block(cx, H * 0.92, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 10.0, 10.8) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: DELEN — "Delen loont" (de give-and-take van de kring) --------------------------
+function buildDelen({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
+  const cx = W / 2;
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += block(cx, H * 0.26, ["You spot a flaw", "that isn't your trade."], { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
+    s += block(cx, H * 0.46, ["Pass it to the circle.", "We make the intro."], { fs: Math.round(W * 0.05), w: 700, fill: C.accent, op: win(t, 3.2, 4.2) });
+    s += block(cx, H * 0.64, ["Share, and you move up —", "hot leads come back to you."], { fs: Math.round(W * 0.042), w: 600, fill: C.ink, op: win(t, 6.4, 7.4) });
+    s += tx(cx, H * 0.82, "Everyone feeds the pot they eat from.", { fs: Math.round(W * 0.036), w: 700, fill: C.green, op: win(t, 10.0, 11.0) });
+    s += tx(cx, H * 0.9, "UncleRank — the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
+// ---- TYPE: RESULTAAT — "Eén telefoontje" (de hele loop) -----------------------------------
+function buildResultaat({ opts, W, H }) {
+  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 12;
+  const cx = W / 2, fs = Math.round(W * 0.062);
+  function sceneAt(frame) {
+    const t = frame / FPS;
+    let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
+    s += tx(cx, H * 0.32, "One flaw, named.", { fs, w: 800, fill: C.ink, op: win(t, 0.6, 1.6) });
+    s += tx(cx, H * 0.46, "One call that lands.", { fs, w: 800, fill: C.ink, op: win(t, 2.6, 3.6) });
+    s += tx(cx, H * 0.6, "One new client.", { fs: Math.round(W * 0.072), w: 800, fill: C.accent, op: win(t, 4.6, 5.6) });
+    s += block(cx, H * 0.78, ["That's the whole loop.", "No cold lists. No luck."], { fs: Math.round(W * 0.04), w: 600, fill: C.mut, op: win(t, 7.4, 8.4) });
+    s += tx(cx, H * 0.9, "UncleRank — try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.6, 10.4) });
+    return root(W, H, s);
+  }
+  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+}
+
 export function makeBrand({ ROOT, config } = {}) {
   const branding = { navy: C.bg0, accent: C.accent };
   const templates = [
@@ -427,6 +552,12 @@ export function makeBrand({ ROOT, config } = {}) {
     { id: "mankement", name: "Een naam is geen lead", music: ["upbeat", "lofi", "calm"], defaults: {} },
     { id: "rekensom", name: "Wat kost een warme lead", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "gratisweek", name: "Gratis week (aanbod)", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "omdraai", name: "De omdraai (de pivot)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "volume", name: "Elke ochtend nieuw", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "signalen", name: "Wat we vinden (per vak)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "actueel", name: "Altijd actueel (dagelijks)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "delen", name: "Delen loont (kring)", music: ["calm", "lofi", "upbeat"], defaults: {} },
+    { id: "resultaat", name: "Eén telefoontje", music: ["upbeat", "lofi", "calm"], defaults: {} },
   ];
   // De Studio wil een onderwerp kunnen kiezen; UncleRank is type-gedreven, dus één dummy-onderwerp.
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
@@ -501,6 +632,12 @@ export function makeBrand({ ROOT, config } = {}) {
     if (templateId === "mankement") return buildMankement({ opts, W, H });
     if (templateId === "rekensom") return buildRekensom({ opts, W, H });
     if (templateId === "gratisweek") return buildGratisweek({ opts, W, H });
+    if (templateId === "omdraai") return buildOmdraai({ opts, W, H });
+    if (templateId === "volume") return buildVolume({ opts, W, H });
+    if (templateId === "signalen") return buildSignalen({ opts, W, H });
+    if (templateId === "actueel") return buildActueel({ opts, W, H });
+    if (templateId === "delen") return buildDelen({ opts, W, H });
+    if (templateId === "resultaat") return buildResultaat({ opts, W, H });
     return buildRoi({ opts, W, H });
   }
   return {
