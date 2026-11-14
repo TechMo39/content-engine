@@ -516,7 +516,8 @@ function openPicker(si,bi){
  const cur=(b.vid||b.img||'').split('/').pop();
  if(!list.length){const m=document.createElement('div');m.style.cssText='grid-column:1/-1;color:var(--mut)';m.textContent='Nog geen opgehaalde beelden voor deze beat. Klik “Zoek opnieuw (3)”.';g.appendChild(m);}
  list.forEach(f=>{const it=document.createElement('div');it.className='it'+(cur&&f.split('/').pop()===cur?' on':'');const isV=/\.(mp4|webm)$/i.test(f);
-   it.innerHTML=(isV?'<img class="th" loading="lazy" src="/api/channel-poster?f='+encodeURIComponent(f)+'&channel='+CHANNEL+'">':'<img class="th" src="/channel-media/'+encodeURIComponent(f)+'?channel='+CHANNEL+'">')+'<div class="nm">'+f.split('/').pop()+'</div>';
+   const murl='/channel-media/'+f.split('/').map(encodeURIComponent).join('/')+'?channel='+CHANNEL;
+   it.innerHTML=(isV?'<video class="th" src="'+murl+'" muted loop autoplay playsinline preload="auto"></video>':'<img class="th" src="'+murl+'">')+'<div class="nm">'+f.split('/').pop()+'</div>';
    it.addEventListener('click',()=>{setBeatMedia(selBeat.si,selBeat.bi,'assets/channels/'+CHANNEL+'/video/'+f,isV?'vid':'img');closePicker();});g.appendChild(it);});
  $('pk-fresh').addEventListener('click',pickerFresh);
  $('pk-up').addEventListener('click',()=>$('ld-beeld').click());
