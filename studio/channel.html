@@ -412,6 +412,8 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  else if(!vd.paused){try{vd.pause();}catch(e){}}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}}
+ // volgende scène's stem alvast inladen (binnen 3s van de grens) zodat er geen stilte-gat valt
+ const nsi=si+1;if(nsi<SC.length){const ns=SC[nsi],dt=ns.start-t;if(dt>0&&dt<3){const na=voiceAudio[ns.scene];if(na&&na.readyState<3){try{na.preload='auto';na.load();}catch(e){}}}}
  manageMusic();fireSfx();}
 function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
  if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
@@ -425,18 +427,29 @@ function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.
 function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=playEnd||t>=total){t=Math.min(t,total);stop();}placePlayhead();syncAudio();
  raf=requestAnimationFrame(tick);}
-function play(){if(playing)return;playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
+// ---- AFSPELEN MET LAAD-GATE: nooit stilte terwijl de knop "speelt". We wachten tot de stem (en de
+// muziek onder dit punt) genoeg geladen is; tot die tijd staat er "… laden". Pas als er geluid is,
+// loopt de tijd. Na 12s geven we het op en starten we tóch (dan is er iets anders mis). ----
+function audReady(a){return !!(a&&a.readyState>=3);}
+function neededAudioAt(tt){const s=SC[sceneAt(tt)],list=[];if(voiceAudio[s.scene])list.push(voiceAudio[s.scene]);for(const b of musicBlocks){if(tt>=b.start&&tt<b.end){list.push(b.audio);break;}}return list;}
+function prepAudio(els,onReady){els=els.filter(Boolean);const pend=els.filter(a=>!audReady(a));if(!pend.length){onReady();return;}
+ let done=false,left=pend.length;const fin=()=>{if(done)return;done=true;onReady();};const to=setTimeout(fin,12000);
+ pend.forEach(a=>{const h=()=>{a.removeEventListener('canplaythrough',h);a.removeEventListener('canplay',h);if(--left<=0){clearTimeout(to);fin();}};
+  a.addEventListener('canplaythrough',h);a.addEventListener('canplay',h);try{a.preload='auto';a.load();}catch(e){}});}
+let playGen=0;
+function _play(){playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
  const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}
  manageMusic();raf=requestAnimationFrame(tick);}
-function stop(){playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
+function play(onbtn){if(playing)return;const g=++playGen;const btn=onbtn||$('btn-play');const orig=btn.textContent;btn.textContent='… laden';
+ prepAudio(neededAudioAt(t),()=>{ if(btn!==$('btn-play'))btn.textContent=orig; if(g!==playGen)return; _play(); });}
+function stop(){playGen++;playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
  for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}musicBlocks.forEach(b=>{try{b.audio.pause();}catch(e){}});}
 $('btn-play').addEventListener('click',()=>{if(playing){stop();}else{playEnd=total;play();}});
 $('btn-rew').addEventListener('click',()=>{stop();t=0;playEnd=total;placePlayhead();scrollTo({top:0,behavior:'smooth'});});
-// PER SCÈNE afspelen: alleen deze scène hoor/zie je, de pagina scrollt niet mee en het stopt vanzelf
-// aan het einde van de scène. Alleen de voice van DÍT nummer wordt geladen (niet alle 14 tegelijk).
-function playScene(si){const s=SC[si];if(!s)return;stop();t=s.start;playEnd=s.start+s.dur;const a=voiceAudio[s.scene];if(a){try{a.load();}catch(e){}}placePlayhead();play();}
+// PER SCÈNE afspelen: alleen deze scène, met dezelfde laad-gate op de scène-knop ("… laden").
+function playScene(si,btn){const s=SC[si];if(!s)return;stop();t=s.start;playEnd=s.start+s.dur;placePlayhead();play(btn);}
 document.addEventListener('click',e=>{const b=e.target.closest('.playsc');if(!b)return;const si=+b.dataset.playsi,s=SC[si];
- const here=playing&&t>=s.start-0.01&&t<s.start+s.dur+0.3;if(here)stop();else playScene(si);});
+ const here=playing&&t>=s.start-0.01&&t<s.start+s.dur+0.3;if(here)stop();else playScene(si,b);});
 
 // audio: eerst uit de engine proberen, anders handmatig laden
 function autoAudio(){
