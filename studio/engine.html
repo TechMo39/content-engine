@@ -329,7 +329,8 @@ function updateSelBtn(){ const n=state.selected?state.selected.size:0; const btn
 function log(){const es=new EventSource('/api/log');const box=$('#logbox');es.onmessage=e=>{let t;try{t=JSON.parse(e.data)}catch{ t=e.data}const d=document.createElement('div');if(/✓|klaar/.test(t))d.className='ok';else if(/✗|FOUT|fout/.test(t))d.className='err';else if(/▶|render/.test(t))d.className='run';d.textContent=t;box.appendChild(d);while(box.children.length>300)box.removeChild(box.firstChild);box.scrollTop=box.scrollHeight;};}
 
 async function loadBrands(){const j=await (await fetch('/api/brands')).json();const g=$('#brands');g.innerHTML='';
-  j.brands.forEach((b,i)=>{const el=document.createElement('button');el.textContent=b.name;el.onclick=()=>selectBrand(b.id,el);g.appendChild(el);if(i===0)selectBrand(b.id,el);});}
+  const bs=(j.brands||[]).filter(b=>b.business);   // alleen echte merken (Tale of Tiles, UncleRank); channels via de Channels-knop
+  bs.forEach((b,i)=>{const el=document.createElement('button');el.textContent=b.name;el.onclick=()=>selectBrand(b.id,el);g.appendChild(el);if(i===0)selectBrand(b.id,el);});}
 
 async function selectBrand(id,el){state.brand=id;state.subject=null;$('#subjPick').textContent='';setSubjOpen(false);$$('#brands button').forEach(x=>x.classList.remove('on'));if(el)el.classList.add('on');
   const [sj,tp]=await Promise.all([fetch('/api/subjects?brand='+id).then(r=>r.json()),fetch('/api/templates?brand='+id).then(r=>r.json())]);
@@ -771,13 +772,16 @@ async function loadSocial(){
   renderChannels();
   // merk-filter
   const seen=new Map();soc.items.forEach(i=>{if(i.brand&&!seen.has(i.brand))seen.set(i.brand,i.brandName||i.brand);});
+  // Vaste merk-lijst (zelfde als de planner) zodat UncleRank er ALTIJD staat, ook zonder video's.
+  let socBrandList=[];try{socBrandList=((await (await fetch('/api/plan/brands')).json()).brands)||[];}catch(e){}
   const bc=$('#socBrands');bc.innerHTML='';
   const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=async()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');soc.page=1;
     // kanalen/koppel-status per merk herladen (zodat je bv. UncleRank apart kan koppelen/posten)
     soc.chanBrand=id||'taleoftiles';
     try{const ch=await (await fetch('/api/social/channels?brand='+encodeURIComponent(soc.chanBrand))).json();soc.accounts=ch.accounts||[];if(ch.platforms)soc.platforms=ch.platforms;}catch(e){}
     renderChannels();renderMonitor();renderSoc();};bc.appendChild(b);};
-  mkb('','Alle merken'); for(const [id,label] of seen) mkb(id,label);
+  // Alleen de echte merken (Tale of Tiles + UncleRank). Channels (Truthward e.d.) horen hier niet.
+  mkb('','Alle merken'); socBrandList.forEach(b=>mkb(b.id,b.name));
   // taal-filter
   const lc=$('#socLangs');lc.innerHTML='';
   const mkl=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.lang===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.lang=id;$$('#socLangs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');soc.page=1;renderMonitor();renderSoc();};lc.appendChild(b);};

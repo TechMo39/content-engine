@@ -473,7 +473,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(404); res.end("nope"); return;
     }
     if (u.pathname === "/api/log") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); res.write(`data: ${JSON.stringify("— verbonden —")}\n\n`); logClients.add(res); req.on("close", () => logClients.delete(res)); return; }
-    if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) }); return; }
+    if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name, business: BUSINESS_BRANDS.has(b.id) })) }); return; }
     if (u.pathname === "/api/subjects") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { subjects: [] }); return; } json(res, { subjects: await b.listSubjects() }); return; }
     if (u.pathname === "/api/templates") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { templates: [] }); return; } json(res, { templates: b.templates, options: b.options || [] }); return; }
     // ---- PLANNING-endpoints (laag 2), PER MERK ----
@@ -1101,6 +1101,7 @@ const server = http.createServer(async (req, res) => {
       try {
         for (const r of await listRenderFiles()) {
           const meta = parseOutName(r.base.replace(/\.mp4$/i, ""));
+          if (!BUSINESS_BRANDS.has(meta.brand)) continue;   // alleen echte merken; channels horen in de Channels-view
           const lang = ["en", "fr"].includes(meta.lang) ? meta.lang : "nl";
           items.push({
             url: outUrl(r.rel), file: r.rel,
