@@ -53,3 +53,12 @@ sfx scène 1: Orchestral Hit by Rizzard (Freesound, CC0)
 sfx scène 4: Kick 002.wav by AudioPapkin (Freesound, CC0)
 sfx scène 5: Fantasy UI Stinger - Magical Level Up 02 by TommasoMotteran (Freesound, CC-BY)
 sfx scène 9: Big Cinematic Impact by Rizzard (Freesound, CC0)
+muziek: chose__muziek__c1.mp3 | CC0 | Anxious_Just_Before_80BPM_Em by SignatureSoundsOrg
+muziek: chose__muziek__c2.mp3 | CC0 | uplift Piano riff 82bpm F# by CVLTIV8R
+muziek: chose__muziek__c3.mp3 | CC0 | Lonely_Walk_88BPM_Am by SignatureSoundsOrg
+sfx s06_end: sfx__s06_end__c1.mp3 | CC0 | Impact 1 by Daftrio
+sfx s06_end: sfx__s06_end__c2.mp3 | CC0 | Hit Impact by MadPanCake
+sfx s06_end: sfx__s06_end__c3.mp3 | CC0 | FX - HIT IMPACT - Retro Videogame by bolkmar
+sfx s07_end: sfx__s07_end__c1.mp3 | CC0 | Impact 1 by Daftrio
+sfx s07_end: sfx__s07_end__c2.mp3 | CC0 | Hit Impact by MadPanCake
+sfx s07_end: sfx__s07_end__c3.mp3 | CC0 | FX - HIT IMPACT - Retro Videogame by bolkmar
