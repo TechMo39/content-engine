@@ -583,7 +583,13 @@ function planCardFor(slot,idx){
     planWirePrev(cell);
     return cell;
   }
-  const opts=['<option value="">— leeg —</option>'].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
+  // OPGESLAGEN KEUZE VASTHOUDEN: staat het geplande bestand niet (meer) in de verse-renders-pool
+  // (bv. na een engine-update met ander pad, of nadat de video verplaatst is), dan tonen we het
+  // tóch als geselecteerde optie. Zo valt een ingepland slot nooit "leeg" terug en hoef je niets
+  // opnieuw te kiezen. De keuze blijft bewaard en wordt gewoon mee-opgeslagen.
+  const inPool=slot.file&&cands.some(c=>c.file===slot.file);
+  const savedOpt=(slot.file&&!inPool)?`<option value="${esc(slot.file)}" selected>${esc(slot.typeName||slot.type||'ingepland')} · ${esc(String(slot.file).split('/').pop())}</option>`:'';
+  const opts=['<option value="">— leeg —</option>',savedOpt].concat(cands.map(c=>`<option value="${esc(c.file)}"${c.file===slot.file?' selected':''}>${esc(c.datum||'')} · ${esc(c.typeName)}${c.name?' · '+esc(c.name):''}</option>`)).join('');
   const plats=planAccountsFor(lang);
   const sel=slot.platforms&&slot.platforms.length?slot.platforms.slice():plats.map(a=>a.platform);  // leeg veld = alle kanalen
   const platsHtml=plats.length

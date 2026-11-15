@@ -1,128 +1,160 @@
 #!/usr/bin/env python3
-# channel_voice.py — genereert per scene een voice-over-fragment met KOKORO (lokaal, CPU, geen GPU),
-# met de TOON per scene (rustig / nadruk / warm), zodat de stem klopt met wat er gezegd wordt.
-# Draait LOKAAL op Mo's laptop. Schrijft assets/channels/channel1/voice/<story>/<stem>/<nn>.wav + een
-# import-script met de voice-paden. (Piper is vervangen door Kokoro; klinkt veel natuurlijker.)
+# channel_voice.py — genereert per scène een voice-over-fragment met CHATTERBOX (lokaal, CPU),
+# gekloond van een REFERENTIE-stem. Per verhaal maken we DRIE stemmen (v1 / v2 / v3), elk uit een
+# eigen referentie-wav, zodat je later IN DE STUDIO kiest welke stem de video krijgt. Elke stem is
+# een eigen project (eigen map + eigen _timeline.json), dus kiezen in de studio = die stem laden.
 #
-# Eenmalig installeren:  pip install "pykokoro[cpu]"
-# Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_voice.py                 # beide delen, beide stemmen
-#   python tools/channel_voice.py --voice man      # alleen de mannenstem
-#   python tools/channel_voice.py --only 3         # alleen scene 3 opnieuw
-#   python tools/channel_voice.py --story fitra --voice man --format 16:9   # NIEUW project
-#   python tools/channel_voice.py --story fitra --voice man --format 9:16   # de afgeleide short
+# Draait LOKAAL op Mo's laptop (Git Bash, in ~/Desktop/content-engine):
+#   python tools/channel_voice.py                      # verhaal "chose", alle 3 de stemmen
+#   python tools/channel_voice.py --voice v2           # alleen stem v2
+#   python tools/channel_voice.py --only 3             # alleen scène 3 opnieuw (alle stemmen)
+#   python tools/channel_voice.py --story fitra        # NIEUW verhaal (zet eerst het script hieronder)
+#   python tools/channel_voice.py --format 9:16        # de afgeleide short
 #
-# PROJECT = <story>/<voice>. Elk project krijgt een eigen map en een eigen _timeline.json, dus
-# een nieuw project overschrijft NOOIT een bestaand project. Het FORMAAT (16:9 lang / 9:16 short)
-# wordt in de tijdlijn opgeslagen zodat de studio het per project onthoudt.
+# Chatterbox is eenmalig te installeren met:  pip install chatterbox-tts soundfile
+# (zelfde content-engine als UncleRank; is die al eens gedraaid, dan staat Chatterbox er al.)
 #
-# De TOON per scene staat in STORIES hieronder. Een zin die niet goed valt: alleen die regel
-# wijzigen en opnieuw draaien met --only <nn>.
-import argparse, os, sys, wave, re, math, array, struct, json
-
-# De twee gekozen Kokoro-stemmen (door Mo gekozen uit de test). a=Amerikaans, m=man, f=vrouw.
-VOICES = {
-    "man":   "bm_george",
-    "vrouw": "af_bella",
-}
+# De DRIE referentie-stemmen staan onderin bij VOICES. Een stem vervangen = die ene wav vervangen.
+import argparse, os, sys, re, math, array, struct, json
 
 # ---------------------------------------------------------------------------------------------
-# FONETISCHE LAAG. De STEM leest een fonetische versie van de tekst, zodat lastige woorden goed
-# klinken (Kokoro sprak bv. "a" uit als "AY", en "Allah"/"Quran" raar). De ONDERTITEL blijft de
-# gewone Engelse tekst; het fonetische is puur intern en komt nergens in beeld. We vervangen alleen
-# HELE woorden, met gelijk aantal lettergrepen, zodat de zin-timing exact gelijk blijft.
-# Nieuwe probleemwoorden fix je door één regel aan PRON toe te voegen.
-ARTICLE_FIX = True   # lidwoord "a" -> "uh" (anders zegt Kokoro "AY"); zet op False als het niet bevalt
-PRON = {
-    "Allah": "Allaah",   # ah-LAAH
-    "Quran": "Kuraan",   # koe-RAAN
-    "Umar":  "Oomar",    # OE-mar
+# DE DRIE STEMMEN. Elk is een korte, schone referentie-opname (24k mono) die Chatterbox kloont.
+# De sleutel (v1/v2/v3) is tegelijk de projectnaam-stem waaronder de studio het toont.
+VOICES = {
+    "v1": "voice-test/refs/ref7.wav",
+    "v2": "voice-test/refs/ref8.wav",
+    "v3": "voice-test/refs/ref9.wav",
 }
-_PRON_L = {k.lower(): v for k, v in PRON.items()}
-def _match_case(src, repl):
-    if src.isupper(): return repl.upper()
-    if src[:1].isupper(): return repl[:1].upper() + repl[1:]
-    return repl
-def to_phonetic(text):
-    def _rep(m):
-        w = m.group(0); v = _PRON_L.get(w.lower())
-        return _match_case(w, v) if v else w
-    out = re.sub(r"[A-Za-z']+", _rep, text)
-    if ARTICLE_FIX:
-        out = re.sub(r"\ba\b", "uh", out)
-        out = re.sub(r"\bA\b", "Uh", out)
-    return out
-
-# Kokoro ('github:v1.0:fp32') weigert een aanvraag boven ~510 tokens. Bij deze stem/taal ligt het
-# aantal tokens dicht bij het aantal tekens, dus we houden een veilige grens op TEKENS aan en
-# knippen een langere scene op zinsgrenzen in stukken die elk ruim onder de limiet blijven. De
-# stukken worden daarna naadloos aan elkaar geplakt tot een scene-wav (zelfde stem/tempo), zodat
-# de intonatie doorloopt als een verhaal.
-MAX_CHARS = 490
+LANG = "en"   # Truthward = Engels
 
 # Stilte VOORAAN de intro-wav (seconden): het logo staat zo eerst rustig in beeld voordat de stem
 # begint. Pas dit getal aan voor een langere/kortere logo-hold aan het begin.
 LEAD_SILENCE = 3.0
 
-# Toon-presets voor Kokoro: speed (tempo, <1 = trager/zwaarder, >1 = sneller) en sil = extra
-# STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte kan landen (adem,
-# niet bam-bam-bam). De engine voegt tussen scenes ook nog een adempauze toe (VOICE_PAD).
+# Toon-presets: sil = extra STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte
+# kan landen (adem, niet bam-bam-bam). Chatterbox heeft geen tempo-knop; de rust zit in deze stiltes
+# plus het PAUZE-plan hieronder. De engine voegt tussen scènes nog een adempauze toe (VOICE_PAD).
 TONE = {
-    "rustig": dict(speed=0.79, sil=0.45),   # verhalend, iets vlotter
-    "nadruk": dict(speed=0.75, sil=0.70),   # statement, zwaarder, laat de klap hangen
-    "warm":   dict(speed=0.75, sil=0.85),   # payoff, rustig, laat het bezinken
-    "hook":   dict(speed=0.77, sil=0.55),   # haak
-    "intro":  dict(speed=0.79, sil=0.60),   # opening
-    "outro":  dict(speed=0.77, sil=0.80),   # afsluiter, met lucht
+    "rustig": dict(sil=0.45),
+    "nadruk": dict(sil=0.70),
+    "warm":   dict(sil=0.85),
+    "hook":   dict(sil=0.55),
+    "intro":  dict(sil=0.60),
+    "outro":  dict(sil=0.80),
 }
 
-# --- PAUZES TUSSEN ZINNEN --------------------------------------------------------------------
-# Twee niveaus. (a) BASIS-pauze tussen ALLE zinnen (BASE_PAUSE, seconden) — iets ruimer dan
-# Kokoro's natuurlijke adem, zodat de kijker kan nadenken. (b) EXTRA pauzes op gekozen momenten
-# via PAUSES_BY[story][scene][zin-index] = extra seconden BOVENOP de basis (richtwaarde 1.5-2.5s),
-# bv. direct na de grootste vraag. De zin-index is 0-gebaseerd BINNEN de scene. Een "base"-sleutel
-# per story overschrijft de globale basis voor dat verhaal. De script-kant vult dit per project;
-# standaard leeg = overal alleen de basis-pauze.
-BASE_PAUSE = 0.5
-PAUSES_BY = {
-    # "chose": {"base": 0.55, 6: {7: 2.0}},   # 0.55s basis + 2s extra na zin 7 in scene 6
-}
+# Chatterbox heeft een natuurlijke, gekloonde stem die ZELF adem en intonatie plaatst. Anders dan de
+# vorige engine hoeven we dus NIET zin-voor-zin in te spreken met kunstmatige pauzes ertussen (traag
+# en liet korte zinnen als "So." crashen). We spreken per CHUNK in: zinnen van een scène gegroepeerd
+# tot stukken net onder de modellimiet, elk in EEN keer ingesproken en aan elkaar geplakt.
+MAX_CHARS = 300   # veilige lengte per Chatterbox-aanroep (te korte stukjes crashen, te lange kappen af)
 
-# Kokoro-synthesizer wordt per (stem, snelheid) één keer opgezet (model laadt dan één keer per
-# combinatie). De snelheid zit in de SynthesisConfig, zodat de toon-per-scene echt doorwerkt.
-_SYNTH_CACHE = {}
-def _get_synth(voice_model, speed):
-    key = (voice_model, round(speed, 3))
-    if key in _SYNTH_CACHE:
-        return _SYNTH_CACHE[key]
-    from pykokoro import KokoroSynthesizer, SynthesisConfig, GenerationConfig
-    cfg = SynthesisConfig(voice=voice_model, generation=GenerationConfig(lang="en-us", speed=speed))
-    synth = KokoroSynthesizer(cfg).__enter__()
-    _SYNTH_CACHE[key] = synth
-    return synth
+# ---------------------------------------------------------------------------------------------
+# CHATTERBOX-MODEL. Eén keer laden per proces; de referentie-stem geven we per generate-call mee,
+# dus hetzelfde model bedient alle drie de stemmen. Perth (de watermerk-laag) kan ontbreken of een
+# bug geven op CPU; daarom zetten we vooraf een onschadelijke stub klaar als perth niet importeert.
+_CB = {}
+def _get_model():
+    if "m" in _CB:
+        return _CB["m"]
+    try:
+        import perth  # noqa
+    except Exception:
+        import types
+        pm = types.ModuleType("perth")
+        class _Dummy:
+            def __init__(self, *a, **k): pass
+            def apply_watermark(self, wav, *a, **k): return wav
+            def get_watermark(self, *a, **k): return None
+        pm.PerthImplicitWatermarker = _Dummy
+        pm.DummyWatermarker = _Dummy
+        sys.modules["perth"] = pm
+    from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+    _CB["m"] = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
+    return _CB["m"]
 
-def _split_for_tokens(text, max_chars=MAX_CHARS):
-    # Knip op zinsgrenzen (. ! ?) en groepeer zinnen tot net onder max_chars, zodat elk stuk ruim
-    # onder Kokoro's 510-token-limiet blijft. De naad valt zo altijd op een zin-einde.
-    text = text.strip()
-    if len(text) <= max_chars:
-        return [text]
-    sents = re.split(r'(?<=[.!?])\s+', text)
-    chunks, cur = [], ""
-    for s in sents:
-        s = s.strip()
-        if not s:
-            continue
-        if cur and len(cur) + 1 + len(s) > max_chars:
-            chunks.append(cur); cur = s
-        else:
-            cur = (cur + " " + s).strip() if cur else s
+def _synthesize(ref_abs, text, sil, out_wav):
+    # één stuk tekst inspreken met de gekloonde stem en als standaard PCM-16 wav wegschrijven.
+    import soundfile as sf
+    m = _get_model()
+    wav = m.generate(text, language_id=LANG, audio_prompt_path=ref_abs)
+    sf.write(out_wav, wav.squeeze().detach().cpu().numpy(), m.sr, subtype="PCM_16")
+    if sil and sil > 0:
+        _append_silence(out_wav, sil)
+
+def _sentences(text):
+    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+
+def _syllables(w):
+    w = w.lower(); v = "aeiouy"; c = 0; prev = False
+    for ch in w:
+        isv = ch in v
+        if isv and not prev: c += 1
+        prev = isv
+    if w.endswith("e") and c > 1: c -= 1
+    return max(1, c)
+
+def _sent_weight(s):
+    base = sum(_syllables(w) for w in re.findall(r"[A-Za-z']+", s))
+    base += 0.6 * len(re.findall(r"[,;:]", s))   # interne pauzes kosten tijd
+    base += 0.9                                  # zin-eind-pauze
+    return max(base, 1.0)
+
+def _group_sentences(sents, max_chars=MAX_CHARS):
+    # Groepeer hele zinnen tot stukken net onder max_chars. Elk stuk onthoudt welke zin-indices erin
+    # zitten, zodat we straks per zin de tijd kunnen schatten. Zo wordt een losse "So." nooit apart
+    # ingesproken (dat crasht), maar samengevoegd met de buurzin.
+    groups = []; cur = []; cur_idx = []; cur_len = 0
+    for i, s in enumerate(sents):
+        add = len(s) + (1 if cur else 0)
+        if cur and cur_len + add > max_chars:
+            groups.append((" ".join(cur), cur_idx)); cur = []; cur_idx = []; cur_len = 0
+            add = len(s)
+        cur.append(s); cur_idx.append(i); cur_len += add
     if cur:
-        chunks.append(cur)
-    return chunks or [text]
+        groups.append((" ".join(cur), cur_idx))
+    return groups
 
+def _synthesize_scene(ref_abs, scene_text, tail_sil, out_wav):
+    # Spreek de scène in per CHUNK (niet per zin): Chatterbox plaatst de pauzes zelf. Plak de chunks
+    # aan elkaar met een mini-adem ertussen, en zet achteraan een korte staart-stilte (tail_sil).
+    # Lever een GESCHAT (start, duur) per zin terug (lettergreep-gewicht binnen de gemeten chunk-duur)
+    # voor de ondertitel; in de studio kun je grenzen alsnog verschuiven.
+    sents = _sentences(scene_text)
+    if not sents:
+        _synthesize(ref_abs, scene_text, tail_sil, out_wav)
+        d = _wav_duration(out_wav); return [(0.0, round(d, 3))], 0.0, round(d, 3)
+    groups = _group_sentences(sents)
+    parts = []; seg = [None] * len(sents); cursor = 0.0
+    GAP = 0.12   # mini-adem tussen chunks; de rest van het ritme doet Chatterbox zelf
+    for gi, (text, idxs) in enumerate(groups):
+        tmp = f"{out_wav}.g{gi:02d}.wav"
+        _synthesize(ref_abs, text, 0.0, tmp)
+        gdur = _wav_duration(tmp)
+        weights = [_sent_weight(sents[i]) for i in idxs]; tot = sum(weights) or 1.0
+        c = cursor
+        for i, w in zip(idxs, weights):
+            dd = gdur * (w / tot); seg[i] = (round(c, 3), round(dd, 3)); c += dd
+        last = (gi == len(groups) - 1)
+        if not last and GAP > 0:
+            _append_silence(tmp, GAP)
+        parts.append(tmp)
+        cursor += gdur + (0.0 if last else GAP)
+    if tail_sil and tail_sil > 0:
+        _append_silence(parts[-1], tail_sil)
+    _concat_wavs(parts, out_wav)
+    for p in parts:
+        try: os.remove(p)
+        except Exception: pass
+    segs = [s for s in seg if s is not None]
+    sp0 = segs[0][0] if segs else 0.0
+    sp1 = round(segs[-1][0] + segs[-1][1], 3) if segs else round(_wav_duration(out_wav), 3)
+    return segs, sp0, sp1
+
+# ---------------------------------------------------------------------------------------------
+# WAV-HELPERS (byte-niveau, RIFF). Werken op de standaard PCM-16 wavs die soundfile schrijft:
+# stilte aanplakken/voorzetten, exacte duur meten, en meerdere wavs naadloos aan elkaar plakken.
 def _read_wav_parts(path):
-    # (bytes, offset-van-data-payload, lengte-van-data) via RIFF-logica (werkt op float32-wav).
     with open(path, "rb") as f:
         data = bytearray(f.read())
     if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
@@ -136,8 +168,6 @@ def _read_wav_parts(path):
     return data, None, None
 
 def _concat_wavs(paths, out_wav):
-    # Plak meerdere wavs (zelfde fmt) aan elkaar: header van het eerste stuk, payloads achter
-    # elkaar, lengte-velden (data-chunk + RIFF) bijwerken.
     base, doff, dlen = _read_wav_parts(paths[0])
     if doff is None:
         with open(paths[0], "rb") as f, open(out_wav, "wb") as g:
@@ -156,173 +186,9 @@ def _concat_wavs(paths, out_wav):
     with open(out_wav, "wb") as f:
         f.write(new)
 
-def _sentence_breaks(text):
-    # RUST TUSSEN ZINNEN: zet een regeleinde NA elke punt/uitroep/vraagteken, zodat Kokoro daar
-    # ZELF ademt (in de juiste woorden, geen geknipt geluid). De stem doet de pauze, wij knippen
-    # niets in de opname. Dubbele enter = iets langere adem.
-    return re.sub(r'([.!?])\s+', r'\1\n\n', text.strip())
-
-def _synthesize(voice_model, text, speed, sil, out_wav):
-    synth = _get_synth(voice_model, speed)
-    text = _sentence_breaks(text)   # adem na elke zin via regeleindes (natuurlijke pauze)
-    chunks = _split_for_tokens(text)
-    if len(chunks) == 1:
-        rendered = synth.synthesize_text(chunks[0], language="en-us", voice=voice_model)
-        rendered.save_wav(out_wav)
-    else:
-        parts = []
-        for idx, ch in enumerate(chunks):
-            tmp = f"{out_wav}.part{idx}.wav"
-            r = synth.synthesize_text(ch, language="en-us", voice=voice_model)
-            r.save_wav(tmp)
-            parts.append(tmp)
-        _concat_wavs(parts, out_wav)
-        for p in parts:
-            try: os.remove(p)
-            except Exception: pass
-    if sil and sil > 0:
-        _append_silence(out_wav, sil)
-
-def _synthesize_with_pauses(voice_model, voiceline, speed, base_pause, tail_sil, pauses_scene, out_wav):
-    # Spreekt elke zin APART in en zet ECHTE stilte ertussen: basis-pauze na elke zin + eventueel
-    # extra uit het PAUZE-plan (bv. 2s na de grootste vraag). Knipt nooit in woorden (de stilte is
-    # losse nul-samples tussen twee hele zin-opnames). Levert de EXACTE (start, duur) per zin BINNEN
-    # de scene-wav terug, plus speech_start/-_end — geen schatting meer, want we kennen elke lengte.
-    sents = _sentences(voiceline)
-    if not sents:
-        _synthesize(voice_model, to_phonetic(voiceline), speed, tail_sil, out_wav)
-        return [], 0.0, round(_wav_duration(out_wav), 3)
-    parts, segs = [], []
-    cursor = 0.0
-    N = len(sents)
-    for i, sent in enumerate(sents):
-        tmp = f"{out_wav}.s{i:02d}.wav"
-        _synthesize(voice_model, to_phonetic(sent), speed, 0.0, tmp)   # pure spraak, geen staart
-        sdur = _wav_duration(tmp)
-        segs.append((round(cursor, 3), round(sdur, 3)))
-        # pauze NA deze zin: de laatste zin krijgt de scene-staart-stilte, de rest basis (+ extra)
-        if i < N - 1:
-            extra = pauses_scene.get(i, pauses_scene.get(str(i), 0.0)) or 0.0
-            pause = base_pause + float(extra)
-        else:
-            pause = tail_sil
-        if pause and pause > 0:
-            _append_silence(tmp, pause)
-        parts.append(tmp)
-        cursor += sdur + pause
-    _concat_wavs(parts, out_wav)
-    for p in parts:
-        try: os.remove(p)
-        except Exception: pass
-    sp0 = segs[0][0]
-    sp1 = round(segs[-1][0] + segs[-1][1], 3)   # eind van de laatste spraak (vóór de staart-stilte)
-    return segs, sp0, sp1
-
-# ---------------------------------------------------------------------------------------------
-# PER-ZIN-MEETROOSTER (fase 1). De scene wordt als EEN vloeiende alinea ingesproken (intonatie
-# blijft heel), en daarna knippen we die opname in zinnen met EXACTE tijden. Methode, geverifieerd
-# op Mo's echte stem: we detecteren de stiltes in de opname, schatten per zin de lengte uit de
-# lettergrepen, en leggen de knip op de echte pauze die het dichtst bij die schatting ligt. Zo
-# raakt geen zin kwijt, ook niet bij korte zinnen zonder hoorbare pauze. Deze tijden zijn de
-# ruggengraat voor de ondertiteling en voor het plaatsen van beeld.
-def _load_f32_wav(path):
-    d = open(path, "rb").read()
-    i = 12; doff = dlen = None
-    while i + 8 <= len(d):
-        cid = d[i:i+4]; clen = struct.unpack_from("<I", d, i+4)[0]
-        if cid == b"data": doff = i+8; dlen = clen
-        i += 8 + clen + (clen & 1)
-    if doff is None:
-        return array.array("f"), 24000
-    sr = struct.unpack_from("<I", d, 24)[0] or 24000
-    sm = array.array("f"); sm.frombytes(d[doff:doff+dlen])
-    return sm, sr
-
-def _rms_env(sm, sr, winsec=0.02):
-    win = max(1, int(winsec*sr)); env = []
-    for s in range(0, len(sm), win):
-        c = sm[s:s+win]
-        if not c: break
-        env.append((s/sr, math.sqrt(sum(x*x for x in c)/len(c))))
-    return env, win/sr
-
-def _detect_gaps(env, winsec, rel=0.06, minlen=0.10):
-    peak = max((e for _, e in env), default=0.0) or 1e-9
-    thr = peak*rel
-    runs = []; j = 0; n = len(env)
-    while j < n:
-        if env[j][1] < thr:
-            k = j
-            while k < n and env[k][1] < thr: k += 1
-            st = env[j][0]; ln = (k-j)*winsec
-            runs.append((st+ln/2, st, ln)); j = k
-        else:
-            j += 1
-    return [(c, st, ln) for (c, st, ln) in runs if ln >= minlen]
-
-def _sentences(text):
-    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
-
-def _syllables(w):
-    w = w.lower(); v = "aeiouy"; c = 0; prev = False
-    for ch in w:
-        isv = ch in v
-        if isv and not prev: c += 1
-        prev = isv
-    if w.endswith("e") and c > 1: c -= 1
-    return max(1, c)
-
-def _sent_weight(s):
-    base = sum(_syllables(w) for w in re.findall(r"[a-zA-Z']+", s))
-    base += 0.6*len(re.findall(r"[,;:]", s))   # interne pauzes kosten tijd
-    base += 0.9                                 # zin-eind-pauze
-    return base
-
-def split_sentences(wav_path, text, snap_win=0.35):
-    # Geef [(start, dur) per zin] (tijden binnen de wav) + speech_start/speech_end. Robuust ook als
-    # er weinig pauzes zijn: de syllabe-schatting bepaalt de verwachte knip, en als er een echte
-    # stilte dichtbij is snappen we daarnaartoe (netter), anders houden we de schatting. Altijd
-    # oplopend, nooit een zin kwijt.
-    sm, sr = _load_f32_wav(wav_path)
-    dur = len(sm)/sr if sr else 0.0
-    sents = _sentences(text); N = len(sents)
-    if dur <= 0 or N == 0:
-        return [(0.0, round(dur, 3))], 0.0, round(dur, 3)
-    env, winsec = _rms_env(sm, sr)
-    gaps = _detect_gaps(env, winsec)
-    sp_start, sp_end = 0.0, dur
-    if gaps and gaps[0][1] < 0.30: sp_start = gaps[0][1] + gaps[0][2]
-    if gaps and (gaps[-1][1] + gaps[-1][2]) >= dur - 0.10: sp_end = gaps[-1][1]
-    if N <= 1:
-        return [(round(sp_start, 3), round(sp_end - sp_start, 3))], round(sp_start, 3), round(sp_end, 3)
-    w = [_sent_weight(s) for s in sents]; tot = sum(w) or 1.0
-    cum = 0.0; exp = []
-    for ww in w[:-1]:
-        cum += ww; exp.append(sp_start + (sp_end - sp_start)*cum/tot)
-    cent = sorted(c for (c, st, ln) in gaps if sp_start < c < sp_end)
-    bounds = []; prev = sp_start; used = set()
-    for k, e in enumerate(exp):
-        best = None; bestd = snap_win
-        for ci, c in enumerate(cent):
-            if ci in used or c <= prev + 0.15: continue
-            dd = abs(c - e)
-            if dd < bestd: bestd = dd; best = (ci, c)
-        if best is not None:
-            used.add(best[0]); b = best[1]
-        else:
-            b = max(e, prev + 0.15)
-        b = min(b, sp_end - 0.15*(N - 1 - k))
-        bounds.append(b); prev = b
-    cuts = [sp_start] + bounds + [sp_end]
-    segs = [(round(cuts[i], 3), round(cuts[i+1] - cuts[i], 3)) for i in range(N)]
-    return segs, round(sp_start, 3), round(sp_end, 3)
-
 def _wav_duration(wav_path):
-    # exacte duur (seconden) van een wav, OOK als het een float32-wav van Kokoro is (die de
-    # wave-module niet kan lezen). We lezen byteRate (offset 28) en de lengte van de data-chunk
-    # en delen: duur = data_bytes / byteRate. Dit is dezelfde RIFF-logica als _append_silence.
+    # exacte duur (seconden): data_bytes / byteRate (offset 28), via dezelfde RIFF-logica.
     try:
-        import struct
         with open(wav_path, "rb") as f:
             data = f.read()
         if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
@@ -341,23 +207,16 @@ def _wav_duration(wav_path):
         return 0.0
 
 def _append_silence(wav_path, seconds):
-    # plak stilte achter de wav zodat er adem na de zin zit. Kokoro schrijft FLOAT-wav (format 3),
-    # die de wave-module niet kan lezen; daarom werken we direct op de RIFF-bytes. Stilte = nullen
-    # (0.0 in float en 0 in PCM zijn allebei nul-bytes). We lezen de fmt-chunk, berekenen hoeveel
-    # bytes stilte nodig is, plakken die achter de data-chunk en werken de twee lengte-velden bij.
+    # plak stilte (nul-bytes) achter de data-chunk en werk de twee lengte-velden bij.
     try:
-        import struct
         with open(wav_path, "rb") as f:
             data = bytearray(f.read())
         if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
             return
-        # byteRate staat op offset 28 in de standaard fmt-chunk
         byte_rate = struct.unpack_from("<I", data, 28)[0]
         if byte_rate <= 0:
             return
-        # zoek de 'data'-chunk
-        i = 12
-        data_off = None; data_len = None
+        i = 12; data_off = None; data_len = None
         while i + 8 <= len(data):
             cid = bytes(data[i:i+4]); clen = struct.unpack_from("<I", data, i+4)[0]
             if cid == b"data":
@@ -366,14 +225,11 @@ def _append_silence(wav_path, seconds):
         if data_off is None:
             return
         nbytes = int(byte_rate * seconds)
-        # sample-uitlijning (4 bytes bij 32-bit mono; blockalign op offset 32)
         block_align = struct.unpack_from("<H", data, 32)[0] or 1
         nbytes -= (nbytes % block_align)
         silence = b"\x00" * nbytes
-        # voeg stilte toe direct na de data-bytes
         insert_at = data_off + data_len
         new = data[:insert_at] + silence + data[insert_at:]
-        # werk data-chunk-lengte (offset data_off-4) en RIFF-lengte (offset 4) bij
         struct.pack_into("<I", new, data_off - 4, data_len + nbytes)
         struct.pack_into("<I", new, 4, len(new) - 8)
         with open(wav_path, "wb") as f:
@@ -382,11 +238,8 @@ def _append_silence(wav_path, seconds):
         pass
 
 def _prepend_silence(wav_path, seconds):
-    # Plak stilte VOORAAN de wav (vóór de eerste zin). Gebruikt voor de intro: zo staat het logo
-    # een paar seconden rustig in beeld voordat de stem begint. Zelfde RIFF-logica als _append_silence,
-    # maar de stilte komt direct NA de data-chunk-header (vóór de audio) i.p.v. aan het eind.
+    # plak stilte VOORAAN (vóór de eerste zin): het logo staat zo eerst rustig in beeld.
     try:
-        import struct
         with open(wav_path, "rb") as f:
             data = bytearray(f.read())
         if data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
@@ -407,7 +260,6 @@ def _prepend_silence(wav_path, seconds):
         if nbytes <= 0:
             return
         silence = b"\x00" * nbytes
-        # stilte VOOR de audio-data invoegen (bij data_off), audio schuift op
         new = data[:data_off] + silence + data[data_off:]
         struct.pack_into("<I", new, data_off - 4, data_len + nbytes)
         struct.pack_into("<I", new, 4, len(new) - 8)
@@ -416,153 +268,74 @@ def _prepend_silence(wav_path, seconds):
     except Exception:
         pass
 
-# Het script "sword" (idee 1), per scene: nummer, toon, on-screen-tekst, en de VOICE-zin.
-# De voice-zin is wat ingesproken wordt; de on-screen-tekst is de korte zin in beeld.
-# TWEE DELEN. Knip op de natuurlijke breuk: deel 1 = HOE de islam opkwam (zonder dwang),
-# eindigt op een cliffhanger die de grote test opzet (500 jaar kolonisatie). Deel 2 = de TEST,
-# en dat het standhield (Indonesië 300 jaar, Bosnië, Spanje, payoff, CTA).
-# SCRIPT v2 — scherper, trots, DIRECT tot de moslim-kijker (iedereen mag meekijken). Korte rake
-# zinnen, pakkende haak, geen neutraal-documentaire-toon. Per scene: nr, toon, ON-SCREEN kernzin
-# (groot in beeld bij statement/mythe), en de VOICE-zin (ook de ondertitel die meeloopt).
+# ---------------------------------------------------------------------------------------------
+# SCRIPT. Per scène: nummer, toon, ON-SCREEN kernzin, en de VOLLE gesproken zin (= de ondertitel).
+# GEEN m-dashes in de tekst. Scène 0 = merk-intro MET de vaste CTA-aanzet (like / comment / share /
+# subscribe), die in beeld samenloopt met de CTA-animatie + chimes tijdens de sterren-intro.
 STORIES = {
-  # LANGE VIDEO — ÉÉN doorlopend verhaal "Spread by the sword?" (herschreven 4 nov, door Mo
-  # goedgekeurd). Scène 0 = merk-intro met missie + CTA; 1-17 = het verhaal; 18 = outro + CTA.
-  # Per scène: nr, toon, korte on-screen kernzin, en de VOLLE gesproken zin (= de ondertitel).
-  # De STEM leest een FONETISCHE versie hiervan (zie to_phonetic); de ondertitel blijft deze tekst.
-  # GEEN m-dashes in de tekst.
-  "sword": {
-    "title": "Spread by the sword?",
-    "scenes": [
-      (0,  "intro",  "Umma United",
-           "Welcome to Umma United. Here is what we do on this channel. All your life you have been handed stories about who you are and where you come from, told so often and so confidently that they begin to feel like facts set in stone. We take those stories down, and we hold them up against the real history, the dates, the places, the record that was actually left behind. And more often than not, they do not survive the light. If that is the kind of thing you want more of, subscribe before we begin. Now, let us start with the biggest story of them all."),
-      (1,  "hook",   "Spread by the sword?",
-           "There is one accusation thrown at Islam more than any other. That it was never truly chosen. That it was forced onto the world at the edge of a sword. Convert, or die. You hear it in classrooms, in documentaries, in half the arguments online. So tonight we are not going to get angry, and we are not going to get defensive. We are simply going to test it, with real history, real dates, and real places. And then the truth can speak for itself."),
-      (2,  "nadruk", "Here is the test.",
-           "Here is the test, and it is a fair one. A faith that is only held up by force has a single weakness. The moment that force is gone, it falls. If people never truly believed it, they do not wait a generation to walk away. They let go the instant no one is standing over them anymore. So we do not need to raise our voices. We only need to watch what force actually does to belief. What quietly collapses the second the pressure lifts, and what refuses to break even with the full weight of an empire bearing down on it. We are going to see both. First in Rome, and then in the empires of Europe."),
-      (3,  "rustig", "Start with Rome.",
-           "Start with Rome. This was not some local kingdom. It was the superpower of its age, ruling tens of millions of people across three continents, from the cold edge of Britain to the sands of Arabia. And in the year 380, the emperor Theodosius signed a decree that bound that entire machine to one single religion. From that day on, one form of Christianity was the law of the state, and every other belief was, quite literally, a crime. Temples were pulled down. Other Christians were hunted as heretics. And for the next two and a half centuries, across Syria, across Egypt, and all along North Africa, you believed what the empire ordered you to believe, or you paid for it."),
-      (4,  "nadruk", "A world of force.",
-           "And no one paid more dearly than the Jews. They were taxed for their faith and shut out of public life, and in Jerusalem, their own holy city, they were forbidden from even living there at all. Whole communities survived one new law away from losing everything. And anyone else whose belief did not match the emperor's lived under that very same shadow. Hold on to this picture, because it is the world that came before. A world where the ruler alone decided what your soul was permitted to believe."),
-      (5,  "nadruk", "Two empires fall.",
-           "Now watch what replaced it. In the 630s, within a single generation, the Muslims did something the world thought impossible. They did not face down one superpower. They faced two. They took the Christian Roman east, and alongside it they brought down the entire Persian empire, the other great power of the age, with its own state religion enforced from the top. Two empires that had divided the known world between them, now in the hands of the believers. And it is right here, at the very height of that power, that the whole accusation quietly falls apart."),
-      (6,  "warm",   "They forced no one.",
-           "Because the Muslims forced no one. The Christian kept his church. The Jew kept his synagogue. The Zoroastrian of Persia kept his fire. Every one of them stayed free to worship exactly as he always had, his place of prayer protected, and he was not even asked to take up a weapon for the state. Look at what Umar, may Allah be pleased with him, did the day he took Jerusalem. He walked into a city that had banned Jews for close to five hundred years, and he lifted that ban and invited them to come home. The conqueror arrived and undid the cruelty of the ones who came before him. And this was not the good manners of one unusual man. This was what the faith itself demanded of them. Because Islam is clear that no one can place belief inside another person's heart. Guidance comes from Allah alone. So the task of a believer was only ever to carry the message, to rule with justice and not with injustice, and to leave the hearts to the One who made them."),
-      (7,  "nadruk", "The real question.",
-           "So now ask the real question, the one that takes the whole accusation apart. If Islam was spread by forcing people to convert, the conversions would have come at once. Convert this week, or die. But that is the opposite of what the record shows. For a long time after the conquests, most people in those lands stayed Christian, stayed Jewish, stayed Zoroastrian, and they were left in peace to do exactly that. They had been handed something they never had under Rome or Persia, the simple freedom to choose. And only after living inside that freedom did they begin, slowly, over generations, to turn to Islam on their own, until in the end it became the faith of the overwhelming majority. That is the fingerprint of a faith that is chosen. The heart has to move first, and that takes time. Now set it beside the faith that Rome truly did force. The day Rome's power left those lands, that faith did not hold on for generations. It fell away almost at once, because for so many it had never really been theirs to begin with."),
-      (8,  "rustig", "A thousand years.",
-           "And what the believers built did not last for a season. It stood for well over a thousand years. Long enough, many times over, for a forced faith to crack and crumble into nothing. Instead it only grew deeper, generation after generation, held up by no army at all, but by people who had come to it with open eyes and chosen it as their own."),
-      (9,  "nadruk", "The test returns.",
-           "And then, almost a thousand years later, the test arrived again, this time from the opposite direction. Starting in the 1500s, and rising over the next four hundred years, it was Europe's turn to sail out across the world. The Portuguese and the Spanish, then the Dutch, the French, and the British. They took North Africa. They took Indonesia. They took the Muslim lands of the Balkans. And this time the sword was no figure of speech. It was real, it was foreign, and a great deal of it was pointed straight at the faith itself."),
-      (10, "nadruk", "They tried everything.",
-           "And they did not come to govern gently and leave people to their prayers. In Algeria, France turned the great mosques into cathedrals and seized the endowments that had kept the faith running for centuries. The language of the Quran was driven out of the schools. Rulers set community against community so that a people could never again stand as one. Everything an empire is capable of doing to tear a faith out by its roots, they tried, with real power, for generation after generation. So if a forced faith cannot survive, then this one, crushed for centuries under the most advanced empires on earth, should have been wiped from the map."),
-      (11, "warm",   "It held.",
-           "It was not. When the Europeans finally lowered their flags and sailed home after the Second World War, the faith was still standing exactly where they had first found it. Indonesia walked out of centuries of Dutch rule and is today the largest Muslim nation on earth, with nearly nine in ten of its people Muslim. Bosnia, surrounded in the very heart of Europe, is still Muslim and still praying. And all along North Africa, the people who walked out into freedom carried the very same faith they had carried into occupation."),
-      (12, "rustig", "No army takes a heart.",
-           "So line it all up, and the verdict is almost embarrassing in how clear it is. Count the believers in those lands before the colonisers ever arrived, and count them again the day they left. The number barely moves. The most powerful empires the world had ever built, with everything they owned aimed at one single thing, and they could not shift it an inch. Because you cannot conquer what never lived in the soil to begin with. It lived in the heart. And no army in all of history has ever taken a heart."),
-      (13, "nadruk", "The wrong religion.",
-           "So let us return, one last time, to the rule we began with. A faith held up by force cannot last. The moment the force is gone, the people let it go. It is completely true. They had simply aimed it at the wrong religion all along. Because there was a faith in this story that truly was forced, first by Rome and then across the whole of Europe. Convert, or be ruined. And if you want to see how that story ends, you do not need a history book. Walk through Europe today and look at its great cathedrals. They stand almost empty."),
-      (14, "nadruk", "A wound.",
-           "And it is worth asking, with no trace of mockery in it, why that is. When a faith is pressed onto people by force, through generation after generation, it does not simply fade away cleanly. It leaves a wound. And a wounded people do not only turn away from the one faith that was forced upon them. Given enough time, they grow wary of faith itself. That may well be a part of what Europe is living through now, that reflex to push religion out of sight, because somewhere far back in its memory, religion first arrived as a hand closing around the throat. Their own rule came true, in their own home, upon their own faith. That is their history to carry, and it was never ours."),
-      (15, "warm",   "Ruled with justice.",
-           "Because ours was never forced upon a single soul. Our forefathers walked into the two greatest empires on the face of the earth, and where those empires had ruled through cruelty, our forefathers ruled through justice. They freed the hunted. They guarded the churches, the synagogues, and the fire temples of the very people they had just defeated. And it was that justice, and not any blade, that finally opened the hearts. They forced their faith, and in the end they lost it. We offered ours with an open hand, and we are the ones still holding it today."),
-      (16, "warm",   "You are the proof.",
-           "So the next time someone tells you that your faith was spread by the sword, you will not need to argue, and you will not need to raise your voice. You know the history now. You know the dates. You know whose hand was truly on the blade, and you know what your own forefathers did with the power they held in theirs. They used it to establish what was right and to put an end to what was wrong. The truth never needed a sword. All it ever needed was to be seen clearly. That is why, after Rome, after Persia, after every empire that ever came for it, you are still standing here today, with well over a billion others beside you. And every single time you rise to your feet to pray, you yourself are the living proof of it."),
-      (17, "warm",   "The truth runs straight.",
-           "And think, for a moment, about how much a lie has to carry just to stay on its feet. It has to bend the facts, bury half of them, and count on you never once going back to check. The truth carries none of that weight. It simply walks in a straight line. And we are going to keep walking it, story after story, through everything they told you was settled and beyond question. So if you are tired of being made to feel small about who you are, do not just watch this and leave. Subscribe, and stand with us, because there is a great deal more of this still to come."),
-      (18, "outro",  "Umma United",
-           "Umma United. Subscribe, so the next story finds you. We will see you in the next one."),
-    ],
-  },
-
-  # VIDEO 1 van de nieuwe reeks — "The Answer You Never Chose" (werktitel). Engels, mannenstem,
-  # 16:9. De kijker denkt overal rationeel na (dokter/advocaat = de rationele daad), behalve over
-  # de grootste vraag (ons bestaan): daar nam hij zijn antwoord blind over. De vijf deuren zijn
-  # HET antwoord van de video. Identiteit (scene 10) dicht de "ik ben nu volwassen"-tegenwerping.
-  # Slot opent bewust, geen bom maar een kwartje, en bruggt naar video 2 (absolute waarheid).
-  # De stille disclaimer-kaart aan het begin is een BEELD-laag in de studio, geen gesproken scene.
-  # Regels: islam nooit als antwoord, "de meeste mensen" niet "iedereen", geen m-dashes.
+  # VIDEO 1 — "The Answer You Never Chose". Engels, 16:9. De kijker denkt overal rationeel na, behalve
+  # over de grootste vraag (ons bestaan): daar nam hij zijn antwoord blind over. Vijf deuren = HET
+  # antwoord. Identiteit (scène 10) dicht de "ik ben nu volwassen"-tegenwerping. Slot bruggt naar
+  # video 2 (absolute waarheid). Regels: islam nooit als antwoord, "de meeste mensen" niet "iedereen".
   "chose": {
     "title": "The Answer You Never Chose",
     "scenes": [
       (0,  "intro",  "Truthward",
-           "Welcome to Truthward. This is a calm place for loud questions. The ones we are usually too busy to sit with. We will take them slowly, one at a time. We will be honest about what we find, and honest about what we do not. There is no rush here. So take a breath. And let us begin."),
+           "Welcome to Truthward. This channel is new, and small, and honest about both. Here is what we do. We take the questions that are too large to fit into a normal day, the ones you feel for a second and then push aside, and we refuse to push them aside. One at a time. Slowly. We follow each one as far as it goes, even when it stops being comfortable. If that is something you have been quietly looking for, then the most useful thing you can do is come back. Like it only if it earned that. Disagree in the comments, because we would rather be corrected than left comfortable. And subscribe, so the next question reaches you instead of getting lost. That is all. Now take a breath. And let us begin."),
       (1,  "rustig", "You can think.",
-           "Start with something simple. Something that is quietly true about you. You can think. A bird does not decide to fly south. It is born with the answer already inside it. Where to go. What to eat. What to fear. It never has to wonder. You are not like that. You wake up in front of choices that nothing prepared you for. And you have to work them out for yourself. You weigh things. You reason. You choose. That is a quiet kind of miracle. And you do it every single day."),
-      (2,  "rustig", "A thousand small choices.",
-           "Most of the time you do not even notice it. You look up at the sky, and you take a coat. Such a small thing. But look a little closer. You read the world. You weighed it. And you made a choice. You do that a thousand times a day. You just never call it thinking."),
+           "Here is something that is true about you, right now, that you almost never stop to notice. You can think. A bird flying south chose nothing. The answer was built into it before it was born. Where to go. What to eat. What to run from. It never has to wonder. You are not built like that. You wake up in front of questions nothing prepared you for, and you have to work them out yourself. You weigh. You reason. You decide. That is a strange and quiet gift. And you use it every single day without once calling it remarkable."),
+      (2,  "rustig", "A thousand calls a day.",
+           "Most of the time you do not even feel it happening. You glance at the sky and you take a coat. Nothing to it. But slow it down. You read the world in front of you, you weighed it, and you made a call. You do that a thousand times before noon. You just never give it a name."),
       (3,  "nadruk", "Go to who knows.",
-           "And when something truly matters, you become even more careful. A pain comes, and it does not go away. You do not guess. You do not open yourself up on the kitchen table. You stop, and you think. I do not know enough about this. So I will go to someone who does. Sit with that for a moment. You saw the edge of your own knowing. And you walked toward the person who could see further. That is not weakness. That is the most rational thing a human being can do."),
-      (4,  "rustig", "Look first.",
-           "And it is everywhere, once you notice it. You do not argue your own case in court on a feeling. You find someone who knows the law. You do not trust a bridge because it looks strong. Someone spent years proving that it holds. The pattern never changes. You look first. You decide after. To simply accept something, handed to you, without ever once checking. That would be reckless. And somewhere inside, you already know it."),
+           "And the moment something actually matters, you get more careful, not less. A pain shows up and it does not leave. You do not guess. You do not open yourself up at the kitchen table. You stop, and you think one honest thought. I do not know enough about this. So I will go to someone who does. Sit with that, because it is the whole thing in one move. You saw the edge of your own knowing, and you walked toward someone who could see past it. That is not weakness. That is the most rational thing a person ever does."),
+      (4,  "rustig", "Look first, decide after.",
+           "And once you see it, you see it everywhere. You do not defend yourself in a courtroom on a hunch. You find someone who knows the law. You do not trust a bridge because it looks sturdy. Someone spent years proving it holds. The move never changes. You look first. You decide after. To just accept a thing, handed to you, and never once check it, would be reckless. And somewhere in you, you already know that."),
       (5,  "nadruk", "Except one question.",
-           "Except in one place. There is a single question where all of that quietly stops. And it is not a small one. It is the largest question there is. Larger than your health. Larger than your money. Larger than anything you will ever stand up in a court to defend."),
+           "Except there is one place where all of that stops. One question where the careful, checking, reasoning version of you simply does not show up. And it is not a small question. It is the largest one there is. Larger than your health. Larger than your money. Larger than anything you would ever stand in a courtroom to defend."),
       (6,  "nadruk", "Why are you here.",
-           "Here it is. Why are you here. What is this. What happens when it all ends. Stay with those for a moment. Do not rush past them. Because this is the question that everything else is standing on. And on this one, the largest of them all, most people never looked. Not once. They did not weigh it. They did not go to anyone who might know. They simply have an answer. And if you ask them, gently, where that answer came from. The room goes quiet."),
-      (7,  "warm",   "I caught myself.",
-           "And I want to be honest with you. I am not saying this to look down on anyone. I am saying it because it was me. I had my answer too. I carried it for years, as if it were mine. As if I had earned it. Until one quiet day, I asked myself a simple thing. When did I ever sit down with the biggest question there is, and do what I would do for a crack in the wall. Look into it, before I trust it. And the honest answer was, never. Not once. It had been handed to me. And I had spent my whole life calling it my own."),
+           "Here it is. Why are you here. What is this. What happens when it ends. Do not rush past those. Sit in them for a second, because every other thing you do is standing on top of the answer you gave them. And on this one, the biggest of them all, most people never looked. Not once. They did not weigh it. They did not go to anyone who might know. They simply hold an answer. And when you ask them, gently, where it came from, the room goes quiet."),
+      (7,  "warm",   "It was me.",
+           "And I am not saying this from above anyone. I am saying it because it was me. I had my answer too. I carried it for years like it was mine, like I had earned it. Until one ordinary day I asked myself one simple thing. Did I ever once sit down with the biggest question there is and do what I would do for a crack in a wall. Actually look, before I trust it. And the honest answer was no. Never. It had been handed to me. And I had spent my whole life calling it mine."),
       (8,  "rustig", "Five doors.",
-           "So I began to pay attention. If people did not reason their way to this answer, then where did it come from. And as far as I can tell, it arrives through five quiet doors. The first is home. Your parents believed something, or they believed in nothing. And it was yours before you could even speak. The second is a single moment. Something happened that you could not explain. You took it as proof. And you never went back to it. The third is the people around you. Everyone leaned one way. And leaning with them was easier than standing alone. The fourth is the world itself. The films, the songs, the things that school handed you as simply true. A thousand gentle pushes that you never felt as pushes. And the fifth is pain. Someone hurt you in the name of their answer. So you took the opposite one. Not because you weighed it. But because you were walking away from them."),
-      (9,  "nadruk", "Not one is reasoning.",
-           "Now look at those five, honestly. Four of them are something arriving from outside you. One of them is you pushing something away. And not a single one of them is you, sitting down, and reasoning it through. And yet, for most people, this is how they came to hold the most important thing they believe. One person swallowed it whole. The next spat it out just as fast. And both of them were certain that they had chosen."),
+           "So I started paying attention. If people did not reason their way to this answer, then how did it get in. And as far as I can tell, it comes through five quiet doors. The first is home. Your parents believed something, or believed in nothing, and it was yours before you could speak. The second is a single moment. Something happened you could not explain, you took it as proof, and you never went back to it. The third is the people around you. Everyone leaned one way, and leaning with them was easier than standing alone. The fourth is the world itself. The films, the songs, the things school handed you as simply true. A thousand soft pushes you never felt as pushes. And the fifth is pain. Someone hurt you in the name of their answer, so you took the opposite one. Not because you weighed it. Because you were walking away from them."),
+      (9,  "nadruk", "None of it is reasoning.",
+           "Now look at those five honestly. Four of them are something arriving from outside you. One of them is you pushing something away. And not a single one of them is you sitting down and reasoning it through. And yet for most people, that is how they came to hold the most important thing they believe. One person swallowed it whole. The next spat it out just as fast. And both of them walked away certain that they had chosen."),
       (10, "nadruk", "But I am grown now.",
-           "Now you might be thinking. Fine. I was a child. I did not choose it back then. But I am grown now. If it were wrong, I would have gone back, and checked. And here is the uncomfortable part. Most of us never do. And it is not because we are not clever enough. It is that, by now, the answer is not just an idea that you hold. It has become a part of who you are. It is woven into the people you belong to. And when something sits that close to you, you do not test it. You protect it. You take that same sharp mind that chooses the right doctor, and you turn it around. You use it to defend your answer, instead of examining it. That is the strange thing. The sharper the mind, the better it becomes at defending. It is not the careless who are most stuck here. Very often, it is the brightest."),
+           "Now you might be thinking, fine, I was a child, I did not choose it then. But I am grown now. If it were wrong, I would have gone back and checked. And here is the uncomfortable part. Most of us never do. And it is not because we are not clever enough. It is that by now the answer is not just something you hold. It has grown into who you are. It is woven through the people you belong to. And when a thing sits that close to you, you do not test it. You guard it. You take the same sharp mind that picks the right doctor and you turn it around, and you point it at defending the answer instead of examining it. That is the trap. The sharper the mind, the better it gets at defending. It is not the careless who are most stuck here. Very often it is the brightest."),
       (11, "nadruk", "The answer.",
-           "So. Why does the thinking creature stop thinking, right here, on the one question that matters most. I promised you an answer. So here it is, plainly. It is not because people are foolish. It is that an answer was already waiting for them. Through one of those five doors, something was always filled in, long before they arrived. There was never a blank page in front of them, asking to be filled. And the one time they might have gone back to check. The answer had already become a part of them. So they guarded it, instead. That is the answer. And I will be honest about my own. These are the five doors that I could find. Maybe you can find a sixth. They are not carved in stone, just because they came out of my head. That is the whole point of this. But look at them, honestly. And ask yourself. Is even one of them a reason to be sure of anything."),
+           "So. Why does the one creature that can think stop thinking, right here, on the question that matters most. I promised you an answer, so here it is, plainly. It is not that people are foolish. It is that an answer was already waiting for them. Through one of those five doors, something got filled in long before they arrived. There was never a blank page in front of them asking to be filled. And the one time they might have gone back to check, the answer had already become a part of them. So they guarded it instead. That is the answer. And I will be honest about mine. These are the five doors I could find. Maybe there is a sixth, and maybe you are the one who finds it. They are not carved in stone just because they came out of my head. That is the entire point of this channel. But look at them honestly, and ask yourself one thing. Is even one of them a reason to be sure of anything."),
       (12, "warm",   "Is any of it true?",
-           "And this is where it begins to itch. If your answer to the largest question did not come from you. But from where you happened to be born. And who raised you. And what once hurt you. Then how could you ever really know if it is true. Most people never reach that question. But most is not all. Some people do go back. Some do sit down with it. That is the only reason anyone has ever changed their mind about anything. So maybe you are one of the ones who looks. This time. And the moment you try, something stands in the doorway. A quiet voice that says. Who cares. It is all just opinion anyway. Your truth. My truth. No one is really right. And if that is true, then this whole thing is pointless. So before we go anywhere near what the answer might be, we have to sit with that one first. Is there such a thing as a truth that stays true. Whether you believe it or not. Or is all of it just opinion. Until we have looked at that, honestly, nothing else we say has any ground to stand on. And that. Is where we go next."),
+           "And this is where it starts to itch. If your answer to the largest question did not come from you, but from where you happened to be born, and who raised you, and what once hurt you, then how could you ever really know if it is true. Most people never reach that question. But most is not all. Some people do go back. Some do sit down with it. That is the only reason anyone has ever changed their mind about anything. So maybe you are one of the ones who looks. This time. And the second you try, something steps into the doorway. A quiet voice that says, who cares, it is all just opinion anyway. Your truth, my truth, nobody is really right. And if that is true, then this whole thing is pointless before it starts. So before we go anywhere near what the answer might be, we have to deal with that one first. Is there such a thing as a truth that stays true whether you believe it or not. Or is all of it just opinion. Until we have looked at that, honestly, nothing else we say has any ground to stand on. And that is exactly where we go next."),
       (13, "outro",  "Truthward",
-           "If this gave you something to sit with tonight, then stay with us. We take one honest question at a time, slowly, and we follow it wherever it leads. No preaching. No noise. Just an honest look. Subscribe, so that the next one finds you. And the next one asks whether any truth can hold at all, whether you believe it or not. I would be glad to have you there, when we look."),
+           "If this gave you something to sit with tonight, then stay with us. We take one honest question at a time, and we follow it wherever it goes. No preaching. No noise. Just an honest look, from a channel that is only getting started. Subscribe, so the next one finds you. Comment with where you think this is wrong, because that is how we get sharper. And the next question we open is the one underneath all of this. Whether any truth can hold at all, no matter who believes it. I would be glad to have you there when we look."),
     ],
   },
 }
-STORIES["sword"]["groups"] = []
 STORIES["chose"]["groups"] = []
 STORIES["chose"]["map"] = [
   (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["chose"]["scenes"]
 ]
 
-PAUSES_BY["chose"] = {
-    "base": 0.45,                                           # basispauze tussen alle zinnen (rustig, loopt natuurlijk)
-    3:  {7: 1.2},                                           # na "Sit with that for a moment."
-    5:  {0: 1.0, 3: 1.0},                                   # opbouw naar de grote vraag
-    6:  {0: 0.8, 1: 2.0, 2: 2.0, 3: 2.5, 5: 1.2, 11: 1.2, 12: 1.2},  # DE grootste vraag laten landen
-    9:  {3: 1.2},                                           # na "reasoning it through."
-    10: {7: 1.0, 13: 1.0},                                  # identiteit: laat de klap hangen
-    11: {0: 0.8, 3: 1.0, 11: 1.5, 18: 1.0},                # het antwoord, stellig met lucht
-    12: {5: 1.2, 22: 1.2, 26: 0.8},                        # brug naar video 2
-}
-# map = per-scène de getekende basis (statement). Het ECHTE beeld (video/foto per scène) wordt in
-# de volgende stap bepaald, niet hier. Elke scène krijgt hier gewoon een veilige getekende techniek
-# zodat de keten compleet is; de studio/engine negeert tech bij media-beats.
-STORIES["sword"]["map"] = [
-  (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["sword"]["scenes"]
-]
-
 def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
     story = STORIES[story_id]
-    model = VOICES[voice]
+    ref_abs = os.path.join(root, VOICES[voice])
+    if not os.path.isfile(ref_abs):
+        print(f"  referentie-stem ontbreekt voor {voice}: {ref_abs}"); return
     outdir = os.path.join(root, "assets", "channels", channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
-    durs = {}   # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
-    sents_by = {}  # scene-nr -> per-zin [(start, dur)] + speech-grenzen (het meetrooster)
+    durs = {}      # scène-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
+    sents_by = {}  # scène-nr -> per-zin [(start, dur)] + speech-grenzen (het meetrooster)
     for num, tone, screen, voiceline in story["scenes"]:
         if only and num != only:
             continue
         t = TONE[tone]
         wav = os.path.join(outdir, f"{num:02d}.wav")
-        # PAUZES: elke zin apart inspreken en ECHTE stilte ertussen zetten (basis + extra per plan),
-        # zodat de stem niet raast en de climax landt. De zin-tijden zijn hierdoor EXACT bekend
-        # (geen schatting meer), wat de ondertitel + het beeld strakker op de stem zet.
-        pauses_scene = PAUSES_BY.get(story_id, {}).get(num, {})
-        base_pause = PAUSES_BY.get(story_id, {}).get("base", BASE_PAUSE)
         try:
-            segs, sp0, sp1 = _synthesize_with_pauses(
-                model, voiceline, t["speed"], base_pause, t["sil"], pauses_scene, wav)
+            segs, sp0, sp1 = _synthesize_scene(ref_abs, voiceline, t["sil"], wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
         # INTRO: stilte VOORAAN zodat het logo eerst rustig in beeld staat voordat de stem begint.
-        # De zin-tijden schuiven mee, zodat de ondertiteling op tijd blijft.
         if tone == "intro":
             _prepend_silence(wav, LEAD_SILENCE)
             segs = [(round(st + LEAD_SILENCE, 3), dd) for (st, dd) in segs]
@@ -575,7 +348,6 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
     if not only:
         lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
         by = {num: wav for num, wav in made}
-        # volle gesproken zin per scene-nr (voor de ondertitel die meeloopt met de stem)
         caption_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
         for num, screen, mapspec in story["map"]:
             parts = [f"scene {num}", screen] + list(mapspec)
@@ -589,19 +361,12 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
             f.write("\n".join(lines) + "\n")
         print("  import-script:", imp)
 
-        # DUUR-METING wegschrijven: de spil van de timeline. Per scène de EXACTE gemeten duur,
-        # plus toon en de volle zin, zodat Claude hiermee de timeline kan vullen en gericht het
-        # beeld + de sound effects per scène kan bepalen (lengte >= zinsduur).
         tone_by = {num: tone for (num, tone, screen, voiceline) in story["scenes"]}
         line_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
         total = round(sum(durs.get(n, 0.0) for n in durs), 2)
         meta = {
-            "story": story_id,
-            "voice": voice,
-            "format": fmt,
-            "title": story["title"],
-            "total_seconds": total,
-            "total_mmss": f"{int(total)//60}:{int(total)%60:02d}",
+            "story": story_id, "voice": voice, "format": fmt, "title": story["title"],
+            "total_seconds": total, "total_mmss": f"{int(total)//60}:{int(total)%60:02d}",
             "scenes": [
                 {"scene": num, "tone": tone_by.get(num, ""),
                  "seconds": durs.get(num, 0.0), "line": line_by.get(num, "")}
@@ -613,44 +378,31 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
             json.dump(meta, f, ensure_ascii=False, indent=2)
         print(f"  duur-meting: {dj}  (totaal {meta['total_mmss']})")
 
-        # GEDEELDE TIJDLIJN (fase 1): de ene databron die straks preview EN eindrender voedt.
-        # Per scene: absolute starttijd + duur in de hele video, plus het per-zin-meetrooster
-        # (start/dur binnen de scene-wav). Beeld-beats en effecten worden hier later in gevuld.
-        # Het FORMAAT (16:9 lang / 9:16 short) staat hier zodat de studio het per project onthoudt.
+        # GEDEELDE TIJDLIJN: de ene databron die preview EN eindrender voedt. Per scène absolute
+        # starttijd + duur, plus het per-zin-meetrooster (start/dur binnen de scène-wav).
         tl_scenes = []
         abs_t = 0.0
         for num, _wav in made:
             segs, sp0, sp1 = sents_by.get(num, (None, 0.0, durs.get(num, 0.0)))
-            lines = _sentences(line_by.get(num, ""))
+            lines_s = _sentences(line_by.get(num, ""))
             sentences = []
             if segs:
                 for i, (st, dd) in enumerate(segs):
                     sentences.append({
-                        "i": i,
-                        "text": lines[i] if i < len(lines) else "",
-                        "start": st,          # binnen de scene-wav
-                        "dur": dd,
-                        "abs_start": round(abs_t + st, 3),   # in de hele video
+                        "i": i, "text": lines_s[i] if i < len(lines_s) else "",
+                        "start": st, "dur": dd, "abs_start": round(abs_t + st, 3),
                     })
             sc = {
-                "scene": num,
-                "tone": tone_by.get(num, ""),
+                "scene": num, "tone": tone_by.get(num, ""),
                 "wav": os.path.relpath(by[num], root).replace("\\", "/") if by.get(num) else "",
-                "start": round(abs_t, 3),            # absolute start in de video
-                "dur": round(durs.get(num, 0.0), 3), # volle scene-duur (incl. adem-stilte)
-                "speech_start": sp0,
-                "speech_end": sp1,
-                "sentences": sentences,
-                "beats": [],   # beeld-beats (groepen zinnen); vult Claude later
-                "sfx": [],     # effect-punten; vult Claude later
+                "start": round(abs_t, 3), "dur": round(durs.get(num, 0.0), 3),
+                "speech_start": sp0, "speech_end": sp1,
+                "sentences": sentences, "beats": [], "sfx": [],
             }
             tl_scenes.append(sc)
             abs_t += durs.get(num, 0.0)
         timeline = {
-            "story": story_id,
-            "voice": voice,
-            "format": fmt,
-            "title": story["title"],
+            "story": story_id, "voice": voice, "format": fmt, "title": story["title"],
             "total_seconds": round(abs_t, 3),
             "total_mmss": f"{int(abs_t)//60}:{int(abs_t)%60:02d}",
             "scenes": tl_scenes,
@@ -661,25 +413,11 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
         print(f"  tijdlijn:     {tj}  ({len(tl_scenes)} scenes, {sum(len(s['sentences']) for s in tl_scenes)} zinnen, formaat {fmt})")
     print(f"  klaar: {len(made)} fragment(en)")
 
-def _ensure_espeak():
-    # Kokoro valt voor woorden buiten zijn woordenboek (bv. "Quran", namen, plaatsnamen) terug op
-    # eSpeak NG. Staat die niet op PATH, dan zoeken we de standaard Windows-installatieplek en
-    # wijzen we er zelf naar, zodat Mo nooit een variabele hoeft te zetten. eSpeak NG moet wel
-    # eenmalig geinstalleerd zijn (winget install eSpeak-NG.eSpeak-NG).
-    if os.environ.get("ESPEAKNG_RUNTIME_EXECUTABLE"):
-        return
-    for c in (r"C:\Program Files\eSpeak NG\espeak-ng.exe",
-              r"C:\Program Files (x86)\eSpeak NG\espeak-ng.exe"):
-        if os.path.isfile(c):
-            os.environ["ESPEAKNG_RUNTIME_EXECUTABLE"] = c
-            os.environ["PATH"] = os.path.dirname(c) + os.pathsep + os.environ.get("PATH", "")
-            return
-
 def main():
-    _ensure_espeak()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", default="sword", help="projectnaam (= verhaal-slug, eigen map)")
-    ap.add_argument("--voice", default="beide", choices=list(VOICES.keys()) + ["beide"])
+    ap.add_argument("--story", default="chose", help="projectnaam (= verhaal-slug, eigen map)")
+    ap.add_argument("--voice", default="alle", choices=list(VOICES.keys()) + ["alle"],
+                    help="v1 / v2 / v3, of 'alle' voor alle drie de stemmen")
     ap.add_argument("--only", type=int, default=0, help="alleen scene-nummer N opnieuw maken")
     ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"],
                     help="16:9 = lange video, 9:16 = afgeleide short; reist mee in de tijdlijn")
@@ -687,26 +425,19 @@ def main():
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
-    # vroege check: is Kokoro geinstalleerd?
+    # vroege check: is Chatterbox geinstalleerd?
     try:
-        import pykokoro  # noqa
+        import chatterbox.mtl_tts  # noqa
     except Exception:
-        print("Kokoro is niet geinstalleerd. Doe eerst:  pip install \"pykokoro[cpu]\"")
+        print("Chatterbox is niet geinstalleerd. Doe eerst:  pip install chatterbox-tts soundfile")
         sys.exit(1)
 
-    stories = ["sword"] if args.story in ("all", "sword") else [args.story]
-    voices = list(VOICES.keys()) if args.voice == "beide" else [args.voice]
-    for sid in stories:
-        if sid not in STORIES:
-            print("onbekend verhaal:", sid); continue
-        for voice in voices:
-            print(f"\n=== {sid} · STEM: {voice} ({VOICES[voice]}) · FORMAAT: {args.fmt} ===")
-            build_story(sid, voice, args.root, args.only, args.fmt, args.channel)
-
-    # synthesizers netjes afsluiten
-    for synth in _SYNTH_CACHE.values():
-        try: synth.__exit__(None, None, None)
-        except Exception: pass
+    if args.story not in STORIES:
+        print("onbekend verhaal:", args.story); sys.exit(1)
+    voices = list(VOICES.keys()) if args.voice == "alle" else [args.voice]
+    for voice in voices:
+        print(f"\n=== {args.story} · STEM: {voice} ({VOICES[voice]}) · FORMAAT: {args.fmt} ===")
+        build_story(args.story, voice, args.root, args.only, args.fmt, args.channel)
 
 if __name__ == "__main__":
     main()

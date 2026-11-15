@@ -129,6 +129,7 @@
  <button id="chan-new" title="een nieuw kanaal aanmaken">+ kanaal</button>
  <select id="proj-pick" title="kies een project (film + stem)" style="font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;max-width:230px"></select>
  <button id="proj-new" title="een nieuw project starten">+ nieuw</button>
+ <button id="btn-voice" title="luister de 3 stemmen en kies er één">🎙 Stem</button>
  <div class="spacer"></div>
  <span class="savemsg" id="savemsg"></span>
  <button class="save" id="btn-save">opslaan</button>
@@ -139,6 +140,7 @@
 <input id="ld-beeld" type="file" accept="image/*,video/*" style="display:none">
 <div class="picker" id="picker"><div class="box"><button class="close" id="pick-close">sluiten</button><h3 id="pick-title">Kies een opgehaald beeld voor deze beat</h3><div class="grid" id="pick-grid"></div></div></div>
 <div class="picker" id="apicker"><div class="box"><button class="close" id="ap-close">sluiten</button><h3 id="ap-title">Kies geluid</h3><div class="row" id="ap-ctrl" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"></div><div class="btcands" id="ap-cands"></div></div></div>
+<div class="picker" id="vpicker"><div class="box"><button class="close" id="vp-close">sluiten</button><h3>Kies de stem voor deze video</h3><div style="color:var(--mut);font-size:12px;margin:-4px 0 12px">Elke stem is een eigen tijdlijn. Beluister een fragment en kies; de studio laadt dan die stem.</div><div id="vp-cands" style="display:flex;gap:12px;flex-wrap:wrap"></div></div></div>
 <div class="preview">
  <div class="screen">
   <img class="media" id="pv-img" style="display:none" alt="">
@@ -863,6 +865,49 @@ $('proj-new').addEventListener('click',()=>{
  // alvast naar het nieuwe project-adres; zodra de tijdlijn bestaat laadt hij
  location.search='?story='+encodeURIComponent(slug)+'&voice='+encodeURIComponent(vo)+'&channel='+CHANNEL;
 });
+
+// ---- STEM-KIEZER: luister de 3 gegenereerde stemmen (v1/v2/v3) voor dit verhaal en kies er één.
+// Elke stem is een eigen tijdlijn op schijf (eigen timing); kiezen laadt die stem, net als de
+// projectkiezer maar met voorbeluisteren. We spelen de eerste gesproken scène als sample.
+let _vpAudio=null,_vpBtn=null;
+function vpStop(){if(_vpAudio){try{_vpAudio.pause();}catch(e){}}_vpAudio=null;if(_vpBtn){_vpBtn.textContent='► beluister';_vpBtn=null;}}
+function vpPlay(voice,btn){
+ vpStop();
+ const sample=(SC[1]&&SC[1].scene!=null)?SC[1].scene:(SC[0]?SC[0].scene:1);
+ const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+encodeURIComponent(voice)+'&n='+String(sample).padStart(2,'0')+'&channel='+CHANNEL);
+ a.addEventListener('ended',()=>{if(_vpAudio===a)vpStop();});
+ a.addEventListener('error',()=>{if(_vpBtn===btn){btn.textContent='geen opname';_vpAudio=null;_vpBtn=null;}});
+ _vpAudio=a;_vpBtn=btn;btn.textContent='■ stop';
+ const p=a.play();if(p&&p.catch)p.catch(()=>{btn.textContent='geen opname';_vpAudio=null;_vpBtn=null;});
+}
+function closeVP(){vpStop();$('vpicker').classList.remove('on');}
+function openVoice(){
+ const box=$('vp-cands');box.innerHTML='<div style="color:var(--mut);font-size:12px">… stemmen laden</div>';
+ $('vpicker').classList.add('on');
+ fetch('/api/channel-scripts?channel='+CHANNEL).then(r=>r.ok?r.json():null).then(d=>{
+   const items=(d&&Array.isArray(d.items))?d.items:[];
+   let voices=items.filter(it=>it.story===STORY).map(it=>it.voice);
+   if(!voices.includes(VOICE))voices.unshift(VOICE);
+   voices=[...new Set(voices)].sort();
+   if(!voices.length)voices=[VOICE];
+   box.innerHTML='';
+   voices.forEach(vo=>{
+     const card=document.createElement('div');
+     card.style.cssText='border:2px solid '+(vo===VOICE?'var(--muz)':'var(--line)')+';border-radius:10px;background:#0b0f18;padding:12px;min-width:150px;'+(vo===VOICE?'box-shadow:0 0 0 2px var(--muz)':'');
+     const nm=document.createElement('div');nm.style.cssText='font-weight:700;margin-bottom:9px;color:var(--ink)';
+     nm.textContent=vo+(vo===VOICE?'  · huidige':'');
+     const play=document.createElement('button');play.textContent='► beluister';play.style.cssText='width:100%;margin-bottom:7px';
+     play.onclick=()=>{if(_vpBtn===play)vpStop();else vpPlay(vo,play);};
+     const pick=document.createElement('button');pick.textContent=vo===VOICE?'✓ in gebruik':'kies deze stem';
+     pick.style.cssText='width:100%';pick.disabled=(vo===VOICE);
+     pick.onclick=()=>{closeVP();switchProject(STORY,vo);};
+     card.appendChild(nm);card.appendChild(play);card.appendChild(pick);box.appendChild(card);
+   });
+ }).catch(()=>{box.innerHTML='<div style="color:#e88;font-size:12px">kon stemmen niet laden</div>';});
+}
+$('btn-voice').addEventListener('click',openVoice);
+$('vp-close').addEventListener('click',closeVP);
+$('vpicker').addEventListener('click',e=>{if(e.target.id==='vpicker')closeVP();});
 
 // live tijdlijn uit de engine; valt terug op de ingebakken kopie als de engine niet draait.
 // boot() in try/catch zodat een fout in het tekenen NOOIT de projectkiezer meesleept.
