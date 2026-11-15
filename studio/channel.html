@@ -138,6 +138,7 @@
 </header>
 <input id="ld-beeld" type="file" accept="image/*,video/*" style="display:none">
 <div class="picker" id="picker"><div class="box"><button class="close" id="pick-close">sluiten</button><h3 id="pick-title">Kies een opgehaald beeld voor deze beat</h3><div class="grid" id="pick-grid"></div></div></div>
+<div class="picker" id="apicker"><div class="box"><button class="close" id="ap-close">sluiten</button><h3 id="ap-title">Kies geluid</h3><div class="row" id="ap-ctrl" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"></div><div class="btcands" id="ap-cands"></div></div></div>
 <div class="preview">
  <div class="screen">
   <img class="media" id="pv-img" style="display:none" alt="">
@@ -332,10 +333,10 @@ host.addEventListener('pointerdown',e=>{
    drag={si,kind,bi,arr:kind==='beeld'?SC[si].beatBounds:SC[si].subBounds};tip.style.display='block';moveDrag(e);return;}
  const card=e.target.closest('.scard');if(!card)return;const si=+card.dataset.si,s=SC[si];
  const tb=card.querySelector('[data-tr="beeld"]');const r=tb.getBoundingClientRect();
- if(e.target.closest('.musicbed')){openMusic(si);return;}
- if(sfxMode&&e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();return;}
+ if(e.target.closest('.musicbed')){openMusicModal(si);return;}
+ if(sfxMode&&e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();openSfxModal(si,s.sfx.length-1);return;}
  const sf=e.target.closest('.blk.sfx');
- if(sf&&sf.dataset.fi!==undefined){const ssi=+sf.dataset.si,sfi=+sf.dataset.fi;selectSfx(ssi,sfi);const ff=(SC[ssi].sfx||[])[sfi];stop();t=SC[ssi].start+(ff?(+ff.t||0):0);placePlayhead();return;}
+ if(sf&&sf.dataset.fi!==undefined){const ssi=+sf.dataset.si,sfi=+sf.dataset.fi;const ff=(SC[ssi].sfx||[])[sfi];stop();t=SC[ssi].start+(ff?(+ff.t||0):0);placePlayhead();openSfxModal(ssi,sfi);return;}
  const bb=e.target.closest('.blk.beeld');
  if(bb&&bb.dataset.bi!==undefined){const bsi=+bb.dataset.si,bbi=+bb.dataset.bi;selectBeat(bsi,bbi);const bt=beatsOf(SC[bsi])[bbi];stop();t=SC[bsi].start+(bt?bt.start:0);placePlayhead();openPicker(bsi,bbi);return;}
  stop();const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));t=s.start+local;placePlayhead();
@@ -348,7 +349,7 @@ function moveDrag(e){if(!drag)return;const{si,kind,bi,arr}=drag;const s=SC[si];c
  tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';layout();}
 addEventListener('pointermove',e=>{if(drag)moveDrag(e);});
 addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}});
-host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);selSfx=null;$('sfxtools').classList.add('none');rebuildSfxAudio();dirty();layout();return;}});
+host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){openSfxModal(+f.dataset.si,+f.dataset.fi);return;}});
 let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
 
 let t=0,playing=false,raf=null,last=0,playEnd=Infinity;const voiceAudio={};let musicBlocks=[],sfxList=[],curScene=-1,curBlock=-1;
@@ -681,6 +682,56 @@ function setSfxFile(fileBase){ if(!selSfx)return; const s=SC[selSfx.si],f=(s.sfx
  $('rendermsg').textContent='SFX-geluid gekozen ✓ — vergeet niet op te slaan.'; }
 $('sx-cand').addEventListener('click',searchSfxCands);
 $('sx-del').addEventListener('click',()=>{ if(!selSfx)return; if(confirm('SFX weghalen bij dit punt?')){ SC[selSfx.si].sfx.splice(selSfx.fi,1); selSfx=null; $('sfxtools').classList.add('none'); rebuildSfxAudio(); dirty(); layout(); } });
+
+// ===== GEDEELDE AUDIO-KIEZER (zelfde pop-up als beeld): klik muziek/SFX -> pop-up met 3 keuzes =====
+function closeAP(){ $('apicker').classList.remove('on'); if(audPrev){try{audPrev.a.pause();}catch(e){}if(audPrev.el)audPrev.el.classList.remove('playing');} }
+$('ap-close').addEventListener('click',closeAP);
+$('apicker').addEventListener('click',e=>{ if(e.target.id==='apicker')closeAP(); });
+
+// -- MUZIEK: 3 per scène, met "t/m scène" voor een bereik --
+function openMusicModal(si){ selMusic=si; const s=SC[si];
+ $('ap-title').innerHTML='Muziek voor scène <b>'+s.scene+'</b> — kies een track (3). Met “t/m scène” aan meerdere scènes.';
+ const ctrl=$('ap-ctrl'); ctrl.innerHTML='';
+ const lab=document.createElement('label'); lab.style.cssText='display:inline-flex;align-items:center;gap:5px;color:var(--mut);font-size:12px'; lab.textContent='t/m scène ';
+ const sel=document.createElement('select'); sel.id='ap-upto'; sel.style.cssText='background:#0b0f18;border:1px solid var(--line);color:#dfe7f3;border-radius:7px;padding:5px 7px;font-size:12px';
+ for(let k=si;k<SC.length;k++){const o=document.createElement('option');o.value=k;o.textContent='scène '+SC[k].scene;sel.appendChild(o);} sel.value=String(si);
+ lab.appendChild(sel); ctrl.appendChild(lab);
+ const bAnd=document.createElement('button'); bAnd.textContent='🔎 3 andere'; bAnd.onclick=()=>loadMusicModalCands(true); ctrl.appendChild(bAnd);
+ const bDel=document.createElement('button'); bDel.className='del'; bDel.textContent='🗑 muziek weg'; bDel.onclick=()=>{ MUS[si]=null; coalesceMusic(); rebuildMusic(); updateMusicLanes(); dirty(); updAudioLabel(); closeAP(); }; ctrl.appendChild(bDel);
+ $('ap-cands').innerHTML='<span class="cndhint">laden…</span>'; $('apicker').classList.add('on'); loadMusicModalCands(false); }
+async function loadMusicModalCands(fresh){ const box=$('ap-cands'); box.innerHTML='<span class="cndhint">'+(fresh?'verse 3 ophalen…':'laden…')+'</span>';
+ try{ const body=fresh?{story:STORY,voice:VOICE,fresh:1}:{story:STORY,voice:VOICE,cached:1};
+  const r=await fetch('/api/channel-music-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(d&&Array.isArray(d.candidates)&&d.candidates.length) renderAudioCands('ap-cands',d.candidates,'/api/channel-audio',(MUS[selMusic]?bn(MUS[selMusic]):''),pickMusicModal);
+  else box.innerHTML='<span class="cndhint">'+((d&&d.reason)||'nog geen bedden — klik “3 andere”.')+'</span>';
+ }catch(e){ box.innerHTML='<span class="cndhint">engine niet bereikbaar.</span>'; } }
+function pickMusicModal(fileBase){ const rel='assets/channels/'+CHANNEL+'/muziek/'+fileBase;
+ const sel=$('ap-upto'); let upto=sel?(+sel.value):selMusic; if(isNaN(upto)||upto<selMusic)upto=selMusic;
+ for(let k=selMusic;k<=upto;k++)MUS[k]=rel; coalesceMusic(); rebuildMusic(); updateMusicLanes(); dirty(); updAudioLabel(); closeAP();
+ $('rendermsg').textContent='muziek gezet '+(upto>selMusic?('scène '+SC[selMusic].scene+' t/m '+SC[upto].scene):('scène '+SC[selMusic].scene))+' ✓ — opslaan niet vergeten.'; }
+
+// -- SFX: 3 per punt, eigen zoekterm --
+function openSfxModal(si,fi){ const s=SC[si],f=(s.sfx||[])[fi]; if(!f)return; selSfx={si,fi};
+ $('ap-title').innerHTML='Geluid · scène <b>'+s.scene+'</b> op <b>'+(s.start+(+f.t||0)).toFixed(1)+'s</b> — kies (3).';
+ const ctrl=$('ap-ctrl'); ctrl.innerHTML='';
+ const q=document.createElement('input'); q.id='ap-q'; q.type='text'; q.placeholder='zoekterm, bv. soft swell'; q.value=f.q||''; q.style.cssText='flex:1;min-width:160px;background:#0b0f18;border:1px solid var(--line);color:#dfe7f3;border-radius:7px;padding:7px 9px;font-size:12.5px'; ctrl.appendChild(q);
+ const bS=document.createElement('button'); bS.textContent='🔎 3 geluiden'; bS.onclick=()=>loadSfxModalCands(true); ctrl.appendChild(bS);
+ const bD=document.createElement('button'); bD.className='del'; bD.textContent='🗑 weghalen'; bD.onclick=()=>{ SC[si].sfx.splice(fi,1); selSfx=null; rebuildSfxAudio(); dirty(); layout(); closeAP(); }; ctrl.appendChild(bD);
+ $('ap-cands').innerHTML='<span class="cndhint">laden…</span>'; $('apicker').classList.add('on'); loadSfxModalCands(false); }
+async function loadSfxModalCands(fresh){ const box=$('ap-cands'); if(!selSfx)return; const s=SC[selSfx.si],f=(s.sfx||[])[selSfx.fi]; if(!f)return; const pid=sfxPidFor(s,f);
+ const q=($('ap-q')&&$('ap-q').value.trim())||'';
+ box.innerHTML='<span class="cndhint">'+(fresh?'verse 3 ophalen…':'laden…')+'</span>';
+ try{ const body=fresh?{story:STORY,voice:VOICE,scene:s.scene,pid:pid,q:q,fresh:1}:{story:STORY,voice:VOICE,scene:s.scene,pid:pid,cached:1};
+  const r=await fetch('/api/channel-sfx-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(d&&Array.isArray(d.candidates)&&d.candidates.length){ if(fresh&&q)f.q=q; renderAudioCands('ap-cands',d.candidates,'/api/channel-sfx',f.file?bn(f.file):'',pickSfxModal); }
+  else box.innerHTML='<span class="cndhint">'+((d&&d.reason)||'geen geluiden — pas de zoekterm aan en klik “3 geluiden”.')+'</span>';
+ }catch(e){ box.innerHTML='<span class="cndhint">engine niet bereikbaar.</span>'; } }
+function pickSfxModal(fileBase){ if(!selSfx)return; const s=SC[selSfx.si],f=(s.sfx||[])[selSfx.fi]; if(!f)return;
+ f.file='assets/channels/'+CHANNEL+'/sfx/'+fileBase; const q=($('ap-q')&&$('ap-q').value.trim())||''; if(q)f.q=q;
+ rebuildSfxAudio(); dirty(); updAudioLabel(); layout(); closeAP();
+ $('rendermsg').textContent='SFX-geluid gekozen ✓ — opslaan niet vergeten.'; }
 // lege beats automatisch koppelen aan al opgehaalde bestanden (s01b1.jpg -> scène 1, beat 1)
 function autoHeal(){let n=0;SC.forEach((s,si)=>{
    // GETEKENDE scènes/beats (intro, outro, kaart, tekst, CTA, logo) krijgen NOOIT media. Anders plakt
