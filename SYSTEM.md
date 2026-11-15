@@ -1,8 +1,11 @@
-# TALE OF TILES — SYSTEM.md
-Geef dit bestand aan het begin van een nieuwe chat. Bevat: hoe pushen, welke pagina's er zijn, wat de site technisch doet, wat af is en wat nog moet. Lees dit VOORDAT je begint te werken — begin niet blind.
+# CONTENT ENGINE — SYSTEM.md
+Geef dit bestand aan het begin van een nieuwe chat over de content-engine. Bevat: het bevroren
+mailarm-contract, hoe de engine in elkaar zit, hoe je 'm draait, wat af is en wat nog moet. Lees
+dit VOORDAT je begint. De engine staat LOS van de Tale-of-Tiles-website-repo (`~/Desktop/tale-of-tiles`);
+die heeft z'n eigen SYSTEM.md. Verwar de twee niet.
 
 ## ⛔ BEVROREN CONTRACT — CONTENT-ENGINE ⇄ LIVE MAILARM (NIET BREKEN)
-De cold-mailarm van Tale of Tiles draait LIVE en automatisch. Een lokale render-tool (`tot_plaatjes.js` in het UncleRank-outreach-project) belt elke ochtend de **content-engine** (`~/Desktop/content-engine`, los van deze website-repo) aan om per lead drie mail-plaatjes te renderen, zet ze op R2 en schrijft de URLs in D1. Wijzig je iets aan de content-engine, hou dan deze 8 punten HEEL — breekt er één, dan valt de mailsequence stil:
+De cold-mailarm van Tale of Tiles draait LIVE en automatisch. Een lokale render-tool (`tot_plaatjes.js` in het UncleRank-outreach-project) belt elke ochtend de **content-engine** (`~/Desktop/content-engine`, los van de website-repo) aan om per lead drie mail-plaatjes te renderen, zet ze op R2 en schrijft de URLs in D1. Wijzig je iets aan de content-engine, hou dan deze 8 punten HEEL — breekt er één, dan valt de mailsequence stil:
 1. Endpoint blijft: `POST http://localhost:4600/api/mailstill`, body `{ names: [...], stijl }`, response per naam `{ name, style, file, url, ... }`.
 2. De drie stijlen `klassiek`, `modern`, `kleurrijk` blijven bestaan onder exact die namen (`MS_STYLES` in `engine.mjs`). Elke lead heeft alle drie nodig.
 3. Deterministisch: zelfde bedrijfsnaam + zelfde stijl = zelfde plaatje (`hashSeed(naam+"|"+stijl)`). Een her-render is dus nooit schadelijk.
@@ -11,143 +14,103 @@ De cold-mailarm van Tale of Tiles draait LIVE en automatisch. Een lokale render-
 6. De engine blijft headless te starten met `STUDIO_NO_OPEN=1` + `windowsHide` (geen vensters). Breekt dat → venster-spam terug én de ochtendketen start de engine niet meer.
 7. `renderLock` blijft het toevalsdeel (`makeRender`) serialiseren tussen video- en plaatjes-renders, zodat ze elkaar nooit vervuilen.
 8. De engine blijft op poort 4600 luisteren.
-Dit alles zit in `content-engine/src/engine.mjs` (handler, `MS_STYLES`, `renderMailStill`, de `/out`-serving) en deels `src/brands/taleoftiles.mjs` (de insitu-render). Werk je BUITEN die onderdelen (nieuwe video-types, `film.ts`, losse tweaks) → geen risico. Raak je er één aan → eerst zeggen, tegen deze flow testen, dán pushen. De mailarm is NIET deze website-repo; verwar de twee niet.
+Dit alles zit in `src/engine.mjs` (handler, `MS_STYLES`, `renderMailStill`, de `/out`-serving) en deels `src/brands/taleoftiles.mjs` (de insitu-render). Werk je BUITEN die onderdelen (nieuwe video-types, channels, planner, socials) → geen risico. Raak je er één aan → eerst zeggen, tegen deze flow testen, dán pushen.
 
 ## WAT IS DIT
-Tale of Tiles (taleoftiles.com): webshop die je naam/spreuk/ontwerp omzet naar een handgemaakt mozaiek-naampaneel (met de hand gehakte glazuur-steentjes tot een mozaiek, GEEN grote tegels). Doelgroep: welgestelde Europese/Nederlandse klanten, zakelijk EN particulier.
-- Merk = PREMIUM, MODERN. NOOIT "Marokko/Marokkaans" of een plaatsnaam in klant-copy noemen.
-- Bedrijf: TechBey B.V. (KvK 97194832). Staat in de juridische paginas + footer (Stripe eist dit).
-- Eigenaar: Mo. Woont in Tetouan, bouwt solo.
-- Er is een TWEEDE, apart project "YALSOU" (high-end fragment-kunst). NOOIT door elkaar halen. De README die soms meekomt hoort bij YALSOU, niet bij dit project.
+Lokale, gratis content-fabriek op Mo's laptop. Maakt uit opgeslagen ontwerpen en scripts korte
+video's (+ losse foto's en mail-plaatjes) voor meerdere TechBey-merken, plant ze per merk/taal en
+post ze semi-automatisch. Doel (noordster): een content-FABRIEK voor meerdere merken, niet één
+brand-tool. Draait op Mo's laptop (AMD Ryzen 5 4500U, 15 GB RAM, GEEN NVIDIA-GPU, 6 cores — laat
+bij parallel renderen altijd 1 core vrij, max 5). Zware AI moet CPU-vriendelijk zijn.
 
-## LIVE
-- Live URL: https://taleoftiles.com (Cloudflare Registrar-domein, gekoppeld als custom domain op de worker).
-- Worker-naam: yalsou-configurator (het oude workers.dev-adres bestaat nog als worker-adres).
-- Stripe: LIVE en werkend (echte betalingen). Betaalmethoden aan: iDEAL|Wero, Bancontact, Visa, Mastercard, Apple Pay, Google Pay, Klarna.
+Twee groepen output:
+- **Bedrijven** (Tale of Tiles, UncleRank): postbare wegwerp-video's via de planner → archief →
+  prullenbak (`tools/render_dag.mjs`).
+- **Channels** (Truthward = channel1, en volgende): handgemaakte view-kanalen, blijven bewaard.
 
-## ===== HOE PUSHEN / UPLOADEN (belangrijkste deel) =====
-Repo op Mo's machine: ~/Desktop/tale-of-tiles  (Windows / MINGW64 / Git Bash)
-Bronbestanden in: ~/Desktop/tale-of-tiles/src/
-  - page.ts   = hele homepage + configurator (HTML+CSS+JS in EEN backtick-template `export const PAGE`). In Claude's werkkopie heet dit live.ts.
-  - i18n.ts   = alle klant-teksten NL+EN. NL en EN MOETEN evenveel keys hebben (anders blijft tekst in 1 taal hangen).
-  - index.ts  = Cloudflare Worker: routes, API-endpoints, losse paginas (dnLegalPage), Stripe-code, mail, track-pagina.
-  - pricing.ts = SERVER-side prijsberekening. 1-OP-1 KOPIE van mPrice() in page.ts. Wijzig je de prijs in page.ts, wijzig pricing.ts identiek, anders betaalt de klant het verkeerde bedrag.
-  - adminpage.ts = admin (bestellingen, werkplaat/productieblad, patroon-locks, kostprijs-schatting).
-  - assets.ts, model/* = bestaan alleen op Mo's machine, niet bij Claude.
-
-CODE PUSHEN — standaard format (Claude levert het bestand, Mo downloadt naar ~/Downloads, dan):
-BELANGRIJK: het commando MOET beginnen met `cd ~/Desktop/tale-of-tiles`. Zonder die cd belanden de
-mv, git en wrangler in de verkeerde map (dan mislukt het of pusht er niks). Claude: geef dit cd-commando
-ALTIJD als eerste regel mee in elk push-commando dat je aan Mo levert. Nooit vergeten.
+## ===== HOE DRAAI JE HET =====
+Repo op Mo's machine: `~/Desktop/content-engine` (Windows / MINGW64 / Git Bash). Remote:
+`TechMo39/content-engine` (GitHub). Sinds we git gebruiken: ALTIJD committen én pushen bij elke
+levering — niet laten opstapelen als ongecommitte wijzigingen; Claude bewaakt de git-staat.
 ```
-cd ~/Desktop/tale-of-tiles
-mv ~/Downloads/<file> src/<file>
-git add -A
-git commit -m "..."
-git push
-unset CLOUDFLARE_API_TOKEN
-npx wrangler deploy
+npm run app        # studio als eigen app-venster (Electron) — server op :4600
+npm run engine     # alleen de server (node src/engine.mjs)
+npm run build      # tegel-video's (Remotion), npm run film = tekenfilm
 ```
-Meerdere bestanden: begin met de cd, dan meerdere mv's, dan 1 commit + push + deploy. Voorbeeld:
+Python-pijplijn (Channels): `pip install chatterbox-tts soundfile`, dan
+`python tools/channel_voice.py` (zie README).
+
+CODE PUSHEN — standaardformat (Claude levert het bestand, Mo downloadt naar ~/Downloads):
+BEGIN ALTIJD met de `cd`, anders belanden mv/git in de verkeerde map.
 ```
-cd ~/Desktop/tale-of-tiles
-mv ~/Downloads/page.ts src/page.ts
-mv ~/Downloads/index.ts src/index.ts
-git add -A && git commit -m "..." && git push && npx wrangler deploy
+cd ~/Desktop/content-engine
+cp ~/Downloads/<file> <doelpad>/<file>
+git add -A && git commit -m "..." && git push
 ```
-LET OP bij deploy: ALTIJD eerst `unset CLOUDFLARE_API_TOKEN` (een stale token geeft auth-fouten).
-Git remote: TechMo39/tale-of-tiles (GitHub). Sinds we git gebruiken: ALTIJD git push erbij, anders geen versiebeheer.
+Grote terminal-output die Claude terug nodig heeft: laat het commando naar een bestand in
+~/Downloads schrijven, nooit Mo laten plakken.
 
-AFBEELDINGEN / PDF UPLOADEN NAAR R2 (bucket: yalsou-configurator-images):
-```
-npx wrangler r2 object put yalsou-configurator-images/<key> --file ~/Downloads/<file> --content-type <type> --remote
-npx wrangler r2 object get yalsou-configurator-images/<key> --file ~/Downloads/<naam> --remote
-```
-De worker serveert alles onder /img/<key> (route in index.ts: path.startsWith("/img/")).
-R2 keys in gebruik:
-  - patronen (SVG):        patterns/<S-id>.svg     -> /img/patterns/<id>.svg   (104 velden + border S9xx)
-  - glazuurtegels (webp):  colours/<id>.webp       -> /img/colours/<id>.webp   (~93 tegels, ids 1001-1127)
-  - showcase designs:      site/designs/<slug>.png
-  - hero (zakelijke gevel): site/tale-of-tiles.jpg  (wordt op 2 plekken gebruikt tenzij aangepast)
-  - naambord halverwege:   site/panel-on-wall.jpg
-  - ambacht-fotos:         site/craft/craft-1..6.jpg
-  - status-badges track:   site/status/status-1..12.png
-  - handleiding PDF:       site/montagehandleiding.pdf (NL), site/mounting-guide-en.pdf (EN) -> aparte routes
-  - MAIL-STILLS (mailarm): mail-stills/<slug>-<stijl>.jpg -> /img/mail-stills/...  (geschreven door tot_plaatjes.js via /api/mail-still-upload; NIET handmatig aankomen)
-BELANGRIJK: cache is lang op /img -> na elke upload ALTIJD Ctrl+Shift+R, of check met ?t=999.
+## ===== ARCHITECTUUR =====
+- `src/engine.mjs` — de studio-server (:4600). Kiest merk → onderwerp → template → render, en
+  bevat de endpoints voor de planner, socials, mail-stills, carrousel en de Channels (voice/
+  beeld/audio, timeline, frame-preview). Weet zelf niks van tegels; dat zit in de merk-modules.
+- `src/registry.mjs` — welke merk-modules bestaan (nieuw merk = één regel).
+- `src/brands/` — `taleoftiles.mjs` (tegels/Remotion), `channel1.mjs` (Truthward), `unclerank.mjs`
+  (data-animatie, kale SVG per frame).
+- `src/core/` — `renderer.mjs`, `raster-worker.mjs`, `audio-overlay.mjs` (SVG → frames → mp4 + audio).
+- `src/social/` — per platform één bestand (`youtube`, `tiktok`, `meta`+`instagram`/`facebook`,
+  `whatsapp`), elk met 3 taal-accounts (NL/EN/FR). `index.mjs` = registry, `store.mjs` = logboek
+  (`out/.social.json`), `r2.mjs` = upload via de worker, `post-texts.mjs` = teksten per type/taal.
+- `studio/` — `index.html` (hub), `engine.html` (bedrijven: studio/planner/socials/mail/carrousel),
+  `channel.html` (Channels-studio).
+- `tools/` — `channel_voice|beeld|audio.py` (Channels-pijplijn), `render_dag.mjs` (nacht-render +
+  archief-lifecycle), `post_dag.mjs` (poster), `mail-still.mjs`.
+- `.bat` + `stil.vbs` — Windows Taakplanner-automatisering (zie README).
+- `secrets/` — social-tokens (gitignored). `.env` — keys (UPLOAD_KEY, TOT_ADMIN_PW; gitignored).
 
-WRANGLER: v4. D1 database: dn-store-db (id a5ec8fde-da59-4a65-b3da-e33825416de8). Bindings in code: dn_store_db (D1), dn_store_images / yalsou_configurator_images (R2), env.AI.
-D1 direct queryen kan (SELECT/ALTER via `npx wrangler d1 execute dn-store-db --remote --command "..."`). Auth-fout 7403/7500 = of token-issue (unset CLOUDFLARE_API_TOKEN) of een echte SQL-fout (bv ontbrekende kolom — die staat dan in de melding).
+## ===== CHANNELS / STEM (Truthward) =====
+- Een project = `verhaal/stem` (bv. `chose/v1`); elke stem = een eigen `_timeline.json`.
+- `channel_voice.py` draait **Chatterbox** stem-kloning (CPU, Engels). Per video 3 stemmen
+  (v1/v2/v3) uit `voice-test/refs/ref7-9.wav`; Mo kiest er één in de studio (🎙 Stem-kiezer).
+  Spreekt per CHUNK in (zinnen gegroepeerd onder `MAX_CHARS`); Chatterbox plaatst zelf adem/
+  intonatie. Geen zin-voor-zin + handmatige pauzes meer (dat was de Kokoro-aanpak, eruit).
+  Let op: losse te-korte zinnen (bv. "So.") crashen Chatterbox → daarom chunken. Zwaar op CPU
+  (uren voor 3 volledige stemmen).
+- Scripts worden in Truthward's EIGEN stem geschreven; voorbeeldvideo's dienen alleen als
+  inspiratie voor de opbouw, niet om zinnen te kopiëren. Eigen CTA passend bij een klein kanaal.
 
-## ===== VALIDATIE VOOR ELKE LEVERING (verplicht) =====
-- page.ts / index.ts / pricing.ts / i18n.ts / adminpage.ts: esbuild transform MOET slagen (Claude checkt: `esbuild.transformSync(bestand, {loader:"ts"})`).
-- VALKUIL: esbuild slikt backslashes in regexen binnen de PAGE-backtick. Gebruik tekenklasse [/] ipv \/, [(] ipv \(, [ ] ipv \s.
-- Frontend prijs (mPrice in page.ts) MOET exact gelijk zijn aan server prijs (panelTotalPrice in pricing.ts). Test dit over veel combinaties (patroon x maat x vorm x rand x tegelgrootte); mismatches = klant betaalt fout.
-- ZELF renderen/checken met Playwright headless (localhost:8799 serveert de PAGE-string; patterns uit map, colours als effen test-pngs). Visueel kijken, niet alleen tekst.
-- 1 losse ongesloten (function(){ maakt de HELE page-JS dood. Test met page.on('pageerror').
-
-## ===== WELKE PAGINA'S / ROUTES =====
-KLANT (in index.ts):
-  - /                     homepage + configurator (de hele PAGE uit page.ts)
-  - /track/<token>        "Volg je bestelling" status-pagina (na betaling)
-  - /track/success        redirect-pagina na Stripe-betaling -> maakt order aan -> /track/<token>
-  - /api/track/<token>    JSON voor de track-pagina (order + alle panelen + totaalprijs)
-  - /terms /voorwaarden, /privacy, /shipping /verzending, /contact  (tweetalig via dnLegalPage, ?lang=nl/en)
-  - /montagehandleiding.pdf, /mounting-guide-en.pdf
-  - /api/checkout (POST)  -> Stripe checkout-sessie (dynamische prijs, verzendzones)
-  - /stripe/webhook       checkout.session.completed -> order in D1 (panel_order) + bevestigingsmail
-  - /api/save-cart, /api/save-preview, /api/save-design  (mandje/preview/ontwerp opslaan)
-  - /api/mosaic-request, /api/cart-order  (aanvraag/mandje-order fallback-flows)
-  - /api/mail-stills (lijst R2 mail-stills) + /api/mail-still-upload (PUT, x-upload-key) — mailarm/Library, NIET aankomen
-  - /img/<key>            R2-assets
-ADMIN (/admin, Basic Auth, wachtwoord = ADMIN_PASSWORD secret):
-  - Bestellingen (panel_order): status per paneel bijwerken, volglink, WERKPLAAT/productieblad openen.
-  - Patronen locken (N/gx/gy per patroon), standaardkleuren.
-  - Kostprijs-schatting per bestelling (marge-inzicht, fiberglas-cijfers).
-
-## ===== WAT DE SITE TECHNISCH DOET (kern) =====
-- CONFIGURATOR (page.ts): klant kiest PATROON (stap 1, staat open, eerste categorie uitgeklapt), dan NAAM (stap 2, optioneel — leeg = alleen ontwerp), formaat, vorm (rechthoek/ovaal/cirkel), rand aan/uit, tegelgrootte (grof/normaal/fijn), lijst/extra's. Live preview verandert mee.
-- PATRONEN: categorieen die Mo ziet: Achtsters, Vierkant & Baksteen, Ruit & Driehoek, Waaier & Zeshoek, Gebogen & Golf. Patronen hebben NAMEN (PATTERN_NAMES), NOOIT S-nummers tegen Mo noemen.
-- KLEUREN: per tegel-groep inkleurbaar (Simpel = per groep, Gedetailleerd = per tegel). Voeg (cementlijn) blijft altijd zichtbaar op ingekleurde steentjes (kleur #9a9488).
-- TEGELGROOTTE: grof/normaal/fijn = N-stap (minder/meer, grotere/kleinere steentjes op zelfde paneel). Alleen bij patronen die er zichtbaar op reageren (MTILE_RESPONSIVE). Prijs: fijner +16%/stap, grover -10%/stap.
-- PRIJS (FIBERGLAS-model, sinds cement->fiberglas): tegels (opstart EUR 8,90 + EUR 110/m2 x complexiteit) + fiberglas-drager EUR 20/m2 + frame/omtrek + ophangsysteem (3,50/6/12 naar formaat) + verpakking (5/18) + verzending (22 kg/m2 x ~4/kg), dan glijdende markup. Cirkel/ovaal = ~78,5% oppervlak (minder stenen = goedkoper). Rand = vaste +EUR 65/strekkende meter na markup. Naamplaat apart. + VASTE bezorgbijdrage EUR 29,95 per bestelling (apart in mandje/mails).
-- WERKPLAAT/PRODUCTIEBLAD (mNumberedSheet): paint-by-numbers, nummer op elk echt getekend steentje, legenda per kleur + apart RAND-blok (R1/R2) met hakmaat en aantal. Wordt bij "in mandje" per paneel als afbeelding vastgelegd.
-- MANDJE: drawer, meerdere panelen + shop-producten, per item snapshot van het echte ontwerp met de naam erop (niet een vast plaatje). Item-label = "Patroonnaam - NAAM". Subtotaal + Bezorging 29,95 + Totaal. "Veilig betalen via Stripe" + 7 betaallogo's (inline in code).
-- BETALING: Stripe checkout (mode payment), server herberekent de prijs uit pricing.ts (client-bedrag wordt NOOIT vertrouwd). Verzendzones EU/NA/ROW.
-- TRACK: /track/<token> toont alle panelen van de bestelling (via order_group), per paneel naam/stijl/vorm/formaat/prijs + ordertotaal, 12-staps status met badge-illustraties.
-- MAIL: via Resend HTTP-API (Workers kunnen geen SMTP). Afzender overal hello@taleoftiles.com. Ontvangen gaat naar echte cPanel-mailboxen (hello@ en support@, MX -> cPanel). Resend mag versturen via de send.-subdomein DNS + resend._domainkey (LATEN STAAN). Interne melding naar hello@.
+## ===== VALIDATIE VOOR ELKE LEVERING =====
+- `.mjs`: `node --check <bestand>` moet slagen.
+- `.py`: `python3 -c "import ast; ast.parse(open('<bestand>').read())"`.
+- `.html`: JS-scriptblokken parsen (`new Function(block)`), en visueel checken met Playwright
+  headless waar het om beeld gaat.
+- Channels: pauze-/zin-indices binnen de scène houden; render tegen exact het `_timeline.json`.
 
 ## ===== WERKAFSPRAKEN MO (streng) =====
 - ALTIJD Nederlands, KORT. Geen essays, geen opsomming vooraf van wat je gaat doen.
-- NOOIT S-nummers tegen Mo. Patronen hebben namen.
-- HELE bestanden leveren (present_files), geen patches.
-- ALLE punten die Mo in een bericht noemt afmaken, niet alleen de laatste zin. Dat is Mo's grootste ergernis.
-- ZELF checken/renderen voor levering. Visueel, door de ogen van de klant (customer journey).
-- Als Mo zegt "het is niet gefixt / dat klopt niet": GELOOF hem, ga niet tegenspreken of "checken".
-- Zelf beslissen en bouwen als customer-journey-specialist; niet aan Mo vragen wat te doen.
-- Geen em-dashes in klant-copy. Geen nep-urgentie, geen nep-reviews. Schaarste mag subtiel ("handgemaakt in kleine batches"), geen aftel-timers.
-- WINDOWS DEFENDER kan een .ts-download vals als "virus" flaggen (heuristiek op <script>/data: in de code). Geen echt virus. Mo heeft realtime-scanning uit staan; lever gewoon .ts. Als het terugkomt: map uitsluiten in Defender, of base64 leveren en `base64 -d` bij het pushen.
+- HELE bestanden leveren, geen patches. Alleen de GEWIJZIGDE bestanden, niks extra's ernaast.
+- Lever code mét een commit+push-commando; laat niets ongecommit opstapelen (kapiteinsrol).
+- Zelf-opruimend leveren: cp naar het doelpad + rm uit ~/Downloads in hetzelfde commando.
+- Geen em-dashes. Geen nep-urgentie, geen nep-reviews. Geen afsluitende caveat-/disclaimer-blokken.
+- Zelf beslissen en bouwen (kapitein); niet steeds aan Mo vragen wat te doen. Vraag het bestand
+  op als je iets niet zeker weet, i.p.v. gokken.
+- Als Mo zegt "het is niet gefixt / dat klopt niet": geloof hem, ga niet tegenspreken.
+- Max 5 cores bij parallel renderen (1 vrijlaten).
 
-## ===== WAT AF IS (sept 2026) =====
-- Live op taleoftiles.com met werkende Stripe (echte betalingen).
-- Fiberglas-prijsmodel (verkoop + admin-kostprijs), frontend==server geverifieerd.
-- Configurator: patroon = stap 1 (open), naam = stap 2 (optioneel). Klik op een stap scrollt hem in beeld.
-- Werkplaat met raster-nummering + apart telbaar RAND-blok. Voeg (cement) altijd zichtbaar.
-- Cirkel/ovaal goedkoper (minder stenen). Tegelgrootte grof/normaal/fijn met eerlijke prijs.
-- Mandje toont echt ontwerp-snapshot met naam; leesbaar bij meerdere items; label = patroon + naam.
-- Track-pagina toont alle panelen + per-paneel prijs + totaal; net status-rondje.
-- 7 echte betaallogo's (iDEAL|Wero, Bancontact, Visa, Mastercard, Apple Pay, Google Pay, Klarna) + "Veilig betalen via Stripe".
-- Mail vanaf hello@taleoftiles.com; ontvangst via cPanel-mailboxen.
-- Juridische paginas tweetalig met TechBey B.V. + KvK.
-- Hero = zakelijke gevel; naambord-op-muur halverwege de pagina.
-- Showcase carrousel met bedrijfsnamen, muted/Hollandse + TOT-kleuren, 60x40 formaat.
-- COLD-MAILARM LIVE: content-engine rendert 3 mail-stills/lead (klassiek/modern/kleurrijk) -> R2 -> D1 -> ToT-sequence. Zie het bevroren contract bovenaan.
+## ===== WAT AF IS =====
+- Multi-merk studio (:4600) met Tale of Tiles, UncleRank en Channels/Truthward.
+- Per-merk planner (eigen week/kandidaten/slots, `out/.plan.json`) en per-merk socials-koppeling.
+- Planner houdt een gekozen video vast, ook als het bestandspad wijzigt of de video verplaatst is.
+- Channels-studio: beeld/muziek/SFX per scène via dezelfde pop-up-kiezer, per-scène afspelen met
+  laad-gate, dissolve + muziek-crossfade in de render, 🎙 Stem-kiezer (v1/v2/v3).
+- Truthward-stem op Chatterbox (Kokoro + "spread by the sword" eruit).
+- Cold-mailarm LIVE (3 mail-stills/lead → R2 → D1). Nacht-render + poster via Taakplanner.
 
-## ===== NOG TE DOEN / OVERDRACHT (Mo's volgorde) =====
-1. WEBSITE ONLINE ZETTEN — laatste technische doorloop VOOR echt live gaan: end-to-end Stripe-testbestellingen op mobiel EN desktop (bevestigingsmail in inbox niet spam, adres in backend, bedrag klopt met configurator, incl. rand + tegelgrootte 'fijn' + cirkel/ovaal). Mobiele checkout doorklikken.
-2. ADMIN / WERKPLAAT VEREENVOUDIGEN — NIEUW INZICHT VAN MO: de Marokkaanse makers die de designs echt maken hebben ALLEEN het formaat + het design (het gekleurde ontwerp) nodig. NIET de volledige productieplaat/paint-by-numbers met alle nummers en tellingen. Dus de admin/werkplaat kan versimpeld: per bestelling het design-beeld + de maat, meer niet nodig voor de uitvoerder. (De uitgebreide werkplaat bestaat nog; Mo wil 'm terugbrengen tot wat de maker echt gebruikt.)
-
-## KLEINER / LATER
-- iDEAL|Wero-logo is nu Mo's aangeleverde PNG (base64 inline); de andere 6 zijn SVG. Kan later door officiele iDEAL|Wero SVG.
-- Klarna verschijnt in NL/BE soms alleen bij bepaalde bedragen; check dat het echt als optie opduikt.
-- Homepage cosmetisch verder verfijnen. "Vaas"-vormen bij naden in enkele patronen (geparkeerd, cache/deploy-verschil).
+## ===== NOG TE DOEN =====
+- Analytics (fase 3): creator-stats terug in Mo's eigen systeem — bewust uitgesteld tot er genoeg
+  goede video's staan.
+- Kwaliteitsslag retentie/hook per video-type (seconde-1 payoff, pattern-interrupts, geanimeerde
+  captions).
+- UncleRank-content verder uitbouwen als channel (NL-stem staat los van Truthward).
+- Render naar de cloud (nu laptop-afhankelijk).
+- `channel_beeld.py`: eigen beeldplan voor nieuwe verhalen (valt nu terug op het oude plan).
