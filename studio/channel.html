@@ -66,6 +66,8 @@
  .tip{position:fixed;background:#000;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:11px;font-variant-numeric:tabular-nums;z-index:50;pointer-events:none;display:none}
  .hint{padding:10px 18px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:var(--panel)}
  .appbtn{margin-left:10px;font-size:11.5px;color:var(--ink);cursor:pointer;border:1px solid var(--ok);border-radius:7px;padding:4px 10px;background:rgba(62,198,160,.14);white-space:nowrap}
+ .shead .playsc{margin-left:10px;font-size:11.5px;color:var(--ink);cursor:pointer;border:1px solid var(--beeld);border-radius:7px;padding:4px 10px;background:rgba(47,109,240,.16);white-space:nowrap}
+ .scard.active .shead .playsc{border-color:var(--play);background:rgba(255,90,60,.2)}
  .scard.approved{opacity:.72}
  .scard.approved .shead{background:rgba(62,198,160,.16)}
  .scard.approved .appbtn{border-color:var(--line);background:var(--panel2)}
@@ -160,10 +162,12 @@
    <div class="btcands" id="bt-cands"></div>
   </div>
   <div class="beattools none" id="musictools">
-   <div class="bt-t">Muziek-bed — één doorlopend spoor onder de hele video.</div>
+   <div class="bt-t" id="mt-t">Klik een muziek-balk (groene laag) bij een scène om er muziek voor te kiezen.</div>
    <div class="row">
     <button id="mt-cand">🔎 3 muziekbedden</button>
     <button id="mt-pick">📁 Kies muziek-bestand</button>
+    <label style="display:inline-flex;align-items:center;gap:5px;color:var(--mut);font-size:12px">t/m scène
+     <select id="mt-upto" title="dezelfde track aan scènes tot en met" style="background:#0b0f18;border:1px solid var(--line);color:#dfe7f3;border-radius:7px;padding:5px 7px;font-size:12px"></select></label>
    </div>
    <div class="btcands" id="mt-cands"></div>
   </div>
@@ -288,6 +292,7 @@ function buildCards(){
  SC.forEach((s,si)=>{const c=document.createElement('div');c.className='scard';c.dataset.si=si;
   c.innerHTML='<div class="shead"><span class="n">Scène '+s.scene+'</span><span class="tone">'+s.tone+'</span>'+
    '<span class="rng">'+fmts(s.start)+'–'+fmts(s.start+s.dur)+' · '+s.dur.toFixed(1)+'s</span>'+
+   '<button class="playsc" data-playsi="'+si+'" title="speel alleen deze scène">▶ scène</button>'+
    '<button class="appbtn" data-appsi="'+si+'">✓ Goedkeuren</button></div>'+
    '<div class="body">'+
    '<div class="lane beeld"><div class="lab">BEELD</div><div class="track" data-tr="beeld"></div></div>'+
@@ -314,7 +319,7 @@ function layout(){
   subsOf(s).forEach((u,ui)=>{const d=document.createElement('div');d.className='blk tekst';
     d.style.left=(u.start*pps)+'px';d.style.width=Math.max(8,(u.end-u.start)*pps-2)+'px';d.textContent=u.text;d.title=u.text;tt.appendChild(d);
     if(ui>0){const h=document.createElement('div');h.className='handle tekst';h.style.left=(u.start*pps)+'px';h.dataset.si=si;h.dataset.kind='tekst';h.dataset.bi=(ui-1);tt.appendChild(h);}});
-  s.sfx.forEach((f,fi)=>{const d=document.createElement('div');d.className='blk sfx';d.style.left=(f.t*pps)+'px';d.style.width='70px';
+  s.sfx.forEach((f,fi)=>{const d=document.createElement('div');d.className='blk sfx';const _tw=ts.clientWidth||(s.dur*pps);d.style.left=Math.max(0,Math.min(f.t*pps,_tw-72))+'px';d.style.width='70px';
     d.textContent='✦ '+(f.name||'sfx');d.dataset.si=si;d.dataset.fi=fi;d.title='SFX op '+(s.start+f.t).toFixed(2)+'s (dubbelklik = weg)';ts.appendChild(d);});
   const rl=card.querySelector('.ruler');rl.innerHTML='';const step=s.dur>24?5:(s.dur>12?3:2);
   for(let x=0;x<=s.dur+0.01;x+=step){const e=document.createElement('div');e.className='tk';e.style.left=(x*pps)+'px';e.textContent=x.toFixed(0)+'s';rl.appendChild(e);}});
@@ -327,7 +332,7 @@ host.addEventListener('pointerdown',e=>{
    drag={si,kind,bi,arr:kind==='beeld'?SC[si].beatBounds:SC[si].subBounds};tip.style.display='block';moveDrag(e);return;}
  const card=e.target.closest('.scard');if(!card)return;const si=+card.dataset.si,s=SC[si];
  const tb=card.querySelector('[data-tr="beeld"]');const r=tb.getBoundingClientRect();
- if(e.target.closest('.musicbed')){openMusic();return;}
+ if(e.target.closest('.musicbed')){openMusic(si);return;}
  if(sfxMode&&e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();return;}
  const sf=e.target.closest('.blk.sfx');
  if(sf&&sf.dataset.fi!==undefined){const ssi=+sf.dataset.si,sfi=+sf.dataset.fi;selectSfx(ssi,sfi);const ff=(SC[ssi].sfx||[])[sfi];stop();t=SC[ssi].start+(ff?(+ff.t||0):0);placePlayhead();return;}
@@ -346,7 +351,7 @@ addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}}
 host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){SC[+f.dataset.si].sfx.splice(+f.dataset.fi,1);selSfx=null;$('sfxtools').classList.add('none');rebuildSfxAudio();dirty();layout();return;}});
 let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
 
-let t=0,playing=false,raf=null,last=0;const voiceAudio={};let musicBlocks=[],sfxList=[],curScene=-1,curBlock=-1;
+let t=0,playing=false,raf=null,last=0,playEnd=Infinity;const voiceAudio={};let musicBlocks=[],sfxList=[],curScene=-1,curBlock=-1;
 function bn(p){return String(p).split('/').pop();}
 function sceneAt(tt){let a=0;SC.forEach((s,i)=>{if(tt>=s.start)a=i;});return a;}
 function activeBeat(s,local){const bs=beatsOf(s);let i=0;bs.forEach((b,k)=>{if(local>=b.start)i=k;});return i;}
@@ -417,22 +422,27 @@ function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=m
      if(b.audio.readyState>=2&&Math.abs(b.audio.currentTime-want)>0.5){try{b.audio.currentTime=want;}catch(e){}}}).catch(()=>{});}}}
 function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;}catch(e){}x.audio.play().catch(()=>{});}}}
 function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
-function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=total){t=total;stop();}placePlayhead();syncAudio();
- const card=cardOf(sceneAt(t));if(card&&card.offsetParent){const r=card.getBoundingClientRect();if(r.top<60||r.bottom>innerHeight)card.scrollIntoView({block:'center'});}raf=requestAnimationFrame(tick);}
+function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=playEnd||t>=total){t=Math.min(t,total);stop();}placePlayhead();syncAudio();
+ raf=requestAnimationFrame(tick);}
 function play(){if(playing)return;playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
  const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}
  manageMusic();raf=requestAnimationFrame(tick);}
 function stop(){playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
  for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}musicBlocks.forEach(b=>{try{b.audio.pause();}catch(e){}});}
-$('btn-play').addEventListener('click',()=>playing?stop():play());
-$('btn-rew').addEventListener('click',()=>{stop();t=0;placePlayhead();scrollTo({top:0,behavior:'smooth'});});
+$('btn-play').addEventListener('click',()=>{if(playing){stop();}else{playEnd=total;play();}});
+$('btn-rew').addEventListener('click',()=>{stop();t=0;playEnd=total;placePlayhead();scrollTo({top:0,behavior:'smooth'});});
+// PER SCÈNE afspelen: alleen deze scène hoor/zie je, de pagina scrollt niet mee en het stopt vanzelf
+// aan het einde van de scène. Alleen de voice van DÍT nummer wordt geladen (niet alle 14 tegelijk).
+function playScene(si){const s=SC[si];if(!s)return;stop();t=s.start;playEnd=s.start+s.dur;const a=voiceAudio[s.scene];if(a){try{a.load();}catch(e){}}placePlayhead();play();}
+document.addEventListener('click',e=>{const b=e.target.closest('.playsc');if(!b)return;const si=+b.dataset.playsi,s=SC[si];
+ const here=playing&&t>=s.start-0.01&&t<s.start+s.dur+0.3;if(here)stop();else playScene(si);});
 
 // audio: eerst uit de engine proberen, anders handmatig laden
 function autoAudio(){
  SC.forEach(s=>{const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0')+'&channel='+CHANNEL);
-   a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
+   a.preload='none';a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
  // MUZIEK PER BLOK uit de tijdlijn (TL.music = [{start,end,file,mood}]); elk blok z'n eigen track
- musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL);a.volume=0.22;a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
+ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL);a.volume=0.22;a.preload='none';a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
  // SFX op de gemeten momenten (scene.start + f.t); alleen effecten met een bestand
  sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL);a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
  updAudioLabel();
@@ -597,9 +607,27 @@ function renderAudioCands(boxId,cands,serveUrl,curName,onPick){
   box.appendChild(el); });
 }
 
-// ---- MUZIEK-BED: 3 kandidaten voor de HELE video, één keuze ----
-function openMusic(){ $('musictools').classList.remove('none'); loadMusicCands(); try{$('musictools').scrollIntoView({block:'nearest'});}catch(e){} }
-function curMusicName(){ const m=(TL.music||[])[0]; return m&&m.file?bn(m.file):''; }
+// ---- MUZIEK PER SCÈNE + BEREIK -----------------------------------------------------------------
+// Je kiest een track voor één scène, of met "t/m scène" voor een reeks. Opeenvolgende scènes met
+// DEZELFDE track worden automatisch één doorlopend muziek-blok (geen herstart tussendoor); tussen
+// twee verschillende blokken crossfade de render (channel1.mjs). MUS[si] = de track per scène.
+let selMusic=null, MUS=[];
+function initMusicFromTL(){ MUS=SC.map(s=>{ const b=(TL.music||[]).find(x=>x&&x.file&&(+x.start||0)<=s.start+0.3&&(+x.end||total)>=s.start+Math.min(0.3,s.dur*0.5)); return b?b.file:null; }); }
+function coalesceMusic(){ const out=[]; let i=0;
+ while(i<SC.length){ const f=MUS[i]; if(!f){i++;continue;}
+  let j=i; while(j+1<SC.length&&MUS[j+1]===f)j++;
+  out.push({start:+SC[i].start,end:+(SC[j].start+SC[j].dur),file:f,mood:'scene'}); i=j+1; }
+ TL.music=out; }
+function musicFileForScene(si){ return MUS[si]||null; }
+function openMusic(si){ if(si!=null)selMusic=si; if(selMusic==null)selMusic=0; const s=SC[selMusic];
+ const sel=$('mt-upto'); if(sel){ sel.innerHTML=''; for(let k=selMusic;k<SC.length;k++){const o=document.createElement('option');o.value=k;o.textContent='scène '+SC[k].scene;sel.appendChild(o);} sel.value=String(selMusic); }
+ $('mt-t').innerHTML='Muziek voor scène <b>'+s.scene+'</b> — kies een track; met “t/m scène” hang je dezelfde track aan meerdere scènes.';
+ $('musictools').classList.remove('none'); loadMusicCands(); try{$('musictools').scrollIntoView({block:'nearest'});}catch(e){} }
+function updateMusicLanes(){ SC.forEach((s,si)=>{const c=cardOf(si);if(!c)return;const bed=c.querySelector('.musicbed');if(!bed)return;
+ const f=musicFileForScene(si); const has=!!f;
+ bed.innerHTML = has ? ('&#9834; '+bn(f)) : '&#9834; klik om muziek te kiezen';
+ bed.style.opacity = has ? '1' : '.6'; }); }
+function curMusicName(){ return (selMusic!=null&&MUS[selMusic])?bn(MUS[selMusic]):''; }
 async function loadMusicCands(){ const box=$('mt-cands'); if(!box) return; box.innerHTML='<span class="cndhint">laden…</span>';
  try{ const r=await fetch('/api/channel-music-search?channel='+CHANNEL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,cached:1})});
   const d=await r.json();
@@ -614,9 +642,13 @@ async function searchMusicCands(){ const btn=$('mt-cand'),old=btn.textContent;bt
   renderAudioCands('mt-cands',d.candidates,'/api/channel-audio',curMusicName(),setMusicBed);
  }catch(e){$('mt-cands').innerHTML='<span class="cndhint">zoeken mislukt (engine aan?).</span>';}
  finally{btn.disabled=false;btn.textContent=old;} }
-function setMusicBed(fileBase){ const rel='assets/channels/'+CHANNEL+'/muziek/'+fileBase;
- TL.music=[{start:0,end:total,file:rel,mood:'bed'}]; rebuildMusic(); dirty(); updAudioLabel(); loadMusicCands();
- $('rendermsg').textContent='muziek-bed gekozen ✓ — vergeet niet op te slaan.'; }
+function setMusicBed(fileBase){ if(selMusic==null){alert('Klik eerst op een muziek-balk bij een scène.');return;}
+ const rel='assets/channels/'+CHANNEL+'/muziek/'+fileBase;
+ const sel=$('mt-upto'); let upto=sel?(+sel.value):selMusic; if(isNaN(upto)||upto<selMusic)upto=selMusic;
+ for(let k=selMusic;k<=upto;k++)MUS[k]=rel;
+ coalesceMusic(); rebuildMusic(); updateMusicLanes(); dirty(); updAudioLabel(); loadMusicCands();
+ const n=upto-selMusic+1;
+ $('rendermsg').textContent='muziek gezet voor '+(n>1?('scène '+SC[selMusic].scene+' t/m '+SC[upto].scene):('scène '+SC[selMusic].scene))+' ✓ — vergeet niet op te slaan.'; }
 $('mt-cand').addEventListener('click',searchMusicCands);
 $('mt-pick').addEventListener('click',()=>$('ld-music').click());
 
@@ -705,7 +737,7 @@ function boot(){
  // formaat van DIT project overnemen (9:16 short of 16:9 lang) voordat we tekenen
  if(TL.format==='9:16'||TL.format==='16:9'){FMT=TL.format;applyFormat();}
  buildState();if(Array.isArray(TL.approved))TL.approved.forEach(n=>approved.add(n));
- buildCards();layout();placeApproval();placePlayhead();autoAudio();buildOverview();predrawAll();
+ buildCards();layout();placeApproval();placePlayhead();autoAudio();initMusicFromTL();updateMusicLanes();buildOverview();predrawAll();
  fetch('/api/channel-media-list?story='+encodeURIComponent(STORY)+'&channel='+CHANNEL).then(r=>r.json()).then(d=>{if(d&&Array.isArray(d.files)){MEDIA=d.files;if(autoHeal()){layout();buildOverview();}}}).catch(()=>{});
  $('hdrtitle').textContent='“'+TL.title+'”';$('hdrsub').textContent=SC.length+' scènes · '+TL.total_mmss+' · '+STORY+'/'+VOICE+' · '+FMT;
  $('pv-total').textContent=TL.total_mmss;

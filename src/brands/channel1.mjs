@@ -1295,18 +1295,16 @@ export function makeBrand({ ROOT = "." } = {}) {
           const segDur = +(seg.end - seg.start).toFixed(3);
           if (segDur <= 0.03) { segIdx++; continue; }
           const nF = Math.max(1, Math.round(segDur * FPS));
-          // ZACHTE OVERGANG: scène-randen vloeien wat langer in/uit (FD); tussen beeldblokken BINNEN
-          // een scène een kórte zachte dip (BD) i.p.v. een harde cut. Timing blijft exact. Te korte
-          // beats (< ~0.6s) slaan de extra dip over.
-          const FD = 0.22, BD = 0.14;
-          const canDip = segDur > 0.6;
+          // OVERGANGEN: geen zwart-dip meer tussen beeldblokken. Alle grenzen (beat én scène) krijgen
+          // straks een echte dissolve (crossDissolve, hieronder). Hier alleen nog: fade-in uit zwart op
+          // de ALLEREERSTE clip en fade-out naar zwart op de ALLERLAATSTE. Timing blijft exact.
+          const FD = 0.4;
+          const isGlobalFirst = (i === 0 && segIdx === 0);
+          const isGlobalLast  = (i === scenes.length - 1 && segIdx === segs.length - 1);
           const fo = Math.max(0, segDur - FD).toFixed(2);
-          const foB = Math.max(0, segDur - BD).toFixed(2);
           const vf = [];
-          if (segIdx === 0) vf.push(`fade=t=in:st=0:d=${FD}`);
-          else if (canDip) vf.push(`fade=t=in:st=0:d=${BD}`);
-          if (segIdx === segs.length - 1) vf.push(`fade=t=out:st=${fo}:d=${FD}`);
-          else if (canDip) vf.push(`fade=t=out:st=${foB}:d=${BD}`);
+          if (isGlobalFirst) vf.push(`fade=t=in:st=0:d=${FD}`);
+          if (isGlobalLast)  vf.push(`fade=t=out:st=${fo}:d=${FD}`);
           const fadeChain = vf.length ? "," + vf.join(",") : "";
           const fadeVf = vf.join(",");
           const vidFile = resolveMedia(seg.b.vid);
@@ -1362,10 +1360,35 @@ export function makeBrand({ ROOT = "." } = {}) {
         }
       }
 
-      // scène-clips aan elkaar (concat demuxer)
+      // BEELD-OVERGANGEN: tussen elke twee opeenvolgende clips een echte dissolve (crossfade) i.p.v.
+      // een harde cut. We pakken het laatste frame van de vorige clip en kruisen dat in het BEGIN van
+      // de volgende clip. De dissolve zit binnen het begin van de volgende clip, dus de totale lengte
+      // verandert NIET -> stem, muziek en SFX blijven exact in sync.
+      say(`  beeld-overgangen (dissolve)...`);
+      const XV = 0.4;   // dissolve-duur in seconden
+      const disClips = [];
+      for (let k = 0; k < sceneClips.length; k++) {
+        if (k === 0) { disClips.push(sceneClips[k]); continue; }
+        const prev = sceneClips[k - 1], cur = sceneClips[k];
+        const still = path.join(work, `last${k}.png`);
+        const out = path.join(work, `dis${k}.mp4`);
+        try {
+          await ff(["-y", "-sseof", "-0.08", "-i", prev, "-frames:v", "1", "-q:v", "2", still]);
+          await ff(["-y", "-loop", "1", "-t", XV.toFixed(2), "-i", still, "-i", cur,
+            "-filter_complex",
+            `[0:v]scale=${OW}:${OH},setsar=1,fps=${FPS},format=yuv420p[s];[1:v]setsar=1,fps=${FPS},format=yuv420p[c];[s][c]xfade=transition=fade:duration=${XV}:offset=0[v]`,
+            "-map", "[v]", "-r", String(FPS), "-pix_fmt", "yuv420p", "-an", out]);
+          disClips.push(out);
+        } catch (e) {
+          say(`  (dissolve ${k} overgeslagen -> harde cut: ${e && e.message ? e.message : e})`);
+          disClips.push(cur);   // bij een fout valt deze overgang gewoon terug op een cut
+        }
+      }
+
+      // clips aan elkaar (concat demuxer)
       say(`  scènes samenvoegen...`);
       const listFile = path.join(work, "list.txt");
-      await fs.writeFile(listFile, sceneClips.map((c) => `file '${c.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
+      await fs.writeFile(listFile, disClips.map((c) => `file '${c.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
       const silent = path.join(work, "silent.mp4");
       await ff(["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent]);
 
@@ -1386,13 +1409,21 @@ export function makeBrand({ ROOT = "." } = {}) {
       // bodem. Geen tijdlijn-muziek -> terugval op één doorlopende track (oud gedrag).
       const blocks = (tlAudio && tlAudio.music && tlAudio.music.length) ? tlAudio.music : null;
       if (blocks) {
-        for (const b of blocks) {
+        // CROSSFADE tussen muziek-blokken: elk volgend blok begint XF seconden eerder en faadt over die
+        // XF in, terwijl het vorige blok nog uitfaadt -> de twee tracks vloeien in elkaar over i.p.v.
+        // een dip naar stilte. Het eerste blok faadt gewoon kort in.
+        const XF = 1.0;
+        for (let bi = 0; bi < blocks.length; bi++) {
+          const b = blocks[bi];
           const bf = resolveAudio(b.file); if (!(bf && await exists(bf))) continue;
-          const bdur = Math.max(0.5, (Number(b.end) || 0) - (Number(b.start) || 0));
-          const ms = Math.round((Number(b.start) || 0) * 1000);
+          const raw = Number(b.start) || 0;
+          const start = bi > 0 ? Math.max(0, raw - XF) : raw;            // overlap met vorig blok
+          const bdur = Math.max(0.5, (Number(b.end) || 0) - start);
+          const fin = (bi > 0 ? XF : 0.6).toFixed(2);                    // langere infade op de overlap
+          const ms = Math.round(start * 1000);
           const fo = Math.max(0, bdur - 0.6).toFixed(2);
           inputs.push("-stream_loop", "-1", "-i", bf);
-          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=0.22,afade=t=in:st=0:d=0.6,afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
+          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=0.22,afade=t=in:st=0:d=${fin},afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
           bedLabels.push(`[m${idx}]`); idx++;
         }
       } else {
