@@ -44,7 +44,7 @@ const SCOPES = [
 ].join(",");
 
 // Gedeelde Meta-auth (één per taal). Geeft helpers die zowel de IG- als FB-module gebruiken.
-export function makeMetaAuth({ ROOT } = {}) {
+export function makeMetaAuth({ ROOT, brand } = {}) {
   const SECRETS = ROOT ? path.resolve(ROOT, "secrets") : path.resolve("secrets");
   const tokenPath = (lang) => path.join(SECRETS, `meta-${lang}.json`);
 
@@ -53,8 +53,10 @@ export function makeMetaAuth({ ROOT } = {}) {
     if (!id || !secret) throw new Error("META_APP_ID/SECRET ontbreken in .env");
     return { id, secret, clientToken };
   }
-  // Welke pagina hoort bij welke taal: uit .env (META_PAGE_<LANG>). Leeg = geen voorkeur.
-  const targetPageFor = (lang) => (process.env[`META_PAGE_${String(lang).toUpperCase()}`] || "").trim();
+  // Welke pagina hoort bij welke taal: uit .env. Per merk eigen pagina via META_PAGE_<MERK>_<LANG>
+  // (bv. META_PAGE_UNCLERANK_NL), met terugval op de merk-loze META_PAGE_<LANG> (bestaand gedrag voor
+  // Tale of Tiles). Leeg = geen voorkeur -> eerste pagina.
+  const targetPageFor = (lang) => (process.env[`META_PAGE_${String(brand || "").toUpperCase()}_${String(lang).toUpperCase()}`] || process.env[`META_PAGE_${String(lang).toUpperCase()}`] || "").trim();
   const inProgress = {};   // lang -> true, voorkomt dubbel pollen
   async function readToken(lang) { try { return JSON.parse(await fsp.readFile(tokenPath(lang), "utf8")); } catch { return null; } }
   async function writeToken(lang, data) { await fsp.mkdir(SECRETS, { recursive: true }); await fsp.writeFile(tokenPath(lang), JSON.stringify(data, null, 2)); }

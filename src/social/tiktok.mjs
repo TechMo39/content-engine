@@ -44,7 +44,7 @@ function makePkce() {
   return { verifier, challenge };
 }
 
-export function makeTikTok({ ROOT, suggest } = {}) {
+export function makeTikTok({ ROOT, suggest, brand } = {}) {
   const SECRETS = ROOT ? path.resolve(ROOT, "secrets") : path.resolve("secrets");
   const tokenPath = (lang) => path.join(SECRETS, `tiktok-${lang}.json`);
   // lopende login-flows: lang -> { verifier, state, resolve, reject, timer }
@@ -124,7 +124,7 @@ export function makeTikTok({ ROOT, suggest } = {}) {
     const { key } = creds();
     if (pending[lang]) throw new Error(`koppelen ${lang.toUpperCase()} loopt al — maak de TikTok-login in de browser af`);
     const { verifier, challenge } = makePkce();
-    const state = b64url(crypto.randomBytes(16)) + "_" + lang;   // lang in de state zodat de worker 'm terugvindt
+    const state = b64url(crypto.randomBytes(16)) + "_" + (brand || "taleoftiles") + "_" + lang;   // merk + taal in de state zodat de callback het juiste merk/taal terugvindt
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { cleanupPending(lang); reject(new Error("koppelen verlopen (geen login binnen 5 min)")); }, 5 * 60 * 1000);
       pending[lang] = { verifier, state, resolve, reject, timer };

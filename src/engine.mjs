@@ -105,7 +105,15 @@ const TYPE_MAX_SEC = {
   droste: 60,   // oneindige inzoom: duur wordt gesnapt op hele tunnel-cycli (naadloze loop)
 };
 
-const social = buildSocial({ ROOT, publicUrlFor });
+// SOCIALS PER MERK: elk merk z'n eigen instance met eigen token-opslag. Tale of Tiles houdt exact
+// z'n huidige secrets/ (bestaande logins blijven), andere merken krijgen secrets onder brands/<merk>/.
+const SOCIAL_BRANDS = ["taleoftiles", "unclerank"];
+const SOCIAL_DEFAULT = "taleoftiles";
+const socialBrandOk = (b) => (SOCIAL_BRANDS.includes(b) ? b : SOCIAL_DEFAULT);
+const socials = {};
+for (const b of SOCIAL_BRANDS) socials[b] = buildSocial({ ROOT, publicUrlFor, brand: b });
+const socialFor = (b) => socials[socialBrandOk(b)];
+const social = socials[SOCIAL_DEFAULT];   // standaard-merk voor code die (nog) niet merk-bewust is
 const socialStore = makeSocialStore(OUT);
 
 // ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
@@ -474,7 +482,10 @@ const server = http.createServer(async (req, res) => {
       const date = u.searchParams.get("date") || planToday();
       const brand = planBrandOk(u.searchParams.get("brand"));
       const plan = await readPlan(), days = plan[brand] || {};
-      const slots = (days[date] && days[date].slots) || [];
+      // Opgeslagen slots van een ANDER merk (bv. oude kring-video's die bij de migratie onder Tale of
+      // Tiles belandden) hier wegfilteren: een slot hoort alleen bij dit merk als z'n bestand van dit
+      // merk is. Lege slots blijven staan.
+      const slots = ((days[date] && days[date].slots) || []).filter((s) => !s || !s.file || parseOutName(String(s.file).split("/").pop().replace(/\.mp4$/i, "")).brand === brand);
       // LIVE post-status per slot uit het sociale logboek (PUUR LEZEN): welke kanalen van dit
       // bestand+taal zijn echt geplaatst (posted) of mislukt (failed). Zo kan de Planning een
       // waarschuwing tonen zonder iets aan de render/mail/poster te veranderen.
@@ -1038,21 +1049,22 @@ const server = http.createServer(async (req, res) => {
     // Elk platform (youtube/…) heeft DRIE taal-accounts (NL/EN/FR), elk eigen token.
     // Geeft per account de echte koppel-status (connected + kanaalnaam) terug.
     if (u.pathname === "/api/social/channels") {
+      const soc = socialFor(u.searchParams.get("brand"));
       const accounts = [];
-      for (const a of social.listAccounts()) {
+      for (const a of soc.listAccounts()) {
         let connected = false, who = "";
-        const p = social.platById[a.platform];
+        const p = soc.platById[a.platform];
         if (p && p.enabled && p.authStatus) { try { const s = await p.authStatus(a.lang); connected = !!s.connected; who = s.who || ""; } catch {} }
         accounts.push({ ...a, connected, who });
       }
-      json(res, { platforms: social.listPlatforms(), accounts, langs: social.LANGS });
+      json(res, { brand: soc.brand, platforms: soc.listPlatforms(), accounts, langs: soc.LANGS });
       return;
     }
     // LOGIN: start de OAuth-koppeling voor één platform+taal. Opent de browser (desktop-flow)
     // en lost op zodra de gebruiker is ingelogd en het token lokaal is opgeslagen.
     if (u.pathname === "/api/social/login" && req.method === "POST") {
       const bd = await readBody(req);
-      const p = social.platById[bd.platform];
+      const p = socialFor(bd.brand).platById[bd.platform];
       const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
       if (!p || !p.enabled || !p.startLogin) { json(res, { error: "kan dit platform niet koppelen" }, 400); return; }
       try { const r = await p.startLogin(lang, log); json(res, { ok: true, ...(r || {}) }); }
@@ -1070,9 +1082,11 @@ const server = http.createServer(async (req, res) => {
       const code = u.searchParams.get("code") || "";
       const state = u.searchParams.get("state") || "";
       const err = u.searchParams.get("error") || "";
-      // taal uit de state (we zetten "<rnd>_<lang>" in startLogin)
-      const lang = (state.split("_").pop() || "nl").toLowerCase();
-      const tt = social.platById["tiktok"];
+      // taal + merk uit de state (startLogin zet "<rnd>_<merk>_<lang>"; oude "<rnd>_<lang>" -> standaard-merk)
+      const _sp = state.split("_");
+      const lang = (_sp.pop() || "nl").toLowerCase();
+      const cbBrand = socialBrandOk(_sp.pop());
+      const tt = socialFor(cbBrand).platById["tiktok"];
       if (err) { log(`✗ TikTok ${lang.toUpperCase()}: ${err}`); json(res, { error: err }); return; }
       if (!code || !tt || !tt.completeLogin) { json(res, { error: "geen code of TikTok niet beschikbaar" }, 400); return; }
       try { await tt.completeLogin(lang, code, state, log); json(res, { ok: true }); }
@@ -1133,7 +1147,7 @@ const server = http.createServer(async (req, res) => {
     // het platform een nette fout terug en leggen we de status als "failed" vast (met reden).
     if (u.pathname === "/api/social/post" && req.method === "POST") {
       const bd = await readBody(req);
-      const p = social.platById[bd.platform];
+      const p = socialFor(bd.brand).platById[bd.platform];
       const lang = ["en", "fr"].includes(bd.lang) ? bd.lang : "nl";
       if (!bd.file || !p) { json(res, { error: "onbekend platform of geen video" }, 400); return; }
       if (!p.enabled) { json(res, { error: p.label + " — binnenkort" }, 400); return; }

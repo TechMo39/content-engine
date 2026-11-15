@@ -764,14 +764,19 @@ async function loadSocial(){
   $('#socGroups').innerHTML='';$('#socEmpty').textContent='Laden…';$('#socEmpty').style.display='';
   // kanalen (met koppel-status) + video's parallel
   let vids={items:[],platforms:[]},chan={accounts:[]};
-  try{[vids,chan]=await Promise.all([fetch('/api/social/videos').then(r=>r.json()),fetch('/api/social/channels').then(r=>r.json())]);}catch(e){}
+  soc.chanBrand=soc.brand||'taleoftiles';   // kanalen/koppel-status gelden per merk
+  try{[vids,chan]=await Promise.all([fetch('/api/social/videos').then(r=>r.json()),fetch('/api/social/channels?brand='+encodeURIComponent(soc.chanBrand)).then(r=>r.json())]);}catch(e){}
   soc.items=vids.items||[];soc.platforms=vids.platforms||chan.platforms||[];soc.accounts=chan.accounts||[];soc.loaded=true;soc.page=1;
   renderMonitor();
   renderChannels();
   // merk-filter
   const seen=new Map();soc.items.forEach(i=>{if(i.brand&&!seen.has(i.brand))seen.set(i.brand,i.brandName||i.brand);});
   const bc=$('#socBrands');bc.innerHTML='';
-  const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');soc.page=1;renderMonitor();renderSoc();};bc.appendChild(b);};
+  const mkb=(id,label)=>{const b=document.createElement('button');b.className='chip'+((soc.brand===id)?' on':'');b.textContent=label;b.onclick=async()=>{soc.brand=id;$$('#socBrands button').forEach(x=>x.classList.remove('on'));b.classList.add('on');soc.page=1;
+    // kanalen/koppel-status per merk herladen (zodat je bv. UncleRank apart kan koppelen/posten)
+    soc.chanBrand=id||'taleoftiles';
+    try{const ch=await (await fetch('/api/social/channels?brand='+encodeURIComponent(soc.chanBrand))).json();soc.accounts=ch.accounts||[];if(ch.platforms)soc.platforms=ch.platforms;}catch(e){}
+    renderChannels();renderMonitor();renderSoc();};bc.appendChild(b);};
   mkb('','Alle merken'); for(const [id,label] of seen) mkb(id,label);
   // taal-filter
   const lc=$('#socLangs');lc.innerHTML='';
@@ -846,12 +851,12 @@ function renderChannels(){
       if(connected||!p.enabled){/* niks */}
       else row.querySelector('button').onclick=async(ev)=>{
         ev.target.disabled=true;ev.target.textContent='Koppelen…';
-        try{const r=await (await fetch('/api/social/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({platform:p.id,lang:a.lang})})).json();
+        try{const r=await (await fetch('/api/social/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({platform:p.id,lang:a.lang,brand:soc.chanBrand||'taleoftiles'})})).json();
           if(r.error){ev.target.disabled=false;ev.target.textContent='Koppel';alert(r.error);return;}
           // Meta device-login: toon de code die de gebruiker op facebook.com/device invoert.
           if(r.userCode){
             ev.target.textContent='Code: '+r.userCode;
-            alert('Koppelen:\n\n1. Er opent een Facebook-pagina (of ga naar '+(r.verifyUrl||'facebook.com/device')+')\n2. Voer deze code in: '+r.userCode+'\n3. Kies de pagina Tale of Tiles NL en geef toestemming\n\nDaarna springt dit vanzelf op groen (klik Vernieuwen).');
+            alert('Koppelen:\n\n1. Er opent een Facebook-pagina (of ga naar '+(r.verifyUrl||'facebook.com/device')+')\n2. Voer deze code in: '+r.userCode+'\n3. Kies de juiste pagina'+(r.targetPage?' ('+r.targetPage+')':'')+' en geef toestemming\n\nDaarna springt dit vanzelf op groen (klik Vernieuwen).');
             // na ~15s automatisch verversen om de status te pakken
             setTimeout(()=>{soc.loaded=false;loadSocial();},15000);
           } else { soc.loaded=false;loadSocial(); }
@@ -900,7 +905,7 @@ function videoCard(it){
   const tEl=card.querySelector('.soc-title'),dEl=card.querySelector('.soc-desc'),msg=card.querySelector('.socmsg');
   const firstPf=(soc.platforms.find(p=>p.enabled)||soc.platforms[0]||{}).id||'youtube';
   socText(it,firstPf).then(t=>{tEl.value=t.title||'';dEl.value=t.description||'';});
-  const collect=()=>({file:it.file,lang:vlang,title:tEl.value,description:dEl.value,tags:(dEl.value.match(/#[\p{L}\p{N}]+/gu)||[]).map(s=>s.slice(1))});
+  const collect=()=>({file:it.file,brand:it.brand,lang:vlang,title:tEl.value,description:dEl.value,tags:(dEl.value.match(/#[\p{L}\p{N}]+/gu)||[]).map(s=>s.slice(1))});
   card.querySelector('.soc-savebtn').onclick=async()=>{
     msg.textContent='Bewaren…';
     try{const r=await (await fetch('/api/social/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...collect(),platform:firstPf})})).json();
