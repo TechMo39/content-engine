@@ -110,6 +110,9 @@ const socialStore = makeSocialStore(OUT);
 
 // ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
 const PLAN_FILE = path.join(OUT, ".plan.json");
+// Welke merken in DEZE planner voorgesteld worden. Bewust alleen Tale of Tiles: UncleRank heeft z'n
+// eigen content-aanpak (portaal/AnchorRank) en hoort hier niet in de dagplanning.
+const PLAN_BRANDS = new Set(["taleoftiles"]);
 const PLAN_TIMES = ["11:00", "19:00"];
 const PLAN_LANGS = ["nl", "en", "fr"];
 const planToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });   // Europese dag
@@ -123,7 +126,7 @@ async function planCandidates() {
   try {
     for (const r of await listRenderFiles()) {
       const m = parseOutName(r.base.replace(/\.mp4$/i, ""));
-      if (!BUSINESS_BRANDS.has(m.brand)) continue;
+      if (!PLAN_BRANDS.has(m.brand)) continue;
       const _d = new Date(r.mtimeMs), _p = (n) => String(n).padStart(2, "0");
       const datum = _p(_d.getDate()) + "-" + _p(_d.getMonth() + 1) + " " + _p(_d.getHours()) + ":" + _p(_d.getMinutes());
       out.push({ file: r.rel, url: outUrl(r.rel), type: m.template || null, typeName: m.template ? (TEMPLATE_NAME[m.template] || titleCase(m.template)) : "Video", lang: ["en", "fr"].includes(m.lang) ? m.lang : "nl", name: m.name || "", datum, mtime: r.mtimeMs });
