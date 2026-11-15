@@ -252,6 +252,7 @@ input[type=text],select{background:#1b1430;border:1px solid #3a2f52;color:var(--
 </section>
 
 <section id="view-plan" style="display:none">
+  <div class="planbar"><span class="planhdr">Merk</span><span id="planBrands" class="seg"></span></div>
   <div class="planbar">
     <button id="planPrevWk" class="chip planwknav" title="Vorige week">‹ vorige week</button>
     <div id="planWeek" class="planweek"></div>
@@ -447,7 +448,7 @@ function showView(which){
   $('#tab-car').classList.toggle('on',which==='car');
   $('#topsub').textContent=which==='studio'?'merk → onderwerp → template → render':which==='mail'?'mail-plaatjes per bedrijf':which==='social'?'video → kanaal → keuren → posten':which==='plan'?'kandidaten → dagvoorstel → akkoord':which==='car'?'before/after → keuren → posten (IG + FB)':'alle gerenderde output op één plek';
   if(which==='social'&&!soc.loaded)loadSocial();
-  if(which==='plan'&&!plan.loaded)loadPlan();
+  if(which==='plan'&&!plan.loaded)initPlan();
   if(which==='car'&&!car.loaded)loadCar();
 }
 $('#tab-studio').onclick=()=>showView('studio');
@@ -522,15 +523,26 @@ $('#carMake').onclick=async()=>{
 $('#carRefresh').onclick=()=>loadCar();
 
 // ---- Planning-tab: weekstrip + dagvoorstel -> akkoord/swap + afkeuren ----
-const plan={loaded:false,data:null,date:null,weekBase:null};
+const plan={loaded:false,data:null,date:null,weekBase:null,brand:null,brands:[]};
 const PLANLBL={nl:'NL',en:'EN',fr:'FR'};
 const WKD=['ma','di','wo','do','vr','za','zo'];
 const plToday=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Amsterdam'});
 const fmtDay=ds=>{const p=String(ds).split('-');return p[2]+'-'+p[1];};
 function planAccountsFor(lang){return (plan.data.accounts||[]).filter(a=>a.lang===lang&&a.enabled);}
+// PER-MERK: haal de merken op, teken de kiezer; wissel = plan opnieuw laden voor dat merk.
+async function loadPlanBrands(){
+  let j={brands:[]};try{j=await (await fetch('/api/plan/brands')).json();}catch(e){}
+  plan.brands=j.brands||[];
+  if(!plan.brand||!plan.brands.some(b=>b.id===plan.brand))plan.brand=(plan.brands[0]&&plan.brands[0].id)||'taleoftiles';
+  const g=$('#planBrands');if(!g)return;g.innerHTML='';
+  plan.brands.forEach(b=>{const el=document.createElement('button');el.textContent=b.name;if(b.id===plan.brand)el.classList.add('on');
+    el.onclick=()=>{if(plan.brand===b.id)return;plan.brand=b.id;[...g.children].forEach(c=>c.classList.remove('on'));el.classList.add('on');loadPlan(plan.date);};
+    g.appendChild(el);});
+}
+async function initPlan(){await loadPlanBrands();loadPlan();}
 async function loadWeek(base){
   plan.weekBase=base||plan.date||plToday();
-  let j={days:[]};try{j=await (await fetch('/api/plan/week?date='+plan.weekBase)).json();}catch(e){}
+  let j={days:[]};try{j=await (await fetch('/api/plan/week?date='+plan.weekBase+'&brand='+(plan.brand||''))).json();}catch(e){}
   const w=$('#planWeek');w.innerHTML='';
   (j.days||[]).forEach((d,i)=>{
     const b=document.createElement('button');b.className='planday'+((d.date===plan.date)?' on':'');
@@ -544,7 +556,7 @@ function shiftWeek(delta){const d=new Date((plan.weekBase||plan.date||plToday())
 async function loadPlan(date){
   plan.date=date||plan.date||plToday();
   $('#planGrid').innerHTML='';$('#planMsg').textContent='Laden…';plan.loaded=true;
-  let j=null;try{j=await (await fetch('/api/plan?date='+plan.date)).json();}catch(e){}
+  let j=null;try{j=await (await fetch('/api/plan?date='+plan.date+'&brand='+(plan.brand||''))).json();}catch(e){}
   plan.data=j||{slots:[],candidates:[],accounts:[],times:['11:00','19:00'],langs:['nl','en','fr'],date:plan.date};
   $('#planDate').textContent='Plan voor '+(plan.data.date||plan.date);$('#planMsg').textContent='';
   renderPlan();
@@ -626,11 +638,11 @@ function renderPlan(){
   });
   g.appendChild(wrap);
 }
-async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan, voeg toe of haal weg, en klik Akkoord.';}
+async function proposePlan(){$('#planMsg').textContent='Dagvoorstel maken…';try{await fetch('/api/plan/propose',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,brand:plan.brand})});}catch(e){}await loadPlan(plan.date);$('#planMsg').textContent='Voorstel klaar — pas aan, voeg toe of haal weg, en klik Akkoord.';}
 async function savePlan(){
   const slots=(plan.data.slots||[]).filter(s=>s.file).map(s=>({time:s.time,lang:s.lang,file:s.file||null,url:s.url||null,type:s.type||null,typeName:s.typeName||null,platforms:Array.isArray(s.platforms)?s.platforms:[],status:(s.status==='geplaatst'||s.status==='deels')?s.status:'gepland'}));
   $('#planMsg').textContent='Opslaan…';
-  try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}
+  try{await (await fetch('/api/plan/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:plan.date,brand:plan.brand,slots})})).json();$('#planMsg').textContent='Plan opgeslagen ('+slots.length+' posts gepland).';loadWeek(plan.weekBase||plan.date);}catch(e){$('#planMsg').textContent='Fout bij opslaan.';}
 }
 $('#planPropose').onclick=proposePlan;
 $('#planSave').onclick=savePlan;

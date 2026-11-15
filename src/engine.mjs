@@ -110,23 +110,37 @@ const socialStore = makeSocialStore(OUT);
 
 // ---- PLANNING (laag 2): dagvoorstel -> jij keurt goed/swapt. Opslag out/.plan.json. ----
 const PLAN_FILE = path.join(OUT, ".plan.json");
-// Welke merken in DEZE planner voorgesteld worden. Bewust alleen Tale of Tiles: UncleRank heeft z'n
-// eigen content-aanpak (portaal/AnchorRank) en hoort hier niet in de dagplanning.
-const PLAN_BRANDS = new Set(["taleoftiles"]);
+// Elk merk heeft z'n EIGEN planner (eigen week, kandidaten, slots). Tale of Tiles en UncleRank staan
+// los van elkaar; channels (handgemaakt) plan je hier niet.
+const PLAN_BRANDS = ["taleoftiles", "unclerank"];
+const PLAN_DEFAULT = "taleoftiles";
+const planBrandOk = (b) => (PLAN_BRANDS.includes(b) ? b : PLAN_DEFAULT);
 const PLAN_TIMES = ["11:00", "19:00"];
 const PLAN_LANGS = ["nl", "en", "fr"];
 const planToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });   // Europese dag
-async function readPlan() { try { return JSON.parse(await fs.readFile(PLAN_FILE, "utf8")); } catch { return {}; } }
+// Opslag PER MERK: { <merk>: { <datum>: { slots } } }. Oud formaat ({ <datum>: {slots} }) hoorde bij
+// Tale of Tiles -> dat migreren we onder "taleoftiles", zodat bestaande plannen blijven staan.
+function migratePlan(p) {
+  if (!p || typeof p !== "object") return {};
+  const isDate = (k) => /^\d{4}-\d{2}-\d{2}$/.test(k);
+  if (Object.keys(p).some(isDate)) {
+    const moved = {}, rest = {};
+    for (const k of Object.keys(p)) (isDate(k) ? moved : rest)[k] = p[k];
+    const others = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== "taleoftiles"));
+    return { taleoftiles: { ...(rest.taleoftiles || {}), ...moved }, ...others };
+  }
+  return p;
+}
+async function readPlan() { try { return migratePlan(JSON.parse(await fs.readFile(PLAN_FILE, "utf8"))); } catch { return {}; } }
 async function writePlan(p) { try { await fs.writeFile(PLAN_FILE, JSON.stringify(p, null, 2)); } catch {} }
 // Verse video-kandidaten uit out/ (zelfde bron als de Bibliotheek).
-async function planCandidates() {
-  const out = [];
-  // PLANNER = de BEDRIJVEN (semi-automatisch): alleen renders van bedrijf-merken komen in de
-  // kandidatenpool. Channels (handgemaakt) plan je niet, die horen hier niet thuis.
+async function planCandidates(brand) {
+  const want = planBrandOk(brand), out = [];
+  // Alleen renders van DÍT merk komen in de kandidatenpool (per-merk planner).
   try {
     for (const r of await listRenderFiles()) {
       const m = parseOutName(r.base.replace(/\.mp4$/i, ""));
-      if (!PLAN_BRANDS.has(m.brand)) continue;
+      if (m.brand !== want) continue;
       const _d = new Date(r.mtimeMs), _p = (n) => String(n).padStart(2, "0");
       const datum = _p(_d.getDate()) + "-" + _p(_d.getMonth() + 1) + " " + _p(_d.getHours()) + ":" + _p(_d.getMinutes());
       out.push({ file: r.rel, url: outUrl(r.rel), type: m.template || null, typeName: m.template ? (TEMPLATE_NAME[m.template] || titleCase(m.template)) : "Video", lang: ["en", "fr"].includes(m.lang) ? m.lang : "nl", name: m.name || "", datum, mtime: r.mtimeMs });
@@ -136,11 +150,11 @@ async function planCandidates() {
   return out;
 }
 // Al geposte of al geplande bestanden -> niet opnieuw voorstellen.
-async function planUsedFiles() {
-  const used = new Set();
+async function planUsedFiles(brand) {
+  const want = planBrandOk(brand), used = new Set();
   try { for (const r of await socialStore.all()) if (r && r.file) used.add(r.file); } catch {}
-  const p = await readPlan();
-  for (const d of Object.keys(p)) for (const s of ((p[d] && p[d].slots) || [])) if (s.file) used.add(s.file);
+  const p = await readPlan(), days = p[want] || {};
+  for (const d of Object.keys(days)) for (const s of ((days[d] && days[d].slots) || [])) if (s.file) used.add(s.file);
   return used;
 }
 log("social-platforms: " + social.platforms.map((p) => p.id + (p.enabled ? "" : "·stub")).join(", ") + " × " + social.LANGS.join("/"));
@@ -454,11 +468,13 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/brands") { json(res, { brands: reg.brands.map((b) => ({ id: b.id, name: b.name })) }); return; }
     if (u.pathname === "/api/subjects") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { subjects: [] }); return; } json(res, { subjects: await b.listSubjects() }); return; }
     if (u.pathname === "/api/templates") { const b = reg.byId[u.searchParams.get("brand")]; if (!b) { json(res, { templates: [] }); return; } json(res, { templates: b.templates, options: b.options || [] }); return; }
-    // ---- PLANNING-endpoints (laag 2) ----
+    // ---- PLANNING-endpoints (laag 2), PER MERK ----
+    if (u.pathname === "/api/plan/brands") { json(res, { brands: PLAN_BRANDS.map((id) => ({ id, name: BRAND_NAME[id] || (reg.byId[id] && reg.byId[id].name) || id })) }); return; }
     if (u.pathname === "/api/plan" && req.method === "GET") {
       const date = u.searchParams.get("date") || planToday();
-      const plan = await readPlan();
-      const slots = (plan[date] && plan[date].slots) || [];
+      const brand = planBrandOk(u.searchParams.get("brand"));
+      const plan = await readPlan(), days = plan[brand] || {};
+      const slots = (days[date] && days[date].slots) || [];
       // LIVE post-status per slot uit het sociale logboek (PUUR LEZEN): welke kanalen van dit
       // bestand+taal zijn echt geplaatst (posted) of mislukt (failed). Zo kan de Planning een
       // waarschuwing tonen zonder iets aan de render/mail/poster te veranderen.
@@ -475,14 +491,15 @@ const server = http.createServer(async (req, res) => {
           s.live = { posted, failed };
         } catch {}
       }
-      json(res, { date, times: PLAN_TIMES, langs: PLAN_LANGS, slots, candidates: await planCandidates(), accounts: social.listAccounts() });
+      json(res, { brand, date, times: PLAN_TIMES, langs: PLAN_LANGS, slots, candidates: await planCandidates(brand), accounts: social.listAccounts() });
       return;
     }
     if (u.pathname === "/api/plan/propose" && req.method === "POST") {
       const bd = await readBody(req);
       const date = bd.date || planToday();
-      const cands = await planCandidates();
-      const used = await planUsedFiles();
+      const brand = planBrandOk(bd.brand);
+      const cands = await planCandidates(brand);
+      const used = await planUsedFiles(brand);
       const byLang = {};
       for (const l of PLAN_LANGS) byLang[l] = cands.filter((c) => c.lang === l && !used.has(c.file));
       const slots = [];
@@ -496,31 +513,35 @@ const server = http.createServer(async (req, res) => {
         }
       }
       const plan = await readPlan();
-      plan[date] = { slots };
+      if (!plan[brand]) plan[brand] = {};
+      plan[brand][date] = { slots };
       await writePlan(plan);
-      json(res, { date, slots });
+      json(res, { brand, date, slots });
       return;
     }
     if (u.pathname === "/api/plan/save" && req.method === "POST") {
       const bd = await readBody(req);
       const date = bd.date || planToday();
+      const brand = planBrandOk(bd.brand);
       const plan = await readPlan();
-      plan[date] = { slots: (bd.slots || []).map((s) => ({ time: s.time, lang: s.lang, file: s.file || null, url: s.url || null, type: s.type || null, typeName: s.typeName || null, platforms: Array.isArray(s.platforms) ? s.platforms : [], status: s.status || "gepland" })) };
+      if (!plan[brand]) plan[brand] = {};
+      plan[brand][date] = { slots: (bd.slots || []).map((s) => ({ time: s.time, lang: s.lang, file: s.file || null, url: s.url || null, type: s.type || null, typeName: s.typeName || null, platforms: Array.isArray(s.platforms) ? s.platforms : [], status: s.status || "gepland" })) };
       await writePlan(plan);
-      json(res, { ok: true, date, slots: plan[date].slots });
+      json(res, { ok: true, brand, date, slots: plan[brand][date].slots });
       return;
     }
     // Weekoverzicht: 7 dagen (ma-zo) rond de gevraagde datum, met tellingen per dag.
     if (u.pathname === "/api/plan/week" && req.method === "GET") {
       const base = u.searchParams.get("date") || planToday();
+      const brand = planBrandOk(u.searchParams.get("brand"));
       const d = new Date(base + "T00:00:00Z");
       d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));   // terug naar maandag
-      const plan = await readPlan();
+      const plan = await readPlan(), pdays = plan[brand] || {};
       const days = [];
       for (let i = 0; i < 7; i++) {
         const dd = new Date(d); dd.setUTCDate(d.getUTCDate() + i);
         const ds = dd.toISOString().slice(0, 10);
-        const slots = (plan[ds] && plan[ds].slots) || [];
+        const slots = (pdays[ds] && pdays[ds].slots) || [];
         days.push({ date: ds, filled: slots.filter((s) => s.file).length, gepland: slots.filter((s) => s.status === "gepland").length });
       }
       json(res, { weekStart: days[0].date, days });
