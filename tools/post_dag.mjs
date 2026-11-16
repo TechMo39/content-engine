@@ -166,13 +166,20 @@ function postJson(p, body) {
     if (DOEN && okAny && !errAny) {
       try {
         const geplaatstDir = path.join(ENGINE_DIR, "out", "geplaatst");
-        await fs.promises.mkdir(geplaatstDir, { recursive: true });
         const src = path.join(ENGINE_DIR, "out", s.file);
+        // s.file kan genest zijn (bv. "taleoftiles/....mp4"); maak de doel-submap aan vóór het verplaatsen.
+        const urlFor = (f) => "/out/geplaatst/" + String(f).split("/").map(encodeURIComponent).join("/");
+        const moveInto = async (rel) => {
+          const from = path.join(ENGINE_DIR, "out", rel);
+          const to = path.join(geplaatstDir, rel);
+          await fs.promises.mkdir(path.dirname(to), { recursive: true });
+          await fs.promises.rename(from, to);
+        };
         if (isCarousel && fs.existsSync(src)) {
           let man = {}; try { man = JSON.parse(fs.readFileSync(src, "utf8")); } catch {}
-          for (const im of (man.images || [])) { const is = path.join(ENGINE_DIR, "out", im); if (fs.existsSync(is)) await fs.promises.rename(is, path.join(geplaatstDir, im)).catch(() => {}); }
-          await fs.promises.rename(src, path.join(geplaatstDir, s.file)); s.url = "/out/geplaatst/" + encodeURIComponent(s.file); log("  → carrousel verplaatst naar out/geplaatst/");
-        } else if (fs.existsSync(src)) { await fs.promises.rename(src, path.join(geplaatstDir, s.file)); s.url = "/out/geplaatst/" + encodeURIComponent(s.file); log("  → verplaatst naar out/geplaatst/"); }
+          for (const im of (man.images || [])) { const is = path.join(ENGINE_DIR, "out", im); if (fs.existsSync(is)) await moveInto(im).catch(() => {}); }
+          await moveInto(s.file); s.url = urlFor(s.file); log("  → carrousel verplaatst naar out/geplaatst/");
+        } else if (fs.existsSync(src)) { await moveInto(s.file); s.url = urlFor(s.file); log("  → verplaatst naar out/geplaatst/"); }
       } catch (e) { log("  (kon niet verplaatsen: " + (e.message || e) + ")"); }
     }
   }
