@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-# umma_audio.py — vult automatisch MUZIEK (per blok) en GELUIDSEFFECTEN (op de kantelpunten) in de
-# tijdlijn, net zoals umma_beeld.py dat voor het beeld doet. Draait LOKAAL op Mo's laptop.
+# channel_audio.py - vult automatisch MUZIEK (per blok) en GELUIDSEFFECTEN (op de kantelpunten) in de
+# tijdlijn, net zoals channel_beeld.py dat voor het beeld doet. Draait LOKAAL op Mo's laptop.
+#
+# PER VERHAAL: net als channel_beeld.py kent dit script nu een eigen plan per verhaal. "sword" is het
+# oude plan (18 scenes, eindigt op triumph). "chose" = de bespiegelende video 1 (14 scenes) die bewust
+# ingetogen en OPEN eindigt. Een onbekend verhaal valt terug op het sword-plan. De muziek- en SFX-
+# bestandsnamen zijn per verhaal gescoped, zodat chose en sword elkaars audio nooit overschrijven.
 #
 # Bron: Freesound, gefilterd op CC0 (mag commercieel, geen naamsvermelding nodig). We downloaden de
 # voorbeeld-mp3 (geen OAuth nodig). Limiet Freesound: 60/min, 2000/dag -> ruim; we pacen + retryen.
@@ -8,28 +13,26 @@
 # tools/channel-keys.json :  { "freesound": "JOUW_SLEUTEL" }   (of env FREESOUND_API_KEY)
 #
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_audio.py            # muziek per blok + sfx op de kantelpunten
-#   python tools/channel_audio.py --force    # ook al-gevulde opnieuw ophalen
+#   python tools/channel_audio.py --story chose --voice v1   # muziek per blok + sfx op de kantelpunten
+#   python tools/channel_audio.py --story chose --voice v1 --force   # ook al-gevulde opnieuw ophalen
 #
-# MUZIEK staat per BLOK (groep scènes), niet per scène -> niet te veel afwisseling. SFX alleen op de
+# MUZIEK staat per BLOK (groep scenes), niet per scene -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
 import argparse, os, json, time, urllib.parse, urllib.request, urllib.error
 
 API = "https://freesound.org/apiv2"
 
-# MUZIEK PER BLOK: scène-bereik (van..t/m) + stemming/zoekterm. Een blok krijgt één doorlopend
-# muziekje; op de blok-grenzen laat de render het overvloeien.
-# 5 muziek-SFEREN (elk één track), verdeeld over 7 blokken van het verhaal zodat het NIET één track
-# voor de hele film is. Eén sfeer mag in niet-aangrenzende blokken terugkomen (donker: Rome + de wond;
-# triomf: het-hield-stand + de payoff). De render laat de muziek op de blok-grenzen overvloeien.
-TRACKS = {
+# =================================================================================================
+# PLAN "sword" (het oude verhaal, 18 scenes). MUZIEK PER BLOK: scene-bereik (van..t/m) + stemming/
+# zoekterm. Een blok krijgt een doorlopend muziekje; op de blok-grenzen laat de render het overvloeien.
+TRACKS_SWORD = {
  "opening": "cinematic ambient mysterious tension",   # intro + haak + test
  "dark":    "dark cinematic drone ominous",            # Rome / dwang, en de wond
  "hope":    "emotional cinematic strings uplifting",   # vrijheid / rechtvaardigheid
  "tension": "tense cinematic drums dramatic",          # koloniale test
  "triumph": "epic emotional cinematic uplifting",      # het hield stand / payoff / CTA
 }
-BLOCKS = [
+BLOCKS_SWORD = [
  {"from":0,  "to":2,  "track":"opening"},
  {"from":3,  "to":4,  "track":"dark"},
  {"from":5,  "to":8,  "track":"hope"},
@@ -38,13 +41,7 @@ BLOCKS = [
  {"from":13, "to":14, "track":"dark"},
  {"from":15, "to":18, "track":"triumph"},
 ]
-
-# GELUIDSEFFECTEN op de kantelpunten van het verhaal. Gekoppeld aan de ZIN-index (sent), niet aan
-# een gegokte seconde: de tool leest de gemeten starttijd van die zin uit de tijdlijn, zodat het
-# effect precies op die zin valt. Bewust weinig en subtiel; op de montagetafel schuif/verwijder je ze.
-# SUBTIELE, FILMISCHE lage impacts/risers (documentaire-trailer-gevoel). Je voelt ze meer dan je
-# ze hoort. Termen bewust gekozen op wat Freesound BETROUWBAAR heeft als CC0/CC-BY cinematic sub-booms.
-SFX = [
+SFX_SWORD = [
  {"scene":1,  "q":"cinematic orchestral impact hit"},   # einde haak
  {"scene":4,  "q":"deep cinematic drum hit"},            # einde Rome-dwang
  {"scene":5,  "q":"epic orchestral stinger"},            # de ommekeer
@@ -52,6 +49,37 @@ SFX = [
  {"scene":12, "q":"emotional cinematic strings swell"},  # "no army ever took a heart"
  {"scene":16, "q":"triumphant orchestral swell"},        # climax
 ]
+
+# =================================================================================================
+# PLAN "chose" - "The Answer You Never Chose" (video 1, 14 scenes: 0=intro ... 13=outro).
+# Bespiegelend en nuchter, GEEN triomf. De muziek blijft zacht en bouwt naar een OPEN, onopgelost
+# einde (de video bruggt naar video 2, dus hij mag niet "afsluiten"). Vijf stemmingen over vijf blokken:
+TRACKS_CHOSE = {
+ "quiet":   "soft reflective ambient piano",             # intro + "je kunt denken"
+ "warm":    "warm contemplative ambient strings",        # de nuchtere mens (dokter, brug, de ene vraag)
+ "intimate":"emotional ambient piano slow intimate",     # de grote vraag + de eigen bekentenis
+ "unease":  "subtle tension ambient drone introspective",# de vijf deuren + de val
+ "open":    "soft ambient piano unresolved emotional",   # het antwoord, de twijfel, outro (open eind)
+}
+BLOCKS_CHOSE = [
+ {"from":0,  "to":2,  "track":"quiet"},     # intro, de vogel, de duizend kleine keuzes
+ {"from":3,  "to":5,  "track":"warm"},      # naar wie het weet, eerst kijken, behalve een vraag
+ {"from":6,  "to":7,  "track":"intimate"},  # waarom ben je hier, "het was ik ook"
+ {"from":8,  "to":10, "track":"unease"},    # de vijf deuren, geen ervan is nadenken, de val
+ {"from":11, "to":13, "track":"open"},      # het antwoord, is het wel waar, outro -> open eind
+]
+# SFX subtiel en filmisch, je voelt ze meer dan je ze hoort. Alleen op drie kantelpunten; NOOIT triomf.
+SFX_CHOSE = [
+ {"scene":5,  "q":"deep soft cinematic sub drop"},       # de wending: behalve op de ene vraag
+ {"scene":11, "q":"warm soft cinematic swell ambient"},  # het antwoord landt, rustig
+ {"scene":12, "q":"soft cinematic riser ambient subtle"},# de twijfel die openblijft -> video 2
+]
+
+# verhaal-id -> plan. Onbekend verhaal valt terug op sword (bestaand gedrag).
+PLANS = {
+ "sword": {"tracks": TRACKS_SWORD, "blocks": BLOCKS_SWORD, "sfx": SFX_SWORD},
+ "chose": {"tracks": TRACKS_CHOSE, "blocks": BLOCKS_CHOSE, "sfx": SFX_CHOSE},
+}
 
 def load_key(root):
     k = os.environ.get("FREESOUND_API_KEY", "")
@@ -106,7 +134,7 @@ def _license_label(url):
 
 def search_cc0(query, key, prefer_long=False):
     # Zoek op de korte term; FILTER NIET op de server (dat gaf nul), maar haal de treffers op en kies
-    # zelf het eerste dat CC0 of CC-BY is (commercieel oké). Voor muziek pakken we het langste.
+    # zelf het eerste dat CC0 of CC-BY is (commercieel oke). Voor muziek pakken we het langste.
     params = {"query": query, "page_size": 15, "token": key,
               "fields": "id,name,username,duration,previews,license", "sort": "score"}
     url = API + "/search/text/?" + urllib.parse.urlencode(params)
@@ -155,6 +183,13 @@ def main():
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
+    # kies het audioplan van DIT verhaal (sword/chose/...); val terug op sword als het onbekend is
+    plan = PLANS.get(args.story)
+    if not plan:
+        print(f"let op: geen eigen audioplan voor '{args.story}' -> val terug op sword-plan")
+        plan = PLANS["sword"]
+    TRACKS = plan["tracks"]; BLOCKS = plan["blocks"]; SFX = plan["sfx"]
+
     key = load_key(args.root)
     if not key:
         print("Geen Freesound-sleutel. Haal er gratis een op https://freesound.org/apiv2/apply en zet"
@@ -173,10 +208,11 @@ def main():
     credits = []
     n_mus = n_sfx = n_fail = 0
 
-    # ---- MUZIEK per sfeer: haal elke track ÉÉN keer op (umma-<sfeer>.mp3) ----
+    # ---- MUZIEK per sfeer: haal elke track EEN keer op (<verhaal>-<sfeer>.mp3) ----
+    # Per verhaal gescoped, zodat chose en sword nooit dezelfde muziek-bestandsnaam delen.
     track_file = {}
     for name, query in TRACKS.items():
-        fname = f"umma-{name}.mp3"; fpath = os.path.join(mdir, fname)
+        fname = f"{args.story}-{name}.mp3"; fpath = os.path.join(mdir, fname)
         rel = "assets/channels/" + args.channel + "/muziek/" + fname
         if os.path.exists(fpath) and not args.force:
             track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
@@ -200,24 +236,25 @@ def main():
         if not a or not b: continue
         rel = track_file.get(blk["track"])
         if not rel:
-            print(f"blok scène {blk['from']}-{blk['to']}: sfeer '{blk['track']}' mist, overgeslagen"); continue
+            print(f"blok scene {blk['from']}-{blk['to']}: sfeer '{blk['track']}' mist, overgeslagen"); continue
         start = round(a.get("start", 0), 3)
         end = round(b.get("start", 0) + b.get("dur", 0), 3)
         music.append({"start": start, "end": end, "file": rel, "mood": blk["track"]})
-        print(f"blok scène {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
+        print(f"blok scene {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
     tl["music"] = music
 
-    # ---- SFX AAN HET EINDE van de scène (versterkt wat net gezegd is), NOOIT middenin ----
-    # Plaatsing = speech_end van de scène (na de laatste zin). We overschrijven altijd (force-gedrag)
-    # zodat oude/verkeerde effecten verdwijnen; elke scène krijgt hooguit één effect.
+    # ---- SFX AAN HET EINDE van de scene (versterkt wat net gezegd is), NOOIT middenin ----
+    # Plaatsing = speech_end van de scene (na de laatste zin). We overschrijven altijd (force-gedrag)
+    # zodat oude/verkeerde effecten verdwijnen; elke scene krijgt hooguit een effect. Bestandsnaam per
+    # verhaal gescoped (chose en sword deelden scene 5 en 12 -> anders overschreven ze elkaar).
     for sx in SFX:
         s = by_num.get(sx["scene"])
         if not s: continue
-        # einde van de spraak binnen de scène; valt terug op de scèneduur
+        # einde van de spraak binnen de scene; valt terug op de sceneduur
         t = round(float(s.get("speech_end", s.get("dur", 0))), 3)
-        s["sfx"] = []   # eventueel oude effecten op deze scène wissen (één schoon effect per scène)
-        fname = f"s{sx['scene']:02d}_end.mp3"; fpath = os.path.join(sdir, fname)
-        print(f"scène {sx['scene']} sfx @ einde ({t:.1f}s): zoek '{sx['q']}'")
+        s["sfx"] = []   # eventueel oude effecten op deze scene wissen (een schoon effect per scene)
+        fname = f"{args.story}_s{sx['scene']:02d}_end.mp3"; fpath = os.path.join(sdir, fname)
+        print(f"scene {sx['scene']} sfx @ einde ({t:.1f}s): zoek '{sx['q']}'")
         hit = search_cc0(sx["q"], key)
         if not hit:
             print("    geen bruikbaar effect gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
@@ -227,7 +264,7 @@ def main():
         except Exception as e:
             print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
         s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/" + args.channel + "/sfx/" + fname})
-        credits.append(f"sfx scène {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
+        credits.append(f"sfx scene {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
 
     with open(tlpath, "w", encoding="utf-8") as f:
