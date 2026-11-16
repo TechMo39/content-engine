@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
-# channel_voice.py - genereert per scene een voice-over-fragment met CHATTERBOX (lokaal, CPU),
-# gekloond van een REFERENTIE-stem. Per verhaal maken we DRIE stemmen (v1 / v2 / v3), elk uit een
-# eigen referentie-wav, zodat je later IN DE STUDIO kiest welke stem de video krijgt. Elke stem is
-# een eigen project (eigen map + eigen _timeline.json), dus kiezen in de studio = die stem laden.
+# channel_voice.py - genereert per scene een voice-over met CHATTERBOX (lokaal, CPU), gekloond van een
+# REFERENTIE-stem. Per verhaal DRIE stemmen (v1/v2/v3); je kiest er een in de studio.
 #
-# Draait LOKAAL op Mo's laptop (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_voice.py                      # verhaal "chose", alle 3 de stemmen
-#   python tools/channel_voice.py --voice v3           # alleen stem v3
-#   python tools/channel_voice.py --only 3             # alleen scene 3 opnieuw (alle stemmen)
-#   python tools/channel_voice.py --story fitra        # NIEUW verhaal (zet eerst het script hieronder)
-#   python tools/channel_voice.py --format 9:16        # de afgeleide short
+# DIT IS DE FLOW-VERSIE. Het probleem van de vorige versie: het script werd in piepkleine stukjes van
+# 1 a 2 zinnen geknipt en los ingesproken, daarna aan elkaar geplakt. Gevolg: rare stiltes op de naden,
+# geen intonatie, zinnen die los van elkaar klinken. Deze versie:
+#  1. spreekt in GROTERE, samenhangende stukken in (hele gedachten van een paar zinnen), zodat het model
+#     intonatie opbouwt en de zinnen met elkaar verbindt (niet de hele alinea tegelijk -> dan kapt hij af);
+#  2. knipt de stilte aan het begin en eind van elk stuk weg, zodat de zinnen in elkaar overlopen i.p.v.
+#     die gaten, met een korte, gecontroleerde adem tussen de stukken;
+#  3. vangt het afkappen/herhalen van Chatterbox af: een herhaling-rem in de generatie plus opnieuw
+#     inspreken (andere seed) als een stuk te kort terugkomt;
+#  4. houdt de ondertitel strak door de ECHTE pauzes in het geluid te meten (stilte-detectie) en de
+#     zin-grenzen daarop te leggen, i.p.v. de tijd te gokken.
 #
-# Chatterbox is eenmalig te installeren met:  pip install chatterbox-tts soundfile
-# (zelfde content-engine als UncleRank; is die al eens gedraaid, dan staat Chatterbox er al.)
+# Draait LOKAAL (Git Bash, in ~/Desktop/content-engine):
+#   python tools/channel_voice.py --story chose --voice v3 --format 16:9
+#   python tools/channel_voice.py --story chose --voice v3 --only 3     # alleen scene 3 opnieuw
 #
-# De DRIE referentie-stemmen staan onderin bij VOICES. Een stem vervangen = die ene wav vervangen.
-import argparse, os, sys, re, math, array, struct, json
+# Eenmalig installeren:  pip install chatterbox-tts soundfile
+import argparse, os, sys, re, struct, json
 
 # ---------------------------------------------------------------------------------------------
-# DE DRIE STEMMEN. Elk is een korte, schone referentie-opname (24k mono) die Chatterbox kloont.
-# De sleutel (v1/v2/v3) is tegelijk de projectnaam-stem waaronder de studio het toont.
 VOICES = {
     "v1": "voice-test/refs/ref7.wav",
     "v2": "voice-test/refs/ref8.wav",
@@ -27,14 +29,10 @@ VOICES = {
 }
 LANG = "en"   # Truthward = Engels
 
-# Stilte VOORAAN de intro-wav (seconden): het logo staat zo eerst rustig in beeld voordat de stem
-# begint. Pas dit getal aan voor een langere/kortere logo-hold aan het begin.
+# Stilte VOORAAN de intro-wav (seconden): logo staat eerst rustig in beeld voordat de stem begint.
 LEAD_SILENCE = 3.0
 
-# Toon-presets: sil = extra STILTE (seconden) die we na het fragment aanplakken, zodat een gedachte
-# kan landen (adem, niet bam-bam-bam). Chatterbox heeft geen tempo-knop; de rust zit in deze stiltes
-# plus de adem tussen de chunks hieronder. De engine voegt tussen scenes nog een adempauze toe.
-# Iets ruimer gezet dan eerst, zodat het rustiger loopt.
+# Toon-presets: sil = extra STILTE (seconden) achter de hele scene, zodat een gedachte kan landen.
 TONE = {
     "rustig": dict(sil=0.55),
     "nadruk": dict(sil=0.80),
@@ -44,19 +42,28 @@ TONE = {
     "outro":  dict(sil=0.90),
 }
 
-# Chatterbox heeft een natuurlijke, gekloonde stem die ZELF adem en intonatie plaatst. We spreken in
-# per CHUNK van 1 a 2 ZINNEN (korte zinnen samen, lange zinnen alleen). Zo loopt de ondertitel strak
-# mee met de stem: per hele alinea inspreken liet de ondertitel wegdrijven (de zin-tijden waren dan
-# gegokt over een te lang stuk). Een heel kort los stukje (bv. "You think.") plakken we altijd aan de
-# buurzin, want Chatterbox crasht op een te kort fragment.
-SHORT_CHARS = 100   # een zin tot zoveel tekens telt als "kort" -> mag met een buurzin samen
-TINY_CHARS = 30     # een stukje korter dan dit MOET een buurzin pakken (anders crasht Chatterbox)
-MAX_CHARS = 300     # nooit langer dan dit per Chatterbox-aanroep (langer kapt af)
+# INSPREEK-INSTELLINGEN. Dicht bij de natuurlijke/expressieve standaard gehouden (anders wordt het vlak),
+# met alleen een herhaling-rem erbij om het blijven-hangen in een woord tegen te gaan.
+EXAGGERATION = 0.5
+CFG_WEIGHT = 0.5
+TEMPERATURE = 0.8
+REPETITION_PENALTY = 1.3
+MIN_P = 0.05
+
+# VANGNET tegen afkappen: komt een stuk veel te kort terug (door Chatterbox afgekapt), dan opnieuw met
+# een andere seed, tot het lang genoeg is; we houden het langste van de pogingen.
+MAX_TRIES = 4
+MIN_RATIO = 0.72           # geaccepteerd als de duur >= dit deel van de verwachte duur
+BASE_SEED = 20261116
+
+# CHUNK-GROOTTE: grotere, samenhangende stukken (betere intonatie/flow) maar niet de hele alinea
+# (te lang = afkappen). Streefgrootte in tekens; harde bovengrens voor de veiligheid.
+CHUNK_CHARS = 200
+MAX_CHARS = 300
+BREATH = 0.14              # korte adem (seconden) tussen de stukken
 
 # ---------------------------------------------------------------------------------------------
-# CHATTERBOX-MODEL. Een keer laden per proces; de referentie-stem geven we per generate-call mee,
-# dus hetzelfde model bedient alle drie de stemmen. Perth (de watermerk-laag) kan ontbreken of een
-# bug geven op CPU; daarom zetten we vooraf een onschadelijke stub klaar als perth niet importeert.
+# CHATTERBOX-MODEL. Een keer laden per proces; de referentie-stem geven we per generate-call mee.
 _CB = {}
 def _get_model():
     if "m" in _CB:
@@ -77,17 +84,30 @@ def _get_model():
     _CB["m"] = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
     return _CB["m"]
 
-def _synthesize(ref_abs, text, sil, out_wav):
-    # een stuk tekst inspreken met de gekloonde stem en als standaard PCM-16 wav wegschrijven.
-    import soundfile as sf
-    m = _get_model()
-    wav = m.generate(text, language_id=LANG, audio_prompt_path=ref_abs)
-    sf.write(out_wav, wav.squeeze().detach().cpu().numpy(), m.sr, subtype="PCM_16")
-    if sil and sil > 0:
-        _append_silence(out_wav, sil)
+def _seed_everything(seed):
+    import random
+    random.seed(seed)
+    try:
+        import numpy as _np; _np.random.seed(seed % (2**32))
+    except Exception: pass
+    try:
+        import torch as _t; _t.manual_seed(seed)
+    except Exception: pass
 
-def _sentences(text):
-    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+def _generate_once(m, text, ref_abs):
+    # roep generate aan met onze instellingen; valt netjes terug als een oudere Chatterbox-versie een
+    # van de knoppen niet kent (andere signature), zodat het nooit op een TypeError klapt.
+    base = dict(language_id=LANG, audio_prompt_path=ref_abs)
+    tune = dict(exaggeration=EXAGGERATION, cfg_weight=CFG_WEIGHT, temperature=TEMPERATURE,
+                repetition_penalty=REPETITION_PENALTY, min_p=MIN_P)
+    for drop in ([], ["min_p"], ["min_p", "repetition_penalty"],
+                 ["min_p", "repetition_penalty", "exaggeration", "cfg_weight", "temperature"]):
+        kw = {**base, **{k: v for k, v in tune.items() if k not in drop}}
+        try:
+            return m.generate(text, **kw)
+        except TypeError:
+            continue
+    return m.generate(text, **base)
 
 def _syllables(w):
     w = w.lower(); v = "aeiouy"; c = 0; prev = False
@@ -104,71 +124,168 @@ def _sent_weight(s):
     base += 0.9                                  # zin-eind-pauze
     return max(base, 1.0)
 
+def _expected_secs(text):
+    syl = sum(_syllables(w) for w in re.findall(r"[A-Za-z']+", text))
+    return max(0.6, syl / 3.6)   # ~3.6 lettergrepen/sec verteltempo
+
+def _sentences(text):
+    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+
 def _group_sentences(sents):
-    # Bouw stukken van hooguit 2 zinnen (Mo's regel): korte zinnen plak je per 2, lange zinnen staan
-    # alleen; een heel kort stukje pakt altijd de volgende zin mee. Elk stuk onthoudt welke zin-indices
-    # erin zitten, zodat we straks per zin de tijd kunnen schatten binnen een KORT stuk (klopt dan bijna).
-    groups = []
-    i = 0; n = len(sents)
-    while i < n:
-        chunk = [i]; clen = len(sents[i])
-        if i + 1 < n:
-            nxt = sents[i + 1]; combined = clen + 1 + len(nxt)
-            take = False
-            if combined <= MAX_CHARS:
-                if clen <= SHORT_CHARS and len(nxt) <= SHORT_CHARS:
-                    take = True          # kort + kort -> samen
-                elif clen < TINY_CHARS:
-                    take = True          # heel kort stukje -> altijd aanplakken
-            if take:
-                chunk.append(i + 1); i += 2
-            else:
-                i += 1
-        else:
-            i += 1
-        text = " ".join(sents[k] for k in chunk)
-        groups.append((text, list(chunk)))
+    # Grotere, samenhangende stukken: hele zinnen tot ~CHUNK_CHARS (harde grens MAX_CHARS). Zo bouwt het
+    # model intonatie over meerdere zinnen; een heel lange losse zin gaat alleen (valt vanzelf zo uit).
+    groups = []; cur = []; cur_idx = []; cur_len = 0
+    for i, s in enumerate(sents):
+        add = len(s) + (1 if cur else 0)
+        if cur and cur_len + add > CHUNK_CHARS:
+            groups.append((" ".join(cur), cur_idx)); cur = []; cur_idx = []; cur_len = 0; add = len(s)
+        cur.append(s); cur_idx.append(i); cur_len += add
+    if cur:
+        groups.append((" ".join(cur), cur_idx))
     return groups
 
+# ---------------------------------------------------------------------------------------------
+# GELUID-HELPERS (numpy). Chatterbox levert float [-1,1]; wij werken op int16-samples zodat we stilte
+# kunnen wegknippen en de echte pauzes kunnen meten voor de ondertitel.
+def _gen_chunk(ref_abs, text):
+    # Genereer EEN stuk met vangnet; geef (int16-samples, sr) terug met de stilte aan begin+eind weg.
+    import numpy as np
+    m = _get_model()
+    want = _expected_secs(text)
+    best = None; best_dur = -1.0; sr = int(getattr(m, "sr", 24000))
+    for attempt in range(MAX_TRIES):
+        _seed_everything(BASE_SEED + attempt * 101)
+        wav = _generate_once(m, text, ref_abs)
+        arr = wav.squeeze().detach().cpu().numpy().astype(np.float32)
+        dur = len(arr) / float(sr)
+        if dur > best_dur:
+            best = arr; best_dur = dur
+        if dur >= want * MIN_RATIO:
+            break
+    x = np.clip(best, -1.0, 1.0)
+    i16 = (x * 32767.0).astype(np.int16)
+    i16 = _trim_ends(i16, sr)
+    return i16, sr
+
+def _env(i16, sr, win=0.02):
+    import numpy as np
+    w = max(1, int(win * sr))
+    n = (len(i16) // w) * w
+    if n == 0:
+        return None, w
+    f = np.abs(i16[:n].astype(np.float32)).reshape(-1, w)
+    return f.mean(axis=1), w
+
+def _trim_ends(i16, sr, thr_ratio=0.06, pad=0.03):
+    import numpy as np
+    env, w = _env(i16, sr)
+    if env is None:
+        return i16
+    peak = float(env.max()) or 1.0
+    above = np.where(env >= peak * thr_ratio)[0]
+    if len(above) == 0:
+        return i16
+    start = max(0, int(above[0] * w) - int(pad * sr))
+    end = min(len(i16), int((above[-1] + 1) * w) + int(pad * sr))
+    return i16[start:end]
+
+def _pause_centers(i16, sr, thr_ratio=0.06, min_pause=0.13):
+    # middens (seconden) van echte stiltes binnen een stuk; dit zijn de zin-grenzen om op te snappen.
+    import numpy as np
+    env, w = _env(i16, sr)
+    if env is None:
+        return []
+    peak = float(env.max()) or 1.0
+    low = env < (peak * thr_ratio)
+    centers = []; i = 0; N = len(low)
+    while i < N:
+        if low[i]:
+            j = i
+            while j < N and low[j]:
+                j += 1
+            if (j - i) * w / sr >= min_pause:
+                centers.append(((i + j) / 2.0) * w / sr)
+            i = j
+        else:
+            i += 1
+    return centers
+
+def _sentence_bounds(idxs, sents, chunk_dur, pauses):
+    # per zin (start, duur) binnen het stuk: schat op lettergreep-gewicht, snap de grenzen naar de
+    # dichtstbijzijnde echte pauze; zo loopt de ondertitel strak mee.
+    k = len(idxs)
+    if k == 1:
+        return [(0.0, chunk_dur)]
+    weights = [_sent_weight(sents[i]) for i in idxs]
+    tot = sum(weights) or 1.0
+    est = []; acc = 0.0
+    for wgt in weights[:-1]:
+        acc += chunk_dur * (wgt / tot); est.append(acc)
+    TOL = 0.45; used = set(); snapped = []
+    for e in est:
+        best = None; bd = TOL
+        for p in pauses:
+            if id(p) in used:
+                continue
+            if abs(p - e) < bd:
+                bd = abs(p - e); best = p
+        if best is not None:
+            used.add(id(best)); snapped.append(best)
+        else:
+            snapped.append(e)
+    edges = [0.0] + sorted(snapped) + [chunk_dur]
+    for i in range(1, len(edges)):
+        if edges[i] <= edges[i - 1] + 0.05:
+            edges[i] = min(chunk_dur, edges[i - 1] + 0.05)
+    return [(round(edges[i], 3), round(max(0.05, edges[i + 1] - edges[i]), 3)) for i in range(k)]
+
+def _silence_samples(sr, secs):
+    import numpy as np
+    return np.zeros(max(0, int(sr * secs)), dtype=np.int16)
+
+def _write_pcm16(path, i16, sr):
+    data = i16.astype("<i2").tobytes()
+    n = len(data)
+    with open(path, "wb") as f:
+        f.write(b"RIFF"); f.write(struct.pack("<I", 36 + n)); f.write(b"WAVE")
+        f.write(b"fmt "); f.write(struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16))
+        f.write(b"data"); f.write(struct.pack("<I", n)); f.write(data)
+
 def _synthesize_scene(ref_abs, scene_text, tail_sil, out_wav):
-    # Spreek de scene in per CHUNK (1 a 2 zinnen): Chatterbox plaatst de pauzes zelf. Plak de chunks
-    # aan elkaar met een mini-adem ertussen, en zet achteraan een korte staart-stilte (tail_sil).
-    # Lever een GESCHAT (start, duur) per zin terug (lettergreep-gewicht binnen de gemeten chunk-duur)
-    # voor de ondertitel; in de studio kun je grenzen alsnog verschuiven.
+    # Spreek de scene in per samenhangend stuk, plak ze met een korte adem, en meet per zin de echte tijd.
+    import numpy as np
     sents = _sentences(scene_text)
     if not sents:
-        _synthesize(ref_abs, scene_text, tail_sil, out_wav)
+        i16, sr = _gen_chunk(ref_abs, scene_text)
+        _write_pcm16(out_wav, i16, sr)
+        if tail_sil and tail_sil > 0:
+            _append_silence(out_wav, tail_sil)
         d = _wav_duration(out_wav); return [(0.0, round(d, 3))], 0.0, round(d, 3)
     groups = _group_sentences(sents)
-    parts = []; seg = [None] * len(sents); cursor = 0.0
-    GAP = 0.20   # adem tussen chunks; iets ruimer zodat het rustiger loopt
+    parts = []; seg = [None] * len(sents); cursor = 0.0; sr = 24000
     for gi, (text, idxs) in enumerate(groups):
-        tmp = f"{out_wav}.g{gi:02d}.wav"
-        _synthesize(ref_abs, text, 0.0, tmp)
-        gdur = _wav_duration(tmp)
-        weights = [_sent_weight(sents[i]) for i in idxs]; tot = sum(weights) or 1.0
-        c = cursor
-        for i, w in zip(idxs, weights):
-            dd = gdur * (w / tot); seg[i] = (round(c, 3), round(dd, 3)); c += dd
-        last = (gi == len(groups) - 1)
-        if not last and GAP > 0:
-            _append_silence(tmp, GAP)
-        parts.append(tmp)
-        cursor += gdur + (0.0 if last else GAP)
+        i16, sr = _gen_chunk(ref_abs, text)
+        cdur = len(i16) / float(sr)
+        bounds = _sentence_bounds(idxs, sents, cdur, _pause_centers(i16, sr))
+        for j, i in enumerate(idxs):
+            st, dd = bounds[j]
+            seg[i] = (round(cursor + st, 3), dd)
+        parts.append(i16)
+        cursor += cdur
+        if gi != len(groups) - 1:
+            parts.append(_silence_samples(sr, BREATH))
+            cursor += BREATH
+    full = np.concatenate(parts) if parts else np.zeros(0, dtype=np.int16)
+    _write_pcm16(out_wav, full, sr)
     if tail_sil and tail_sil > 0:
-        _append_silence(parts[-1], tail_sil)
-    _concat_wavs(parts, out_wav)
-    for p in parts:
-        try: os.remove(p)
-        except Exception: pass
+        _append_silence(out_wav, tail_sil)
     segs = [s for s in seg if s is not None]
     sp0 = segs[0][0] if segs else 0.0
     sp1 = round(segs[-1][0] + segs[-1][1], 3) if segs else round(_wav_duration(out_wav), 3)
     return segs, sp0, sp1
 
 # ---------------------------------------------------------------------------------------------
-# WAV-HELPERS (byte-niveau, RIFF). Werken op de standaard PCM-16 wavs die soundfile schrijft:
-# stilte aanplakken/voorzetten, exacte duur meten, en meerdere wavs naadloos aan elkaar plakken.
+# RIFF-helpers voor duur meten en stilte voor/achter plakken (werken op de PCM-16 wavs die we schrijven).
 def _read_wav_parts(path):
     with open(path, "rb") as f:
         data = bytearray(f.read())
@@ -182,27 +299,7 @@ def _read_wav_parts(path):
         i += 8 + clen + (clen & 1)
     return data, None, None
 
-def _concat_wavs(paths, out_wav):
-    base, doff, dlen = _read_wav_parts(paths[0])
-    if doff is None:
-        with open(paths[0], "rb") as f, open(out_wav, "wb") as g:
-            g.write(f.read())
-        return
-    payloads = [bytes(base[doff:doff + dlen])]
-    for p in paths[1:]:
-        d, o, l = _read_wav_parts(p)
-        if o is not None:
-            payloads.append(bytes(d[o:o + l]))
-    allpay = b"".join(payloads)
-    header = bytearray(base[:doff])
-    struct.pack_into("<I", header, doff - 4, len(allpay))
-    new = header + allpay
-    struct.pack_into("<I", new, 4, len(new) - 8)
-    with open(out_wav, "wb") as f:
-        f.write(new)
-
 def _wav_duration(wav_path):
-    # exacte duur (seconden): data_bytes / byteRate (offset 28), via dezelfde RIFF-logica.
     try:
         with open(wav_path, "rb") as f:
             data = f.read()
@@ -222,7 +319,6 @@ def _wav_duration(wav_path):
         return 0.0
 
 def _append_silence(wav_path, seconds):
-    # plak stilte (nul-bytes) achter de data-chunk en werk de twee lengte-velden bij.
     try:
         with open(wav_path, "rb") as f:
             data = bytearray(f.read())
@@ -253,7 +349,6 @@ def _append_silence(wav_path, seconds):
         pass
 
 def _prepend_silence(wav_path, seconds):
-    # plak stilte VOORAAN (voor de eerste zin): het logo staat zo eerst rustig in beeld.
     try:
         with open(wav_path, "rb") as f:
             data = bytearray(f.read())
@@ -285,14 +380,9 @@ def _prepend_silence(wav_path, seconds):
 
 # ---------------------------------------------------------------------------------------------
 # SCRIPT. Per scene: nummer, toon, ON-SCREEN kernzin, en de VOLLE gesproken zin (= de ondertitel).
-# GEEN m-dashes in de tekst. Scene 0 = merk-intro MET de vaste CTA-aanzet (like / comment / subscribe),
-# die in beeld samenloopt met de CTA-animatie + chimes tijdens de sterren-intro.
+# GEEN m-dashes. Islam nooit als antwoord; "de meeste mensen" niet "iedereen"; geen aannames die een
+# scepticus/atheist meteen afwijst.
 STORIES = {
-  # VIDEO 1 - "The Answer You Never Chose". Engels, 16:9. De mens denkt de hele dag rationeel na, behalve
-  # over de grootste vraag (ons bestaan): daar nam hij zijn antwoord blind over. Vijf deuren = HET
-  # antwoord. Identiteit (scene 10) dicht de "ik ben nu volwassen"-tegenwerping. Slot bruggt naar
-  # video 2 (absolute waarheid). Regels: islam nooit als antwoord, "de meeste mensen" niet "iedereen",
-  # geen aannames die een scepticus/atheist meteen afwijst (geen ontwerper/programma, geen exceptionalisme).
   "chose": {
     "title": "The Answer You Never Chose",
     "scenes": [
@@ -340,8 +430,8 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
     outdir = os.path.join(root, "assets", "channels", channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []
-    durs = {}      # scene-nr -> gemeten duur (sec) van de voice-wav (incl. aangeplakte stilte)
-    sents_by = {}  # scene-nr -> per-zin [(start, dur)] + speech-grenzen (het meetrooster)
+    durs = {}
+    sents_by = {}
     for num, tone, screen, voiceline in story["scenes"]:
         if only and num != only:
             continue
@@ -351,7 +441,6 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
             segs, sp0, sp1 = _synthesize_scene(ref_abs, voiceline, t["sil"], wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
-        # INTRO: stilte VOORAAN zodat het logo eerst rustig in beeld staat voordat de stem begint.
         if tone == "intro":
             _prepend_silence(wav, LEAD_SILENCE)
             segs = [(round(st + LEAD_SILENCE, 3), dd) for (st, dd) in segs]
@@ -394,8 +483,6 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
             json.dump(meta, f, ensure_ascii=False, indent=2)
         print(f"  duur-meting: {dj}  (totaal {meta['total_mmss']})")
 
-        # GEDEELDE TIJDLIJN: de ene databron die preview EN eindrender voedt. Per scene absolute
-        # starttijd + duur, plus het per-zin-meetrooster (start/dur binnen de scene-wav).
         tl_scenes = []
         abs_t = 0.0
         for num, _wav in made:
@@ -441,7 +528,6 @@ def main():
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
-    # vroege check: is Chatterbox geinstalleerd?
     try:
         import chatterbox.mtl_tts  # noqa
     except Exception:
