@@ -2,10 +2,9 @@
 # channel_audio.py - vult automatisch MUZIEK (per blok) en GELUIDSEFFECTEN (op de kantelpunten) in de
 # tijdlijn, net zoals channel_beeld.py dat voor het beeld doet. Draait LOKAAL op Mo's laptop.
 #
-# PER VERHAAL: net als channel_beeld.py kent dit script nu een eigen plan per verhaal. "sword" is het
-# oude plan (18 scenes, eindigt op triumph). "chose" = de bespiegelende video 1 (14 scenes) die bewust
-# ingetogen en OPEN eindigt. Een onbekend verhaal valt terug op het sword-plan. De muziek- en SFX-
-# bestandsnamen zijn per verhaal gescoped, zodat chose en sword elkaars audio nooit overschrijven.
+# PER VERHAAL: net als channel_beeld.py kent dit script een eigen plan per verhaal. Alleen "chose"
+# bestaat nu (video 1); sword is verwijderd. Een onbekend verhaal krijgt geen audioplan (niets gedaan).
+# De muziek- en SFX-bestandsnamen zijn per verhaal gescoped, zodat verhalen elkaars audio niet overschrijven.
 #
 # Bron: Freesound, gefilterd op CC0 (mag commercieel, geen naamsvermelding nodig). We downloaden de
 # voorbeeld-mp3 (geen OAuth nodig). Limiet Freesound: 60/min, 2000/dag -> ruim; we pacen + retryen.
@@ -13,42 +12,14 @@
 # tools/channel-keys.json :  { "freesound": "JOUW_SLEUTEL" }   (of env FREESOUND_API_KEY)
 #
 # Gebruik (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_audio.py --story chose --voice v1   # muziek per blok + sfx op de kantelpunten
-#   python tools/channel_audio.py --story chose --voice v1 --force   # ook al-gevulde opnieuw ophalen
+#   python tools/channel_audio.py --story chose --voice v3          # muziek per blok + sfx op de kantelpunten
+#   python tools/channel_audio.py --story chose --voice v3 --force  # ook al-gevulde opnieuw ophalen
 #
 # MUZIEK staat per BLOK (groep scenes), niet per scene -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
 import argparse, os, json, time, urllib.parse, urllib.request, urllib.error
 
 API = "https://freesound.org/apiv2"
-
-# =================================================================================================
-# PLAN "sword" (het oude verhaal, 18 scenes). MUZIEK PER BLOK: scene-bereik (van..t/m) + stemming/
-# zoekterm. Een blok krijgt een doorlopend muziekje; op de blok-grenzen laat de render het overvloeien.
-TRACKS_SWORD = {
- "opening": "cinematic ambient mysterious tension",   # intro + haak + test
- "dark":    "dark cinematic drone ominous",            # Rome / dwang, en de wond
- "hope":    "emotional cinematic strings uplifting",   # vrijheid / rechtvaardigheid
- "tension": "tense cinematic drums dramatic",          # koloniale test
- "triumph": "epic emotional cinematic uplifting",      # het hield stand / payoff / CTA
-}
-BLOCKS_SWORD = [
- {"from":0,  "to":2,  "track":"opening"},
- {"from":3,  "to":4,  "track":"dark"},
- {"from":5,  "to":8,  "track":"hope"},
- {"from":9,  "to":10, "track":"tension"},
- {"from":11, "to":12, "track":"triumph"},
- {"from":13, "to":14, "track":"dark"},
- {"from":15, "to":18, "track":"triumph"},
-]
-SFX_SWORD = [
- {"scene":1,  "q":"cinematic orchestral impact hit"},   # einde haak
- {"scene":4,  "q":"deep cinematic drum hit"},            # einde Rome-dwang
- {"scene":5,  "q":"epic orchestral stinger"},            # de ommekeer
- {"scene":9,  "q":"dark cinematic impact drum"},         # de echte test
- {"scene":12, "q":"emotional cinematic strings swell"},  # "no army ever took a heart"
- {"scene":16, "q":"triumphant orchestral swell"},        # climax
-]
 
 # =================================================================================================
 # PLAN "chose" - "The Answer You Never Chose" (video 1, 14 scenes: 0=intro ... 13=outro).
@@ -75,9 +46,8 @@ SFX_CHOSE = [
  {"scene":12, "q":"soft cinematic riser ambient subtle"},# de twijfel die openblijft -> video 2
 ]
 
-# verhaal-id -> plan. Onbekend verhaal valt terug op sword (bestaand gedrag).
+# verhaal-id -> plan. Onbekend verhaal = geen plan (niets gedaan).
 PLANS = {
- "sword": {"tracks": TRACKS_SWORD, "blocks": BLOCKS_SWORD, "sfx": SFX_SWORD},
  "chose": {"tracks": TRACKS_CHOSE, "blocks": BLOCKS_CHOSE, "sfx": SFX_CHOSE},
 }
 
@@ -178,16 +148,15 @@ def download(url, outpath):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", default="chose"); ap.add_argument("--voice", default="v1")
+    ap.add_argument("--story", default="chose"); ap.add_argument("--voice", default="v3")
     ap.add_argument("--root", default="."); ap.add_argument("--force", action="store_true")
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     args = ap.parse_args()
 
-    # kies het audioplan van DIT verhaal (sword/chose/...); val terug op sword als het onbekend is
+    # kies het audioplan van DIT verhaal. Alleen "chose" bestaat; onbekend verhaal -> niets doen.
     plan = PLANS.get(args.story)
     if not plan:
-        print(f"let op: geen eigen audioplan voor '{args.story}' -> val terug op sword-plan")
-        plan = PLANS["sword"]
+        print(f"geen audioplan voor '{args.story}' (alleen 'chose' bestaat). Niets gedaan."); return
     TRACKS = plan["tracks"]; BLOCKS = plan["blocks"]; SFX = plan["sfx"]
 
     key = load_key(args.root)
@@ -209,7 +178,7 @@ def main():
     n_mus = n_sfx = n_fail = 0
 
     # ---- MUZIEK per sfeer: haal elke track EEN keer op (<verhaal>-<sfeer>.mp3) ----
-    # Per verhaal gescoped, zodat chose en sword nooit dezelfde muziek-bestandsnaam delen.
+    # Per verhaal gescoped, zodat verhalen nooit dezelfde muziek-bestandsnaam delen.
     track_file = {}
     for name, query in TRACKS.items():
         fname = f"{args.story}-{name}.mp3"; fpath = os.path.join(mdir, fname)
@@ -246,7 +215,7 @@ def main():
     # ---- SFX AAN HET EINDE van de scene (versterkt wat net gezegd is), NOOIT middenin ----
     # Plaatsing = speech_end van de scene (na de laatste zin). We overschrijven altijd (force-gedrag)
     # zodat oude/verkeerde effecten verdwijnen; elke scene krijgt hooguit een effect. Bestandsnaam per
-    # verhaal gescoped (chose en sword deelden scene 5 en 12 -> anders overschreven ze elkaar).
+    # verhaal gescoped, zodat verhalen elkaars effecten niet overschrijven.
     for sx in SFX:
         s = by_num.get(sx["scene"])
         if not s: continue
