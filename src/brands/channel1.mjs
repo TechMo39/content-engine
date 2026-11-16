@@ -839,6 +839,57 @@ export function makeBrand({ ROOT = "." } = {}) {
   // de video-render ALS het studio-voorbeeld exact dezelfde intro/outro tekenen (één bron, geen
   // divergentie). kind wordt niet meer onderscheiden (intro==outro-veld); de ondertitel loopt
   // er net als overal via subAt overheen.
+  // ---- CTA-INTRO: like / comment / share / abonneer, verschijnen één voor één in de 2e helft van
+  // de intro, elk met een korte pop + een synced chime (cta_tick.wav; de abonneer cta_sub.wav).
+  // Puur SVG-vector in de merk-kleuren; het abonneer-belletje is oranje gevuld en pulseert zacht.
+  // Mist de chime-wav, dan tekenen we de iconen gewoon zonder geluid (exists-guard in de audio-mix).
+  const CTA_ICONS = [
+    "M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1z",   // like (thumb up)
+    "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z",   // comment (bubble)
+    "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z",   // share
+    "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",   // bell (subscribe)
+  ];
+  const CTA_STEP = 0.6;   // seconden tussen twee iconen
+  function ctaTimesFor(dur) {
+    // de CTA-rij valt in de 2e helft van de intro (daar zit de gesproken CTA); nooit buiten de scène.
+    let start = dur * 0.58;
+    const latest = dur - 1.0 - 3 * CTA_STEP;
+    if (start > latest) start = Math.max(1.0, latest);
+    return [0, 1, 2, 3].map((k) => +(start + k * CTA_STEP).toFixed(3));
+  }
+  function ctaStrip(W, H, tsec, dur) {
+    const times = ctaTimesFor(dur);
+    const appear = clamp01((tsec - (times[0] - 0.25)) / 0.3);
+    const vanish = 1 - clamp01((tsec - (dur - 0.8)) / 0.6);
+    const vis = Math.min(appear, vanish);
+    if (vis <= 0.01) return "";
+    const S = Math.min(W, H);
+    const R = Math.round(S * 0.052);     // straal icoon-cirkel
+    const gap = Math.round(S * 0.145);   // afstand tussen middelpunten
+    const cy = Math.round(H * 0.44);
+    const x0 = Math.round(W / 2 - 1.5 * gap);
+    const gl = Math.round(S * 0.058);    // glyph-grootte (24-eenheden geschaald)
+    const sg = (gl / 24).toFixed(4);
+    let g = `<g opacity="${vis.toFixed(2)}">`;
+    for (let k = 0; k < 4; k++) {
+      const cx = x0 + k * gap, tt = times[k];
+      const pop = clamp01((tsec - tt) / 0.28);
+      if (pop <= 0) continue;
+      const over = 1 + 0.18 * Math.sin(Math.min(pop, 1) * Math.PI);   // kleine overshoot
+      const isBell = k === 3;
+      const puls = isBell ? (1 + 0.06 * Math.sin((tsec - tt) * 6)) : 1;   // abonneer pulseert
+      const scale = ((0.6 + 0.4 * sm(pop)) * over * puls).toFixed(3);
+      const circleFill = isBell ? COL.orange : COL.navy2;
+      const iconFill = isBell ? COL.ink : COL.cream;
+      g += `<g transform="translate(${cx} ${cy}) scale(${scale})" opacity="${clamp01(pop).toFixed(2)}">`
+        + `<circle r="${R}" fill="${circleFill}" stroke="${COL.orange}" stroke-width="2.5"/>`
+        + `<g transform="translate(${(-gl / 2).toFixed(1)} ${(-gl / 2).toFixed(1)}) scale(${sg})"><path d="${CTA_ICONS[k]}" fill="${iconFill}"/></g>`
+        + `</g>`;
+    }
+    g += `</g>`;
+    return g;
+  }
+
   function brandInner(kind, W, H, p = 0.6, opts = {}) {
     // PREMIUM intro/outro: diepe gradient-achtergrond met zachte gloed + sierlijnen, kleiner logo
     // bovenin, woordmerk met dunne lijnen eronder, een tagline, en op de outro een abonneer-CTA.
@@ -918,6 +969,11 @@ export function makeBrand({ ROOT = "." } = {}) {
     }
 
     g += `</g>`;
+    // CTA-rij BUITEN het merk-blok (blijft staan nadat het logo is weggefade). Alleen op de intro,
+    // als we de scène-duur kennen; de iconen verschijnen in de 2e helft, synced met de chimes.
+    if (kind === "intro" && Number.isFinite(t) && Number.isFinite(Number(opts.dur))) {
+      g += ctaStrip(W, H, t, Number(opts.dur));
+    }
     return g;
   }
 
@@ -1241,7 +1297,7 @@ export function makeBrand({ ROOT = "." } = {}) {
       const grps = tlGroups || groups;
       const isBrand = s.tone === "intro" || s.tone === "outro";
       const tsec = p * durs[i];
-      const inner = isBrand ? brandInner(s.tone, W, H, p, { t: tsec, speechStart: speechStartOf(i) }) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups: grps });
+      const inner = isBrand ? brandInner(s.tone, W, H, p, { t: tsec, speechStart: speechStartOf(i), dur: durs[i] }) : (TECHS[s.tech || "statement"] || techStatement)({ W, H, p, scene: s, groups: grps });
       const ovl = overlayBody(i, p);
       return composeChrome({ branding, W, H, panel: null, innerField: inner, overlay: ovl, logoUri: "" });
     }
@@ -1446,6 +1502,17 @@ export function makeBrand({ ROOT = "." } = {}) {
           const at = Math.round((starts[i] + (Number(fx.t) || 0)) * 1000);
           inputs.push("-i", xf);
           aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=0.4[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
+        }
+        // CTA-CHIMES op de intro, synced met de iconen (cta_tick.wav per icoon, cta_sub.wav voor abonneer).
+        if (s && s.tone === "intro") {
+          const ctimes = ctaTimesFor(durs[i]);
+          for (let k = 0; k < ctimes.length; k++) {
+            const cf = resolveAudio(k === 3 ? "cta_sub.wav" : "cta_tick.wav");
+            if (!(cf && await exists(cf))) continue;
+            const at = Math.round((starts[i] + ctimes[k]) * 1000);
+            inputs.push("-i", cf);
+            aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=${k === 3 ? "0.5" : "0.32"}[c${idx}]`); bedLabels.push(`[c${idx}]`); idx++;
+          }
         }
       }
       const out = path.join(work, "final.mp4");
