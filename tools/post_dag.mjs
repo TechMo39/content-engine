@@ -24,6 +24,10 @@ const ENGINE_ENTRY = path.join(ENGINE_DIR, "src", "engine.mjs");
 const OUT_LOG_DIR = path.join(ENGINE_DIR, "out", "logs");
 const PLAN_FILE = path.join(ENGINE_DIR, "out", ".plan.json");
 
+// De merken die een eigen planner + eigen socials hebben (zelfde lijst als PLAN_BRANDS in engine.mjs).
+// Het plan is per-merk genest: plan[merk][datum].slots — NIET plan[datum].slots.
+const PLAN_BRANDS = ["taleoftiles", "unclerank"];
+
 const DOEN = process.argv.includes("--doen");
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 const nu = () => new Date().toLocaleTimeString("nl-NL");
@@ -87,29 +91,41 @@ function postJson(p, body) {
   // EERDERE dagen (tot INHAAL_DAGEN terug) tellen ALTIJD (die tijd is sowieso voorbij) -> gemiste
   // posts (laptop was uit, of laat goedgekeurd rond middernacht) worden alsnog ingehaald. De store
   // blokkeert dubbel posten, dus een al-gepost slot kan hier geen tweede keer uit.
+  // LET OP: het plan is PER MERK genest -> plan[merk][datum].slots. We lopen dus elk merk langs.
   const dagen = [];
   for (let i = INHAAL_DAGEN; i >= 1; i--) dagen.push(dateStrOffset(i));   // oudste eerst
   dagen.push(date);                                                       // dan vandaag
   const nowM = nowMin();
   const due = [];
-  for (const d of dagen) {
-    const slots = (planAll[d] && planAll[d].slots) || [];
-    for (const s of slots) {
-      if (!s.file || s.status !== "gepland") continue;
-      if (d === date && toMin(s.time) > nowM) continue;   // vandaag: alleen als de tijd al voorbij is
-      due.push({ s, d });                                  // onthoud bij welke dag dit slot hoort
+  for (const brand of PLAN_BRANDS) {
+    const byDate = planAll[brand] || {};
+    for (const d of dagen) {
+      const slots = (byDate[d] && byDate[d].slots) || [];
+      for (const s of slots) {
+        if (!s.file || s.status !== "gepland") continue;
+        if (d === date && toMin(s.time) > nowM) continue;   // vandaag: alleen als de tijd al voorbij is
+        due.push({ s, d, brand });                           // onthoud dag + merk van dit slot
+      }
     }
   }
-  log(`plan: ${due.length} due (vandaag + ${INHAAL_DAGEN} dag(en) inhaal)` + (DOEN ? "" : "  [DROOG]"));
+  log(`plan: ${due.length} due (vandaag + ${INHAAL_DAGEN} dag(en) inhaal, ${PLAN_BRANDS.length} merk(en))` + (DOEN ? "" : "  [DROOG]"));
   if (!due.length) { log("niets te posten; engine niet gestart."); process.exit(0); }
 
   if (!(await zorgVoorEngine())) { console.error("Geen engine beschikbaar. Stop."); process.exit(1); }
-  let chan; try { chan = await getJson("/api/social/channels"); } catch { chan = { accounts: [] }; }
-  const connected = {};   // lang -> [platform, ...]
-  for (const a of (chan.accounts || [])) if (a.connected) (connected[a.lang] = connected[a.lang] || []).push(a.platform);
+
+  // Gekoppelde kanalen PER MERK (elk merk heeft eigen logins/tokens). Lazy + gecachet.
+  const connCache = {};   // merk -> { taal -> [platform, ...] }
+  async function connectedFor(brand) {
+    if (connCache[brand]) return connCache[brand];
+    let chan; try { chan = await getJson("/api/social/channels?brand=" + encodeURIComponent(brand)); } catch { chan = { accounts: [] }; }
+    const c = {};
+    for (const a of (chan.accounts || [])) if (a.connected) (c[a.lang] = c[a.lang] || []).push(a.platform);
+    connCache[brand] = c; return c;
+  }
 
   let gepost = 0, mislukt = 0;
-  for (const { s, d } of due) {
+  for (const { s, d, brand } of due) {
+    const connected = await connectedFor(brand);
     let plats = connected[s.lang] || [];
     // WhatsApp is GEEN auto-post-kanaal (handmatige export via QR/link in de Socials-tab).
     plats = plats.filter((p) => p !== "whatsapp");
@@ -119,15 +135,15 @@ function postJson(p, body) {
     // PER-PLATFORM KEUZE: heeft dit slot een platform-selectie, dan alleen die (en alleen de
     // gekoppelde ervan). Leeg/afwezig = alle gekoppelde kanalen van de taal (oud gedrag).
     if (Array.isArray(s.platforms) && s.platforms.length) plats = plats.filter((p) => s.platforms.includes(p));
-    if (!plats.length) { log(`⚠ ${s.time} ${s.lang.toUpperCase()}: geen gekoppeld/gekozen kanaal, overslaan.`); continue; }
+    if (!plats.length) { log(`⚠ ${brand} ${s.time} ${s.lang.toUpperCase()}: geen gekoppeld/gekozen kanaal, overslaan.`); continue; }
     let okAny = false, errAny = false;
     for (const platform of plats) {
-      const label = `${d === date ? "" : d + " "}${s.time} ${s.lang.toUpperCase()} → ${platform}${d === date ? "" : " (inhaal)"}`;
+      const label = `${brand} ${d === date ? "" : d + " "}${s.time} ${s.lang.toUpperCase()} → ${platform}${d === date ? "" : " (inhaal)"}`;
       if (!DOEN) { log("(droog) zou posten: " + label + "  (" + (s.typeName || s.type) + ")"); okAny = true; continue; }
       let cap = { title: "", description: "", tags: [] };
-      try { cap = await getJson(`/api/social/suggest?platform=${encodeURIComponent(platform)}&type=${encodeURIComponent(s.type || "")}&lang=${encodeURIComponent(s.lang)}&name=`); } catch {}
+      try { cap = await getJson(`/api/social/suggest?brand=${encodeURIComponent(brand)}&platform=${encodeURIComponent(platform)}&type=${encodeURIComponent(s.type || "")}&lang=${encodeURIComponent(s.lang)}&name=`); } catch {}
       log("▶ posten: " + label);
-      let r; try { r = await postJson("/api/social/post", { file: s.file, platform, lang: s.lang, title: cap.title, description: cap.description, tags: cap.tags }); } catch (e) { r = { status: 0, json: { error: e.message } }; }
+      let r; try { r = await postJson("/api/social/post", { brand, file: s.file, platform, lang: s.lang, title: cap.title, description: cap.description, tags: cap.tags }); } catch (e) { r = { status: 0, json: { error: e.message } }; }
       if (r.status === 200) { log("✓ geplaatst: " + label); okAny = true; }
       else if (r.status === 409) { log("• al eerder geplaatst: " + label); okAny = true; }
       else { log("✗ mislukt: " + label + " — " + ((r.json && r.json.error) || r.status)); errAny = true; }
@@ -161,11 +177,9 @@ function postJson(p, body) {
     }
   }
 
-  // Status terugschrijven in het plan (alle dagen; de slot-objecten zijn in planAll bijgewerkt).
+  // Status terugschrijven in het plan (alle merken/dagen; de slot-objecten zijn in planAll bijgewerkt).
   if (DOEN) { try { await fs.promises.writeFile(PLAN_FILE, JSON.stringify(planAll, null, 2)); } catch {} }
   log(`KLAAR — ${gepost} slot(s) (deels) gepost, ${mislukt} met fouten.`);
   stopOnzeEngine();
   process.exit(0);
 })().catch((e) => { console.error("post_dag faalde:", e && e.message || e); process.exit(1); });
-
-
