@@ -48,3 +48,7 @@ assets/ummaunited/_oud-*/
 __pycache__/
 assets/unclerank/portal-state.json
 voice-test/
+
+# UR: gegenereerde stem + muziek niet in git
+assets/unclerank/voice/
+assets/unclerank/muziek/
