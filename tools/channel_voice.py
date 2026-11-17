@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 # channel_voice.py - voice-over met CHATTERBOX (lokaal, CPU), gekloond van een REFERENTIE-stem.
 #
-# AANPAK (na Mo's feedback): grote, samenhangende stukken inspreken voor intonatie, MAAR de zinnen
-# netjes uit elkaar met echte ADEM ertussen, en de ondertitel EXACT op het geluid. Hoe:
-#  1. spreek per samenhangend stuk van een paar zinnen in -> intonatie en verbinding;
-#  2. knip dat stuk op de ECHTE pauzes in losse zin-stukjes;
-#  3. zet die zin-stukjes weer aan elkaar met een vaste adempauze (SENT_GAP) ertussen -> ruimte tussen
-#     de zinnen, geen gehaast, geen rare dubbele gaten;
-#  4. omdat WIJ die adem er zelf tussen zetten, weten we per zin exact de starttijd -> de ondertitel
-#     staat per constructie goed op de tijdlijn (niet gegokt, niet opgepropt);
-#  5. vangnet tegen Chatterbox-afkappen: komt een stuk te kort terug, opnieuw met een andere seed.
+# AANPAK (terug naar wat werkte, Mo's afspraak): spreek per 2 zinnen in, en zet er een ECHTE adem
+# tussen de blokken. GEEN knipmechanisme meer. Waarom dit klopt:
+#   - 2 zinnen samen -> het model houdt de intonatie verbonden (geen "opdreunen"), en het blok is kort
+#     genoeg dat Chatterbox het niet halverwege afkapt.
+#   - we knippen NIETS terug. Elk blok is een schone opname. De ruimte tussen de zinnen bouwen we zelf
+#     door een stilte TUSSEN de blokken te zetten -> geen foute knippen, geen splice-"effecten".
+#   - ondertiteling: de start van elk blok is per constructie exact bekend. Zit een blok uit 2 zinnen,
+#     dan schatten we binnen het blok alleen het MOMENT waarop de ondertiteltekst wisselt (op
+#     lettergreep-gewicht). Dat is PUUR voor de tekst op het scherm; de audio wordt nooit geknipt.
+#   - vangnet tegen Chatterbox-afkappen EN tegen de token-herhaling-ruis: komt een blok te kort terug,
+#     of vuurt het model zijn herhaling-waarschuwing af, dan opnieuw met een andere seed en we houden
+#     de schoonste opname.
+#   - ingebouwde controle: per blok meten we of het in STILTE eindigt (schoon) of in GELUID (mogelijk
+#     afgekapt), en printen dat. Zo is te zien wat eruit komt zonder te hoeven gokken.
 #
 # Draai (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_voice.py --story chose --voice v3 --only 0 --format 16:9   # ALLEEN scene 0
-#   python tools/channel_voice.py --story chose --voice v3 --format 16:9            # alle scenes
-import argparse, os, sys, re, struct, json
+#   python tools/channel_voice.py --story chose --voice v3  --only 1 --format 16:9   # scene 1, v3
+#   python tools/channel_voice.py --story chose --voice alle --only 0 --format 16:9  # scene 0, v1+v2+v3
+#   python tools/channel_voice.py --story chose --voice v3  --format 16:9            # alle scenes, v3
+import argparse, os, sys, re, struct, json, logging, subprocess, shutil
 
 VOICES = {
     "v1": "voice-test/refs/ref7.wav",
@@ -29,23 +35,73 @@ TONE = {
     "hook": dict(sil=0.65), "intro": dict(sil=0.70), "outro": dict(sil=0.90),
 }
 
-# Inspreek-instellingen: expressief genoeg voor intonatie, lagere cfg = iets rustiger tempo, een
-# herhaling-rem tegen het blijven-hangen.
+# Inspreek-instellingen. Lagere cfg = rustiger tempo (Mo: "praat te snel"); hogere herhaling-rem
+# onderdrukt juist de token-herhaling die de ruis-artefacten veroorzaakt.
 EXAGGERATION = 0.5
-CFG_WEIGHT = 0.4
+CFG_WEIGHT = 0.3
 TEMPERATURE = 0.8
-REPETITION_PENALTY = 1.3
+REPETITION_PENALTY = 2.0
 MIN_P = 0.05
 
 MAX_TRIES = 4
-MIN_RATIO = 0.72
+MIN_RATIO = 0.72          # een blok dat < 72% van de verwachte lengte terugkomt = waarschijnlijk afgekapt
 BASE_SEED = 20261117
 
-CHUNK_CHARS = 200     # samenhangende stukken (intonatie), niet de hele alinea
-MAX_CHARS = 300
-SENT_GAP = 0.38       # vaste adem tussen de zinnen (ruimte, geen gehaast)
+GROUP_MIN_SENTS = 2       # Mo's afspraak: minimaal 2 zinnen per blok
+GROUP_SOFT_CHARS = 200    # alleen een 3e (korte) zin erbij als de eerste twee samen nog kort zijn
+GAP_BETWEEN_GROUPS = 0.50 # echte adem TUSSEN de blokken (ruimte, geen gehaast)
+
+# RUISREDUCTIE: de referentieclips (ref7/8/9.wav) hebben achtergrondgeluid dat Chatterbox meekloont.
+# Een zachte ffmpeg-denoiser (afftdn) op het eindresultaat haalt die ruis onder de stem weg zonder
+# de stem zelf aan te tasten. Zacht houden (te hard = "waterig").
+DENOISE = True
+DENOISE_DB = 12           # dB ruisreductie (zacht); hoger = meer weg maar meer kans op artefacten
+_FFMPEG = None
+
+def _ffmpeg_path(root):
+    p = os.environ.get("FFMPEG_PATH")
+    if p and os.path.isfile(p):
+        return p
+    for rel in ("node_modules/ffmpeg-static/ffmpeg.exe", "node_modules/ffmpeg-static/ffmpeg"):
+        cand = os.path.join(root, *rel.split("/"))
+        if os.path.isfile(cand):
+            return cand
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+def _denoise_wav(path):
+    # in-place zachte ruisreductie; bij elke fout laten we het bestand gewoon zoals het was.
+    if not DENOISE or not _FFMPEG:
+        return False
+    tmp = path + ".dn.wav"
+    cmd = [_FFMPEG, "-y", "-i", path, "-af", f"afftdn=nr={DENOISE_DB}:nf=-25",
+           "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", tmp]
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        print(f"      (ruisreductie overgeslagen: {e})")
+        return False
 
 # ---------------------------------------------------------------------------------------------
+# Let op Chatterbox' eigen herhaling-waarschuwing, zodat we een vuil blok kunnen overdoen.
+class _RepWatch(logging.Handler):
+    def __init__(self):
+        super().__init__(); self.hit = False
+    def emit(self, record):
+        try:
+            msg = record.getMessage().lower()
+        except Exception:
+            msg = ""
+        if "repetition of token" in msg or "token_repetition=true" in msg:
+            self.hit = True
+_REPW = _RepWatch(); _REPW.setLevel(logging.WARNING)
+
 _CB = {}
 def _get_model():
     if "m" in _CB:
@@ -62,6 +118,9 @@ def _get_model():
         pm.PerthImplicitWatermarker = _Dummy
         pm.DummyWatermarker = _Dummy
         sys.modules["perth"] = pm
+    # herhaling-waarschuwing aan de analyzer-logger hangen
+    lg = logging.getLogger("chatterbox.models.t3.inference.alignment_stream_analyzer")
+    lg.addHandler(_REPW); lg.setLevel(logging.WARNING)
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
     _CB["m"] = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
     return _CB["m"]
@@ -112,34 +171,45 @@ def _sentences(text):
     return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
 
 def _group_sentences(sents):
-    groups = []; cur = []; cur_idx = []; cur_len = 0
-    for i, s in enumerate(sents):
-        add = len(s) + (1 if cur else 0)
-        if cur and cur_len + add > CHUNK_CHARS:
-            groups.append((" ".join(cur), cur_idx)); cur = []; cur_idx = []; cur_len = 0; add = len(s)
-        cur.append(s); cur_idx.append(i); cur_len += add
-    if cur:
-        groups.append((" ".join(cur), cur_idx))
+    # blokken van MINIMAAL 2 zinnen; een 3e alleen als het blok nog kort is. Nooit een losse zin:
+    # een overgebleven laatste zin gaat bij het vorige blok.
+    groups = []; i = 0; n = len(sents)
+    while i < n:
+        idx = [i]; j = i + 1
+        if j < n:
+            idx.append(j); j += 1
+        while j < n and sum(len(sents[k]) for k in idx) < GROUP_SOFT_CHARS and (j - i) < 3:
+            idx.append(j); j += 1
+        groups.append(([sents[k] for k in idx], idx)); i = j
+    if len(groups) >= 2 and len(groups[-1][1]) < GROUP_MIN_SENTS:
+        pt, pi = groups[-2]; lt, li = groups[-1]
+        groups[-2] = (pt + lt, pi + li); groups.pop()
     return groups
 
 # ---------------------------------------------------------------------------------------------
-# GELUID (numpy): genereren, stilte wegknippen, pauzes meten, op zinnen knippen.
-def _gen_chunk(ref_abs, text):
+# GELUID (numpy): genereren (met vangnet), stilte aan de uiteinden wegknippen, staart-controle.
+def _gen_group(ref_abs, text):
     import numpy as np
     m = _get_model()
     want = _expected_secs(text)
-    best = None; best_dur = -1.0; sr = int(getattr(m, "sr", 24000))
+    sr = int(getattr(m, "sr", 24000))
+    best = None; best_score = -1e9; best_clean = False; best_dur = 0.0
     for attempt in range(MAX_TRIES):
         _seed_everything(BASE_SEED + attempt * 101)
+        _REPW.hit = False
         wav = _generate_once(m, text, ref_abs)
         arr = wav.squeeze().detach().cpu().numpy().astype(np.float32)
         dur = len(arr) / float(sr)
-        if dur > best_dur:
-            best = arr; best_dur = dur
-        if dur >= want * MIN_RATIO:
+        clean = (not _REPW.hit) and (dur >= want * MIN_RATIO)
+        # sterk voorkeur voor een schoon blok; daarbinnen de opname die het dichtst bij de
+        # verwachte lengte zit (niet onnodig lang = geen staart-geleuter).
+        score = (1000.0 if clean else 0.0) - abs(dur - want)
+        if score > best_score:
+            best_score = score; best = arr; best_clean = clean; best_dur = dur
+        if clean:
             break
     x = np.clip(best, -1.0, 1.0)
-    return (x * 32767.0).astype(np.int16), sr
+    return (x * 32767.0).astype(np.int16), sr, best_clean, best_dur
 
 def _env(i16, sr, win=0.02):
     import numpy as np
@@ -150,7 +220,7 @@ def _env(i16, sr, win=0.02):
     f = np.abs(i16[:n].astype(np.float32)).reshape(-1, w)
     return f.mean(axis=1), w
 
-def _trim_ends(i16, sr, thr_ratio=0.05, pad=0.04):
+def _trim_ends(i16, sr, thr_ratio=0.05, pad=0.05):
     import numpy as np
     env, w = _env(i16, sr)
     if env is None:
@@ -163,61 +233,16 @@ def _trim_ends(i16, sr, thr_ratio=0.05, pad=0.04):
     end = min(len(i16), int((above[-1] + 1) * w) + int(pad * sr))
     return i16[start:end]
 
-def _pause_centers(i16, sr, thr_ratio=0.06, min_pause=0.12):
+def _tail_is_silent(i16, sr, win=0.08, thr_ratio=0.08):
+    # eindigt het blok netjes in stilte (schoon) of nog in geluid (mogelijk afgekapt)?
     import numpy as np
     env, w = _env(i16, sr)
     if env is None:
-        return []
+        return True
     peak = float(env.max()) or 1.0
-    low = env < (peak * thr_ratio)
-    centers = []; i = 0; N = len(low)
-    while i < N:
-        if low[i]:
-            j = i
-            while j < N and low[j]:
-                j += 1
-            if (j - i) * w / sr >= min_pause:
-                centers.append(((i + j) / 2.0) * w / sr)
-            i = j
-        else:
-            i += 1
-    return centers
-
-def _split_chunk(i16, sr, sent_texts):
-    # knip een stuk in exact len(sent_texts) zin-stukjes: schat de grenzen op lettergreep-gewicht,
-    # snap elke grens naar de dichtstbijzijnde echte pauze. Altijd k stukjes (ook als een pauze mist).
-    k = len(sent_texts)
-    if k <= 1:
-        return [i16]
-    total = len(i16) / float(sr)
-    weights = [_sent_weight(s) for s in sent_texts]; tot = sum(weights) or 1.0
-    est = []; acc = 0.0
-    for wgt in weights[:-1]:
-        acc += total * (wgt / tot); est.append(acc)
-    pauses = _pause_centers(i16, sr)
-    used = []; cuts = []
-    for e in est:
-        best = None; bd = 0.5
-        for p in pauses:
-            if p in used:
-                continue
-            if abs(p - e) < bd:
-                bd = abs(p - e); best = p
-        if best is not None:
-            used.append(best); cuts.append(best)
-        else:
-            cuts.append(e)
-    cuts = sorted(cuts)
-    segs = []; prev = 0
-    minlen = int(0.12 * sr)
-    for t in cuts:
-        s = int(t * sr)
-        s = max(prev + minlen, min(len(i16) - minlen, s))
-        if s <= prev:
-            s = min(len(i16) - 1, prev + minlen)
-        segs.append(i16[prev:s]); prev = s
-    segs.append(i16[prev:])
-    return segs
+    n = max(1, int(win / 0.02))
+    tail = env[-n:]
+    return float(tail.mean()) < peak * thr_ratio
 
 def _silence_samples(sr, secs):
     import numpy as np
@@ -234,38 +259,47 @@ def _synthesize_scene(ref_abs, scene_text, tail_sil, out_wav):
     import numpy as np
     sents = _sentences(scene_text)
     if not sents:
-        i16, sr = _gen_chunk(ref_abs, scene_text)
+        i16, sr, _clean, _d = _gen_group(ref_abs, scene_text)
         i16 = _trim_ends(i16, sr)
         _write_pcm16(out_wav, i16, sr)
+        _denoise_wav(out_wav)
         if tail_sil and tail_sil > 0:
             _append_silence(out_wav, tail_sil)
-        d = _wav_duration(out_wav); return [(0.0, round(d, 3))], 0.0, round(d, 3)
-    # 1) per samenhangend stuk inspreken, en op de zinnen knippen
+        d = _wav_duration(out_wav); return [(0.0, round(d, 3))], 0.0, round(d, 3), []
     groups = _group_sentences(sents)
-    seg_audio = []; sr = 24000
-    for ctext, idxs in groups:
-        i16, sr = _gen_chunk(ref_abs, ctext)
+    out = []; cursor = 0.0; sr = 24000
+    sent_times = []   # (zin-index, abs_start, dur) -> voor de ondertiteling
+    diag = []         # (zin-indexen, verwacht, gekregen, schoon, staart_stil) -> controle
+    gap = None
+    for gi, (gtexts, gidx) in enumerate(groups):
+        text = " ".join(gtexts)
+        i16, sr, clean, _dur = _gen_group(ref_abs, text)
         i16 = _trim_ends(i16, sr, thr_ratio=0.05, pad=0.05)
-        parts = _split_chunk(i16, sr, [sents[i] for i in idxs])
-        for j in range(len(idxs)):
-            p = parts[j] if j < len(parts) else np.zeros(int(0.2 * sr), dtype=np.int16)
-            seg_audio.append(_trim_ends(p, sr, thr_ratio=0.05, pad=0.04))
-    # 2) zin-stukjes aan elkaar met vaste adem ertussen; starttijd per zin is exact bekend
-    out = []; cursor = 0.0; segs = []
-    gap = _silence_samples(sr, SENT_GAP)
-    for k, sa in enumerate(seg_audio):
-        dur = len(sa) / float(sr)
-        segs.append((round(cursor, 3), round(dur, 3)))
-        out.append(sa); cursor += dur
-        if k != len(seg_audio) - 1:
-            out.append(gap); cursor += SENT_GAP
+        gdur = len(i16) / float(sr)
+        diag.append((gidx, _expected_secs(text), gdur, clean, _tail_is_silent(i16, sr)))
+        # ondertitel-wissel BINNEN het blok, alleen voor de tekst op het scherm (audio blijft heel)
+        weights = [_sent_weight(s) for s in gtexts]; tw = sum(weights) or 1.0
+        acc = 0.0
+        for si, s in enumerate(gtexts):
+            st = cursor + gdur * (acc / tw)
+            en = cursor + gdur * ((acc + weights[si]) / tw)
+            sent_times.append((gidx[si], round(st, 3), round(en - st, 3)))
+            acc += weights[si]
+        if gap is None:
+            gap = _silence_samples(sr, GAP_BETWEEN_GROUPS)
+        out.append(i16); cursor += gdur
+        if gi != len(groups) - 1:
+            out.append(gap); cursor += GAP_BETWEEN_GROUPS
     full = np.concatenate(out) if out else np.zeros(0, dtype=np.int16)
     _write_pcm16(out_wav, full, sr)
+    _denoise_wav(out_wav)
     if tail_sil and tail_sil > 0:
         _append_silence(out_wav, tail_sil)
+    sent_times.sort(key=lambda x: x[0])
+    segs = [(st, dd) for (_i, st, dd) in sent_times]
     sp0 = segs[0][0] if segs else 0.0
     sp1 = round(segs[-1][0] + segs[-1][1], 3) if segs else round(_wav_duration(out_wav), 3)
-    return segs, sp0, sp1
+    return segs, sp0, sp1, diag
 
 # ---------------------------------------------------------------------------------------------
 def _read_wav_parts(path):
@@ -406,6 +440,11 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
     ref_abs = os.path.join(root, VOICES[voice])
     if not os.path.isfile(ref_abs):
         print(f"  referentie-stem ontbreekt voor {voice}: {ref_abs}"); return
+    global _FFMPEG
+    if _FFMPEG is None:
+        _FFMPEG = _ffmpeg_path(root)
+        if DENOISE:
+            print(f"  ruisreductie: aan ({DENOISE_DB} dB) via {_FFMPEG}")
     outdir = os.path.join(root, "assets", "channels", channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
     made = []; durs = {}; sents_by = {}
@@ -415,7 +454,7 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
         t = TONE[tone]
         wav = os.path.join(outdir, f"{num:02d}.wav")
         try:
-            segs, sp0, sp1 = _synthesize_scene(ref_abs, voiceline, t["sil"], wav)
+            segs, sp0, sp1, diag = _synthesize_scene(ref_abs, voiceline, t["sil"], wav)
         except Exception as e:
             print(f"  scene {num}: FOUT -> {e}"); continue
         if tone == "intro":
@@ -425,9 +464,15 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
         d = _wav_duration(wav)
         durs[num] = d; sents_by[num] = (segs, sp0, sp1)
         made.append((num, wav)); print(f"  scene {num:02d} [{tone}] {d:6.2f}s, {len(segs)} zin(nen) -> {wav}")
+        # CONTROLE per blok: schoon + netjes in stilte geeindigd, of mogelijk afgekapt
+        for (gidx, exp, got, clean, tail_ok) in diag:
+            zin = "zin " + "+".join(str(i + 1) for i in gidx)
+            vlag = "OK" if (clean and tail_ok) else ("afgekapt?" if not tail_ok else "ruis?")
+            print(f"      {zin:<10} verwacht ~{exp:4.1f}s  kreeg {got:4.1f}s  "
+                  f"{'schoon' if clean else 'overgedaan/vuil'}  "
+                  f"{'eindigt in stilte' if tail_ok else 'EINDIGT IN GELUID'}  [{vlag}]")
 
-    # ALTIJD de tijdlijn/import schrijven voor wat gemaakt is (ook bij een enkele --only scene),
-    # zodat de studio het meteen kan afspelen.
+    # ALTIJD de tijdlijn/import schrijven voor wat gemaakt is (ook bij een enkele --only scene).
     lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
     by = {num: wav for num, wav in made}
     caption_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
@@ -472,6 +517,7 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
     print(f"  klaar: {len(made)} fragment(en)")
 
 def main():
+    global DENOISE, DENOISE_DB
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="chose")
     ap.add_argument("--voice", default="alle", choices=list(VOICES.keys()) + ["alle"])
@@ -479,7 +525,11 @@ def main():
     ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"])
     ap.add_argument("--root", default=".")
     ap.add_argument("--channel", default="channel1")
+    ap.add_argument("--no-denoise", dest="denoise", action="store_false", help="ruisreductie uit")
+    ap.add_argument("--denoise-db", type=int, default=DENOISE_DB, help="dB ruisreductie (zacht ~12)")
     args = ap.parse_args()
+    DENOISE = args.denoise
+    DENOISE_DB = args.denoise_db
 
     try:
         import chatterbox.mtl_tts  # noqa

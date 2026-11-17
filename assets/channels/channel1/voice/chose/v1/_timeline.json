@@ -1,0 +1,135 @@
+{
+  "story": "chose",
+  "voice": "v1",
+  "format": "16:9",
+  "title": "The Answer You Never Chose",
+  "total_seconds": 63.59,
+  "total_mmss": "1:03",
+  "scenes": [
+    {
+      "scene": 0,
+      "tone": "intro",
+      "wav": "assets/channels/channel1/voice/chose/v1/00.wav",
+      "start": 0.0,
+      "dur": 63.59,
+      "speech_start": 3.0,
+      "speech_end": 62.89,
+      "sentences": [
+        {
+          "i": 0,
+          "text": "Welcome to Truthward.",
+          "start": 3.0,
+          "dur": 1.862,
+          "abs_start": 3.0
+        },
+        {
+          "i": 1,
+          "text": "Good to have you here.",
+          "start": 4.862,
+          "dur": 1.862,
+          "abs_start": 4.862
+        },
+        {
+          "i": 2,
+          "text": "Here is the whole idea behind this channel.",
+          "start": 6.724,
+          "dur": 3.756,
+          "abs_start": 6.724
+        },
+        {
+          "i": 3,
+          "text": "In every video, we take one real question, and we do our honest best to answer it.",
+          "start": 10.98,
+          "dur": 5.93,
+          "abs_start": 10.98
+        },
+        {
+          "i": 4,
+          "text": "We reason it through, step by step, and we look at it honestly, without preaching and without telling you what to think.",
+          "start": 16.91,
+          "dur": 7.49,
+          "abs_start": 16.91
+        },
+        {
+          "i": 5,
+          "text": "And by the end, we will usually have more than an answer.",
+          "start": 24.9,
+          "dur": 3.58,
+          "abs_start": 24.9
+        },
+        {
+          "i": 6,
+          "text": "We will have a new question or two worth chasing, and those become the next videos.",
+          "start": 28.48,
+          "dur": 4.665,
+          "abs_start": 28.48
+        },
+        {
+          "i": 7,
+          "text": "That is really all this is.",
+          "start": 33.146,
+          "dur": 1.714,
+          "abs_start": 33.146
+        },
+        {
+          "i": 8,
+          "text": "Because the truth is never as complicated as people make it sound.",
+          "start": 35.36,
+          "dur": 3.983,
+          "abs_start": 35.36
+        },
+        {
+          "i": 9,
+          "text": "It is honest, and simple enough for anyone to follow.",
+          "start": 39.343,
+          "dur": 3.449,
+          "abs_start": 39.343
+        },
+        {
+          "i": 10,
+          "text": "So all we try to do here is bring it back to the surface, one question at a time.",
+          "start": 42.793,
+          "dur": 5.007,
+          "abs_start": 42.793
+        },
+        {
+          "i": 11,
+          "text": "If you want to come along for that, subscribe so the next question finds you.",
+          "start": 48.3,
+          "dur": 4.865,
+          "abs_start": 48.3
+        },
+        {
+          "i": 12,
+          "text": "Leave a comment, especially if you see it differently.",
+          "start": 53.165,
+          "dur": 4.366,
+          "abs_start": 53.165
+        },
+        {
+          "i": 13,
+          "text": "And if it was worth your time, a like helps.",
+          "start": 57.531,
+          "dur": 2.869,
+          "abs_start": 57.531
+        },
+        {
+          "i": 14,
+          "text": "Alright.",
+          "start": 60.9,
+          "dur": 0.74,
+          "abs_start": 60.9
+        },
+        {
+          "i": 15,
+          "text": "Let us begin.",
+          "start": 61.64,
+          "dur": 1.25,
+          "abs_start": 61.64
+        }
+      ],
+      "beats": [],
+      "sfx": []
+    }
+  ]
+}
