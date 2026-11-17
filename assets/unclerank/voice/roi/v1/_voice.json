@@ -1,0 +1,36 @@
+{
+  "type": "roi",
+  "ref": "NL_commercial_5.wav",
+  "lines": [
+    {
+      "i": 0,
+      "wav": "00.wav",
+      "dur": 2.73,
+      "text": "Veertig verse leads, elke maand opnieuw."
+    },
+    {
+      "i": 1,
+      "wav": "01.wav",
+      "dur": 2.97,
+      "text": "Elk bedrijf met een gat dat jij kunt dichten."
+    },
+    {
+      "i": 2,
+      "wav": "02.wav",
+      "dur": 4.67,
+      "text": "Zoveel is één nieuwe klant jou al waard: zesduizend euro."
+    },
+    {
+      "i": 3,
+      "wav": "03.wav",
+      "dur": 5.49,
+      "text": "En jij betaalt maar negenentachtig euro per maand. Twee euro drieëntwintig per bedrijf."
+    },
+    {
+      "i": 4,
+      "wav": "04.wav",
+      "dur": 3.83,
+      "text": "Eén deal en je zit al in de plus. Pak je gratis week."
+    }
+  ]
+}

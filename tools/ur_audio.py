@@ -12,13 +12,14 @@ import argparse, os, sys, subprocess, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # zodat 'channel_audio' importeerbaar is
 import channel_audio as ca
 
-# mood -> zoekterm (zakelijk/SaaS-sfeer). Mo vervangt de missers handmatig in de map.
+# mood -> meerdere zoektermen (probeer tot er één een bruikbare CC0/CC-BY-track geeft). Mo vervangt
+# de missers handmatig in de map.
 UR_MOODS = {
-    "upbeat": "uplifting corporate background music",
-    "calm":   "calm minimal corporate ambient background",
-    "lofi":   "lofi chill business background",
+    "upbeat": ["uplifting corporate background music", "motivational corporate", "positive business background", "upbeat ambient"],
+    "calm":   ["calm ambient background", "soft piano background", "minimal ambient", "gentle corporate background"],
+    "lofi":   ["lofi hip hop", "chill lofi beat", "lofi background", "chillhop instrumental"],
 }
-MUSIC_VOL = 0.30   # bodem wordt zacht INGEBAKKEN; de renderer legt 'm op 0.75 -> ~0.22 effectief
+MUSIC_VOL = 0.15   # bodem wordt zacht INGEBAKKEN; de renderer legt 'm op 0.75 -> ~0.11 effectief (stem domineert)
 
 def _ffmpeg(root):
     for rel in ("node_modules/ffmpeg-static/ffmpeg.exe", "node_modules/ffmpeg-static/ffmpeg"):
@@ -43,14 +44,18 @@ def main():
     mdir = os.path.join(args.root, "assets", "unclerank", "muziek")
     os.makedirs(mdir, exist_ok=True)
     ff = _ffmpeg(args.root)
-    for mood, query in UR_MOODS.items():
+    for mood, queries in UR_MOODS.items():
         out = os.path.join(mdir, f"ur-{mood}.mp3")
         if os.path.exists(out) and not args.force:
             print(f"{mood}: staat al ({os.path.basename(out)})"); continue
-        print(f"{mood}: zoek '{query}'")
-        hit = ca.search_cc0(query, key, prefer_long=True)
+        hit = None
+        for query in queries:
+            print(f"{mood}: zoek '{query}'")
+            hit = ca.search_cc0(query, key, prefer_long=True)
+            if hit:
+                break
         if not hit:
-            print("   niets bruikbaars gevonden -> overslaan"); continue
+            print("   niets bruikbaars gevonden (alle termen) -> overslaan"); continue
         tmp = out + ".raw.mp3"
         try:
             ca.download(hit["url"], tmp)

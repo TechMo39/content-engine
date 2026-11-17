@@ -139,8 +139,10 @@ function markOnly(cx, cy, size, op = 1) {
 // maakt tools/ur_voice.py (NL-Chatterbox, willekeurige stem uit voice-test/refs-ur/) in
 // assets/unclerank/voice/<type>/NN.wav. De regel-TEKST staat in ur_voice.py; hier alleen de timing,
 // zodat beeld en stem op dezelfde beats vallen. Nieuwe types: voeg een beats-rij toe + script in ur_voice.
+// Beat-FRACTIES van de totale duur. De echte duur komt van de ingesproken stem (Truthward-stijl:
+// video volgt de stem); het beeld verschijnt op deze fracties zodat beeld en stem meelopen.
 const UR_BEATS = {
-  roi: [0.6, 4.4, 7.8, 11.0, 13.4],   // hook · warm · waarde · kost · ROI+CTA
+  roi: [0.03, 0.24, 0.45, 0.66, 0.85],   // hook · warm · waarde · kost · ROI+CTA
 };
 // AFWISSELING: per type meerdere varianten (andere woorden, andere stem-regels, zelfde boodschap +
 // timing). De render kiest er willekeurig één (anti-herhaling), zodat beeld én stem per render
@@ -158,8 +160,8 @@ const UR_VARIANTS = {
         "Elke maand veertig nieuwe bedrijven om te bellen.",
         "Elk met een mankement dat jij kunt fixen.",
         "Eén nieuwe klant levert je al snel zesduizend euro op.",
-        "En jij betaalt maar negenentachtig euro per maand. Twee euro drieëntwintig per bedrijf.",
-        "Eén klant, en je maand is er zo uit. Begin gratis, zeven dagen.",
+        "En jij betaalt maar negenentachtig euro per maand.",
+        "Eén klant en je maand is er zo uit, dus begin gratis.",
       ],
     },
     {
@@ -171,9 +173,9 @@ const UR_VARIANTS = {
       voice: [
         "Veertig verse leads, elke maand opnieuw.",
         "Elk bedrijf met een gat dat jij kunt dichten.",
-        "Zoveel is één nieuwe klant jou al waard: zesduizend euro.",
-        "En jij betaalt maar negenentachtig euro per maand. Twee euro drieëntwintig per bedrijf.",
-        "Eén deal en je zit al in de plus. Pak je gratis week.",
+        "Zoveel is één nieuwe klant jou al waard, zesduizend euro.",
+        "En jij betaalt maar negenentachtig euro per maand.",
+        "Eén deal en je zit al in de plus, dus pak je gratis week.",
       ],
     },
   ],
@@ -202,16 +204,11 @@ function attachAudio(ROOT, templates, templateId, render, vi = 0) {
     const mp = path.resolve(ROOT, "assets/unclerank/muziek", "ur-" + mood + ".mp3");
     if (fs.existsSync(mp)) render.music = mp;
   } catch {}
-  // stem: één wav per beat uit de map van de GEKOZEN variant, gain ~1.7 over de muziek (zoals Truthward)
-  const beats = UR_BEATS[templateId];
-  if (beats) {
-    const vdir = voiceDir(ROOT, templateId, vi);
-    const tracks = [];
-    beats.forEach((at, i) => {
-      const w = path.join(vdir, String(i).padStart(2, "0") + ".wav");
-      try { if (fs.existsSync(w)) tracks.push({ file: w, atSec: at, gain: 1.7 }); } catch {}
-    });
-    if (tracks.length) render.audio = { tracks };
+  // stem: ÉÉN doorlopend voice.wav (hele variant in één opname, Truthward-stijl) over de muziek.
+  // Gain 2.2 zodat de stem duidelijk boven de muziekbodem uitkomt.
+  if (UR_BEATS[templateId]) {
+    const w = path.join(voiceDir(ROOT, templateId, vi), "voice.wav");
+    try { if (fs.existsSync(w)) render.audio = { tracks: [{ file: w, atSec: 0, gain: 2.2 }] }; } catch {}
   }
   return render;
 }
@@ -231,32 +228,34 @@ function root(W, H, inner) {
 }
 
 // ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
-function buildRoi({ opts, W, H, variant }) {
-  const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 16;
+function buildRoi({ opts, W, H, variant, durSec }) {
+  const FPS = 30, SS = 1;
+  const dur = Number(durSec) || Number(opts.durSec) || 16;   // duur volgt de stem (Truthward-stijl)
   const prijs = Number(opts.kostMnd) || 89;          // START-pakket per maand (kost)
   const klantWaarde = Number(opts.klantWaarde) || 6000; // WAT één nieuwe klant OPLEVERT
   const perBedrijf = opts.perBedrijf || "€2,23";     // kost per bedrijf (START)
   const v = variant || UR_VARIANTS.roi[0];           // afwisseling: de gekozen woord-variant
+  const b = UR_BEATS.roi.map((f) => f * dur);        // beats op de tijdlijn: [hook,warm,waarde,kost,roi+cta]
   const cx = W / 2, fsHook = Math.round(W * 0.056), fsLbl = Math.round(W * 0.035);
   function sceneAt(frame) {
     const t = frame / FPS;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    // 1) hook — volume dat je krijgt
-    s += block(cx, H * 0.30, v.hook, { fs: fsHook, w: 800, fill: C.ink, op: win(t, 0.3, 1.4, 3.3, 4.1) });
-    // 2) waarom ze warm zijn
-    s += block(cx, H * 0.30, v.warm, { fs: fsHook, w: 700, fill: C.ink, op: win(t, 4.2, 5.2, 6.6, 7.2) });
-    // 3) DE WAARDE — wat één nieuwe klant OPLEVERT (de hero, groen)
-    s += tx(cx, H * 0.42, eur(klantWaarde), { fs: Math.round(W * 0.16), w: 800, fill: C.green, op: win(t, 7.6, 8.6) });
-    s += block(cx, H * 0.505, v.valueLabel, { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 8.2, 9.0) });
-    // 4) DE KOST — klein, als contrast eronder (feitelijk, varieert niet)
-    s += tx(cx, H * 0.64, "Jij betaalt " + eur(prijs) + " per maand", { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, 10.8, 11.6) });
-    s += tx(cx, H * 0.695, perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 11.2, 12.0) });
-    // 5) ROI-landing + CTA
-    s += block(cx, H * 0.82, v.roi, { fs: Math.round(W * 0.044), w: 800, fill: C.green, op: win(t, 13.2, 14.0) });
-    s += tx(cx, H * 0.92, v.cta, { fs: Math.round(W * 0.036), w: 600, fill: C.ink, op: win(t, 14.4, 15.0) });
+    // 1) hook — verschijnt op b[0], weg vóór b[1]
+    s += block(cx, H * 0.30, v.hook, { fs: fsHook, w: 800, fill: C.ink, op: win(t, b[0], b[0] + 0.9, b[1] - 0.4, b[1] + 0.2) });
+    // 2) warm — b[1]..b[2]
+    s += block(cx, H * 0.30, v.warm, { fs: fsHook, w: 700, fill: C.ink, op: win(t, b[1], b[1] + 0.9, b[2] - 0.4, b[2] + 0.2) });
+    // 3) DE WAARDE — wat één nieuwe klant OPLEVERT (de hero, groen), blijft vanaf b[2]
+    s += tx(cx, H * 0.42, eur(klantWaarde), { fs: Math.round(W * 0.16), w: 800, fill: C.green, op: win(t, b[2], b[2] + 0.8) });
+    s += block(cx, H * 0.505, v.valueLabel, { fs: fsLbl, w: 500, fill: C.mut, op: win(t, b[2] + 0.5, b[2] + 1.2) });
+    // 4) DE KOST — klein contrast, b[3]
+    s += tx(cx, H * 0.64, "Jij betaalt " + eur(prijs) + " per maand", { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, b[3], b[3] + 0.7) });
+    s += tx(cx, H * 0.695, perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, b[3] + 0.4, b[3] + 1.1) });
+    // 5) ROI-landing + CTA, b[4]
+    s += block(cx, H * 0.82, v.roi, { fs: Math.round(W * 0.044), w: 800, fill: C.green, op: win(t, b[4], b[4] + 0.7) });
+    s += tx(cx, H * 0.92, v.cta, { fs: Math.round(W * 0.036), w: 600, fill: C.ink, op: win(t, b[4] + 0.5, b[4] + 1.2) });
     return root(W, H, s);
   }
-  return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
+  return { W, H, FPS, SS, durSec: dur, sceneAt, music: null, clicks: [] };
 }
 
 // ---- TYPE: GAT — "Het harde cijfer" -------------------------------------------------------
@@ -735,6 +734,7 @@ export function makeBrand({ ROOT, config } = {}) {
   // Stem + muziek worden BIJ DE RENDER aangemaakt (niet handmatig in Git Bash): de engine roept
   // ur_audio.py (muziekbodem, eenmalig per mood) en ur_voice.py (NL-stem) zelf aan, met voortgang
   // in het studio-log — net zoals de portaal-opname. Faalt een stap, dan rendert de video stil door.
+  // Genereert muziek + stem BIJ DE RENDER en geeft de totale STEM-DUUR terug (de video volgt de stem).
   async function ensureAudioAssets(templateId, vi, opts, log) {
     const PY = process.env.UR_PYTHON || "python";
     const tpl = templates.find((t) => t.id === templateId);
@@ -747,13 +747,14 @@ export function makeBrand({ ROOT, config } = {}) {
         await runStreamed(PY, [path.resolve(ROOT, "tools/ur_audio.py"), "--root", ROOT], { ...process.env, FFMPEG }, log, "· muziek:");
       }
     } catch (e) { if (log) log("muziek-stap overgeslagen: " + e.message); }
-    // 2) NL-stem van de GEKOZEN variant (genereren als die mist, of forceer-vers met opts.versStem)
+    // 2) NL-stem van de GEKOZEN variant: de HELE tekst in één opname (Truthward-stijl, pauzes + afkap-
+    //    vangnet), rustiger tempo. ur_voice schrijft voice.wav + _timeline.json (met de totale duur).
+    let total;
     try {
       const vdir = voiceDir(ROOT, templateId, vi);
-      const first = path.join(vdir, "00.wav");
-      if ((opts && opts.versStem) || !fs.existsSync(first)) {
+      const wavp = path.join(vdir, "voice.wav");
+      if ((opts && opts.versStem) || !fs.existsSync(wavp)) {
         await fs.promises.mkdir(vdir, { recursive: true });
-        // de stem-regels van deze variant doorgeven aan ur_voice (die synthetiseert wat 'ie krijgt)
         const variant = (UR_VARIANTS[templateId] || [])[vi];
         const linesFile = path.join(vdir, "_lines.json");
         if (variant && Array.isArray(variant.voice)) {
@@ -765,7 +766,12 @@ export function makeBrand({ ROOT, config } = {}) {
         if (opts && opts.voice) args.push("--voice", String(opts.voice));
         await runStreamed(PY, args, { ...process.env, FFMPEG }, log, "· stem:");
       }
+      try {
+        const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8"));
+        if (tl && tl.total) total = Number(tl.total);
+      } catch {}
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
+    return total;
   }
   async function makeRender({ templateId = "roi", opts = {}, format = "9:16", log } = {}) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
@@ -773,8 +779,9 @@ export function makeBrand({ ROOT, config } = {}) {
     const fn = BUILDERS[templateId] || buildRoi;
     const vi = pickVariant(templateId);                                  // afwisseling per render
     const variant = (UR_VARIANTS[templateId] || [])[vi];
-    const render = fn({ opts, W, H, variant });
-    if (UR_BEATS[templateId]) await ensureAudioAssets(templateId, vi, opts, log);   // stem/muziek bij de render
+    let durSec;
+    if (UR_BEATS[templateId]) durSec = await ensureAudioAssets(templateId, vi, opts, log);  // duur volgt de stem
+    const render = fn({ opts, W, H, variant, durSec });
     return attachAudio(ROOT, templates, templateId, render, vi);
   }
   // De engine roept bij het laden brand.init(log) aan (zoals taleoftiles). UncleRank is type-
