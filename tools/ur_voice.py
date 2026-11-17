@@ -42,13 +42,24 @@ def pick_voice(root, want):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--type", required=True, help="UR-type, bv. roi")
+    ap.add_argument("--variant", type=int, default=-1, help="variant-index; -1 = geen submap")
+    ap.add_argument("--lines", default="", help="JSON-bestand met de in te spreken regels (van de engine); leeg = ingebouwd script")
     ap.add_argument("--voice", default="", help="vaste ref-naam zonder .wav; leeg = random")
     ap.add_argument("--root", default=".")
     args = ap.parse_args()
 
-    lines = UR_SCRIPTS.get(args.type)
+    # regels: van de engine (gekozen variant) als --lines gegeven is, anders het ingebouwde script
+    lines = None
+    if args.lines:
+        try:
+            with open(args.lines, encoding="utf-8") as f:
+                lines = json.load(f)
+        except Exception as e:
+            print(f"kon --lines niet lezen ({e}); val terug op ingebouwd script")
     if not lines:
-        print(f"geen script voor type '{args.type}'. Bekend: {list(UR_SCRIPTS)}"); sys.exit(1)
+        lines = UR_SCRIPTS.get(args.type)
+    if not lines:
+        print(f"geen regels voor type '{args.type}'. Geef --lines of voeg een script toe. Bekend: {list(UR_SCRIPTS)}"); sys.exit(1)
 
     try:
         import chatterbox.mtl_tts  # noqa
@@ -58,6 +69,8 @@ def main():
     ref = pick_voice(args.root, args.voice)
     cv._FFMPEG = cv._ffmpeg_path(args.root)   # voor de ruisreductie, net als Truthward
     outdir = os.path.join(args.root, "assets", "unclerank", "voice", args.type)
+    if args.variant >= 0:
+        outdir = os.path.join(outdir, f"v{args.variant}")
     os.makedirs(outdir, exist_ok=True)
     print(f"=== UR-stem: {args.type} - ref: {os.path.basename(ref)} - {len(lines)} regel(s) ===")
     durs = []
