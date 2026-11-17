@@ -142,7 +142,7 @@ function markOnly(cx, cy, size, op = 1) {
 // Beat-FRACTIES van de totale duur. De echte duur komt van de ingesproken stem (Truthward-stijl:
 // video volgt de stem); het beeld verschijnt op deze fracties zodat beeld en stem meelopen.
 const UR_BEATS = {
-  roi: [0.03, 0.24, 0.45, 0.66, 0.85],   // hook · warm · waarde · kost · ROI+CTA
+  roi: [0.03, 0.22, 0.42, 0.66, 0.88],   // hook · aanbod · pakketten · waarde · CTA(stop)
 };
 // AFWISSELING: per type meerdere varianten (andere woorden, andere stem-regels, zelfde boodschap +
 // timing). De render kiest er willekeurig één (anti-herhaling), zodat beeld én stem per render
@@ -151,31 +151,29 @@ const UR_BEATS = {
 const UR_VARIANTS = {
   roi: [
     {
-      hook: ["Elke maand 40 nieuwe", "bedrijven om te bellen."],
-      warm: ["Elk met een mankement", "dat jij kunt fixen."],
-      valueLabel: ["wat één nieuwe klant", "je oplevert"],
-      roi: ["Eén klant en je maand", "is er zo uit."],
+      hook: ["Stop met bellen", "zonder reden."],
+      offer: ["Geen gekochte lijst.", "Een dossier per bedrijf."],
+      valueLabel: ["wat één gewonnen klant", "je per maand oplevert"],
       cta: "Begin gratis — 7 dagen.",
       voice: [
-        "Elke maand veertig nieuwe bedrijven om te bellen.",
-        "Elk met een mankement dat jij kunt fixen.",
-        "Eén nieuwe klant levert je al snel zesduizend euro op.",
-        "En jij betaalt maar negenentachtig euro per maand.",
-        "Eén klant en je maand is er zo uit, dus begin gratis.",
+        "Stop met bellen zonder reden.",
+        "Geen gekochte lijst, maar een dossier per bedrijf, met de meting en de reden om te bellen.",
+        "Kies veertig, honderd of vierhonderd bedrijven per maand, een paar euro per bedrijf.",
+        "Win er één, en die levert je vijfhonderd tot tweeduizend vijfhonderd euro per maand op.",
+        "Begin gratis. Zeven dagen.",
       ],
     },
     {
-      hook: ["40 verse leads,", "elke maand opnieuw."],
-      warm: ["Elk bedrijf met een gat", "dat jij kunt dichten."],
-      valueLabel: ["zoveel is één", "nieuwe klant waard"],
-      roi: ["Eén deal en je zit", "al in de plus."],
+      hook: ["Bellen zonder reden?", "Daar stoppen we mee."],
+      offer: ["Geen lijst.", "Een reden om te bellen."],
+      valueLabel: ["zoveel verdient", "één klant per maand"],
       cta: "Pak je gratis week.",
       voice: [
-        "Veertig verse leads, elke maand opnieuw.",
-        "Elk bedrijf met een gat dat jij kunt dichten.",
-        "Zoveel is één nieuwe klant jou al waard, zesduizend euro.",
-        "En jij betaalt maar negenentachtig euro per maand.",
-        "Eén deal en je zit al in de plus, dus pak je gratis week.",
+        "Bellen zonder reden? Daar stoppen we mee.",
+        "Geen lijst, maar een reden om te bellen: de meting en het mankement per bedrijf.",
+        "Veertig, honderd of vierhonderd bedrijven per maand, een paar euro per stuk.",
+        "Eén gewonnen klant verdient al vijfhonderd tot tweeduizend vijfhonderd euro per maand.",
+        "Pak je gratis week.",
       ],
     },
   ],
@@ -228,31 +226,50 @@ function root(W, H, inner) {
 }
 
 // ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
+// De ECHTE pakketten (uit de verkooppagina, alle drie — niet één). Volume is het verschil.
+const ROI_PAKKETTEN = [
+  { naam: "Start", aantal: 40, prijs: 89 },
+  { naam: "Groot", aantal: 100, prijs: 179, top: true },
+  { naam: "Maximaal", aantal: 400, prijs: 599 },
+];
+const ROI_KLANT_MIN = 500, ROI_KLANT_MAX = 2500;   // wat één gewonnen klant per maand oplevert (SEO-traject)
 function buildRoi({ opts, W, H, variant, durSec }) {
   const FPS = 30, SS = 1;
   const dur = Number(durSec) || Number(opts.durSec) || 16;   // duur volgt de stem (Truthward-stijl)
-  const prijs = Number(opts.kostMnd) || 89;          // START-pakket per maand (kost)
-  const klantWaarde = Number(opts.klantWaarde) || 6000; // WAT één nieuwe klant OPLEVERT
-  const perBedrijf = opts.perBedrijf || "€2,23";     // kost per bedrijf (START)
-  const v = variant || UR_VARIANTS.roi[0];           // afwisseling: de gekozen woord-variant
-  const b = UR_BEATS.roi.map((f) => f * dur);        // beats op de tijdlijn: [hook,warm,waarde,kost,roi+cta]
-  const cx = W / 2, fsHook = Math.round(W * 0.056), fsLbl = Math.round(W * 0.035);
+  const v = variant || UR_VARIANTS.roi[0];
+  const b = UR_BEATS.roi.map((f) => f * dur);                // [hook, aanbod, pakketten, waarde, CTA]
+  const cx = W / 2, fsHook = Math.round(W * 0.058), fsLbl = Math.round(W * 0.034);
+  // elk beat verschijnt en verdwijnt weer vóór het volgende (één ding tegelijk, rustig)
+  const beat = (i) => win(t_, b[i], b[i] + 0.6, b[i + 1] - 0.5, b[i + 1] - 0.15);
+  let t_ = 0;
   function sceneAt(frame) {
-    const t = frame / FPS;
+    t_ = frame / FPS; const t = t_;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    // 1) hook — verschijnt op b[0], weg vóór b[1]
-    s += block(cx, H * 0.30, v.hook, { fs: fsHook, w: 800, fill: C.ink, op: win(t, b[0], b[0] + 0.9, b[1] - 0.4, b[1] + 0.2) });
-    // 2) warm — b[1]..b[2]
-    s += block(cx, H * 0.30, v.warm, { fs: fsHook, w: 700, fill: C.ink, op: win(t, b[1], b[1] + 0.9, b[2] - 0.4, b[2] + 0.2) });
-    // 3) DE WAARDE — wat één nieuwe klant OPLEVERT (de hero, groen), blijft vanaf b[2]
-    s += tx(cx, H * 0.42, eur(klantWaarde), { fs: Math.round(W * 0.16), w: 800, fill: C.green, op: win(t, b[2], b[2] + 0.8) });
-    s += block(cx, H * 0.505, v.valueLabel, { fs: fsLbl, w: 500, fill: C.mut, op: win(t, b[2] + 0.5, b[2] + 1.2) });
-    // 4) DE KOST — klein contrast, b[3]
-    s += tx(cx, H * 0.64, "Jij betaalt " + eur(prijs) + " per maand", { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, b[3], b[3] + 0.7) });
-    s += tx(cx, H * 0.695, perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, b[3] + 0.4, b[3] + 1.1) });
-    // 5) ROI-landing + CTA, b[4]
-    s += block(cx, H * 0.82, v.roi, { fs: Math.round(W * 0.044), w: 800, fill: C.green, op: win(t, b[4], b[4] + 0.7) });
-    s += tx(cx, H * 0.92, v.cta, { fs: Math.round(W * 0.036), w: 600, fill: C.ink, op: win(t, b[4] + 0.5, b[4] + 1.2) });
+    // 1) HOOK — de propositie
+    s += block(cx, H * 0.40, v.hook, { fs: Math.round(W * 0.07), w: 800, fill: C.ink, op: beat(0) });
+    // 2) AANBOD — geen lijst, een dossier met reden
+    s += block(cx, H * 0.40, v.offer, { fs: fsHook, w: 800, fill: C.ink, op: beat(1) });
+    // 3) PAKKETTEN — alle drie, volume is het verschil
+    const pOp = beat(2);
+    if (pOp > 0.001) {
+      s += tx(cx, H * 0.22, "Kies je volume", { fs: fsLbl, w: 600, fill: C.mut, op: pOp });
+      ROI_PAKKETTEN.forEach((p, i) => {
+        const y = H * 0.36 + i * H * 0.13;
+        const col = p.top ? C.accent : C.ink;
+        s += tx(cx, y, p.aantal + " bedrijven   ·   " + eur(p.prijs) + " p/m",
+          { fs: Math.round(W * 0.052), w: 800, fill: col, op: pOp });
+        if (p.top) s += tx(cx, y + H * 0.035, "meest gekozen", { fs: Math.round(W * 0.028), w: 700, fill: C.accent, op: pOp });
+      });
+      s += tx(cx, H * 0.80, "een paar euro per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: pOp });
+    }
+    // 4) WAARDE — wat één gewonnen klant per maand oplevert (echt, uit de pagina), groen
+    const wOp = beat(3);
+    if (wOp > 0.001) {
+      s += tx(cx, H * 0.42, eur(ROI_KLANT_MIN) + " – " + eur(ROI_KLANT_MAX), { fs: Math.round(W * 0.11), w: 800, fill: C.green, op: wOp });
+      s += block(cx, H * 0.52, v.valueLabel, { fs: fsLbl, w: 500, fill: C.mut, op: wOp });
+    }
+    // 5) CTA — laatste zin, blijft staan tot het eind (video stopt hierop)
+    s += tx(cx, H * 0.50, v.cta, { fs: Math.round(W * 0.06), w: 800, fill: C.ink, op: win(t, b[4], b[4] + 0.6) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec: dur, sceneAt, music: null, clicks: [] };
@@ -753,16 +770,18 @@ export function makeBrand({ ROOT, config } = {}) {
     try {
       const vdir = voiceDir(ROOT, templateId, vi);
       const wavp = path.join(vdir, "voice.wav");
-      if ((opts && opts.versStem) || !fs.existsSync(wavp)) {
+      const linesFile = path.join(vdir, "_lines.json");
+      const variant = (UR_VARIANTS[templateId] || [])[vi];
+      const wantLines = (variant && Array.isArray(variant.voice)) ? JSON.stringify(variant.voice) : "";
+      let haveLines = null;
+      try { haveLines = await fs.promises.readFile(linesFile, "utf8"); } catch {}
+      const stale = wantLines && haveLines !== wantLines;   // script gewijzigd -> opnieuw inspreken (duurzaam, geen handmatig wissen)
+      if ((opts && opts.versStem) || !fs.existsSync(wavp) || stale) {
         await fs.promises.mkdir(vdir, { recursive: true });
-        const variant = (UR_VARIANTS[templateId] || [])[vi];
-        const linesFile = path.join(vdir, "_lines.json");
-        if (variant && Array.isArray(variant.voice)) {
-          await fs.promises.writeFile(linesFile, JSON.stringify(variant.voice), "utf8");
-        }
-        if (log) log("● UR-stem genereren (Chatterbox, NL) — dit duurt even…");
+        if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
+        if (log) log(stale ? "● Script gewijzigd — UR-stem opnieuw inspreken…" : "● UR-stem genereren (Chatterbox, NL) — dit duurt even…");
         const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", templateId, "--variant", String(vi), "--root", ROOT];
-        if (variant && Array.isArray(variant.voice)) args.push("--lines", linesFile);
+        if (wantLines) args.push("--lines", linesFile);
         if (opts && opts.voice) args.push("--voice", String(opts.voice));
         await runStreamed(PY, args, { ...process.env, FFMPEG }, log, "· stem:");
       }
