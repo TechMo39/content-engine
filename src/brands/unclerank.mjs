@@ -72,6 +72,10 @@ const C = {
   accent: "#00b8e6", accentDark: "#0a5f78", green: "#19c37d", line: "#1d3146",
 };
 
+// UncleRank = strakke SANS (niet de Tale-of-Tiles-serif). De sans-font "UR Sans" ligt in
+// assets/fonts/ (eigen naam zodat andere merken niks merken); valt netjes terug op system-sans.
+const SANS = "'UR Sans', Arial, Helvetica, sans-serif";
+
 // Het echte UR-merk: de UR-mark (favicon, transparant) wordt als data-URI in elke frame gestempeld;
 // het uitgeschreven "UncleRank" tekenen we als scherpe vector in de merkkleuren. Één keer geladen.
 let MARK_URI = "";
@@ -112,15 +116,15 @@ function wordmark(W, H, op = 1) {
   const mk = Math.round(W * 0.075);            // mark-grootte
   const fs = Math.round(W * 0.05);             // woordmerk-tekst
   const gap = Math.round(mk * 0.26);
-  const wUncle = fs * 2.62, wRank = fs * 2.12; // benadering (DejaVu/Arial bold) om te centreren
-  const totalW = mk + gap + wUncle + wRank;
+  const wordEst = fs * 4.9;                     // "UncleRank"-breedte-benadering: ALLEEN om de lockup te centreren
+  const totalW = mk + gap + wordEst;
   const x0 = Math.round(W / 2 - totalW / 2);
-  const baY = topY + Math.round(fs * 0.36);    // baseline ~ verticaal midden van de mark
+  const baY = topY + Math.round(fs * 0.36);     // baseline ~ verticaal midden van de mark
   const tx0 = x0 + mk + gap;
   let g = `<g opacity="${op.toFixed(3)}">`;
   if (MARK_URI) g += `<image x="${x0}" y="${topY - Math.round(mk / 2)}" width="${mk}" height="${mk}" href="${MARK_URI}" preserveAspectRatio="xMidYMid meet"/>`;
-  g += `<text x="${tx0}" y="${baY}" fill="${C.ink}" font-family="Arial, Helvetica, sans-serif" font-size="${fs}" font-weight="800" text-anchor="start">Uncle</text>`;
-  g += `<text x="${tx0 + wUncle}" y="${baY}" fill="${C.accent}" font-family="Arial, Helvetica, sans-serif" font-size="${fs}" font-weight="800" text-anchor="start">Rank</text>`;
+  // ÉÉN tekst-element met twee tspans = altijd "UncleRank" aaneen (geen gat), kleur-split Uncle/Rank.
+  g += `<text x="${tx0}" y="${baY}" font-family="${SANS}" font-size="${fs}" font-weight="800" text-anchor="start"><tspan fill="${C.ink}">Uncle</tspan><tspan fill="${C.accent}">Rank</tspan></text>`;
   g += `</g>`;
   return g;
 }
@@ -131,7 +135,7 @@ function markOnly(cx, cy, size, op = 1) {
 }
 function tx(x, y, s, { fs, w = 400, fill = C.ink, op = 1, anchor = "middle", ls = 0 }) {
   if (op <= 0.001) return "";
-  return `<text x="${x}" y="${y}" fill="${fill}" opacity="${op.toFixed(3)}" font-family="Arial, Helvetica, sans-serif"
+  return `<text x="${x}" y="${y}" fill="${fill}" opacity="${op.toFixed(3)}" font-family="${SANS}"
     font-size="${fs}" font-weight="${w}" letter-spacing="${ls}" text-anchor="${anchor}">${esc(s)}</text>`;
 }
 // Een tekst over meerdere regels (handmatig gesplitst), gecentreerd rond y.
