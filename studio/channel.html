@@ -93,6 +93,9 @@
  .btcands .acnd.on{border-color:var(--muz);box-shadow:0 0 0 2px var(--muz)}
  .btcands .acnd .pl{color:var(--muz);font-weight:700}
  .btcands .acnd.playing .pl{color:var(--play)}
+ .btcands .acnd .usecnd{margin-left:4px;border:1px solid var(--muz);background:transparent;color:var(--muz);border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer}
+ .btcands .acnd .usecnd:hover{background:var(--muz);color:#0b0f18}
+ .btcands .acnd.on .usecnd{background:var(--muz);color:#0b0f18}
  .picker{position:fixed;inset:0;background:rgba(6,9,14,.82);z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
  .picker.on{display:flex}
  .picker .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:760px;width:100%;max-height:82vh;overflow:auto;padding:16px}
@@ -614,12 +617,17 @@ function renderAudioCands(boxId,cands,serveUrl,curName,onPick){
  if(!cands.length){ box.innerHTML='<span class="cndhint">geen kandidaten.</span>'; return; }
  cands.forEach((c,i)=>{ const fb=c.file;
   const el=document.createElement('div'); el.className='acnd'+(curName&&curName===fb?' on':''); el.title=fb;
-  el.innerHTML='<span class="pl">&#9654;</span><span>'+(i+1)+'</span>';
+  el.innerHTML='<span class="pl" title="beluister">&#9654;</span><span class="nr">'+(i+1)+'</span><button class="usecnd" title="gebruik deze">kies</button>';
   el.querySelector('.pl').addEventListener('click',ev=>{ ev.stopPropagation();
     if(audPrev){try{audPrev.a.pause();}catch(e){} if(audPrev.el)audPrev.el.classList.remove('playing');}
     const a=new Audio(serveUrl+'?f='+encodeURIComponent(fb)+'&channel='+CHANNEL); a.volume=0.6; audPrev={a,el}; el.classList.add('playing');
     a.addEventListener('ended',()=>el.classList.remove('playing')); a.play().catch(()=>{}); });
-  el.addEventListener('click',()=>onPick(fb));
+  // KIEZEN: eigen knop EN de tegel zelf koppelen de track; alleen de ▶-knop is puur beluisteren.
+  const choose=ev=>{ ev.stopPropagation();
+    box.querySelectorAll('.acnd.on').forEach(x=>x.classList.remove('on')); el.classList.add('on');
+    onPick(fb); };
+  el.querySelector('.usecnd').addEventListener('click',choose);
+  el.addEventListener('click',choose);
   box.appendChild(el); });
 }
 
