@@ -72,6 +72,21 @@ const C = {
   accent: "#00b8e6", accentDark: "#0a5f78", green: "#19c37d", line: "#1d3146",
 };
 
+// Het echte UR-merk: de UR-mark (favicon, transparant) wordt als data-URI in elke frame gestempeld;
+// het uitgeschreven "UncleRank" tekenen we als scherpe vector in de merkkleuren. Één keer geladen.
+let MARK_URI = "";
+function loadMark(ROOT) {
+  if (MARK_URI) return MARK_URI;
+  const cands = [
+    path.resolve(ROOT, "assets/unclerank/brand/mark.png"),
+    path.resolve(ROOT, "assets/unclerank/brand/logo-mark.png"),
+  ];
+  for (const p of cands) {
+    try { if (fs.existsSync(p)) { MARK_URI = "data:image/png;base64," + fs.readFileSync(p).toString("base64"); return MARK_URI; } } catch {}
+  }
+  return MARK_URI;
+}
+
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const smooth = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
@@ -90,13 +105,29 @@ function bg(W, H) {
     <stop offset="0" stop-color="${C.bg1}"/><stop offset="1" stop-color="${C.bg0}"/></radialGradient></defs>
     <rect x="0" y="0" width="${W}" height="${H}" fill="url(#bg)"/>`;
 }
-// Klein woordmerk bovenin, altijd zichtbaar.
+// Merk-lockup bovenin: de echte UR-mark + "UncleRank" (Uncle = licht, Rank = cyaan), altijd zichtbaar.
 function wordmark(W, H, op = 1) {
-  const y = Math.round(H * 0.085), fs = Math.round(W * 0.05);
-  return `<text x="${W / 2}" y="${y}" fill="${C.ink}" opacity="${op}" font-family="Arial, Helvetica, sans-serif"
-    font-size="${fs}" font-weight="800" letter-spacing="${fs * 0.08}" text-anchor="middle">UNCLERANK</text>
-    <text x="${W / 2}" y="${y + fs * 0.75}" fill="${C.mut}" opacity="${op * 0.9}" font-family="Arial, Helvetica, sans-serif"
-    font-size="${Math.round(fs * 0.34)}" letter-spacing="2" text-anchor="middle">een reden om te bellen, geen lijst</text>`;
+  if (op <= 0.001) return "";
+  const topY = Math.round(H * 0.072);
+  const mk = Math.round(W * 0.075);            // mark-grootte
+  const fs = Math.round(W * 0.05);             // woordmerk-tekst
+  const gap = Math.round(mk * 0.26);
+  const wUncle = fs * 2.62, wRank = fs * 2.12; // benadering (DejaVu/Arial bold) om te centreren
+  const totalW = mk + gap + wUncle + wRank;
+  const x0 = Math.round(W / 2 - totalW / 2);
+  const baY = topY + Math.round(fs * 0.36);    // baseline ~ verticaal midden van de mark
+  const tx0 = x0 + mk + gap;
+  let g = `<g opacity="${op.toFixed(3)}">`;
+  if (MARK_URI) g += `<image x="${x0}" y="${topY - Math.round(mk / 2)}" width="${mk}" height="${mk}" href="${MARK_URI}" preserveAspectRatio="xMidYMid meet"/>`;
+  g += `<text x="${tx0}" y="${baY}" fill="${C.ink}" font-family="Arial, Helvetica, sans-serif" font-size="${fs}" font-weight="800" text-anchor="start">Uncle</text>`;
+  g += `<text x="${tx0 + wUncle}" y="${baY}" fill="${C.accent}" font-family="Arial, Helvetica, sans-serif" font-size="${fs}" font-weight="800" text-anchor="start">Rank</text>`;
+  g += `</g>`;
+  return g;
+}
+// Alleen de UR-mark, gecentreerd (voor een sober merk-moment, bv. op een slot/CTA).
+function markOnly(cx, cy, size, op = 1) {
+  if (!MARK_URI || op <= 0.001) return "";
+  return `<image x="${Math.round(cx - size / 2)}" y="${Math.round(cy - size / 2)}" width="${size}" height="${size}" href="${MARK_URI}" opacity="${op.toFixed(3)}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 function tx(x, y, s, { fs, w = 400, fill = C.ink, op = 1, anchor = "middle", ls = 0 }) {
   if (op <= 0.001) return "";
@@ -113,40 +144,38 @@ function root(W, H, inner) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${inner}</svg>`;
 }
 
-// ---- TYPE: ROI — "Eén klant betaalt je jaar" ----------------------------------------------
+// ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (waarde-insteek, maandpakket) ----------
 function buildRoi({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 16;
-  const jaarKost = Number(opts.kost) || 1068;     // een jaar Start (uit bureaus.mjs)
-  const klant = Number(opts.omzet) || 6000;       // wat die ene klant opbrengt
-  const cx = W / 2, fsBig = Math.round(W * 0.145), fsLbl = Math.round(W * 0.035), fsHook = Math.round(W * 0.058);
+  const prijs = Number(opts.kostMnd) || 89;        // START-pakket per maand
+  const aantal = Number(opts.aantal) || 40;        // bedrijven per maand (START)
+  const perBedrijf = opts.perBedrijf || "€2,23";   // kost per bedrijf (START)
+  const cx = W / 2, fsHook = Math.round(W * 0.056), fsLbl = Math.round(W * 0.035);
   function sceneAt(frame) {
     const t = frame / FPS;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    // 1) hook
-    s += block(cx, H * 0.26, ["What's one new", "client worth to you?"],
-      { fs: fsHook, w: 800, fill: C.ink, op: win(t, 0.3, 1.4, 3.4, 4.2), anchor: "middle" });
-    // 2) de kost (rood-neutraal), schuift naar boven als de omzet komt
-    const costOp = win(t, 3.4, 4.3);
-    const costY = H * 0.46 - smooth(clamp((t - 7.5) / 1.0)) * H * 0.07;
-    s += tx(cx, costY, eur(jaarKost), { fs: fsBig, w: 800, fill: "#cdd9e6", op: costOp });
-    s += tx(cx, costY + fsBig * 0.42, "a year of UncleRank", { fs: fsLbl, w: 500, fill: C.mut, op: costOp });
-    // 3) de klant (wit, groot) met pijl
-    const omOp = win(t, 7.6, 8.6);
-    const omY = H * 0.58;
-    s += tx(cx, omY - fsBig * 0.62, "↓", { fs: Math.round(fsBig * 0.5), w: 400, fill: C.accent, op: win(t, 7.2, 8.0) });
-    s += tx(cx, omY, eur(klant), { fs: fsBig, w: 800, fill: "#ffffff", op: omOp });
-    s += tx(cx, omY + fsBig * 0.42, "one new client", { fs: fsLbl, w: 500, fill: C.accent, op: omOp });
-    // 4) winst
-    const wOp = win(t, 11.0, 12.0);
+    // 1) hook — de WAARDE eerst: volume dat je krijgt
+    s += block(cx, H * 0.30, ["Elke maand " + aantal + " nieuwe", "bedrijven om te bellen."],
+      { fs: fsHook, w: 800, fill: C.ink, op: win(t, 0.3, 1.4, 3.3, 4.1) });
+    // 2) waarom ze warm zijn
+    s += block(cx, H * 0.30, ["Elk met een mankement", "dat jij kunt fixen."],
+      { fs: fsHook, w: 700, fill: C.ink, op: win(t, 4.2, 5.2, 6.6, 7.2) });
+    // 3) de kost, bewust KLEIN gemaakt (per bedrijf)
+    const kOp = win(t, 7.4, 8.3);
+    s += tx(cx, H * 0.46, eur(prijs) + " per maand", { fs: Math.round(W * 0.1), w: 800, fill: "#cdd9e6", op: kOp });
+    s += tx(cx, H * 0.525, "dat is " + perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 8.0, 8.9) });
+    // 4) ROI-punch — maandelijks, niet per jaar
+    s += tx(cx, H * 0.65, "Eén wordt klant.", { fs: Math.round(W * 0.078), w: 800, fill: "#ffffff", op: win(t, 10.6, 11.5) });
+    const wOp = win(t, 11.4, 12.2);
     if (wOp > 0.001) {
-      const bw = W * 0.62, bh = H * 0.11, bx = cx - bw / 2, by = H * 0.70;
+      const bw = W * 0.64, bh = H * 0.10, bx = cx - bw / 2, by = H * 0.71;
       s += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh * 0.28}" fill="${C.green}" opacity="${(wOp * 0.16).toFixed(3)}"/>`
         + `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh * 0.28}" fill="none" stroke="${C.green}" stroke-width="2.5" opacity="${wOp.toFixed(3)}"/>`;
-      s += tx(cx, by + bh * 0.64, "Everything above that is profit.", { fs: Math.round(W * 0.045), w: 800, fill: C.green, op: wOp });
+      s += tx(cx, by + bh * 0.62, "Je maand is er zo uit.", { fs: Math.round(W * 0.045), w: 800, fill: C.green, op: wOp });
     }
     // 5) CTA
     const cOp = win(t, 13.6, 14.4);
-    s += block(cx, H * 0.87, ["Start free. 7 days.", "No card charged today."],
+    s += block(cx, H * 0.88, ["Begin gratis. 7 dagen.", "Vandaag nog niets betaald."],
       { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: cOp });
     return root(W, H, s);
   }
@@ -538,9 +567,10 @@ function buildResultaat({ opts, W, H }) {
 }
 
 export function makeBrand({ ROOT, config } = {}) {
+  loadMark(ROOT);   // UR-mark eenmalig inladen als data-URI (voor het woordmerk/lockup)
   const branding = { navy: C.bg0, accent: C.accent };
   const templates = [
-    { id: "roi", name: "Eén klant betaalt je jaar", music: ["upbeat", "calm", "lofi"], defaults: {} },
+    { id: "roi", name: "Eén klant en 't is terugverdiend", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "portaal", name: "Portaal-opname (de kring)", music: ["upbeat", "lofi", "calm"], defaults: {} },
     { id: "kring", name: "De kring uitgelegd", music: ["calm", "lofi", "upbeat"], defaults: {} },
