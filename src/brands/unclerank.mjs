@@ -205,10 +205,10 @@ function attachAudio(ROOT, templates, templateId, render, vi = 0) {
     if (fs.existsSync(mp)) render.music = mp;
   } catch {}
   // stem: ÉÉN doorlopend voice.wav (hele variant in één opname, Truthward-stijl) over de muziek.
-  // Gain 2.2 zodat de stem duidelijk boven de muziekbodem uitkomt.
+  // De stem is in ur_voice.py al LUID genormaliseerd (loudnorm), dus hier gain 1.0 — geen clipping.
   if (UR_BEATS[templateId]) {
     const w = path.join(voiceDir(ROOT, templateId, vi), "voice.wav");
-    try { if (fs.existsSync(w)) render.audio = { tracks: [{ file: w, atSec: 0, gain: 2.2 }] }; } catch {}
+    try { if (fs.existsSync(w)) render.audio = { tracks: [{ file: w, atSec: 0, gain: 1.0 }] }; } catch {}
   }
   return render;
 }

@@ -8,7 +8,7 @@
 # Draai (Git Bash, in ~/Desktop/content-engine):
 #   python tools/ur_voice.py --type roi
 #   python tools/ur_voice.py --type roi --voice NL_commercial_3   # vaste stem i.p.v. random
-import argparse, os, sys, glob, random, json
+import argparse, os, sys, glob, random, json, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # zodat 'channel_voice' importeerbaar is
 import channel_voice as cv
 
@@ -29,6 +29,26 @@ UR_SCRIPTS = {
 TAIL_SIL = 0.35   # kleine adem aan het eind
 LEAD_SIL = 0.40   # kleine aanloop zodat het eerste woord niet abrupt begint
 SLOWER_CFG = 0.20 # rustiger tempo (lager cfg = langzamer; Mo: "rustiger laten spreken")
+LOUDNORM = "loudnorm=I=-13:TP=-1.5:LRA=11"  # stem LUID normaliseren (Chatterbox levert zacht af)
+
+def normalize_loud(path):
+    # Tilt de stem naar een vast, LUID niveau (streaming-loud). Een vermenigvuldiger op een zachte
+    # opname blijft zacht; loudnorm maakt 'm écht luid, zonder te clippen (TP=-1.5).
+    ff = cv._FFMPEG or "ffmpeg"
+    tmp = path + ".ln.wav"
+    try:
+        subprocess.run([ff, "-y", "-v", "error", "-i", path, "-af", LOUDNORM,
+                        "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", tmp],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        try:
+            if os.path.exists(tmp): os.remove(tmp)
+        except Exception:
+            pass
+        print(f"  (loudnorm overgeslagen: {e})")
+        return False
 
 def pick_voice(root, want):
     refs = sorted(glob.glob(os.path.join(root, "voice-test", "refs-ur", "*.wav")))
@@ -87,6 +107,7 @@ def main():
         print(f"  FOUT bij inspreken -> {e}"); sys.exit(1)
     if LEAD_SIL and LEAD_SIL > 0:
         cv._prepend_silence(out_wav, LEAD_SIL)   # kleine aanloop vooraan
+    normalize_loud(out_wav)                       # stem LUID zetten (anders blijft 'ie zacht)
     total = cv._wav_duration(out_wav)
     # per-regel timing (informatief); de engine gebruikt alleen 'total' en spreidt het beeld daarover
     lines_tl = []
