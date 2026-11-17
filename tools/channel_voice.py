@@ -1,69 +1,51 @@
 #!/usr/bin/env python3
-# channel_voice.py - genereert per scene een voice-over met CHATTERBOX (lokaal, CPU), gekloond van een
-# REFERENTIE-stem. Per verhaal DRIE stemmen (v1/v2/v3); je kiest er een in de studio.
+# channel_voice.py - voice-over met CHATTERBOX (lokaal, CPU), gekloond van een REFERENTIE-stem.
 #
-# DIT IS DE FLOW-VERSIE. Het probleem van de vorige versie: het script werd in piepkleine stukjes van
-# 1 a 2 zinnen geknipt en los ingesproken, daarna aan elkaar geplakt. Gevolg: rare stiltes op de naden,
-# geen intonatie, zinnen die los van elkaar klinken. Deze versie:
-#  1. spreekt in GROTERE, samenhangende stukken in (hele gedachten van een paar zinnen), zodat het model
-#     intonatie opbouwt en de zinnen met elkaar verbindt (niet de hele alinea tegelijk -> dan kapt hij af);
-#  2. knipt de stilte aan het begin en eind van elk stuk weg, zodat de zinnen in elkaar overlopen i.p.v.
-#     die gaten, met een korte, gecontroleerde adem tussen de stukken;
-#  3. vangt het afkappen/herhalen van Chatterbox af: een herhaling-rem in de generatie plus opnieuw
-#     inspreken (andere seed) als een stuk te kort terugkomt;
-#  4. houdt de ondertitel strak door de ECHTE pauzes in het geluid te meten (stilte-detectie) en de
-#     zin-grenzen daarop te leggen, i.p.v. de tijd te gokken.
+# AANPAK (na Mo's feedback): grote, samenhangende stukken inspreken voor intonatie, MAAR de zinnen
+# netjes uit elkaar met echte ADEM ertussen, en de ondertitel EXACT op het geluid. Hoe:
+#  1. spreek per samenhangend stuk van een paar zinnen in -> intonatie en verbinding;
+#  2. knip dat stuk op de ECHTE pauzes in losse zin-stukjes;
+#  3. zet die zin-stukjes weer aan elkaar met een vaste adempauze (SENT_GAP) ertussen -> ruimte tussen
+#     de zinnen, geen gehaast, geen rare dubbele gaten;
+#  4. omdat WIJ die adem er zelf tussen zetten, weten we per zin exact de starttijd -> de ondertitel
+#     staat per constructie goed op de tijdlijn (niet gegokt, niet opgepropt);
+#  5. vangnet tegen Chatterbox-afkappen: komt een stuk te kort terug, opnieuw met een andere seed.
 #
-# Draait LOKAAL (Git Bash, in ~/Desktop/content-engine):
-#   python tools/channel_voice.py --story chose --voice v3 --format 16:9
-#   python tools/channel_voice.py --story chose --voice v3 --only 3     # alleen scene 3 opnieuw
-#
-# Eenmalig installeren:  pip install chatterbox-tts soundfile
+# Draai (Git Bash, in ~/Desktop/content-engine):
+#   python tools/channel_voice.py --story chose --voice v3 --only 0 --format 16:9   # ALLEEN scene 0
+#   python tools/channel_voice.py --story chose --voice v3 --format 16:9            # alle scenes
 import argparse, os, sys, re, struct, json
 
-# ---------------------------------------------------------------------------------------------
 VOICES = {
     "v1": "voice-test/refs/ref7.wav",
     "v2": "voice-test/refs/ref8.wav",
     "v3": "voice-test/refs/ref9.wav",
 }
-LANG = "en"   # Truthward = Engels
+LANG = "en"
+LEAD_SILENCE = 3.0   # stilte vooraan de intro (logo in beeld)
 
-# Stilte VOORAAN de intro-wav (seconden): logo staat eerst rustig in beeld voordat de stem begint.
-LEAD_SILENCE = 3.0
-
-# Toon-presets: sil = extra STILTE (seconden) achter de hele scene, zodat een gedachte kan landen.
 TONE = {
-    "rustig": dict(sil=0.55),
-    "nadruk": dict(sil=0.80),
-    "warm":   dict(sil=0.95),
-    "hook":   dict(sil=0.65),
-    "intro":  dict(sil=0.70),
-    "outro":  dict(sil=0.90),
+    "rustig": dict(sil=0.55), "nadruk": dict(sil=0.80), "warm": dict(sil=0.95),
+    "hook": dict(sil=0.65), "intro": dict(sil=0.70), "outro": dict(sil=0.90),
 }
 
-# INSPREEK-INSTELLINGEN. Dicht bij de natuurlijke/expressieve standaard gehouden (anders wordt het vlak),
-# met alleen een herhaling-rem erbij om het blijven-hangen in een woord tegen te gaan.
+# Inspreek-instellingen: expressief genoeg voor intonatie, lagere cfg = iets rustiger tempo, een
+# herhaling-rem tegen het blijven-hangen.
 EXAGGERATION = 0.5
-CFG_WEIGHT = 0.5
+CFG_WEIGHT = 0.4
 TEMPERATURE = 0.8
 REPETITION_PENALTY = 1.3
 MIN_P = 0.05
 
-# VANGNET tegen afkappen: komt een stuk veel te kort terug (door Chatterbox afgekapt), dan opnieuw met
-# een andere seed, tot het lang genoeg is; we houden het langste van de pogingen.
 MAX_TRIES = 4
-MIN_RATIO = 0.72           # geaccepteerd als de duur >= dit deel van de verwachte duur
-BASE_SEED = 20261116
+MIN_RATIO = 0.72
+BASE_SEED = 20261117
 
-# CHUNK-GROOTTE: grotere, samenhangende stukken (betere intonatie/flow) maar niet de hele alinea
-# (te lang = afkappen). Streefgrootte in tekens; harde bovengrens voor de veiligheid.
-CHUNK_CHARS = 200
+CHUNK_CHARS = 200     # samenhangende stukken (intonatie), niet de hele alinea
 MAX_CHARS = 300
-BREATH = 0.14              # korte adem (seconden) tussen de stukken
+SENT_GAP = 0.38       # vaste adem tussen de zinnen (ruimte, geen gehaast)
 
 # ---------------------------------------------------------------------------------------------
-# CHATTERBOX-MODEL. Een keer laden per proces; de referentie-stem geven we per generate-call mee.
 _CB = {}
 def _get_model():
     if "m" in _CB:
@@ -95,8 +77,6 @@ def _seed_everything(seed):
     except Exception: pass
 
 def _generate_once(m, text, ref_abs):
-    # roep generate aan met onze instellingen; valt netjes terug als een oudere Chatterbox-versie een
-    # van de knoppen niet kent (andere signature), zodat het nooit op een TypeError klapt.
     base = dict(language_id=LANG, audio_prompt_path=ref_abs)
     tune = dict(exaggeration=EXAGGERATION, cfg_weight=CFG_WEIGHT, temperature=TEMPERATURE,
                 repetition_penalty=REPETITION_PENALTY, min_p=MIN_P)
@@ -120,20 +100,18 @@ def _syllables(w):
 
 def _sent_weight(s):
     base = sum(_syllables(w) for w in re.findall(r"[A-Za-z']+", s))
-    base += 0.6 * len(re.findall(r"[,;:]", s))   # interne pauzes kosten tijd
-    base += 0.9                                  # zin-eind-pauze
+    base += 0.6 * len(re.findall(r"[,;:]", s))
+    base += 0.9
     return max(base, 1.0)
 
 def _expected_secs(text):
     syl = sum(_syllables(w) for w in re.findall(r"[A-Za-z']+", text))
-    return max(0.6, syl / 3.6)   # ~3.6 lettergrepen/sec verteltempo
+    return max(0.6, syl / 3.6)
 
 def _sentences(text):
     return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
 
 def _group_sentences(sents):
-    # Grotere, samenhangende stukken: hele zinnen tot ~CHUNK_CHARS (harde grens MAX_CHARS). Zo bouwt het
-    # model intonatie over meerdere zinnen; een heel lange losse zin gaat alleen (valt vanzelf zo uit).
     groups = []; cur = []; cur_idx = []; cur_len = 0
     for i, s in enumerate(sents):
         add = len(s) + (1 if cur else 0)
@@ -145,10 +123,8 @@ def _group_sentences(sents):
     return groups
 
 # ---------------------------------------------------------------------------------------------
-# GELUID-HELPERS (numpy). Chatterbox levert float [-1,1]; wij werken op int16-samples zodat we stilte
-# kunnen wegknippen en de echte pauzes kunnen meten voor de ondertitel.
+# GELUID (numpy): genereren, stilte wegknippen, pauzes meten, op zinnen knippen.
 def _gen_chunk(ref_abs, text):
-    # Genereer EEN stuk met vangnet; geef (int16-samples, sr) terug met de stilte aan begin+eind weg.
     import numpy as np
     m = _get_model()
     want = _expected_secs(text)
@@ -163,9 +139,7 @@ def _gen_chunk(ref_abs, text):
         if dur >= want * MIN_RATIO:
             break
     x = np.clip(best, -1.0, 1.0)
-    i16 = (x * 32767.0).astype(np.int16)
-    i16 = _trim_ends(i16, sr)
-    return i16, sr
+    return (x * 32767.0).astype(np.int16), sr
 
 def _env(i16, sr, win=0.02):
     import numpy as np
@@ -176,7 +150,7 @@ def _env(i16, sr, win=0.02):
     f = np.abs(i16[:n].astype(np.float32)).reshape(-1, w)
     return f.mean(axis=1), w
 
-def _trim_ends(i16, sr, thr_ratio=0.06, pad=0.03):
+def _trim_ends(i16, sr, thr_ratio=0.05, pad=0.04):
     import numpy as np
     env, w = _env(i16, sr)
     if env is None:
@@ -189,8 +163,7 @@ def _trim_ends(i16, sr, thr_ratio=0.06, pad=0.03):
     end = min(len(i16), int((above[-1] + 1) * w) + int(pad * sr))
     return i16[start:end]
 
-def _pause_centers(i16, sr, thr_ratio=0.06, min_pause=0.13):
-    # middens (seconden) van echte stiltes binnen een stuk; dit zijn de zin-grenzen om op te snappen.
+def _pause_centers(i16, sr, thr_ratio=0.06, min_pause=0.12):
     import numpy as np
     env, w = _env(i16, sr)
     if env is None:
@@ -210,82 +183,91 @@ def _pause_centers(i16, sr, thr_ratio=0.06, min_pause=0.13):
             i += 1
     return centers
 
-def _sentence_bounds(idxs, sents, chunk_dur, pauses):
-    # per zin (start, duur) binnen het stuk: schat op lettergreep-gewicht, snap de grenzen naar de
-    # dichtstbijzijnde echte pauze; zo loopt de ondertitel strak mee.
-    k = len(idxs)
-    if k == 1:
-        return [(0.0, chunk_dur)]
-    weights = [_sent_weight(sents[i]) for i in idxs]
-    tot = sum(weights) or 1.0
+def _split_chunk(i16, sr, sent_texts):
+    # knip een stuk in exact len(sent_texts) zin-stukjes: schat de grenzen op lettergreep-gewicht,
+    # snap elke grens naar de dichtstbijzijnde echte pauze. Altijd k stukjes (ook als een pauze mist).
+    k = len(sent_texts)
+    if k <= 1:
+        return [i16]
+    total = len(i16) / float(sr)
+    weights = [_sent_weight(s) for s in sent_texts]; tot = sum(weights) or 1.0
     est = []; acc = 0.0
     for wgt in weights[:-1]:
-        acc += chunk_dur * (wgt / tot); est.append(acc)
-    TOL = 0.45; used = set(); snapped = []
+        acc += total * (wgt / tot); est.append(acc)
+    pauses = _pause_centers(i16, sr)
+    used = []; cuts = []
     for e in est:
-        best = None; bd = TOL
+        best = None; bd = 0.5
         for p in pauses:
-            if id(p) in used:
+            if p in used:
                 continue
             if abs(p - e) < bd:
                 bd = abs(p - e); best = p
         if best is not None:
-            used.add(id(best)); snapped.append(best)
+            used.append(best); cuts.append(best)
         else:
-            snapped.append(e)
-    edges = [0.0] + sorted(snapped) + [chunk_dur]
-    for i in range(1, len(edges)):
-        if edges[i] <= edges[i - 1] + 0.05:
-            edges[i] = min(chunk_dur, edges[i - 1] + 0.05)
-    return [(round(edges[i], 3), round(max(0.05, edges[i + 1] - edges[i]), 3)) for i in range(k)]
+            cuts.append(e)
+    cuts = sorted(cuts)
+    segs = []; prev = 0
+    minlen = int(0.12 * sr)
+    for t in cuts:
+        s = int(t * sr)
+        s = max(prev + minlen, min(len(i16) - minlen, s))
+        if s <= prev:
+            s = min(len(i16) - 1, prev + minlen)
+        segs.append(i16[prev:s]); prev = s
+    segs.append(i16[prev:])
+    return segs
 
 def _silence_samples(sr, secs):
     import numpy as np
     return np.zeros(max(0, int(sr * secs)), dtype=np.int16)
 
 def _write_pcm16(path, i16, sr):
-    data = i16.astype("<i2").tobytes()
-    n = len(data)
+    data = i16.astype("<i2").tobytes(); n = len(data)
     with open(path, "wb") as f:
         f.write(b"RIFF"); f.write(struct.pack("<I", 36 + n)); f.write(b"WAVE")
         f.write(b"fmt "); f.write(struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16))
         f.write(b"data"); f.write(struct.pack("<I", n)); f.write(data)
 
 def _synthesize_scene(ref_abs, scene_text, tail_sil, out_wav):
-    # Spreek de scene in per samenhangend stuk, plak ze met een korte adem, en meet per zin de echte tijd.
     import numpy as np
     sents = _sentences(scene_text)
     if not sents:
         i16, sr = _gen_chunk(ref_abs, scene_text)
+        i16 = _trim_ends(i16, sr)
         _write_pcm16(out_wav, i16, sr)
         if tail_sil and tail_sil > 0:
             _append_silence(out_wav, tail_sil)
         d = _wav_duration(out_wav); return [(0.0, round(d, 3))], 0.0, round(d, 3)
+    # 1) per samenhangend stuk inspreken, en op de zinnen knippen
     groups = _group_sentences(sents)
-    parts = []; seg = [None] * len(sents); cursor = 0.0; sr = 24000
-    for gi, (text, idxs) in enumerate(groups):
-        i16, sr = _gen_chunk(ref_abs, text)
-        cdur = len(i16) / float(sr)
-        bounds = _sentence_bounds(idxs, sents, cdur, _pause_centers(i16, sr))
-        for j, i in enumerate(idxs):
-            st, dd = bounds[j]
-            seg[i] = (round(cursor + st, 3), dd)
-        parts.append(i16)
-        cursor += cdur
-        if gi != len(groups) - 1:
-            parts.append(_silence_samples(sr, BREATH))
-            cursor += BREATH
-    full = np.concatenate(parts) if parts else np.zeros(0, dtype=np.int16)
+    seg_audio = []; sr = 24000
+    for ctext, idxs in groups:
+        i16, sr = _gen_chunk(ref_abs, ctext)
+        i16 = _trim_ends(i16, sr, thr_ratio=0.05, pad=0.05)
+        parts = _split_chunk(i16, sr, [sents[i] for i in idxs])
+        for j in range(len(idxs)):
+            p = parts[j] if j < len(parts) else np.zeros(int(0.2 * sr), dtype=np.int16)
+            seg_audio.append(_trim_ends(p, sr, thr_ratio=0.05, pad=0.04))
+    # 2) zin-stukjes aan elkaar met vaste adem ertussen; starttijd per zin is exact bekend
+    out = []; cursor = 0.0; segs = []
+    gap = _silence_samples(sr, SENT_GAP)
+    for k, sa in enumerate(seg_audio):
+        dur = len(sa) / float(sr)
+        segs.append((round(cursor, 3), round(dur, 3)))
+        out.append(sa); cursor += dur
+        if k != len(seg_audio) - 1:
+            out.append(gap); cursor += SENT_GAP
+    full = np.concatenate(out) if out else np.zeros(0, dtype=np.int16)
     _write_pcm16(out_wav, full, sr)
     if tail_sil and tail_sil > 0:
         _append_silence(out_wav, tail_sil)
-    segs = [s for s in seg if s is not None]
     sp0 = segs[0][0] if segs else 0.0
     sp1 = round(segs[-1][0] + segs[-1][1], 3) if segs else round(_wav_duration(out_wav), 3)
     return segs, sp0, sp1
 
 # ---------------------------------------------------------------------------------------------
-# RIFF-helpers voor duur meten en stilte voor/achter plakken (werken op de PCM-16 wavs die we schrijven).
 def _read_wav_parts(path):
     with open(path, "rb") as f:
         data = bytearray(f.read())
@@ -379,9 +361,6 @@ def _prepend_silence(wav_path, seconds):
         pass
 
 # ---------------------------------------------------------------------------------------------
-# SCRIPT. Per scene: nummer, toon, ON-SCREEN kernzin, en de VOLLE gesproken zin (= de ondertitel).
-# GEEN m-dashes. Islam nooit als antwoord; "de meeste mensen" niet "iedereen"; geen aannames die een
-# scepticus/atheist meteen afwijst.
 STORIES = {
   "chose": {
     "title": "The Answer You Never Chose",
@@ -422,18 +401,16 @@ STORIES["chose"]["map"] = [
   (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["chose"]["scenes"]
 ]
 
-def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
+def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
     story = STORIES[story_id]
     ref_abs = os.path.join(root, VOICES[voice])
     if not os.path.isfile(ref_abs):
         print(f"  referentie-stem ontbreekt voor {voice}: {ref_abs}"); return
     outdir = os.path.join(root, "assets", "channels", channel, "voice", story_id, voice)
     os.makedirs(outdir, exist_ok=True)
-    made = []
-    durs = {}
-    sents_by = {}
+    made = []; durs = {}; sents_by = {}
     for num, tone, screen, voiceline in story["scenes"]:
-        if only and num != only:
+        if only >= 0 and num != only:
             continue
         t = TONE[tone]
         wav = os.path.join(outdir, f"{num:02d}.wav")
@@ -446,86 +423,62 @@ def build_story(story_id, voice, root, only=0, fmt="16:9", channel="channel1"):
             segs = [(round(st + LEAD_SILENCE, 3), dd) for (st, dd) in segs]
             sp0 = round(sp0 + LEAD_SILENCE, 3); sp1 = round(sp1 + LEAD_SILENCE, 3)
         d = _wav_duration(wav)
-        durs[num] = d
-        sents_by[num] = (segs, sp0, sp1)
-        nz = len(segs) if segs else 0
-        made.append((num, wav)); print(f"  scene {num:02d} [{tone}] {d:6.2f}s, {nz} zin(nen) -> {wav}")
-    if not only:
-        lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
-        by = {num: wav for num, wav in made}
-        caption_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
-        for num, screen, mapspec in story["map"]:
-            parts = [f"scene {num}", screen] + list(mapspec)
-            if caption_by.get(num):
-                parts.append("caption: " + caption_by[num])
-            if by.get(num):
-                parts.append("voice: " + os.path.relpath(by[num], root).replace("\\", "/"))
-            lines.append(" | ".join(parts))
-        imp = os.path.join(outdir, f"_import-{voice}.txt")
-        with open(imp, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-        print("  import-script:", imp)
+        durs[num] = d; sents_by[num] = (segs, sp0, sp1)
+        made.append((num, wav)); print(f"  scene {num:02d} [{tone}] {d:6.2f}s, {len(segs)} zin(nen) -> {wav}")
 
-        tone_by = {num: tone for (num, tone, screen, voiceline) in story["scenes"]}
-        line_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
-        total = round(sum(durs.get(n, 0.0) for n in durs), 2)
-        meta = {
-            "story": story_id, "voice": voice, "format": fmt, "title": story["title"],
-            "total_seconds": total, "total_mmss": f"{int(total)//60}:{int(total)%60:02d}",
-            "scenes": [
-                {"scene": num, "tone": tone_by.get(num, ""),
-                 "seconds": durs.get(num, 0.0), "line": line_by.get(num, "")}
-                for num, _wav in made
-            ],
-        }
-        dj = os.path.join(outdir, "_durations.json")
-        with open(dj, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
-        print(f"  duur-meting: {dj}  (totaal {meta['total_mmss']})")
+    # ALTIJD de tijdlijn/import schrijven voor wat gemaakt is (ook bij een enkele --only scene),
+    # zodat de studio het meteen kan afspelen.
+    lines = [f"title: {story['title']}", "view: belt"] + story["groups"]
+    by = {num: wav for num, wav in made}
+    caption_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
+    for num, screen, mapspec in story["map"]:
+        if num not in by:
+            continue
+        parts = [f"scene {num}", screen] + list(mapspec)
+        if caption_by.get(num):
+            parts.append("caption: " + caption_by[num])
+        parts.append("voice: " + os.path.relpath(by[num], root).replace("\\", "/"))
+        lines.append(" | ".join(parts))
+    imp = os.path.join(outdir, f"_import-{voice}.txt")
+    with open(imp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
-        tl_scenes = []
-        abs_t = 0.0
-        for num, _wav in made:
-            segs, sp0, sp1 = sents_by.get(num, (None, 0.0, durs.get(num, 0.0)))
-            lines_s = _sentences(line_by.get(num, ""))
-            sentences = []
-            if segs:
-                for i, (st, dd) in enumerate(segs):
-                    sentences.append({
-                        "i": i, "text": lines_s[i] if i < len(lines_s) else "",
-                        "start": st, "dur": dd, "abs_start": round(abs_t + st, 3),
-                    })
-            sc = {
-                "scene": num, "tone": tone_by.get(num, ""),
-                "wav": os.path.relpath(by[num], root).replace("\\", "/") if by.get(num) else "",
-                "start": round(abs_t, 3), "dur": round(durs.get(num, 0.0), 3),
-                "speech_start": sp0, "speech_end": sp1,
-                "sentences": sentences, "beats": [], "sfx": [],
-            }
-            tl_scenes.append(sc)
-            abs_t += durs.get(num, 0.0)
-        timeline = {
-            "story": story_id, "voice": voice, "format": fmt, "title": story["title"],
-            "total_seconds": round(abs_t, 3),
-            "total_mmss": f"{int(abs_t)//60}:{int(abs_t)%60:02d}",
-            "scenes": tl_scenes,
-        }
-        tj = os.path.join(outdir, "_timeline.json")
-        with open(tj, "w", encoding="utf-8") as f:
-            json.dump(timeline, f, ensure_ascii=False, indent=2)
-        print(f"  tijdlijn:     {tj}  ({len(tl_scenes)} scenes, {sum(len(s['sentences']) for s in tl_scenes)} zinnen, formaat {fmt})")
+    tone_by = {num: tone for (num, tone, screen, voiceline) in story["scenes"]}
+    line_by = {num: voiceline for (num, tone, screen, voiceline) in story["scenes"]}
+    tl_scenes = []; abs_t = 0.0
+    for num, _wav in made:
+        segs, sp0, sp1 = sents_by.get(num, (None, 0.0, durs.get(num, 0.0)))
+        lines_s = _sentences(line_by.get(num, ""))
+        sentences = []
+        if segs:
+            for i, (st, dd) in enumerate(segs):
+                sentences.append({"i": i, "text": lines_s[i] if i < len(lines_s) else "",
+                                  "start": st, "dur": dd, "abs_start": round(abs_t + st, 3)})
+        tl_scenes.append({
+            "scene": num, "tone": tone_by.get(num, ""),
+            "wav": os.path.relpath(by[num], root).replace("\\", "/") if by.get(num) else "",
+            "start": round(abs_t, 3), "dur": round(durs.get(num, 0.0), 3),
+            "speech_start": sp0, "speech_end": sp1,
+            "sentences": sentences, "beats": [], "sfx": [],
+        })
+        abs_t += durs.get(num, 0.0)
+    timeline = {"story": story_id, "voice": voice, "format": fmt, "title": story["title"],
+                "total_seconds": round(abs_t, 3), "total_mmss": f"{int(abs_t)//60}:{int(abs_t)%60:02d}",
+                "scenes": tl_scenes}
+    tj = os.path.join(outdir, "_timeline.json")
+    with open(tj, "w", encoding="utf-8") as f:
+        json.dump(timeline, f, ensure_ascii=False, indent=2)
+    print(f"  tijdlijn: {tj}  ({len(tl_scenes)} scene(s), {sum(len(s['sentences']) for s in tl_scenes)} zinnen)")
     print(f"  klaar: {len(made)} fragment(en)")
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--story", default="chose", help="projectnaam (= verhaal-slug, eigen map)")
-    ap.add_argument("--voice", default="alle", choices=list(VOICES.keys()) + ["alle"],
-                    help="v1 / v2 / v3, of 'alle' voor alle drie de stemmen")
-    ap.add_argument("--only", type=int, default=0, help="alleen scene-nummer N opnieuw maken")
-    ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"],
-                    help="16:9 = lange video, 9:16 = afgeleide short; reist mee in de tijdlijn")
-    ap.add_argument("--root", default=".", help="content-engine root")
-    ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
+    ap.add_argument("--story", default="chose")
+    ap.add_argument("--voice", default="alle", choices=list(VOICES.keys()) + ["alle"])
+    ap.add_argument("--only", type=int, default=-1, help="alleen scene-nummer N (0 is geldig); -1 = alle")
+    ap.add_argument("--format", dest="fmt", default="16:9", choices=["16:9", "9:16"])
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--channel", default="channel1")
     args = ap.parse_args()
 
     try:
@@ -538,7 +491,8 @@ def main():
         print("onbekend verhaal:", args.story); sys.exit(1)
     voices = list(VOICES.keys()) if args.voice == "alle" else [args.voice]
     for voice in voices:
-        print(f"\n=== {args.story} - STEM: {voice} ({VOICES[voice]}) - FORMAAT: {args.fmt} ===")
+        scope = f"scene {args.only}" if args.only >= 0 else "alle scenes"
+        print(f"\n=== {args.story} - STEM: {voice} ({VOICES[voice]}) - {scope} - {args.fmt} ===")
         build_story(args.story, voice, args.root, args.only, args.fmt, args.channel)
 
 if __name__ == "__main__":
