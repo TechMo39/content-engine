@@ -3,129 +3,101 @@
   "voice": "v2",
   "format": "16:9",
   "title": "The Answer You Never Chose",
-  "total_seconds": 62.26,
-  "total_mmss": "1:02",
+  "total_seconds": 45.92,
+  "total_mmss": "0:45",
   "scenes": [
     {
-      "scene": 0,
-      "tone": "intro",
-      "wav": "assets/channels/channel1/voice/chose/v2/00.wav",
+      "scene": 2,
+      "tone": "rustig",
+      "wav": "assets/channels/channel1/voice/chose/v2/02.wav",
       "start": 0.0,
-      "dur": 62.26,
-      "speech_start": 3.0,
-      "speech_end": 61.56,
+      "dur": 45.92,
+      "speech_start": 0.0,
+      "speech_end": 45.37,
       "sentences": [
         {
           "i": 0,
-          "text": "Welcome to Truthward.",
-          "start": 3.0,
-          "dur": 1.332,
-          "abs_start": 3.0
+          "text": "Now here is what makes that so strange.",
+          "start": 0.0,
+          "dur": 2.921,
+          "abs_start": 0.0
         },
         {
           "i": 1,
-          "text": "Good to have you here.",
-          "start": 4.332,
-          "dur": 1.332,
-          "abs_start": 4.332
+          "text": "Think about an animal for a moment.",
+          "start": 2.921,
+          "dur": 3.512,
+          "abs_start": 2.921
         },
         {
           "i": 2,
-          "text": "Here is the whole idea behind this channel.",
-          "start": 5.664,
-          "dur": 2.686,
-          "abs_start": 5.664
+          "text": "A bird getting ready to fly south does not sit there weighing its options.",
+          "start": 6.433,
+          "dur": 5.577,
+          "abs_start": 6.433
         },
         {
           "i": 3,
-          "text": "In every video, we take one real question, and we do our honest best to answer it.",
-          "start": 8.85,
-          "dur": 4.848,
-          "abs_start": 8.85
+          "text": "It does not wonder whether it is making the right call.",
+          "start": 12.51,
+          "dur": 3.569,
+          "abs_start": 12.51
         },
         {
           "i": 4,
-          "text": "We reason it through, step by step, and we look at it honestly, without preaching and without telling you what to think.",
-          "start": 13.698,
-          "dur": 6.122,
-          "abs_start": 13.698
+          "text": "It just goes, the way it always has.",
+          "start": 16.079,
+          "dur": 2.515,
+          "abs_start": 16.079
         },
         {
           "i": 5,
-          "text": "And by the end, we will usually have more than an answer.",
-          "start": 20.32,
-          "dur": 5.0,
-          "abs_start": 20.32
+          "text": "That is instinct, not a decision.",
+          "start": 18.595,
+          "dur": 2.515,
+          "abs_start": 18.595
         },
         {
           "i": 6,
-          "text": "We will have a new question or two worth chasing, and those become the next videos.",
-          "start": 25.32,
-          "dur": 6.516,
-          "abs_start": 25.32
+          "text": "You are different.",
+          "start": 21.61,
+          "dur": 1.239,
+          "abs_start": 21.61
         },
         {
           "i": 7,
-          "text": "That is really all this is.",
-          "start": 31.836,
-          "dur": 2.394,
-          "abs_start": 31.836
+          "text": "You can stop before you act.",
+          "start": 22.849,
+          "dur": 1.658,
+          "abs_start": 22.849
         },
         {
           "i": 8,
-          "text": "Because the truth is never as complicated as people make it sound.",
-          "start": 34.73,
-          "dur": 3.468,
-          "abs_start": 34.73
+          "text": "You can question what you are doing, and even question the way you are thinking about it.",
+          "start": 24.507,
+          "dur": 4.933,
+          "abs_start": 24.507
         },
         {
           "i": 9,
-          "text": "It is honest, and simple enough for anyone to follow.",
-          "start": 38.198,
-          "dur": 3.003,
-          "abs_start": 38.198
+          "text": "You can reason about things that are not in front of you at all, things you cannot see or touch.",
+          "start": 29.94,
+          "dur": 5.034,
+          "abs_start": 29.94
         },
         {
           "i": 10,
-          "text": "So all we try to do here is bring it back to the surface, one question at a time.",
-          "start": 41.201,
-          "dur": 4.359,
-          "abs_start": 41.201
+          "text": "You do this constantly, without ever noticing.",
+          "start": 34.974,
+          "dur": 2.979,
+          "abs_start": 34.974
         },
         {
           "i": 11,
-          "text": "If you want to come along for that, subscribe so the next question finds you.",
-          "start": 46.06,
-          "dur": 5.207,
-          "abs_start": 46.06
-        },
-        {
-          "i": 12,
-          "text": "Leave a comment, especially if you see it differently.",
-          "start": 51.267,
-          "dur": 4.673,
-          "abs_start": 51.267
-        },
-        {
-          "i": 13,
-          "text": "And if it was worth your time, a like helps.",
-          "start": 55.939,
-          "dur": 3.071,
-          "abs_start": 55.939
-        },
-        {
-          "i": 14,
-          "text": "Alright.",
-          "start": 59.51,
-          "dur": 0.762,
-          "abs_start": 59.51
-        },
-        {
-          "i": 15,
-          "text": "Let us begin.",
-          "start": 60.272,
-          "dur": 1.288,
-          "abs_start": 60.272
+          "text": "And it is exactly this ability, the one you lean on all day without a second thought, that the rest of this video is about.",
+          "start": 37.953,
+          "dur": 7.417,
+          "abs_start": 37.953
         }
       ],
       "beats": [],
