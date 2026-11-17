@@ -511,6 +511,37 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
                 "total_seconds": round(abs_t, 3), "total_mmss": f"{int(abs_t)//60}:{int(abs_t)%60:02d}",
                 "scenes": tl_scenes}
     tj = os.path.join(outdir, "_timeline.json")
+
+    # Bij een enkele --only her-render NIET de volledige tijdlijn overschrijven met
+    # alleen die ene scene (anders raakt de timing van de rest van de video kwijt).
+    # In plaats daarvan de bestaande volledige tijdlijn inladen, alleen de opnieuw
+    # gemaakte scene(s) vervangen, en alle absolute starttijden opnieuw doorrekenen.
+    if only >= 0 and os.path.isfile(tj):
+        try:
+            with open(tj, encoding="utf-8") as f:
+                base = json.load(f)
+            old_scenes = base.get("scenes", [])
+            if old_scenes:
+                new_by = {s["scene"]: s for s in tl_scenes}
+                merged = [new_by.get(s.get("scene"), s) for s in old_scenes]
+                for num_new, s_new in new_by.items():
+                    if not any(s.get("scene") == num_new for s in old_scenes):
+                        merged.append(s_new)
+                merged.sort(key=lambda s: s.get("scene", 0))
+                t = 0.0
+                for s in merged:
+                    s["start"] = round(t, 3)
+                    for sent in s.get("sentences", []):
+                        sent["abs_start"] = round(t + sent.get("start", 0.0), 3)
+                    t += s.get("dur", 0.0)
+                base["scenes"] = merged
+                base["total_seconds"] = round(t, 3)
+                base["total_mmss"] = f"{int(t)//60}:{int(t)%60:02d}"
+                timeline = base
+                tl_scenes = merged
+        except Exception as e:
+            print(f"      (tijdlijn-merge overgeslagen, volledige herschrijf: {e})")
+
     with open(tj, "w", encoding="utf-8") as f:
         json.dump(timeline, f, ensure_ascii=False, indent=2)
     print(f"  tijdlijn: {tj}  ({len(tl_scenes)} scene(s), {sum(len(s['sentences']) for s in tl_scenes)} zinnen)")
