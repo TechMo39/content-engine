@@ -133,6 +133,38 @@ function markOnly(cx, cy, size, op = 1) {
   if (!MARK_URI || op <= 0.001) return "";
   return `<image x="${Math.round(cx - size / 2)}" y="${Math.round(cy - size / 2)}" width="${size}" height="${size}" href="${MARK_URI}" opacity="${op.toFixed(3)}" preserveAspectRatio="xMidYMid meet"/>`;
 }
+
+// ---- AUDIO (hergebruikt Truthward-keten) --------------------------------------------------
+// Per type: de momenten (atSec) waarop de voice-over-regels vallen, één wav per regel. De wavs
+// maakt tools/ur_voice.py (NL-Chatterbox, willekeurige stem uit voice-test/refs-ur/) in
+// assets/unclerank/voice/<type>/NN.wav. De regel-TEKST staat in ur_voice.py; hier alleen de timing,
+// zodat beeld en stem op dezelfde beats vallen. Nieuwe types: voeg een beats-rij toe + script in ur_voice.
+const UR_BEATS = {
+  roi: [0.6, 4.4, 7.8, 11.0, 13.4],   // hook · warm · waarde · kost · ROI+CTA
+};
+// Laad stem-wavs + muziekbodem additief in het render-object (Truthward: render.music + audio.tracks).
+// Raakt de kern NIET: de engine legt render.music onder de video en overlayAudio mixt de stem erover.
+function attachAudio(ROOT, templates, templateId, render) {
+  // muziekbodem: eigen UR-map (merk-gescheiden), mood = eerste music-tag van het type
+  try {
+    const tpl = templates.find((t) => t.id === templateId);
+    const mood = (tpl && tpl.music && tpl.music[0]) || "calm";
+    const mp = path.resolve(ROOT, "assets/unclerank/muziek", "ur-" + mood + ".mp3");
+    if (fs.existsSync(mp)) render.music = mp;
+  } catch {}
+  // stem: één wav per beat, gain ~1.7 over de muziek (zoals Truthward)
+  const beats = UR_BEATS[templateId];
+  if (beats) {
+    const vdir = path.resolve(ROOT, "assets/unclerank/voice", templateId);
+    const tracks = [];
+    beats.forEach((at, i) => {
+      const w = path.join(vdir, String(i).padStart(2, "0") + ".wav");
+      try { if (fs.existsSync(w)) tracks.push({ file: w, atSec: at, gain: 1.7 }); } catch {}
+    });
+    if (tracks.length) render.audio = { tracks };
+  }
+  return render;
+}
 function tx(x, y, s, { fs, w = 400, fill = C.ink, op = 1, anchor = "middle", ls = 0 }) {
   if (op <= 0.001) return "";
   return `<text x="${x}" y="${y}" fill="${fill}" opacity="${op.toFixed(3)}" font-family="${SANS}"
@@ -148,39 +180,34 @@ function root(W, H, inner) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${inner}</svg>`;
 }
 
-// ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (waarde-insteek, maandpakket) ----------
+// ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
 function buildRoi({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 16;
-  const prijs = Number(opts.kostMnd) || 89;        // START-pakket per maand
-  const aantal = Number(opts.aantal) || 40;        // bedrijven per maand (START)
-  const perBedrijf = opts.perBedrijf || "€2,23";   // kost per bedrijf (START)
+  const prijs = Number(opts.kostMnd) || 89;          // START-pakket per maand (kost)
+  const aantal = Number(opts.aantal) || 40;          // bedrijven per maand (START)
+  const klantWaarde = Number(opts.klantWaarde) || 6000; // WAT één nieuwe klant OPLEVERT
+  const perBedrijf = opts.perBedrijf || "€2,23";     // kost per bedrijf (START)
   const cx = W / 2, fsHook = Math.round(W * 0.056), fsLbl = Math.round(W * 0.035);
   function sceneAt(frame) {
     const t = frame / FPS;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    // 1) hook — de WAARDE eerst: volume dat je krijgt
+    // 1) hook — volume dat je krijgt
     s += block(cx, H * 0.30, ["Elke maand " + aantal + " nieuwe", "bedrijven om te bellen."],
       { fs: fsHook, w: 800, fill: C.ink, op: win(t, 0.3, 1.4, 3.3, 4.1) });
     // 2) waarom ze warm zijn
     s += block(cx, H * 0.30, ["Elk met een mankement", "dat jij kunt fixen."],
       { fs: fsHook, w: 700, fill: C.ink, op: win(t, 4.2, 5.2, 6.6, 7.2) });
-    // 3) de kost, bewust KLEIN gemaakt (per bedrijf)
-    const kOp = win(t, 7.4, 8.3);
-    s += tx(cx, H * 0.46, eur(prijs) + " per maand", { fs: Math.round(W * 0.1), w: 800, fill: "#cdd9e6", op: kOp });
-    s += tx(cx, H * 0.525, "dat is " + perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 8.0, 8.9) });
-    // 4) ROI-punch — maandelijks, niet per jaar
-    s += tx(cx, H * 0.65, "Eén wordt klant.", { fs: Math.round(W * 0.078), w: 800, fill: "#ffffff", op: win(t, 10.6, 11.5) });
-    const wOp = win(t, 11.4, 12.2);
-    if (wOp > 0.001) {
-      const bw = W * 0.64, bh = H * 0.10, bx = cx - bw / 2, by = H * 0.71;
-      s += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh * 0.28}" fill="${C.green}" opacity="${(wOp * 0.16).toFixed(3)}"/>`
-        + `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh * 0.28}" fill="none" stroke="${C.green}" stroke-width="2.5" opacity="${wOp.toFixed(3)}"/>`;
-      s += tx(cx, by + bh * 0.62, "Je maand is er zo uit.", { fs: Math.round(W * 0.045), w: 800, fill: C.green, op: wOp });
-    }
-    // 5) CTA
-    const cOp = win(t, 13.6, 14.4);
-    s += block(cx, H * 0.88, ["Begin gratis. 7 dagen.", "Vandaag nog niets betaald."],
-      { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: cOp });
+    // 3) DE WAARDE — wat één nieuwe klant OPLEVERT (de hero, groen)
+    const vOp = win(t, 7.6, 8.6);
+    s += tx(cx, H * 0.42, eur(klantWaarde), { fs: Math.round(W * 0.16), w: 800, fill: C.green, op: vOp });
+    s += block(cx, H * 0.505, ["wat één nieuwe klant", "je oplevert"], { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 8.2, 9.0) });
+    // 4) DE KOST — klein, als contrast eronder
+    const kOp = win(t, 10.8, 11.6);
+    s += tx(cx, H * 0.64, "Jij betaalt " + eur(prijs) + " per maand", { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: kOp });
+    s += tx(cx, H * 0.695, perBedrijf + " per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 11.2, 12.0) });
+    // 5) ROI-landing + CTA
+    s += block(cx, H * 0.82, ["Eén klant en je maand", "is er zo uit."], { fs: Math.round(W * 0.044), w: 800, fill: C.green, op: win(t, 13.2, 14.0) });
+    s += tx(cx, H * 0.92, "Begin gratis — 7 dagen.", { fs: Math.round(W * 0.036), w: 600, fill: C.ink, op: win(t, 14.4, 15.0) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
@@ -653,26 +680,18 @@ export function makeBrand({ ROOT, config } = {}) {
     return { prebuilt: path.join(work, "portal-final.mp4"), music: "", lang, cleanup: work };
   }
 
+  const BUILDERS = {
+    roi: buildRoi, gat: buildGat, kring: buildKring, bureaus: buildBureaus, exclusief: buildExclusief,
+    voorna: buildVoorna, hoehetwerkt: buildHoehetwerkt, bezwaar: buildBezwaar, mankement: buildMankement,
+    rekensom: buildRekensom, gratisweek: buildGratisweek, omdraai: buildOmdraai, volume: buildVolume,
+    signalen: buildSignalen, actueel: buildActueel, delen: buildDelen, resultaat: buildResultaat,
+  };
   async function makeRender({ templateId = "roi", opts = {}, format = "9:16", log } = {}) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     if (templateId === "portaal") return await makePortalRender({ opts, format, log });
-    if (templateId === "gat") return buildGat({ opts, W, H });
-    if (templateId === "kring") return buildKring({ opts, W, H });
-    if (templateId === "bureaus") return buildBureaus({ opts, W, H });
-    if (templateId === "exclusief") return buildExclusief({ opts, W, H });
-    if (templateId === "voorna") return buildVoorna({ opts, W, H });
-    if (templateId === "hoehetwerkt") return buildHoehetwerkt({ opts, W, H });
-    if (templateId === "bezwaar") return buildBezwaar({ opts, W, H });
-    if (templateId === "mankement") return buildMankement({ opts, W, H });
-    if (templateId === "rekensom") return buildRekensom({ opts, W, H });
-    if (templateId === "gratisweek") return buildGratisweek({ opts, W, H });
-    if (templateId === "omdraai") return buildOmdraai({ opts, W, H });
-    if (templateId === "volume") return buildVolume({ opts, W, H });
-    if (templateId === "signalen") return buildSignalen({ opts, W, H });
-    if (templateId === "actueel") return buildActueel({ opts, W, H });
-    if (templateId === "delen") return buildDelen({ opts, W, H });
-    if (templateId === "resultaat") return buildResultaat({ opts, W, H });
-    return buildRoi({ opts, W, H });
+    const fn = BUILDERS[templateId] || buildRoi;
+    const render = fn({ opts, W, H });
+    return attachAudio(ROOT, templates, templateId, render);   // stem + muziek additief (indien aanwezig)
   }
   // De engine roept bij het laden brand.init(log) aan (zoals taleoftiles). UncleRank is type-
   // gedreven en heeft niets te laden, dus init is een no-op — maar moet wél bestaan.
