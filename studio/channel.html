@@ -455,12 +455,12 @@ document.addEventListener('click',e=>{const b=e.target.closest('.playsc');if(!b)
 
 // audio: eerst uit de engine proberen, anders handmatig laden
 function autoAudio(){
- SC.forEach(s=>{const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0')+'&channel='+CHANNEL);
+ SC.forEach(s=>{const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0')+'&channel='+CHANNEL+'&v='+VER);
    a.preload='none';a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
  // MUZIEK PER BLOK uit de tijdlijn (TL.music = [{start,end,file,mood}]); elk blok z'n eigen track
- musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL);a.volume=0.22;a.preload='none';a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
+ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.22;a.preload='none';a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
  // SFX op de gemeten momenten (scene.start + f.t); alleen effecten met een bestand
- sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL);a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
+ sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});});
  updAudioLabel();
 }
 $('ld-voice').addEventListener('change',e=>{for(const f of e.target.files){const m=f.name.match(/(\d+)/);if(!m)continue;voiceAudio[+m[1]]=new Audio(URL.createObjectURL(f));}updAudioLabel();});
@@ -604,8 +604,8 @@ function renderCands(cands){
 
 // ======== MUZIEK + SFX: "kies uit 3", zelfde opzet als de beeld-picker ========
 // Audio-sporen opnieuw opbouwen na een keuze (zelfde logica als in autoAudio).
-function rebuildMusic(){ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL);a.volume=0.22;a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};}); }
-function rebuildSfxAudio(){ sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL);a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});}); }
+function rebuildMusic(){ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.22;a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};}); }
+function rebuildSfxAudio(){ sfxList=[];SC.forEach(s=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.4;a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false});}});}); }
 
 // Gedeelde renderer: 3 audio-chips met ▶ beluisteren; klik op de chip = kiezen.
 let audPrev=null;
@@ -820,7 +820,7 @@ function switchProject(story,voice){
 }
 function fillProjects(){
  const sel=$('proj-pick');if(!sel)return;
- fetch('/api/channel-scripts?channel='+CHANNEL).then(r=>r.ok?r.json():null).then(d=>{
+ fetch('/api/channel-scripts?channel='+CHANNEL+'&v='+VER).then(r=>r.ok?r.json():null).then(d=>{
    const items=(d&&Array.isArray(d.items))?d.items:[];
    // zorg dat het HUIDIGE project altijd in de lijst staat (ook als er nog geen import-script is)
    const cur=STORY+'/'+VOICE;
@@ -874,7 +874,7 @@ function vpStop(){if(_vpAudio){try{_vpAudio.pause();}catch(e){}}_vpAudio=null;if
 function vpPlay(voice,btn){
  vpStop();
  const sample=(SC[1]&&SC[1].scene!=null)?SC[1].scene:(SC[0]?SC[0].scene:1);
- const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+encodeURIComponent(voice)+'&n='+String(sample).padStart(2,'0')+'&channel='+CHANNEL);
+ const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+encodeURIComponent(voice)+'&n='+String(sample).padStart(2,'0')+'&channel='+CHANNEL+'&v='+VER);
  a.addEventListener('ended',()=>{if(_vpAudio===a)vpStop();});
  a.addEventListener('error',()=>{if(_vpBtn===btn){btn.textContent='geen opname';_vpAudio=null;_vpBtn=null;}});
  _vpAudio=a;_vpBtn=btn;btn.textContent='■ stop';
@@ -884,7 +884,7 @@ function closeVP(){vpStop();$('vpicker').classList.remove('on');}
 function openVoice(){
  const box=$('vp-cands');box.innerHTML='<div style="color:var(--mut);font-size:12px">… stemmen laden</div>';
  $('vpicker').classList.add('on');
- fetch('/api/channel-scripts?channel='+CHANNEL).then(r=>r.ok?r.json():null).then(d=>{
+ fetch('/api/channel-scripts?channel='+CHANNEL+'&v='+VER).then(r=>r.ok?r.json():null).then(d=>{
    const items=(d&&Array.isArray(d.items))?d.items:[];
    let voices=items.filter(it=>it.story===STORY).map(it=>it.voice);
    if(!voices.includes(VOICE))voices.unshift(VOICE);
@@ -914,6 +914,6 @@ $('vpicker').addEventListener('click',e=>{if(e.target.id==='vpicker')closeVP();}
 function bootSafe(){try{boot();}catch(e){console.error('boot-fout:',e);
   const hs=$('hdrsub');if(hs)hs.textContent='fout bij laden scènes — zie console';}
   fillProjects();}
-fetch('/api/channel-timeline?story='+STORY+'&voice='+VOICE+'&channel='+CHANNEL).then(r=>r.ok?r.json():null).then(d=>{if(d&&Array.isArray(d.scenes)&&d.scenes.length){TL=d;}bootSafe();}).catch(()=>bootSafe());
+fetch('/api/channel-timeline?story='+STORY+'&voice='+VOICE+'&channel='+CHANNEL+'&v='+VER).then(r=>r.ok?r.json():null).then(d=>{if(d&&Array.isArray(d.scenes)&&d.scenes.length){TL=d;}bootSafe();}).catch(()=>bootSafe());
 addEventListener('resize',layout);
 </script></body></html>
