@@ -194,11 +194,11 @@ const UR_VARIANTS = {
   portaal: [
     {
       voice: [
-        "Zoek je nu een nieuwe klant, dan open je z'n website of z'n Google. Je ziet hoe het er vandaag voor staat.",
-        "Eén moment. Of het vorige maand beter ging, of juist slechter, dat zie je niet.",
-        "Wij meten Nederlandse bedrijven elke dag. Verandert er iets, dan leggen we het vast, over tijd.",
-        "Zo zie je niet alleen dát een bedrijf slecht scoort, maar ook of het stijgt of daalt, en sinds wanneer.",
-        "Dat is geen leadlijst. Het is een gemeten beeld van elk bedrijf, bijgehouden door de tijd heen.",
+        "Zoek je een nieuwe klant, dan bekijk je z'n website en hoe hij scoort in Google. Je ziet hoe het er nu voor staat.",
+        "Maar dat is een momentopname. Of het vorige maand beter ging, of slechter, dat zie je niet.",
+        "UncleRank is een portaal dat Nederlandse bedrijven elke dag meet, en elke verandering bewaart.",
+        "Zo zie je niet alleen dat een bedrijf nu slecht scoort, maar ook of het stijgt of daalt, en sinds wanneer.",
+        "Geen lijst met koude namen. Een gemeten beeld van elk bedrijf, dag na dag.",
       ],
     },
   ],
@@ -254,10 +254,23 @@ function root(W, H, inner) {
 // De 4 kaarten vertellen het verhaal (momentopname -> wij meten dagelijks -> beweging over tijd ->
 // geen leadlijst). De opname-stukjes komen ertussen als illustratie. Titel mag 2 regels via "\n".
 const PORTAAL_CARDS = [
-  { key: "intro", title: "Eén momentopname",        sub: "Je opent een website of Google.\nAlleen hoe het er vandaag voor staat." },
-  { key: "meten", title: "Wij meten élke dag",      sub: "Verandert er iets bij een bedrijf,\ndan leggen we het vast — over tijd." },
-  { key: "tijd",  title: "Stijgt het?\nOf daalt het?", sub: "En sinds wanneer.\nDat is de waarheid, geen foto." },
-  { key: "slot",  title: "Geen leadlijst",          sub: "Een gemeten beeld van elk bedrijf,\nbijgehouden door de tijd heen.", outro: true },
+  { key: "scene",  title: "Zo zoek je nu een klant",  sub: "Je bekijkt een bedrijf.\nHoe het er nu voor staat." },
+  { key: "moment", title: "Eén momentopname",         sub: "Ging het beter of slechter?\nDat zie je niet." },
+  { key: "watis",  title: "Dit is UncleRank",         sub: "Een portaal dat elk Nederlands bedrijf\nelke dag meet." },
+  { key: "tijd",   title: "Stijgt het?\nOf daalt het?", sub: "En sinds wanneer.\nDat is de waarheid, geen foto." },
+  { key: "slot",   title: "Geen koude lijst",         sub: "Een gemeten beeld van elk bedrijf,\ndag na dag.", outro: true },
+];
+// Volgorde van de montage. De "oude manier" (scene + momentopname) is tekst-only; de opname-stukjes
+// (het echte portaal) komen pas als we UITLEGGEN wat UncleRank doet. Elk item heeft een gewicht voor
+// de duur-verdeling (kaarten korter, opname-stukjes iets langer). card = index in PORTAAL_CARDS.
+const PORTAAL_SEQUENCE = [
+  { kind: "card", i: 0, w: 1.3 },   // "zo zoek je nu een klant"
+  { kind: "card", i: 1, w: 1.1 },   // "eén momentopname"
+  { kind: "card", i: 2, w: 1.3 },   // "dit is UncleRank"
+  { kind: "clip", i: 0, w: 1.7 },   // opname: het portaal meet veel bedrijven (de lijst)
+  { kind: "card", i: 3, w: 1.1 },   // "stijgt het? of daalt het?"
+  { kind: "clip", i: 1, w: 1.7 },   // opname: een bedrijf openen -> de historie in het dossier
+  { kind: "card", i: 4, w: 1.2 },   // slot: "geen koude lijst"
 ];
 // Eén tekstkaart -> complete SVG (donker merk-vlak, UR-lockup boven, grote titel + subtekst, cyaan tik).
 function makeCardSvg({ W, H, title, sub, outro = false }) {
@@ -789,32 +802,31 @@ export function makeBrand({ ROOT, config } = {}) {
       }
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
 
-    // 2) duur-verdeling: ~50% tekstkaarten, ~50% opname. Kaarten hebben een leesbare bodem.
-    const cardDur = {
-      intro: Math.max(2.8, +(T * 0.15).toFixed(2)),
-      meten: Math.max(2.6, +(T * 0.13).toFixed(2)),
-      tijd:  Math.max(2.6, +(T * 0.12).toFixed(2)),
-      slot:  Math.max(2.8, +(T * 0.11).toFixed(2)),
-    };
-    const clipsTotal = Math.max(10, Math.round(T * 0.49));            // zoveel opname nemen we op
-    const clipDur = [ +(clipsTotal * 0.34).toFixed(2), +(clipsTotal * 0.36).toFixed(2), +(clipsTotal * 0.30).toFixed(2) ];
+    // 2) duur per onderdeel uit de gewichten in PORTAAL_SEQUENCE. Kaarten en opname-stukjes krijgen
+    //    een leesbare bodem. De opname nemen we precies zo lang op als de opname-stukjes samen.
+    const SEQ = PORTAAL_SEQUENCE;
+    const sumW = SEQ.reduce((a, s) => a + (s.w || 1), 0);
+    const FLOOR = { card: 2.3, clip: 2.6 };
+    const durOf = SEQ.map((s) => Math.max(FLOOR[s.kind] || 2.3, +(((s.w || 1) / sumW) * T).toFixed(2)));
+    const clipDurs = SEQ.map((s, k) => (s.kind === "clip" ? durOf[k] : 0)).filter((d) => d > 0);
+    const clipsTotal = Math.max(10, +clipDurs.reduce((a, d) => a + d, 0).toFixed(2));
 
-    // 3) opname van het portaal (ingelogd via opgeslagen state), lengte = de 3 clip-stukjes samen
+    // 3) opname van het portaal (ingelogd via opgeslagen state), lengte = de opname-stukjes samen
     const stateCand = opts.state || process.env.UR_PORTAL_STATE || path.resolve(ROOT, "assets/unclerank/portal-state.json");
     const recEnv = {
       ...process.env, FFMPEG,
       UR_OUT: work, UR_W: String(W), UR_H: String(H),
       UR_PORTAL_URL: (opts.url || process.env.UR_PORTAL_URL || "https://portaal.unclerank.com"),
-      UR_SECONDS: String(clipsTotal),
+      UR_SECONDS: String(Math.round(clipsTotal)),
     };
     try { if (stateCand && fs.existsSync(stateCand)) recEnv.UR_PORTAL_STATE = stateCand; } catch {}
     if (log) log("● portaal-opname van de live site…");
     const raw = path.join(work, "portal-walkthrough.mp4");
     const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
     const haveRec = (r1.status === 0 && fs.existsSync(raw));
-    if (!haveRec && log) log("opname faalde — montage met alleen tekstkaarten");
+    if (!haveRec && log) log("opname faalde, montage met alleen tekstkaarten");
 
-    // 4) segmenten bouwen (allemaal zelfde codec/res/fps -> veilig aan elkaar te plakken)
+    // 4) segment-helpers (allemaal zelfde codec/res/fps -> veilig aan elkaar te plakken)
     async function cardSeg(card, dur, i) {
       try {
         const png = path.join(work, `card-${i}-${card.key}.png`);
@@ -838,17 +850,21 @@ export function makeBrand({ ROOT, config } = {}) {
       return null;
     }
 
+    // 5) de montage in volgorde opbouwen: kaarten tekst-only, opname-stukjes uit de ene opname geknipt
     if (log) log("● montage bouwen (tekstkaarten + opname-stukjes)…");
-    const segs = []; let si = 0; const push = (p) => { if (p) segs.push(p); };
-    push(await cardSeg(PORTAAL_CARDS[0], cardDur.intro, si++));                 // intro-kaart
-    push(await clipSeg(0,                         clipDur[0], si++));           // opname: lijst
-    push(await cardSeg(PORTAAL_CARDS[1], cardDur.meten, si++));                 // "wij meten elke dag"
-    push(await clipSeg(clipDur[0],                clipDur[1], si++));           // opname: lead openen
-    push(await cardSeg(PORTAAL_CARDS[2], cardDur.tijd,  si++));                 // "stijgt/daalt"
-    push(await clipSeg(clipDur[0] + clipDur[1],   clipDur[2], si++));          // opname: dossier
-    push(await cardSeg(PORTAAL_CARDS[3], cardDur.slot,  si++));                 // slot: "geen leadlijst"
+    const segs = []; const push = (p) => { if (p) segs.push(p); };
+    let clipAt = 0;
+    for (let i = 0; i < SEQ.length; i++) {
+      const s = SEQ[i];
+      if (s.kind === "card") {
+        push(await cardSeg(PORTAAL_CARDS[s.i], durOf[i], i));
+      } else {
+        push(await clipSeg(clipAt, durOf[i], i));
+        clipAt += durOf[i];
+      }
+    }
 
-    // 5) alles aan elkaar plakken. Lukt er niets, degradeer naar opname (met/zonder stem) of hard falen.
+    // 6) alles aan elkaar plakken. Lukt er niets, degradeer naar opname (met/zonder stem) of hard falen.
     let base = "";
     if (segs.length >= 2) {
       const montage = path.join(work, "portal-montage.mp4");
@@ -864,14 +880,14 @@ export function makeBrand({ ROOT, config } = {}) {
       base = raw;
     }
 
-    // 6) vertelstem over de montage (stem is al luid genormaliseerd; geen muziek). De VIDEO is leidend:
+    // 7) vertelstem over de montage (stem is al luid genormaliseerd; geen muziek). De VIDEO is leidend:
     // apad vult de stem met stilte tot het einde, zodat de slot-kaart blijft staan. Mix faalt -> stil.
     if (voiceWav && fs.existsSync(voiceWav)) {
       if (log) log("● vertelstem over de montage leggen…");
       const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-i", base, "-i", voiceWav,
         "-filter_complex", "[1:a]apad[a]", "-map", "0:v", "-map", "[a]",
         "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", "-shortest", final], { ...process.env }, log, "· mix:");
-      if (r2.status !== 0) { if (log) log("mix faalde — montage zonder stem"); await fs.promises.copyFile(base, final); }
+      if (r2.status !== 0) { if (log) log("mix faalde, montage zonder stem"); await fs.promises.copyFile(base, final); }
     } else {
       await fs.promises.copyFile(base, final);
     }
