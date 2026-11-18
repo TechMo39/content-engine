@@ -65,3 +65,6 @@ sfx s07_end: sfx__s07_end__c3.mp3 | CC0 | FX - HIT IMPACT - Retro Videogame by b
 muziek 'quiet': Ghost Music Box BGM (Rev. 1) by ChristmasKrumble666 (Freesound, CC0)
 muziek 'intimate': Slow_Memory_80BPM by SignatureSoundsOrg (Freesound, CC0)
 muziek 'unease': Light - Ambient Glitching Generative Soundscape by bassimat (Freesound, CC0)
+sfx scene 5: Low Thud by Qvantor (Freesound, CC0)
+sfx scene 11: Mechanical Synth Swell.wav by Stereo Surgeon (Freesound, CC0)
+sfx scene 12: BASIC RISER ONE by johnjohnfm (Freesound, CC0)

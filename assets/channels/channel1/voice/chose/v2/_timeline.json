@@ -627,7 +627,13 @@
           "vid": "assets/channels/channel1/video/chose/s05b2__c1.mp4"
         }
       ],
-      "sfx": []
+      "sfx": [
+        {
+          "t": 26.78,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/chose_s05_end.mp3"
+        }
+      ]
     },
     {
       "scene": 6,
@@ -1365,7 +1371,13 @@
           "vid": ""
         }
       ],
-      "sfx": []
+      "sfx": [
+        {
+          "t": 55.57,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/chose_s11_end.mp3"
+        }
+      ]
     },
     {
       "scene": 12,
@@ -1529,7 +1541,13 @@
           "vid": "assets/channels/channel1/video/chose/s12b4__c1.mp4"
         }
       ],
-      "sfx": []
+      "sfx": [
+        {
+          "t": 71.47,
+          "name": "end",
+          "file": "assets/channels/channel1/sfx/chose_s12_end.mp3"
+        }
+      ]
     },
     {
       "scene": 13,
