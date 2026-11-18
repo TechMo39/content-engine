@@ -17,7 +17,7 @@
 #
 # MUZIEK staat per BLOK (groep scenes), niet per scene -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
-import argparse, os, json, time, urllib.parse, urllib.request, urllib.error
+import argparse, os, re, json, time, urllib.parse, urllib.request, urllib.error
 
 API = "https://freesound.org/apiv2"
 
@@ -40,10 +40,12 @@ BLOCKS_CHOSE = [
  {"from":11, "to":13, "track":"open"},      # het antwoord, is het wel waar, outro -> open eind
 ]
 # SFX subtiel en filmisch, je voelt ze meer dan je ze hoort. Alleen op drie kantelpunten; NOOIT triomf.
+# Per punt een LIJST zoektermen van specifiek naar breed. Freesound geeft op lange, zeldzame
+# woordcombinaties vaak 0 terug; daarom proberen we de termen op volgorde tot er iets gevonden is.
 SFX_CHOSE = [
- {"scene":5,  "q":"deep soft cinematic sub drop"},       # de wending: behalve op de ene vraag
- {"scene":11, "q":"warm soft cinematic swell ambient"},  # het antwoord landt, rustig
- {"scene":12, "q":"soft cinematic riser ambient subtle"},# de twijfel die openblijft -> video 2
+ {"scene":5,  "q":["cinematic sub drop","sub drop","deep boom","cinematic impact","impact"]},       # de wending
+ {"scene":11, "q":["cinematic swell","ambient swell","soft swell","cinematic transition","swell"]},  # het antwoord landt
+ {"scene":12, "q":["cinematic riser","ambient riser","riser","cinematic transition","whoosh"]},      # twijfel open -> video 2
 ]
 
 # verhaal-id -> plan. Onbekend verhaal = geen plan (niets gedaan).
@@ -133,12 +135,124 @@ def search_cc0(query, key, prefer_long=False):
         fit.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -min(c["dur"], 240)))
         b = fit[0]; url = b["lq"] or b["hq"]
     else:
-        # SFX: een effect is KORT. Liefst <= 15s (anders is het een track, geen effect). CC0 eerst,
-        # dan het kortste. HQ-voorbeeld-mp3 (kort, dus snel).
-        short = [c for c in cands if c["dur"] <= 15] or cands
+        # SFX: een effect is KORT. Liefst <= 30s (swells/risers mogen wat langer; daarboven is het een
+        # track, geen effect). CC0 eerst, dan het kortste. HQ-voorbeeld-mp3 (kort, dus snel).
+        short = [c for c in cands if c["dur"] <= 30] or cands
         short.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, c["dur"]))
         b = short[0]; url = b["hq"] or b["lq"]
     return {"url": url, "name": b["name"], "user": b["user"], "dur": b["dur"], "lic": b["lic"]}
+
+def _query_ladder(q, kind):
+    # Maak van een (mogelijk lange) zoekterm een reeks van specifiek naar breed. Een string wordt
+    # stap voor stap korter; een lijst gebruiken we zoals-ie is. Altijd een generieke terugval
+    # achteraan, zodat er voor een filmpje praktisch altijd iets te vinden is.
+    out = []
+    def add(x):
+        x = (x or "").strip()
+        if x and x not in out: out.append(x)
+    if isinstance(q, (list, tuple)):
+        for x in q: add(x)
+    else:
+        w = str(q).split()
+        add(q)
+        if len(w) >= 3: add(" ".join(w[-3:]))
+        if len(w) >= 2: add(" ".join(w[-2:]))
+        if w: add(w[-1])
+    if kind == "sfx":
+        for g in ("cinematic transition", "whoosh", "cinematic impact", "ambient swell"): add(g)
+    else:
+        for g in ("ambient", "cinematic ambient", "soft piano"): add(g)
+    return out
+
+def search_best(q, key, prefer_long=False):
+    # Probeer de zoektermen op volgorde (specifiek -> breed) tot er een bruikbare treffer is.
+    kind = "music" if prefer_long else "sfx"
+    primary = (q[0] if isinstance(q, (list, tuple)) and q else q)
+    for qq in _query_ladder(q, kind):
+        hit = search_cc0(qq, key, prefer_long=prefer_long)
+        if hit:
+            if qq != primary: print(f"    (gevonden via bredere term '{qq}')")
+            return hit
+    return None
+
+def _search_list(query, key, prefer_long=False):
+    # Zoals search_cc0, maar geeft de HELE geschikte lijst terug (gesorteerd), zodat we er meerdere
+    # kandidaten uit kunnen stagen voor de studio-keuze.
+    params = {"query": query, "page_size": 20, "token": key,
+              "fields": "id,name,username,duration,previews,license", "sort": "score"}
+    url = API + "/search/text/?" + urllib.parse.urlencode(params)
+    try:
+        d = json.loads(_get(url).decode("utf-8", "replace"))
+    except Exception as e:
+        print(f"    zoekfout: {e}"); return []
+    out = []
+    for r in d.get("results", []):
+        lab = _license_label(r.get("license", ""))
+        if not lab:
+            continue
+        pv = (r.get("previews") or {})
+        hq = pv.get("preview-hq-mp3"); lq = pv.get("preview-lq-mp3")
+        if not (hq or lq):
+            continue
+        dur = r.get("duration", 0) or 0
+        pref = (lq or hq) if prefer_long else (hq or lq)
+        out.append({"url": pref, "name": r.get("name", ""), "user": r.get("username", ""), "dur": dur, "lic": lab})
+    if prefer_long:
+        fit = [c for c in out if 20 <= c["dur"] <= 240] or out
+        fit.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, -min(c["dur"], 240)))
+        return fit
+    short = [c for c in out if c["dur"] <= 30] or out
+    short.sort(key=lambda c: (0 if c["lic"] == "CC0" else 1, c["dur"]))
+    return short
+
+def search_many(q, key, n, prefer_long=False):
+    # Verzamel tot n VERSCHILLENDE bruikbare treffers, van specifieke naar bredere zoekterm.
+    kind = "music" if prefer_long else "sfx"
+    seen = set(); picked = []
+    for qq in _query_ladder(q, kind):
+        for c in _search_list(qq, key, prefer_long=prefer_long):
+            if c["url"] in seen:
+                continue
+            seen.add(c["url"]); picked.append(c)
+            if len(picked) >= n:
+                return picked
+    return picked
+
+def _stage(hits, outdir, base, n):
+    # Download de kandidaten naar <base>1.mp3, <base>2.mp3, ... en geef de bestandsnamen terug.
+    out = []
+    for i, h in enumerate(hits[:n], 1):
+        fn = f"{base}{i}.mp3"; fp = os.path.join(outdir, fn)
+        try:
+            download(h["url"], fp); out.append(fn)
+        except Exception as e:
+            print(f"    stage-fout {fn}: {e}")
+    return out
+
+def run_candidates(args, key):
+    # STUDIO-MODUS: zoek N kandidaat-audiobestanden, stage ze op schijf en print CANDIDATES_JSON.
+    # Hiermee werken de studio-knoppen "3 geluiden" (sfx) en "3 muziekbedden" (music).
+    n = max(1, int(args.candidates))
+    what = (args.what or "sfx").lower()
+    if not key:
+        print("CANDIDATES_JSON:" + json.dumps({"candidates": [], "reason": "geen Freesound-sleutel ingesteld"}))
+        return
+    if what == "music":
+        outdir = os.path.join(args.root, "assets", "channels", args.channel, "muziek")
+        os.makedirs(outdir, exist_ok=True)
+        base = f"{args.story}__muziek__c"
+        q = args.q or "soft reflective ambient piano"
+        hits = search_many(q, key, n, prefer_long=True)
+    else:
+        outdir = os.path.join(args.root, "assets", "channels", args.channel, "sfx")
+        os.makedirs(outdir, exist_ok=True)
+        pid = re.sub(r"[^\w-]", "", (args.pid or "x")) or "x"
+        base = f"sfx__{pid}__c"
+        q = args.q or "cinematic transition"
+        hits = search_many(q, key, n, prefer_long=False)
+    files = _stage(hits, outdir, base, n)
+    reason = "" if files else "geen bruikbare geluiden gevonden voor deze zoekterm"
+    print("CANDIDATES_JSON:" + json.dumps({"candidates": [{"file": f} for f in files], "reason": reason}))
 
 def download(url, outpath):
     # de voorbeeld-mp3 is publiek (cdn.freesound.org), dus GEEN token meesturen (die liet de
@@ -151,7 +265,19 @@ def main():
     ap.add_argument("--story", default="chose"); ap.add_argument("--voice", default="v3")
     ap.add_argument("--root", default="."); ap.add_argument("--force", action="store_true")
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
+    ap.add_argument("--sfx-only", dest="sfx_only", action="store_true",
+                    help="alleen SFX (her)zoeken en plaatsen; muziek in de tijdlijn ongemoeid laten")
+    # studio-modus (door de engine aangeroepen): N kandidaten zoeken en stagen i.p.v. de tijdlijn vullen
+    ap.add_argument("--candidates", type=int, default=0, help="studio-modus: N kandidaat-audiobestanden zoeken")
+    ap.add_argument("--what", default="", help="studio-modus: 'music' of 'sfx'")
+    ap.add_argument("--pid", default="", help="studio-modus (sfx): stabiele punt-id")
+    ap.add_argument("--q", default="", help="studio-modus: zoekterm")
+    ap.add_argument("--scene", type=int, default=None, help="studio-modus (sfx): scenenummer, optioneel")
     args = ap.parse_args()
+
+    # STUDIO-MODUS: de engine vraagt N kandidaten (voor de picker). Geen tijdlijn nodig; print JSON en stop.
+    if args.candidates and args.candidates > 0:
+        run_candidates(args, load_key(args.root)); return
 
     # kies het audioplan van DIT verhaal. Alleen "chose" bestaat; onbekend verhaal -> niets doen.
     plan = PLANS.get(args.story)
@@ -177,40 +303,43 @@ def main():
     credits = []
     n_mus = n_sfx = n_fail = 0
 
-    # ---- MUZIEK per sfeer: haal elke track EEN keer op (<verhaal>-<sfeer>.mp3) ----
-    # Per verhaal gescoped, zodat verhalen nooit dezelfde muziek-bestandsnaam delen.
-    track_file = {}
-    for name, query in TRACKS.items():
-        fname = f"{args.story}-{name}.mp3"; fpath = os.path.join(mdir, fname)
-        rel = "assets/channels/" + args.channel + "/muziek/" + fname
-        if os.path.exists(fpath) and not args.force:
-            track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
-        print(f"sfeer '{name}': zoek muziek '{query}'")
-        hit = search_cc0(query, key, prefer_long=True)
-        if not hit:
-            print("    geen bruikbare muziek gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
-        print(f"    treffer: {hit['name'][:42]} ({hit['lic']}, {hit['dur']:.0f}s), downloaden...")
-        try:
-            download(hit["url"], fpath)
-        except Exception as e:
-            print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-        track_file[name] = rel
-        credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
-        print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
+    # ---- MUZIEK per sfeer (met --sfx-only overslaan, dan blijft bestaande muziek in de tijdlijn) ----
+    if args.sfx_only:
+        print("--sfx-only: muziek in de tijdlijn blijft ongemoeid, alleen SFX wordt (her)zocht.")
+    else:
+        # Per verhaal gescoped, zodat verhalen nooit dezelfde muziek-bestandsnaam delen.
+        track_file = {}
+        for name, query in TRACKS.items():
+            fname = f"{args.story}-{name}.mp3"; fpath = os.path.join(mdir, fname)
+            rel = "assets/channels/" + args.channel + "/muziek/" + fname
+            if os.path.exists(fpath) and not args.force:
+                track_file[name] = rel; print(f"sfeer '{name}': staat al ({fname})"); continue
+            print(f"sfeer '{name}': zoek muziek '{query}'")
+            hit = search_best(query, key, prefer_long=True)
+            if not hit:
+                print("    geen bruikbare muziek gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
+            print(f"    treffer: {hit['name'][:42]} ({hit['lic']}, {hit['dur']:.0f}s), downloaden...")
+            try:
+                download(hit["url"], fpath)
+            except Exception as e:
+                print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
+            track_file[name] = rel
+            credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
+            print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
 
-    # ---- blokken op de tijdlijn zetten met de bijbehorende sfeer-track ----
-    music = []
-    for blk in BLOCKS:
-        a = by_num.get(blk["from"]); b = by_num.get(blk["to"])
-        if not a or not b: continue
-        rel = track_file.get(blk["track"])
-        if not rel:
-            print(f"blok scene {blk['from']}-{blk['to']}: sfeer '{blk['track']}' mist, overgeslagen"); continue
-        start = round(a.get("start", 0), 3)
-        end = round(b.get("start", 0) + b.get("dur", 0), 3)
-        music.append({"start": start, "end": end, "file": rel, "mood": blk["track"]})
-        print(f"blok scene {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
-    tl["music"] = music
+        # ---- blokken op de tijdlijn zetten met de bijbehorende sfeer-track ----
+        music = []
+        for blk in BLOCKS:
+            a = by_num.get(blk["from"]); b = by_num.get(blk["to"])
+            if not a or not b: continue
+            rel = track_file.get(blk["track"])
+            if not rel:
+                print(f"blok scene {blk['from']}-{blk['to']}: sfeer '{blk['track']}' mist, overgeslagen"); continue
+            start = round(a.get("start", 0), 3)
+            end = round(b.get("start", 0) + b.get("dur", 0), 3)
+            music.append({"start": start, "end": end, "file": rel, "mood": blk["track"]})
+            print(f"blok scene {blk['from']}-{blk['to']}: {blk['track']}  ({start:.0f}s -> {end:.0f}s)")
+        tl["music"] = music
 
     # ---- SFX AAN HET EINDE van de scene (versterkt wat net gezegd is), NOOIT middenin ----
     # Plaatsing = speech_end van de scene (na de laatste zin). We overschrijven altijd (force-gedrag)
@@ -223,15 +352,22 @@ def main():
         t = round(float(s.get("speech_end", s.get("dur", 0))), 3)
         s["sfx"] = []   # eventueel oude effecten op deze scene wissen (een schoon effect per scene)
         fname = f"{args.story}_s{sx['scene']:02d}_end.mp3"; fpath = os.path.join(sdir, fname)
-        print(f"scene {sx['scene']} sfx @ einde ({t:.1f}s): zoek '{sx['q']}'")
-        hit = search_cc0(sx["q"], key)
+        qprimary = sx["q"][0] if isinstance(sx["q"], (list, tuple)) and sx["q"] else sx["q"]
+        print(f"scene {sx['scene']} sfx @ einde ({t:.1f}s): zoek '{qprimary}'")
+        hit = search_best(sx["q"], key)
         if not hit:
-            print("    geen bruikbaar effect gevonden -> laat leeg"); n_fail += 1; time.sleep(1.2); continue
+            # Niets bruikbaars gevonden: tOch een LEEG SFX-blok op dit kantelpunt zetten (met de
+            # zoekterm erbij), zodat het in de studio als klikbaar "nog geen geluid"-blok verschijnt
+            # en je er zelf een geluid bij kunt kiezen in plaats van helemaal geen blok te zien.
+            s["sfx"].append({"t": t, "name": "end", "q": qprimary})
+            print("    geen bruikbaar effect gevonden -> leeg blok klaargezet om zelf te kiezen"); n_fail += 1; time.sleep(1.2); continue
         print(f"    treffer: {hit['name'][:42]} ({hit['lic']}), downloaden...")
         try:
             download(hit["url"], fpath)
         except Exception as e:
-            print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
+            # download mislukt: ook hier een leeg blok laten staan om zelf te vullen
+            s["sfx"].append({"t": t, "name": "end", "q": qprimary})
+            print(f"    downloadfout: {e} -> leeg blok klaargezet om zelf te kiezen"); n_fail += 1; time.sleep(1.2); continue
         s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/" + args.channel + "/sfx/" + fname})
         credits.append(f"sfx scene {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
