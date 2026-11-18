@@ -14,9 +14,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import ffmpegStatic from "ffmpeg-static";
 
 const FORMATS = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] };
-const FFMPEG = process.env.FFMPEG || "ffmpeg";
+const FFMPEG = process.env.FFMPEG || ffmpegStatic || "ffmpeg";
 
 // Draai een sub-proces en stuur elke uitvoer-regel LIVE door naar log() (zoals taleoftiles),
 // zodat de voortgang in het app-paneel én de terminal verschijnt.
@@ -174,6 +175,19 @@ const UR_VARIANTS = {
         "Veertig, honderd of vierhonderd bedrijven per maand, een paar euro per stuk.",
         "Eén gewonnen klant verdient al vijfhonderd tot tweeduizend vijfhonderd euro per maand.",
         "Pak je gratis week.",
+      ],
+    },
+  ],
+  // PORTAAL (schermopname): vertelstem over de opname. Brede framing — niet alleen gekochte lijsten,
+  // ook zelf googelen is blind. Eindigt op het inzicht, geen pitch.
+  portaal: [
+    {
+      voice: [
+        "Hoe zoek jij nu nieuwe klanten? Een gekochte lijst, of zelf bedrijven googelen.",
+        "Maar zo weet je niet wat er vandaag misgaat bij ze, of waarom je juist nu zou bellen.",
+        "Wij meten Nederlandse bedrijven elke dag opnieuw, voor SEO, SEA, web, content en reclame.",
+        "Open je een lead van ons, dan zie je precies wat er mis is, en waarom het het bellen waard is.",
+        "Geen koude naam. Een reden om te bellen.",
       ],
     },
   ],
@@ -663,9 +677,11 @@ export function makeBrand({ ROOT, config } = {}) {
   loadMark(ROOT);   // UR-mark eenmalig inladen als data-URI (voor het woordmerk/lockup)
   const branding = { navy: C.bg0, accent: C.accent };
   const templates = [
-    { id: "roi", name: "Eén klant en 't is terugverdiend", music: ["upbeat", "calm", "lofi"], defaults: {} },
+    // GEARCHIVEERD (17 nov) — te ad-achtig, niet de LinkedIn-contenttoon. Code (buildRoi + UR_VARIANTS.roi)
+    // blijft staan voor eventueel later hergebruik; type is uit de studio-lijst gehaald.
+    // { id: "roi", name: "Eén klant en 't is terugverdiend", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
-    { id: "portaal", name: "Portaal-opname (de kring)", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "portaal", name: "Portaal-opname (verse data)", music: [], defaults: {} },
     { id: "kring", name: "De kring uitgelegd", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "bureaus", name: "Voor wie: 5 bureautypes", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "exclusief", name: "3 weken exclusief", music: ["calm", "lofi", "upbeat"], defaults: {} },
@@ -686,60 +702,71 @@ export function makeBrand({ ROOT, config } = {}) {
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
   async function pickMusic() { return null; }   // eerst stil renderen; muziek/stem komt erbij
 
-  // PORTAAL-OPNAME (de kring): neemt het PUBLIEKE portaal op als scroll-walkthrough en maakt 'm
-  // content-ready. Draait lokaal (browser + site nodig). Levert een KANT-EN-KLARE mp4 via
-  // { prebuilt } — net als taleoftiles' walkthrough — zodat de engine de SVG-pijplijn overslaat.
-  // Hergebruikt tools/finish.mjs ONGEWIJZIGD via env; de recorder is het aparte tools/portal-capture.mjs.
+  // PORTAAL-OPNAME: neemt het PUBLIEKE portaal op als scroll-walkthrough (lijst -> hot lead -> dossier,
+  // data al vervaagd door de recorder) en legt er een NL-VERTELSTEM overheen die de content-boodschap
+  // vertelt (verse, relevante data). CONTENTTOON: geen ad-hook/finish, geen muziek — schone opname +
+  // stem. Levert een kant-en-klare mp4 via { prebuilt }. Draait lokaal (browser + login + Chatterbox).
   async function makePortalRender({ opts = {}, format = "9:16", log }) {
     const node = process.execPath;
+    const PY = process.env.UR_PYTHON || "python";
     const recorder = path.resolve(ROOT, "tools/portal-capture.mjs");
-    const finisher = path.resolve(ROOT, "tools/finish.mjs");
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     const outDir = (config && config.outDir) ? config.outDir : "out";
     const work = path.resolve(ROOT, outDir, ".portal-" + Date.now());
     await fs.promises.mkdir(work, { recursive: true });
-    const lang = ["nl", "fr"].includes(opts.lang) ? opts.lang : "en";   // UR = Engels (exclusieve uitstraling)
 
-    // 1) opnemen -> ruwe mp4 + markers. Het portaal zit achter login; we geven een opgeslagen
-    // login-state mee (opts.state, env, of standaard assets/unclerank/portal-state.json).
+    // 1) NL-stem genereren (de content-boodschap). Duur bepaalt de opname-lengte, zodat ze meelopen.
+    let voiceWav = "", dur = Number(opts.seconds) || 16;
+    try {
+      const vdir = voiceDir(ROOT, "portaal", 0);
+      const wavp = path.join(vdir, "voice.wav");
+      const linesFile = path.join(vdir, "_lines.json");
+      const variant = (UR_VARIANTS.portaal || [])[0];
+      const wantLines = (variant && Array.isArray(variant.voice)) ? JSON.stringify(variant.voice) : "";
+      let haveLines = null; try { haveLines = await fs.promises.readFile(linesFile, "utf8"); } catch {}
+      if ((opts.versStem) || !fs.existsSync(wavp) || (wantLines && haveLines !== wantLines)) {
+        await fs.promises.mkdir(vdir, { recursive: true });
+        if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
+        if (log) log("● UR-stem genereren (portaal, NL) — dit duurt even…");
+        const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", "portaal", "--variant", "0", "--root", ROOT];
+        if (wantLines) args.push("--lines", linesFile);
+        if (opts.voice) args.push("--voice", String(opts.voice));
+        await runStreamed(PY, args, { ...process.env, FFMPEG }, log, "· stem:");
+      }
+      if (fs.existsSync(wavp)) {
+        voiceWav = wavp;
+        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) dur = Number(tl.total); } catch {}
+      }
+    } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
+
+    // 2) opname van het portaal (ingelogd via opgeslagen state), lengte ~ de stem
     const stateCand = opts.state || process.env.UR_PORTAL_STATE || path.resolve(ROOT, "assets/unclerank/portal-state.json");
     const recEnv = {
       ...process.env, FFMPEG,
       UR_OUT: work, UR_W: String(W), UR_H: String(H),
       UR_PORTAL_URL: (opts.url || process.env.UR_PORTAL_URL || "https://portaal.unclerank.com"),
+      UR_SECONDS: String(Math.max(8, Math.round(dur))),
     };
     try { if (stateCand && fs.existsSync(stateCand)) recEnv.UR_PORTAL_STATE = stateCand; } catch {}
-    if (opts.seconds) recEnv.UR_SECONDS = String(opts.seconds);
-    if (log) log("● portaal-opname van de live site start…");
+    if (log) log("● portaal-opname van de live site…");
     const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
     if (r1.status !== 0) throw new Error("portaal-opname faalde, draait de engine op de machine met de browser en is het portaal bereikbaar?");
     const raw = path.join(work, "portal-walkthrough.mp4");
-    const markers = path.join(work, "portal-walkthrough.markers.json");
+    const final = path.join(work, "portal-final.mp4");
 
-    // 2) captions kiezen, dan content-ready maken (finish.mjs, ongewijzigd). Muziek blijft leeg:
-    // UR rendert eerst stil, de Engelse stem/muziek komt er in een latere stap bij.
-    const music = opts.music || null;
-    const caps = ({
-      en: [opts.caption || "One client can pay for your whole year.", opts.caption2 || "The circle · UncleRank"],
-      nl: [opts.caption || "Eén klant betaalt je hele jaar.", opts.caption2 || "De kring · UncleRank"],
-    })[lang] || ["", "The circle · UncleRank"];
-    const steps = opts.steps || ({
-      en: ["Agencies share their overflow leads", "One trusted circle", "Each dossier, 3 weeks exclusive", "Claim your spot"],
-      nl: ["Bureaus delen hun overschot aan leads", "Eén vertrouwde kring", "Elk dossier, 3 weken exclusief", "Claim je plek"],
-    })[lang];
-    const logo = ensureLogo(ROOT, work, opts);
-    const finEnv = {
-      ...process.env, FFMPEG,
-      TOT_MARKERS: markers, TOT_CAPTION: caps[0], TOT_CAPTION2: caps[1],
-      TOT_STEPS: JSON.stringify(steps), TOT_FINAL: path.join(work, "portal-final.mp4"),
-    };
-    if (logo) finEnv.TOT_LOGO = logo;
-    if (music) finEnv.TOT_MUSIC = music;
-    if (log) log("● portaal, content-ready (hook, snelheid, caption, muziek)…");
-    const r2 = await runStreamed(node, [finisher, raw], finEnv, log, "· montage:");
-    if (r2.status !== 0) throw new Error("content-ready stap (finish) faalde");
+    // 3) stem over de opname (stem is al luid genormaliseerd; geen muziek). apad + -shortest = audio
+    // loopt tot de videolengte. Lukt de mix niet, dan leveren we de opname zonder stem (stil).
+    if (voiceWav && fs.existsSync(voiceWav)) {
+      if (log) log("● vertelstem over de opname leggen…");
+      const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-i", raw, "-i", voiceWav,
+        "-filter_complex", "[1:a]apad[a]", "-map", "0:v", "-map", "[a]",
+        "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", "-shortest", final], { ...process.env }, log, "· mix:");
+      if (r2.status !== 0) { if (log) log("mix faalde — opname zonder stem"); await fs.promises.copyFile(raw, final); }
+    } else {
+      await fs.promises.copyFile(raw, final);
+    }
 
-    return { prebuilt: path.join(work, "portal-final.mp4"), music: "", lang, cleanup: work };
+    return { prebuilt: final, music: "", lang: "nl", cleanup: work };
   }
 
   const BUILDERS = {
