@@ -194,11 +194,11 @@ const UR_VARIANTS = {
   portaal: [
     {
       voice: [
-        "Zoek je een nieuwe klant, dan bekijk je z'n website en hoe hij scoort in Google. Je ziet hoe het er nu voor staat.",
-        "Maar dat is een momentopname. Of het vorige maand beter ging, of slechter, dat zie je niet.",
-        "UncleRank is een portaal dat Nederlandse bedrijven elke dag meet, en elke verandering bewaart.",
-        "Zo zie je niet alleen dat een bedrijf nu slecht scoort, maar ook of het stijgt of daalt, en sinds wanneer.",
-        "Geen lijst met koude namen. Een gemeten beeld van elk bedrijf, dag na dag.",
+        "Heb jij een online marketingbureau? Dan weet je hoe lastig het is om aan goede nieuwe klanten te komen.",
+        "Je belt bedrijven koud, zonder te weten wat er speelt, of waarom ze jou juist nu nodig hebben.",
+        "UncleRank houdt Nederlandse bedrijven in de gaten en geeft jou bedrijven met een vers signaal, per vak: SEO, SEA, web, content en reclame.",
+        "Zo bel je niet meer koud, maar precies op het moment dat een bedrijf jou nodig heeft, met de reden erbij.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
     },
   ],
@@ -253,32 +253,39 @@ function root(W, H, inner) {
 // ---- PORTAAL-MONTAGE: tekstkaarten tussen de schermopname -----------------------------------
 // De 4 kaarten vertellen het verhaal (momentopname -> wij meten dagelijks -> beweging over tijd ->
 // geen leadlijst). De opname-stukjes komen ertussen als illustratie. Titel mag 2 regels via "\n".
+// De URL op de CTA-kaart (laatste kaart). Pas dit aan als de bureaus-pagina een andere URL krijgt.
+const UR_CTA_URL = "portaal.unclerank.com/bureaus";
 const PORTAAL_CARDS = [
-  { key: "scene",  title: "Zo zoek je nu een klant",  sub: "Je bekijkt een bedrijf.\nHoe het er nu voor staat." },
-  { key: "moment", title: "Eén momentopname",         sub: "Ging het beter of slechter?\nDat zie je niet." },
-  { key: "watis",  title: "Dit is UncleRank",         sub: "Een portaal dat elk Nederlands bedrijf\nelke dag meet." },
-  { key: "tijd",   title: "Stijgt het?\nOf daalt het?", sub: "En sinds wanneer.\nDat is de waarheid, geen foto." },
-  { key: "slot",   title: "Geen koude lijst",         sub: "Een gemeten beeld van elk bedrijf,\ndag na dag.", outro: true },
+  { key: "context", title: "Online marketingbureau?",      sub: "Nieuwe klanten vinden\nis het lastigste wat er is." },
+  { key: "pijn",    title: "Koud bellen werkt niet",       sub: "Je weet niet wat er speelt,\nof waarom ze jou nu nodig hebben." },
+  { key: "watdoen", title: "Maak kennis\nmet UncleRank",   sub: "Bedrijven met een vers signaal,\nkant-en-klaar per vak." },
+  { key: "waarde",  title: "Bel op het juiste moment",     sub: "Niet koud, maar precies\nals een bedrijf je nodig heeft." },
+  { key: "cta",     title: "Probeer het gratis",           sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
 ];
-// Volgorde van de montage. De "oude manier" (scene + momentopname) is tekst-only; de opname-stukjes
-// (het echte portaal) komen pas als we UITLEGGEN wat UncleRank doet. Elk item heeft een gewicht voor
-// de duur-verdeling (kaarten korter, opname-stukjes iets langer). card = index in PORTAAL_CARDS.
+// Volgorde van de montage: context + pijn zijn tekst-only; de opname-stukjes (het echte portaal) komen
+// pas bij de oplossing en de waarde. Elk item heeft een gewicht voor de duur-verdeling (kaarten korter,
+// opname-stukjes iets langer). card = index in PORTAAL_CARDS.
 const PORTAAL_SEQUENCE = [
-  { kind: "card", i: 0, w: 1.3 },   // "zo zoek je nu een klant"
-  { kind: "card", i: 1, w: 1.1 },   // "eén momentopname"
-  { kind: "card", i: 2, w: 1.3 },   // "dit is UncleRank"
-  { kind: "clip", i: 0, w: 1.7 },   // opname: het portaal meet veel bedrijven (de lijst)
-  { kind: "card", i: 3, w: 1.1 },   // "stijgt het? of daalt het?"
-  { kind: "clip", i: 1, w: 1.7 },   // opname: een bedrijf openen -> de historie in het dossier
-  { kind: "card", i: 4, w: 1.2 },   // slot: "geen koude lijst"
+  { kind: "card", i: 0, w: 1.3 },   // context: "online marketingbureau?"
+  { kind: "card", i: 1, w: 1.2 },   // pijn: "koud bellen werkt niet"
+  { kind: "card", i: 2, w: 1.3 },   // wat doen we: "maak kennis met UncleRank"
+  { kind: "clip", i: 0, w: 1.7 },   // opname: het portaal met de bedrijven (de lijst)
+  { kind: "card", i: 3, w: 1.2 },   // waarde: "bel op het juiste moment"
+  { kind: "clip", i: 1, w: 1.7 },   // opname: een bedrijf openen -> het signaal in het dossier
+  { kind: "card", i: 4, w: 1.3 },   // CTA: "probeer het gratis"
 ];
 // Eén tekstkaart -> complete SVG (donker merk-vlak, UR-lockup boven, grote titel + subtekst, cyaan tik).
 function makeCardSvg({ W, H, title, sub, outro = false }) {
   const cx = W / 2;
-  const fsT = Math.round(W * (outro ? 0.086 : 0.074));
   const fsS = Math.round(W * 0.039);
   const cy = Math.round(H * (outro ? 0.42 : 0.44));
   const tLines = String(title).split("\n");
+  // Titelgrootte: start op de basis, maar KRIMP automatisch als de langste regel te breed wordt,
+  // zodat geen enkele titel tegen de rand loopt (K = geschatte tekenbreedte van UR Sans bold).
+  const base = Math.round(W * (outro ? 0.086 : 0.074));
+  const longest = Math.max(1, ...tLines.map((l) => l.length));
+  const K = 0.62, fitW = 0.84 * W;
+  const fsT = Math.max(Math.round(W * 0.050), Math.min(base, Math.floor(fitW / (K * longest))));
   let s = bg(W, H) + wordmark(W, H, 1);
   // cyaan tik boven de titel
   s += `<rect x="${cx - 44}" y="${cy - Math.round(fsT * (tLines.length / 2)) - 56}" width="88" height="6" rx="3" fill="${C.accent}"/>`;
