@@ -49,7 +49,9 @@
  .blk.beeld .chip{display:inline-block;background:rgba(0,0,0,.6);border-radius:4px;padding:1px 5px;font-size:10.5px;line-height:1.3}
  .blk.beeld .mtag{position:absolute;top:3px;right:4px;font-size:9px;background:rgba(0,0,0,.6);border-radius:3px;padding:0 4px;color:#9fc0ff}
  .blk.tekst{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.45);color:#ffe4bb;white-space:normal}
- .blk.sfx{background:rgba(224,85,107,.2);border-color:var(--sfx);color:#ffd2da;white-space:nowrap;cursor:grab}
+ .blk.sfx{background:rgba(224,85,107,.2);border-color:var(--sfx);color:#ffd2da;white-space:nowrap;cursor:pointer}
+ .blk.sfx.leeg{background:rgba(224,85,107,.08);border-style:dashed;color:#e0a7b1;opacity:.85}
+ .blk.sfx.vol{background:rgba(224,85,107,.34);border-style:solid;font-weight:600}
  .blk.beeld{cursor:pointer}
  .blk.beeld.sel{outline:2px solid #fff;outline-offset:1px;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
  .handle{position:absolute;top:0;bottom:0;width:18px;margin-left:-9px;cursor:ew-resize;z-index:8;display:flex;align-items:center;justify-content:center;touch-action:none}
@@ -156,7 +158,7 @@
   <div class="t">VOORVERTONING. Klik op een <b>beeldblok</b> (bovenste rij) om het hier groot te zien en er beeld bij te kiezen/uploaden. Sleep de dikke grepen tussen blokken om beeld of ondertitel te verschuiven. Opslaan schrijft de tijdlijn terug; De knop 'Video maken' maakt de video.</div>
   <div class="clock"><span id="pv-clock">0:00.0</span> <span style="color:var(--mut);font-size:13px">/ <span id="pv-total"></span></span> <span id="pv-audio" style="color:var(--mut);font-size:11px;margin-left:8px"></span></div>
   <div class="now">scène <b id="pv-scn">1</b> · beeld-beat <b id="pv-bn">1</b></div>
-  <div class="controls"><button class="play" id="btn-play">► afspelen</button><button id="btn-rew">⟲ begin</button><button id="btn-sfx">+ SFX plaatsen: uit</button></div>
+  <div class="controls"><button class="play" id="btn-play">► afspelen</button><button id="btn-rew">⟲ begin</button><button id="btn-sfx">SFX plaatsen: klik de rode laag</button></div>
   <div class="beattools none" id="beattools">
    <div class="bt-t" id="bt-t">Klik op een beeldblok hierboven om het te kiezen.</div>
    <div class="row">
@@ -325,8 +327,10 @@ function layout(){
   subsOf(s).forEach((u,ui)=>{const d=document.createElement('div');d.className='blk tekst';
     d.style.left=(u.start*pps)+'px';d.style.width=Math.max(8,(u.end-u.start)*pps-2)+'px';d.textContent=u.text;d.title=u.text;tt.appendChild(d);
     if(ui>0){const h=document.createElement('div');h.className='handle tekst';h.style.left=(u.start*pps)+'px';h.dataset.si=si;h.dataset.kind='tekst';h.dataset.bi=(ui-1);tt.appendChild(h);}});
-  s.sfx.forEach((f,fi)=>{const d=document.createElement('div');d.className='blk sfx';const _tw=ts.clientWidth||(s.dur*pps);d.style.left=Math.max(0,Math.min(f.t*pps,_tw-72))+'px';d.style.width='70px';
-    d.textContent='✦ '+(f.name||'sfx');d.dataset.si=si;d.dataset.fi=fi;d.title='SFX op '+(s.start+f.t).toFixed(2)+'s (dubbelklik = weg)';ts.appendChild(d);});
+  s.sfx.forEach((f,fi)=>{const d=document.createElement('div');const _tw=ts.clientWidth||(s.dur*pps);
+    const _m=f.file?bn(f.file).match(/__c(\d+)\./):null; const _lab=f.file?(_m?('optie '+_m[1]):'geluid'):'leeg';
+    d.className='blk sfx'+(f.file?' vol':' leeg');d.style.left=Math.max(0,Math.min(f.t*pps,_tw-92))+'px';d.style.width='90px';
+    d.textContent='✦ '+_lab;d.dataset.si=si;d.dataset.fi=fi;d.title=(f.file?('geluid: '+bn(f.file)):'nog geen geluid')+' — op '+(s.start+f.t).toFixed(2)+'s (klik = kiezen)';ts.appendChild(d);});
   const rl=card.querySelector('.ruler');rl.innerHTML='';const step=s.dur>24?5:(s.dur>12?3:2);
   for(let x=0;x<=s.dur+0.01;x+=step){const e=document.createElement('div');e.className='tk';e.style.left=(x*pps)+'px';e.textContent=x.toFixed(0)+'s';rl.appendChild(e);}});
  placePlayhead();
@@ -339,9 +343,10 @@ host.addEventListener('pointerdown',e=>{
  const card=e.target.closest('.scard');if(!card)return;const si=+card.dataset.si,s=SC[si];
  const tb=card.querySelector('[data-tr="beeld"]');const r=tb.getBoundingClientRect();
  if(e.target.closest('.musicbed')){openMusicModal(si);return;}
- if(sfxMode&&e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();openSfxModal(si,s.sfx.length-1);return;}
  const sf=e.target.closest('.blk.sfx');
  if(sf&&sf.dataset.fi!==undefined){const ssi=+sf.dataset.si,sfi=+sf.dataset.fi;const ff=(SC[ssi].sfx||[])[sfi];stop();t=SC[ssi].start+(ff?(+ff.t||0):0);placePlayhead();openSfxModal(ssi,sfi);return;}
+ // klik op de lege SFX-laag = hier een SFX-blok plaatsen en meteen de kiezer openen (geen toggle nodig)
+ if(e.target.closest('[data-tr="sfx"]')){const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));s.sfx.push({t:+local.toFixed(2),name:'sfx'});dirty();layout();openSfxModal(si,s.sfx.length-1);return;}
  const bb=e.target.closest('.blk.beeld');
  if(bb&&bb.dataset.bi!==undefined){const bsi=+bb.dataset.si,bbi=+bb.dataset.bi;selectBeat(bsi,bbi);const bt=beatsOf(SC[bsi])[bbi];stop();t=SC[bsi].start+(bt?bt.start:0);placePlayhead();openPicker(bsi,bbi);return;}
  stop();const local=Math.max(0,Math.min(s.dur,(e.clientX-r.left)/ppsOf(si)));t=s.start+local;placePlayhead();
@@ -354,8 +359,8 @@ function moveDrag(e){if(!drag)return;const{si,kind,bi,arr}=drag;const s=SC[si];c
  tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';layout();}
 addEventListener('pointermove',e=>{if(drag)moveDrag(e);});
 addEventListener('pointerup',()=>{if(drag){drag=null;tip.style.display='none';}});
-host.addEventListener('dblclick',e=>{const f=e.target.closest('.blk.sfx');if(f){openSfxModal(+f.dataset.si,+f.dataset.fi);return;}});
-let sfxMode=false;$('btn-sfx').addEventListener('click',()=>{sfxMode=!sfxMode;$('btn-sfx').textContent='+ SFX plaatsen: '+(sfxMode?'AAN':'uit');});
+// (dubbelklik-op-SFX verwijderd: één klik opent al de kiezer. Weghalen gaat alleen via de knop, met bevestiging, zodat een snelle dubbelklik nooit per ongeluk een SFX wist.)
+let sfxMode=false;$('btn-sfx').textContent='SFX plaatsen: klik de rode laag';$('btn-sfx').title='Klik in de rode SFX-laag van een scène om daar een geluid te plaatsen en te kiezen';$('btn-sfx').addEventListener('click',()=>{$('rendermsg').textContent='Klik in de rode SFX-laag van een scène om daar een SFX te plaatsen en meteen een geluid te kiezen.';});
 
 let t=0,playing=false,raf=null,last=0,playEnd=Infinity;const voiceAudio={};let musicBlocks=[],sfxList=[],curScene=-1,curBlock=-1;
 function bn(p){return String(p).split('/').pop();}
@@ -740,7 +745,7 @@ function openSfxModal(si,fi){ const s=SC[si],f=(s.sfx||[])[fi]; if(!f)return; se
  const ctrl=$('ap-ctrl'); ctrl.innerHTML='';
  const q=document.createElement('input'); q.id='ap-q'; q.type='text'; q.placeholder='zoekterm, bv. soft swell'; q.value=f.q||''; q.style.cssText='flex:1;min-width:160px;background:#0b0f18;border:1px solid var(--line);color:#dfe7f3;border-radius:7px;padding:7px 9px;font-size:12.5px'; ctrl.appendChild(q);
  const bS=document.createElement('button'); bS.textContent='🔎 3 geluiden'; bS.onclick=()=>loadSfxModalCands(true); ctrl.appendChild(bS);
- const bD=document.createElement('button'); bD.className='del'; bD.textContent='🗑 weghalen'; bD.onclick=()=>{ SC[si].sfx.splice(fi,1); selSfx=null; rebuildSfxAudio(); dirty(); layout(); closeAP(); }; ctrl.appendChild(bD);
+ const bD=document.createElement('button'); bD.className='del'; bD.textContent='🗑 weghalen'; bD.onclick=()=>{ if(!confirm('Dit SFX-blok weghalen?'))return; SC[si].sfx.splice(fi,1); selSfx=null; rebuildSfxAudio(); dirty(); layout(); closeAP(); }; ctrl.appendChild(bD);
  $('ap-cands').innerHTML='<span class="cndhint">laden…</span>'; $('apicker').classList.add('on'); loadSfxModalCands(false); }
 async function loadSfxModalCands(fresh){ const box=$('ap-cands'); if(!selSfx)return; const s=SC[selSfx.si],f=(s.sfx||[])[selSfx.fi]; if(!f)return; const pid=sfxPidFor(s,f);
  const q=($('ap-q')&&$('ap-q').value.trim())||'';
