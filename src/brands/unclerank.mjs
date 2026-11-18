@@ -15,9 +15,19 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import ffmpegStatic from "ffmpeg-static";
+import { Resvg } from "@resvg/resvg-js";
+import { fileURLToPath } from "node:url";
 
 const FORMATS = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] };
 const FFMPEG = process.env.FFMPEG || ffmpegStatic || "ffmpeg";
+
+// Eigen UR-fonts voor het rasteren van de tekstkaarten in de portaal-montage (zelfde set als de
+// raster-worker; systeem-fonts uit = voorspelbaar + snel). Pad t.o.v. dit bestand, dus OS-onafhankelijk.
+let UR_FONT_FILES = [];
+try {
+  const _fdir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "assets", "fonts");
+  UR_FONT_FILES = fs.readdirSync(_fdir).filter((f) => /\.(ttf|otf|ttc)$/i.test(f)).map((f) => path.join(_fdir, f));
+} catch { UR_FONT_FILES = []; }
 
 // Draai een sub-proces en stuur elke uitvoer-regel LIVE door naar log() (zoals taleoftiles),
 // zodat de voortgang in het app-paneel én de terminal verschijnt.
@@ -178,16 +188,17 @@ const UR_VARIANTS = {
       ],
     },
   ],
-  // PORTAAL (schermopname): vertelstem over de opname. Brede framing — niet alleen gekochte lijsten,
-  // ook zelf googelen is blind. Eindigt op het inzicht, geen pitch.
+  // PORTAAL (montage): tekstkaarten + stukjes schermopname. GEEN leadlijst-framing. Kern: een bedrijf
+  // opzoeken geeft één momentopname; wij meten elk bedrijf dagelijks en bewaren de verandering OVER TIJD
+  // (SEO-voorbeeld: stijgt/daalt/sinds wanneer). Kwaliteitstoon. De opname is illustratie tussen de tekst.
   portaal: [
     {
       voice: [
-        "Hoe zoek jij nu nieuwe klanten? Een gekochte lijst, of zelf bedrijven googelen.",
-        "Maar zo weet je niet wat er vandaag misgaat bij ze, of waarom je juist nu zou bellen.",
-        "Wij meten Nederlandse bedrijven elke dag opnieuw, voor SEO, SEA, web, content en reclame.",
-        "Open je een lead van ons, dan zie je precies wat er mis is, en waarom het het bellen waard is.",
-        "Geen koude naam. Een reden om te bellen.",
+        "Zoek je nu een nieuwe klant, dan open je z'n website of z'n Google. Je ziet hoe het er vandaag voor staat.",
+        "Eén moment. Of het vorige maand beter ging, of juist slechter, dat zie je niet.",
+        "Wij meten Nederlandse bedrijven elke dag. Verandert er iets, dan leggen we het vast, over tijd.",
+        "Zo zie je niet alleen dát een bedrijf slecht scoort, maar ook of het stijgt of daalt, en sinds wanneer.",
+        "Dat is geen leadlijst. Het is een gemeten beeld van elk bedrijf, bijgehouden door de tijd heen.",
       ],
     },
   ],
@@ -237,6 +248,40 @@ function block(x, y, lines, o) {
 }
 function root(W, H, inner) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${inner}</svg>`;
+}
+
+// ---- PORTAAL-MONTAGE: tekstkaarten tussen de schermopname -----------------------------------
+// De 4 kaarten vertellen het verhaal (momentopname -> wij meten dagelijks -> beweging over tijd ->
+// geen leadlijst). De opname-stukjes komen ertussen als illustratie. Titel mag 2 regels via "\n".
+const PORTAAL_CARDS = [
+  { key: "intro", title: "Eén momentopname",        sub: "Je opent een website of Google.\nAlleen hoe het er vandaag voor staat." },
+  { key: "meten", title: "Wij meten élke dag",      sub: "Verandert er iets bij een bedrijf,\ndan leggen we het vast — over tijd." },
+  { key: "tijd",  title: "Stijgt het?\nOf daalt het?", sub: "En sinds wanneer.\nDat is de waarheid, geen foto." },
+  { key: "slot",  title: "Geen leadlijst",          sub: "Een gemeten beeld van elk bedrijf,\nbijgehouden door de tijd heen.", outro: true },
+];
+// Eén tekstkaart -> complete SVG (donker merk-vlak, UR-lockup boven, grote titel + subtekst, cyaan tik).
+function makeCardSvg({ W, H, title, sub, outro = false }) {
+  const cx = W / 2;
+  const fsT = Math.round(W * (outro ? 0.086 : 0.074));
+  const fsS = Math.round(W * 0.039);
+  const cy = Math.round(H * (outro ? 0.42 : 0.44));
+  const tLines = String(title).split("\n");
+  let s = bg(W, H) + wordmark(W, H, 1);
+  // cyaan tik boven de titel
+  s += `<rect x="${cx - 44}" y="${cy - Math.round(fsT * (tLines.length / 2)) - 56}" width="88" height="6" rx="3" fill="${C.accent}"/>`;
+  s += block(cx, cy, tLines, { fs: fsT, w: 800, fill: C.ink });
+  if (sub) {
+    const sLines = String(sub).split("\n");
+    const subY = cy + Math.round(fsT * (tLines.length / 2)) + Math.round(fsS * 1.9);
+    s += block(cx, subY, sLines, { fs: fsS, w: 500, fill: C.mut });
+  }
+  if (outro) s += markOnly(cx, Math.round(H * 0.70), Math.round(W * 0.15), 1);
+  return root(W, H, s);
+}
+// SVG-kaart -> PNG (eigen UR-fonts, geen systeem-fonts), voor de ffmpeg-montage.
+function rasterCard(svg, W, outPng) {
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: false, fontFiles: UR_FONT_FILES } }).render().asPng();
+  fs.writeFileSync(outPng, png);
 }
 
 // ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
@@ -702,21 +747,26 @@ export function makeBrand({ ROOT, config } = {}) {
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
   async function pickMusic() { return null; }   // eerst stil renderen; muziek/stem komt erbij
 
-  // PORTAAL-OPNAME: neemt het PUBLIEKE portaal op als scroll-walkthrough (lijst -> hot lead -> dossier,
-  // data al vervaagd door de recorder) en legt er een NL-VERTELSTEM overheen die de content-boodschap
-  // vertelt (verse, relevante data). CONTENTTOON: geen ad-hook/finish, geen muziek — schone opname +
-  // stem. Levert een kant-en-klare mp4 via { prebuilt }. Draait lokaal (browser + login + Chatterbox).
+  // PORTAAL-MONTAGE: de schermopname is AANVULLEND, niet het hele filmpje. Opbouw = tekstkaart (intro)
+  // -> stukje opname -> tekstkaart -> stukje opname -> tekstkaart -> stukje opname -> slot-kaart. De
+  // opname (lijst -> hot lead -> dossier, data al vervaagd door de recorder) wordt in 3 stukjes geknipt
+  // en tussen de kaarten gezet; een NL-vertelstem loopt eroverheen. Verhaal = momentopname vs. dagelijks
+  // meten over tijd (GEEN leadlijst). Contenttoon: geen muziek. Levert een kant-en-klare mp4 via
+  // { prebuilt }. Draait lokaal (browser + login + Chatterbox). Faalt een stap, dan degradeert hij netjes.
   async function makePortalRender({ opts = {}, format = "9:16", log }) {
     const node = process.execPath;
     const PY = process.env.UR_PYTHON || "python";
     const recorder = path.resolve(ROOT, "tools/portal-capture.mjs");
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const FPS = 30;
     const outDir = (config && config.outDir) ? config.outDir : "out";
     const work = path.resolve(ROOT, outDir, ".portal-" + Date.now());
     await fs.promises.mkdir(work, { recursive: true });
+    const final = path.join(work, "portal-final.mp4");
+    const ENC = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(FPS), "-preset", "veryfast"];
 
-    // 1) NL-stem genereren (de content-boodschap). Duur bepaalt de opname-lengte, zodat ze meelopen.
-    let voiceWav = "", dur = Number(opts.seconds) || 16;
+    // 1) NL-stem genereren (de vertelling). Duur bepaalt de totale lengte; de opname-stukjes volgen.
+    let voiceWav = "", T = Number(opts.seconds) || 20;
     try {
       const vdir = voiceDir(ROOT, "portaal", 0);
       const wavp = path.join(vdir, "voice.wav");
@@ -735,35 +785,95 @@ export function makeBrand({ ROOT, config } = {}) {
       }
       if (fs.existsSync(wavp)) {
         voiceWav = wavp;
-        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) dur = Number(tl.total); } catch {}
+        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) T = Number(tl.total); } catch {}
       }
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
 
-    // 2) opname van het portaal (ingelogd via opgeslagen state), lengte ~ de stem
+    // 2) duur-verdeling: ~50% tekstkaarten, ~50% opname. Kaarten hebben een leesbare bodem.
+    const cardDur = {
+      intro: Math.max(2.8, +(T * 0.15).toFixed(2)),
+      meten: Math.max(2.6, +(T * 0.13).toFixed(2)),
+      tijd:  Math.max(2.6, +(T * 0.12).toFixed(2)),
+      slot:  Math.max(2.8, +(T * 0.11).toFixed(2)),
+    };
+    const clipsTotal = Math.max(10, Math.round(T * 0.49));            // zoveel opname nemen we op
+    const clipDur = [ +(clipsTotal * 0.34).toFixed(2), +(clipsTotal * 0.36).toFixed(2), +(clipsTotal * 0.30).toFixed(2) ];
+
+    // 3) opname van het portaal (ingelogd via opgeslagen state), lengte = de 3 clip-stukjes samen
     const stateCand = opts.state || process.env.UR_PORTAL_STATE || path.resolve(ROOT, "assets/unclerank/portal-state.json");
     const recEnv = {
       ...process.env, FFMPEG,
       UR_OUT: work, UR_W: String(W), UR_H: String(H),
       UR_PORTAL_URL: (opts.url || process.env.UR_PORTAL_URL || "https://portaal.unclerank.com"),
-      UR_SECONDS: String(Math.max(8, Math.round(dur))),
+      UR_SECONDS: String(clipsTotal),
     };
     try { if (stateCand && fs.existsSync(stateCand)) recEnv.UR_PORTAL_STATE = stateCand; } catch {}
     if (log) log("● portaal-opname van de live site…");
-    const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
-    if (r1.status !== 0) throw new Error("portaal-opname faalde, draait de engine op de machine met de browser en is het portaal bereikbaar?");
     const raw = path.join(work, "portal-walkthrough.mp4");
-    const final = path.join(work, "portal-final.mp4");
+    const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
+    const haveRec = (r1.status === 0 && fs.existsSync(raw));
+    if (!haveRec && log) log("opname faalde — montage met alleen tekstkaarten");
 
-    // 3) stem over de opname (stem is al luid genormaliseerd; geen muziek). apad + -shortest = audio
-    // loopt tot de videolengte. Lukt de mix niet, dan leveren we de opname zonder stem (stil).
+    // 4) segmenten bouwen (allemaal zelfde codec/res/fps -> veilig aan elkaar te plakken)
+    async function cardSeg(card, dur, i) {
+      try {
+        const png = path.join(work, `card-${i}-${card.key}.png`);
+        rasterCard(makeCardSvg({ W, H, title: card.title, sub: card.sub, outro: !!card.outro }), W, png);
+        const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-card.mp4`);
+        const r = await runStreamed(FFMPEG, ["-y", "-v", "error", "-loop", "1", "-t", String(dur), "-i", png,
+          "-vf", `scale=${W}:${H},fps=${FPS},format=yuv420p`, ...ENC, mp4], { ...process.env }, log, "· kaart:");
+        if (r.status === 0 && fs.existsSync(mp4)) return mp4;
+      } catch (e) { if (log) log("kaart overgeslagen: " + e.message); }
+      return null;
+    }
+    async function clipSeg(startSec, dur, i) {
+      if (!haveRec) return null;
+      try {
+        const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-clip.mp4`);
+        const r = await runStreamed(FFMPEG, ["-y", "-v", "error", "-ss", String(startSec), "-t", String(dur), "-i", raw,
+          "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},setsar=1,format=yuv420p`,
+          "-an", ...ENC, mp4], { ...process.env }, log, "· clip:");
+        if (r.status === 0 && fs.existsSync(mp4)) return mp4;
+      } catch (e) { if (log) log("clip overgeslagen: " + e.message); }
+      return null;
+    }
+
+    if (log) log("● montage bouwen (tekstkaarten + opname-stukjes)…");
+    const segs = []; let si = 0; const push = (p) => { if (p) segs.push(p); };
+    push(await cardSeg(PORTAAL_CARDS[0], cardDur.intro, si++));                 // intro-kaart
+    push(await clipSeg(0,                         clipDur[0], si++));           // opname: lijst
+    push(await cardSeg(PORTAAL_CARDS[1], cardDur.meten, si++));                 // "wij meten elke dag"
+    push(await clipSeg(clipDur[0],                clipDur[1], si++));           // opname: lead openen
+    push(await cardSeg(PORTAAL_CARDS[2], cardDur.tijd,  si++));                 // "stijgt/daalt"
+    push(await clipSeg(clipDur[0] + clipDur[1],   clipDur[2], si++));          // opname: dossier
+    push(await cardSeg(PORTAAL_CARDS[3], cardDur.slot,  si++));                 // slot: "geen leadlijst"
+
+    // 5) alles aan elkaar plakken. Lukt er niets, degradeer naar opname (met/zonder stem) of hard falen.
+    let base = "";
+    if (segs.length >= 2) {
+      const montage = path.join(work, "portal-montage.mp4");
+      const listFile = path.join(work, "concat.txt");
+      await fs.promises.writeFile(listFile, segs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"), "utf8");
+      const rc = await runStreamed(FFMPEG, ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", listFile, ...ENC, montage], { ...process.env }, log, "· plakken:");
+      base = (rc.status === 0 && fs.existsSync(montage)) ? montage : (segs[0] || "");
+    } else if (segs.length === 1) {
+      base = segs[0];
+    }
+    if (!base) {                                                                // geen enkel segment -> val terug op de kale opname
+      if (!haveRec) throw new Error("portaal-opname faalde én geen tekstkaarten, draait de engine op de machine met de browser en is het portaal bereikbaar?");
+      base = raw;
+    }
+
+    // 6) vertelstem over de montage (stem is al luid genormaliseerd; geen muziek). De VIDEO is leidend:
+    // apad vult de stem met stilte tot het einde, zodat de slot-kaart blijft staan. Mix faalt -> stil.
     if (voiceWav && fs.existsSync(voiceWav)) {
-      if (log) log("● vertelstem over de opname leggen…");
-      const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-i", raw, "-i", voiceWav,
+      if (log) log("● vertelstem over de montage leggen…");
+      const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-i", base, "-i", voiceWav,
         "-filter_complex", "[1:a]apad[a]", "-map", "0:v", "-map", "[a]",
         "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", "-shortest", final], { ...process.env }, log, "· mix:");
-      if (r2.status !== 0) { if (log) log("mix faalde — opname zonder stem"); await fs.promises.copyFile(raw, final); }
+      if (r2.status !== 0) { if (log) log("mix faalde — montage zonder stem"); await fs.promises.copyFile(base, final); }
     } else {
-      await fs.promises.copyFile(raw, final);
+      await fs.promises.copyFile(base, final);
     }
 
     return { prebuilt: final, music: "", lang: "nl", cleanup: work };
