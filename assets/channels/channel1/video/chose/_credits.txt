@@ -103,3 +103,15 @@ scene 12 beat 3: chose/s12b3__c3.mp4 | Pixabay License (free) | AVISIONfx
 scene 12 beat 4: chose/s12b4__c1.mp4 | Pixabay License (free) | alexborodai
 scene 12 beat 4: chose/s12b4__c2.mp4 | Pixabay License (free) | Matthias_Groeneveld
 scene 12 beat 4: chose/s12b4__c3.mp4 | Pixabay License (free) | ChristianBodhi
+scene 1 beat 4: chose/s01b4__c1.mp4 | Pixabay License (free) | Coverr-Free-Footage
+scene 1 beat 4: chose/s01b4__c2.mp4 | Pixabay License (free) | Activedia
+scene 1 beat 4: chose/s01b4__c3.mp4 | Pixabay License (free) | Coverr-Free-Footage
+scene 2 beat 3: chose/s02b3__c1.mp4 | Pixabay License (free) | ChristianBodhi
+scene 2 beat 3: chose/s02b3__c2.mp4 | Pixabay License (free) | tunnelmotions
+scene 2 beat 3: chose/s02b3__c3.mp4 | Pixabay License (free) | jeremiah7
+scene 8 beat 6: chose/s08b6__c1.mp4 | Pixabay License (free) | Vimeo-Free-Videos
+scene 8 beat 6: chose/s08b6__c2.mp4 | Pixabay License (free) | Vimeo-Free-Videos
+scene 8 beat 6: chose/s08b6__c3.mp4 | Pixabay License (free) | Vimeo-Free-Videos
+scene 11 beat 4: chose/s11b4__c1.mp4 | Pixabay License (free) | ChristianBodhi
+scene 11 beat 4: chose/s11b4__c2.mp4 | Pixabay License (free) | Leolo212
+scene 11 beat 4: chose/s11b4__c3.mp4 | Pixabay License (free) | ChristianBodhi

@@ -128,7 +128,15 @@
           "abs_start": 60.272
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 3.0,
+          "dur": 58.56,
+          "label": "intro (merk)",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -218,7 +226,36 @@
           "abs_start": 100.354
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 9.69,
+          "label": "wakker, naar buiten",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s01b1__c1.mp4"
+        },
+        {
+          "start": 9.69,
+          "dur": 14.41,
+          "label": "kleren, eten kiezen",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s01b2__c1.mp4"
+        },
+        {
+          "start": 24.1,
+          "dur": 9.61,
+          "label": "de route, oversteken",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s01b3__c1.mp4"
+        },
+        {
+          "start": 33.71,
+          "dur": 10.51,
+          "label": "het brein weegt",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -315,7 +352,29 @@
           "abs_start": 144.983
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 16.079,
+          "label": "vogels, instinct",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s02b1__c1.mp4"
+        },
+        {
+          "start": 16.079,
+          "dur": 8.428,
+          "label": "de mens pauzeert",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s02b2__c1.mp4"
+        },
+        {
+          "start": 24.507,
+          "dur": 20.863,
+          "label": "redeneren over het ongeziene",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -405,7 +464,26 @@
           "abs_start": 192.939
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 15.077,
+          "label": "de auto hapert",
+          "vid": "assets/channels/channel1/video/chose/s03b1__c1.mp4"
+        },
+        {
+          "start": 15.077,
+          "dur": 19.219,
+          "label": "de monteur die het weet",
+          "vid": "assets/channels/channel1/video/chose/s03b2__c1.mp4"
+        },
+        {
+          "start": 34.296,
+          "dur": 9.844,
+          "label": "weten wat je niet weet",
+          "vid": "assets/channels/channel1/video/chose/s03b3__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -467,7 +545,20 @@
           "abs_start": 230.942
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 22.803,
+          "label": "de vreemde, je geld",
+          "vid": "assets/channels/channel1/video/chose/s04b1__c1.mp4"
+        },
+        {
+          "start": 22.803,
+          "dur": 18.267,
+          "label": "de dokter, de pil",
+          "vid": "assets/channels/channel1/video/chose/s04b2__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -522,7 +613,20 @@
           "abs_start": 259.566
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 13.83,
+          "label": "het schakelt uit",
+          "vid": "assets/channels/channel1/video/chose/s05b1__c1.mp4"
+        },
+        {
+          "start": 13.83,
+          "dur": 12.95,
+          "label": "de grootste vraag",
+          "vid": "assets/channels/channel1/video/chose/s05b2__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -612,7 +716,26 @@
           "abs_start": 295.909
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 6.002,
+          "label": "kosmos, waarom hier",
+          "vid": "assets/channels/channel1/video/chose/s06b1__c1.mp4"
+        },
+        {
+          "start": 6.002,
+          "dur": 15.221,
+          "label": "een kaars in het donker",
+          "vid": "assets/channels/channel1/video/chose/s06b2__c1.mp4"
+        },
+        {
+          "start": 21.223,
+          "dur": 13.027,
+          "label": "de stille kamer",
+          "vid": "assets/channels/channel1/video/chose/s06b3__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -688,7 +811,20 @@
           "abs_start": 334.441
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 13.158,
+          "label": "ik betrapte mezelf (raam)",
+          "vid": "assets/channels/channel1/video/chose/s07b1__c1.mp4"
+        },
+        {
+          "start": 13.158,
+          "dur": 28.222,
+          "label": "de dag dat ik het vroeg",
+          "vid": "assets/channels/channel1/video/chose/s07b2__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -806,7 +942,50 @@
           "abs_start": 407.955
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 12.85,
+          "label": "de vijf deuren",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s08b1__c1.mp4"
+        },
+        {
+          "start": 12.85,
+          "dur": 14.59,
+          "label": "thuis",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s08b2__c1.mp4"
+        },
+        {
+          "start": 27.44,
+          "dur": 16.79,
+          "label": "een enkel moment",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s08b3__c1.mp4"
+        },
+        {
+          "start": 44.23,
+          "dur": 7.747,
+          "label": "de omgeving, meelopen",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s08b4__c1.mp4"
+        },
+        {
+          "start": 51.977,
+          "dur": 6.162,
+          "label": "de wereld, de schermen",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s08b5__c1.mp4"
+        },
+        {
+          "start": 58.139,
+          "dur": 10.431,
+          "label": "de pijn, weglopen",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -875,7 +1054,20 @@
           "abs_start": 441.482
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 14.997,
+          "label": "vier van buiten",
+          "vid": "assets/channels/channel1/video/chose/s09b1__c1.mp4"
+        },
+        {
+          "start": 14.997,
+          "dur": 17.453,
+          "label": "eentje duwt weg",
+          "vid": "assets/channels/channel1/video/chose/s09b2__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -993,7 +1185,32 @@
           "abs_start": 498.677
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 12.527,
+          "label": "volwassen, de spiegel",
+          "vid": "assets/channels/channel1/video/chose/s10b1__c1.mp4"
+        },
+        {
+          "start": 12.527,
+          "dur": 12.964,
+          "label": "verweven met wie je bent",
+          "vid": "assets/channels/channel1/video/chose/s10b2__c1.mp4"
+        },
+        {
+          "start": 25.491,
+          "dur": 16.781,
+          "label": "je verdedigt het (muur)",
+          "vid": "assets/channels/channel1/video/chose/s10b3__c1.mp4"
+        },
+        {
+          "start": 42.272,
+          "dur": 13.498,
+          "label": "de scherpe geest (schaak)",
+          "vid": "assets/channels/channel1/video/chose/s10b4__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -1118,7 +1335,36 @@
           "abs_start": 555.511
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 18.524,
+          "label": "het antwoord lag klaar",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s11b1__c1.mp4"
+        },
+        {
+          "start": 18.524,
+          "dur": 17.466,
+          "label": "nooit een leeg vel",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s11b2__c1.mp4"
+        },
+        {
+          "start": 35.99,
+          "dur": 10.219,
+          "label": "je beschermt het",
+          "img": "",
+          "vid": "assets/channels/channel1/video/chose/s11b3__c1.mp4"
+        },
+        {
+          "start": 46.209,
+          "dur": 9.361,
+          "label": "misschien een zesde deur",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
     },
     {
@@ -1257,7 +1503,32 @@
           "abs_start": 628.446
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 20.23,
+          "label": "de twijfel, de mist",
+          "vid": "assets/channels/channel1/video/chose/s12b1__c1.mp4"
+        },
+        {
+          "start": 20.23,
+          "dur": 9.983,
+          "label": "sommigen kijken terug",
+          "vid": "assets/channels/channel1/video/chose/s12b2__c1.mp4"
+        },
+        {
+          "start": 30.213,
+          "dur": 18.585,
+          "label": "ieder zijn waarheid?",
+          "vid": "assets/channels/channel1/video/chose/s12b3__c1.mp4"
+        },
+        {
+          "start": 48.798,
+          "dur": 22.672,
+          "label": "open horizon, video 2",
+          "vid": "assets/channels/channel1/video/chose/s12b4__c1.mp4"
+        }
+      ],
       "sfx": []
     },
     {
@@ -1319,8 +1590,37 @@
           "abs_start": 661.82
         }
       ],
-      "beats": [],
+      "beats": [
+        {
+          "start": 0.0,
+          "dur": 31.85,
+          "label": "outro (merk)",
+          "img": "",
+          "vid": ""
+        }
+      ],
       "sfx": []
+    }
+  ],
+  "groups": {},
+  "music": [
+    {
+      "start": 0.0,
+      "end": 152.95,
+      "file": "assets/channels/channel1/muziek/chose-quiet.mp3",
+      "mood": "quiet"
+    },
+    {
+      "start": 267.09,
+      "end": 344.47,
+      "file": "assets/channels/channel1/muziek/chose-intimate.mp3",
+      "mood": "intimate"
+    },
+    {
+      "start": 344.47,
+      "end": 503.41,
+      "file": "assets/channels/channel1/muziek/chose-unease.mp3",
+      "mood": "unease"
     }
   ]
 }

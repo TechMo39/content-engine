@@ -62,3 +62,6 @@ sfx s06_end: sfx__s06_end__c3.mp3 | CC0 | FX - HIT IMPACT - Retro Videogame by b
 sfx s07_end: sfx__s07_end__c1.mp3 | CC0 | Impact 1 by Daftrio
 sfx s07_end: sfx__s07_end__c2.mp3 | CC0 | Hit Impact by MadPanCake
 sfx s07_end: sfx__s07_end__c3.mp3 | CC0 | FX - HIT IMPACT - Retro Videogame by bolkmar
+muziek 'quiet': Ghost Music Box BGM (Rev. 1) by ChristmasKrumble666 (Freesound, CC0)
+muziek 'intimate': Slow_Memory_80BPM by SignatureSoundsOrg (Freesound, CC0)
+muziek 'unease': Light - Ambient Glitching Generative Soundscape by bassimat (Freesound, CC0)
