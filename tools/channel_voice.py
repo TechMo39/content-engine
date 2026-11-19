@@ -23,9 +23,15 @@
 import argparse, os, sys, re, struct, json, logging, subprocess, shutil
 
 VOICES = {
-    "v1": "voice-test/refs/ref7.wav",
-    "v2": "voice-test/refs/ref8.wav",
-    "v3": "voice-test/refs/ref9.wav",
+    "male1": "voice-test/refs/male1.wav",
+    "male2": "voice-test/refs/male2.wav",
+    "male3": "voice-test/refs/male3.wav",
+    "male4": "voice-test/refs/male4.wav",
+    "male5": "voice-test/refs/male5.wav",
+    "male6": "voice-test/refs/male6.wav",
+    "fem1": "voice-test/refs/fem1.wav",
+    "fem2": "voice-test/refs/fem2.wav",
+    "fem3": "voice-test/refs/fem3.wav",
 }
 LANG = "en"
 LEAD_SILENCE = 3.0   # stilte vooraan de intro (logo in beeld)
