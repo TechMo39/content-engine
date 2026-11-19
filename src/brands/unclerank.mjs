@@ -1233,7 +1233,7 @@ export function makeBrand({ ROOT, config } = {}) {
   // actueel, delen, resultaat, rekensom, gratisweek, roi, hoehetwerkt) blijven als code staan maar zijn
   // uit de studio-lijst; hun inhoud is opgegaan in de thema-pools hierboven (UR_VARIANTS).
   const templates = [
-    { id: "portaal",  name: "Het aanbod (verse leads)",        music: [], defaults: {} },
+    { id: "aanbod",   name: "Het aanbod (verse leads)",        music: [], defaults: {} },
     { id: "vak",      name: "Voor jouw vak (per discipline)",  music: [], defaults: {} },
     { id: "geenlijst", name: "Geen koude lijst",               music: [], defaults: {} },
     { id: "kring",    name: "De kring (exclusief)",            music: [], defaults: {} },
@@ -1348,25 +1348,36 @@ export function makeBrand({ ROOT, config } = {}) {
       } catch (e) { if (log) log("clip overgeslagen: " + e.message); }
       return null;
     }
-    // adaptieve zoom: smal element = dieper inzoomen, breed element (volle kaart) = zacht, zodat de
-    // randen (bv. het label) niet wegvallen. Nooit helemaal plat, nooit te hard.
+    // Basiszoom: het blok VULT de breedte (kleine marge), met een hoogte-rem zodat een hoog blok niet
+    // overloopt. De portaal-blokken zijn bijna schermbreed, dus zonder deze aanpak zou de zoom te zacht
+    // zijn om op te vallen. Vloer 1.22 (altijd duidelijk ingezoomd), plafond 2.1 (smal blok = dieper).
     function adaptiveZoom(r) {
-      const z = Math.min(W / Math.max(1, r.w + 0.10 * W), H / Math.max(1, r.h + 0.10 * H));
-      return Math.max(1.12, Math.min(1.7, z));
+      const zW = W / Math.max(1, r.w + 0.015 * W);
+      const zH = H / Math.max(1, r.h + 0.06 * H);
+      return Math.max(1.22, Math.min(2.1, Math.min(zW, zH)));
     }
-    // push-in op een stilstaand portaal-beeld richting de bounding-box van het verkoop-deel (ffmpeg
-    // zoompan). De blur zit in de pixels, dus ingezoomd blijft de data vervaagd.
+    // push-in op een stilstaand portaal-beeld richting het verkoop-deel (ffmpeg zoompan). De camera
+    // begint AL op het blok (schermvullend) en duwt nog iets verder in, i.p.v. vanaf de volle pagina —
+    // zo zie je meteen het deel dat telt. De blur zit in de pixels, dus ingezoomd blijft data vervaagd.
     async function pushinSeg(shot, dur, i) {
       try {
         if (!shot || !fs.existsSync(shot.path)) return null;
         const r = shot.rect || { x: 0, y: 0, w: W, h: H };
-        const Z = adaptiveZoom(r);
-        const cx = Math.round(r.x + r.w / 2), cy = Math.round(r.y + r.h / 2);
+        const Z0 = adaptiveZoom(r);                         // hoe strak het blok in beeld komt
+        // EERST uitsnijden op het blok (gecentreerd, binnen het beeld geklemd), DAN naar volle maat
+        // schalen. Zo staat elke frame vanaf het begin op het blok — geen zoompan-start-op-1.0 meer.
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        let cw = Math.round(W / Z0), ch = Math.round(H / Z0);
+        cw = Math.min(W, cw + (cw % 2)); ch = Math.min(H, ch + (ch % 2));
+        let cropX = Math.round(cx - cw / 2), cropY = Math.round(cy - ch / 2);
+        cropX = Math.max(0, Math.min(W - cw, cropX));
+        cropY = Math.max(0, Math.min(H - ch, cropY));
+        const Zp = 1.06;                                    // zachte extra push voor leven
         const frames = Math.max(1, Math.round(dur * FPS));
-        const step = ((Z - 1) / Math.max(1, Math.round(0.82 * frames))).toFixed(5);
-        const vf = `zoompan=z='min(1+${step}*on,${Z.toFixed(3)})':`
-          + `x='max(0,min(iw-iw/zoom,${cx}-(iw/zoom)/2))':`
-          + `y='max(0,min(ih-ih/zoom,${cy}-(ih/zoom)/2))':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`;
+        const step = ((Zp - 1) / Math.max(1, Math.round(0.9 * frames))).toFixed(6);
+        const vf = `crop=${cw}:${ch}:${cropX}:${cropY},scale=${W}:${H},`
+          + `zoompan=z='min(1+${step}*on,${Zp})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':`
+          + `d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`;
         const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-shot.mp4`);
         const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", shot.path,
           "-vf", vf, ...ENC, mp4], { ...process.env }, log, "· inzoom:");
@@ -1650,7 +1661,7 @@ export function makeBrand({ ROOT, config } = {}) {
   }
   async function makeRender({ templateId = "roi", opts = {}, format = "9:16", log } = {}) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
-    if (templateId === "portaal") return await makePortalRender({ opts, format, log });
+    if (templateId === "aanbod" || templateId === "portaal") return await makePortalRender({ opts, format, log });
     if (["vak", "geenlijst", "kring", "hoewerkt"].includes(templateId)) return await makeCardMontageRender(templateId, { opts, format, log });
     const fn = BUILDERS[templateId] || buildRoi;
     const vi = pickVariant(templateId);                                  // afwisseling per render
