@@ -590,6 +590,36 @@ export function makeBrand({ ROOT = "." } = {}) {
     });
     return `<text x="${cx}" y="${y}" text-anchor="middle" xml:space="preserve" font-family="${SERIF}" font-weight="800" font-size="${fs}">${spans}</text>`;
   }
+  // GROTE tekst over MEERDERE regels met dezelfde woord-voor-woord reveal. Voor een lange zin of vraag
+  // (de hoofdvraag) die anders op één regel tot een dun lijntje zou krimpen. Wrapt op maxW en blijft groot,
+  // gecentreerd rond cyCenter. De reveal-timing loopt door over alle regels heen (één doorlopende golf).
+  function wordRevealWrap(txt, cx, cyCenter, baseFs, maxW, fill, p) {
+    const words = String(txt).split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
+    const per = 1 / words.length;
+    const charW = baseFs * 0.56;                 // zelfde schatting als fitFs
+    const lines = []; let cur = [], curLen = 0;
+    for (const w of words) {
+      const wLen = (w.length + 1) * charW;
+      if (cur.length && curLen + wLen > maxW) { lines.push(cur); cur = []; curLen = 0; }
+      cur.push(w); curLen += wLen;
+    }
+    if (cur.length) lines.push(cur);
+    const lineH = baseFs * 1.18;
+    const y0 = cyCenter - (lines.length * lineH) / 2 + baseFs * 0.82;   // baseline van de eerste regel
+    let gi = 0, out = "";
+    lines.forEach((lineWords, li) => {
+      let spans = "";
+      lineWords.forEach((w, wi) => {
+        const o = clamp01((p - gi * per) / (per * 0.9));
+        if (wi) spans += `<tspan dx="${(baseFs * 0.3).toFixed(1)}"> </tspan>`;
+        spans += `<tspan fill="${fill}" fill-opacity="${o.toFixed(2)}">${escapeXml(w)}</tspan>`;
+        gi++;
+      });
+      out += `<text x="${cx}" y="${(y0 + li * lineH).toFixed(0)}" text-anchor="middle" xml:space="preserve" font-family="${SERIF}" font-weight="800" font-size="${baseFs}">${spans}</text>`;
+    });
+    return out;
+  }
   // -- rustig sterrenveld (merk-achtergrond, deterministisch) --
   function starfield(W, H, seed = 7) {
     let s = seed, out = "";
@@ -607,11 +637,14 @@ export function makeBrand({ ROOT = "." } = {}) {
   function techStatement({ W, H, p, scene }) {
     const S = Math.min(W, H);
     const txt = scene.text || "";
-    const fs = fitFs(txt, Math.round(S * 0.11), W * 0.80, 0.56);
+    const oneFs = fitFs(txt, Math.round(S * 0.11), W * 0.80, 0.56);
+    const multi = oneFs < S * 0.07;                 // te lang voor één grote regel (bv. de hoofdvraag)
     let g = bgField(W, H, (txt.length * 7) % 97);
-    // zachte oranje gloed achter de tekst
-    g += `<ellipse cx="${W / 2}" cy="${H * 0.46}" rx="${W * 0.44}" ry="${H * 0.14}" fill="${COL.orange}" opacity="${(0.10 * sm(p)).toFixed(2)}"/>`;
-    g += wordReveal(txt, W / 2, H * 0.48, fs, COL.cream, p);
+    // zachte oranje gloed achter de tekst (iets hoger bij meerdere regels)
+    g += `<ellipse cx="${W / 2}" cy="${H * 0.46}" rx="${W * 0.44}" ry="${H * (multi ? 0.18 : 0.14)}" fill="${COL.orange}" opacity="${(0.10 * sm(p)).toFixed(2)}"/>`;
+    g += multi
+      ? wordRevealWrap(txt, W / 2, H * 0.46, Math.round(S * 0.082), W * 0.82, COL.cream, p)
+      : wordReveal(txt, W / 2, H * 0.48, oneFs, COL.cream, p);
     // kicker onder de zin (scene.kick), rustig
     if (scene.kick) {
       const ko = clamp01((p - 0.5) / 0.3);
