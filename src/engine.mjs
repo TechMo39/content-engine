@@ -855,6 +855,24 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    // UMMA STEM-SAMPLES — genereer ÉÉN scène in ALLE stemmen, zodat je ze in de Stem-kiezer kunt
+    // vergelijken en kiezen. Zware job (Chatterbox per stem), dus fire-and-forget: we starten 'm en
+    // antwoorden meteen; de studio klikt "ververs" tot de stemmen verschijnen.
+    if (u.pathname === "/api/channel-voice-samples" && req.method === "POST") {
+      const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");
+      const scene = Number.isInteger(parseInt(bd.scene, 10)) ? String(parseInt(bd.scene, 10)) : "1";
+      if (!story) { json(res, { error: "story vereist" }, 400); return; }
+      const py = process.platform === "win32" ? "python" : "python3";
+      const a = ["tools/channel_voice.py", "--story", story, "--voice", "alle", "--only", scene, "--channel", CH];
+      log(`▶ stem-samples: ${story} scène ${scene}, alle stemmen (dit duurt even)`);
+      execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 16 * 1024 * 1024, timeout: 3600000 }, (err, stdout, stderr) => {
+        if (err) log(`✗ stem-samples ${story}: ${String(stderr || err).slice(0, 300)}`);
+        else log(`✓ stem-samples klaar voor ${story}`);
+      });
+      json(res, { started: true });
+      return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/channel-upload" && req.method === "POST") {

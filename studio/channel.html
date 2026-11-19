@@ -145,7 +145,7 @@
 <input id="ld-beeld" type="file" accept="image/*,video/*" style="display:none">
 <div class="picker" id="picker"><div class="box"><button class="close" id="pick-close">sluiten</button><h3 id="pick-title">Kies een opgehaald beeld voor deze beat</h3><div class="grid" id="pick-grid"></div></div></div>
 <div class="picker" id="apicker"><div class="box"><button class="close" id="ap-close">sluiten</button><h3 id="ap-title">Kies geluid</h3><div class="row" id="ap-ctrl" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"></div><div class="btcands" id="ap-cands"></div></div></div>
-<div class="picker" id="vpicker"><div class="box"><button class="close" id="vp-close">sluiten</button><h3>Kies de stem voor deze video</h3><div style="color:var(--mut);font-size:12px;margin:-4px 0 12px">Elke stem is een eigen tijdlijn. Beluister een fragment en kies; de studio laadt dan die stem.</div><div id="vp-cands" style="display:flex;gap:12px;flex-wrap:wrap"></div></div></div>
+<div class="picker" id="vpicker"><div class="box"><button class="close" id="vp-close">sluiten</button><h3>Kies de stem voor deze video</h3><div style="color:var(--mut);font-size:12px;margin:-4px 0 10px">Elke stem is een eigen tijdlijn. Beluister een fragment en kies; de studio laadt dan die stem.</div><div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><button id="vp-gen">genereer alle stemmen (scène 1)</button><button id="vp-refresh">ververs</button><span id="vp-msg" style="font-size:12px;color:var(--mut)"></span></div><div id="vp-cands" style="display:flex;gap:12px;flex-wrap:wrap"></div></div></div>
 <div class="preview">
  <div class="screen">
   <img class="media" id="pv-img" style="display:none" alt="">
@@ -947,6 +947,14 @@ function openVoice(){
  }).catch(()=>{box.innerHTML='<div style="color:#e88;font-size:12px">kon stemmen niet laden</div>';});
 }
 $('btn-voice').addEventListener('click',openVoice);
+// Alle stemmen in de studio genereren (scène 1), zodat je ze hier kunt beluisteren en kiezen.
+$('vp-gen').addEventListener('click',async()=>{
+ const m=$('vp-msg');m.style.color='var(--mut)';m.textContent='bezig… elke stem duurt een paar minuten. Klik "ververs" zodra je nieuwe stemmen ziet verschijnen.';
+ try{const r=await fetch('/api/channel-voice-samples',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,scene:(SC[1]&&SC[1].scene!=null)?SC[1].scene:1})});
+  const d=await r.json(); if(!d.started){m.style.color='var(--sfx)';m.textContent='kon niet starten: '+(d.error||'onbekende fout');}}
+ catch(e){m.style.color='var(--sfx)';m.textContent='kon niet starten — draait de engine?';}
+});
+$('vp-refresh').addEventListener('click',openVoice);
 $('vp-close').addEventListener('click',closeVP);
 $('vpicker').addEventListener('click',e=>{if(e.target.id==='vpicker')closeVP();});
 
