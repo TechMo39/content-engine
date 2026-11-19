@@ -378,7 +378,10 @@ function stamp() { const d = new Date(); return `${p2(d.getMonth() + 1)}${p2(d.g
 function outBase(job) {
   const p = [job.brand, job.template || "video"];
   const _lg = job.opts && job.opts.lang; if (_lg === "en" || _lg === "fr") p.push(_lg);
-  if (job.opts && job.opts.name) p.push(String(job.opts.name).replace(/\s+/g, ""));
+  // Naam-deel: expliciete opts.name, anders de titel (kanaal-renders sturen opts.title mee), zodat
+  // er een herkenbare bestandsnaam uitkomt (channel1-mix-TheAnswerYouNeverChose-...) i.p.v. kaal "mix".
+  const label = (job.opts && (job.opts.name || job.opts.title)) || "";
+  if (label) p.push(String(label).replace(/\s+/g, ""));
   return (p.join("-").replace(/[^A-Za-z0-9_-]+/g, "").slice(0, 50) || "video") + "-" + stamp();
 }
 async function runOne(job) {
