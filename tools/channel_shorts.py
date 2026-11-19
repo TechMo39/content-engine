@@ -25,7 +25,7 @@ import argparse, json, os, shutil, subprocess, sys
 
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 OUT_W, OUT_H = 1080, 1920
-MIN_LEN, MAX_LEN = 12.0, 58.0           # Shorts: < 60s
+MIN_LEN, MAX_LEN = 12.0, 178.0          # Shorts mogen tot 3 min (180s); promo's houden we kort (auto ~32-36s)
 CTA_TEXT = "FULL VIDEO ON OUR CHANNEL"
 
 FFMPEG = "ffmpeg"
