@@ -161,6 +161,7 @@ const UR_BEATS = {
 // timing). De render kiest er willekeurig één (anti-herhaling), zodat beeld én stem per render
 // wisselen. Elke variant = de tekst-blokken op het scherm + de bijbehorende stem-regels (zelfde
 // volgorde als UR_BEATS). Cijfers blijven structureel (uit opts); alleen de bewoording wisselt.
+const UR_CTA_URL = "portaal.unclerank.com/bureaus";   // CTA-URL op de slotkaart; pas aan als de bureaus-pagina verandert
 const UR_VARIANTS = {
   roi: [
     {
@@ -190,17 +191,107 @@ const UR_VARIANTS = {
       ],
     },
   ],
-  // PORTAAL (montage): tekstkaarten + stukjes schermopname. GEEN leadlijst-framing. Kern: een bedrijf
-  // opzoeken geeft één momentopname; wij meten elk bedrijf dagelijks en bewaren de verandering OVER TIJD
-  // (SEO-voorbeeld: stijgt/daalt/sinds wanneer). Kwaliteitstoon. De opname is illustratie tussen de tekst.
+  // THEMA "HET AANBOD" (montage: tekstkaarten + stukjes schermopname). Elke variant = een ANDERE
+  // invalshoek op dezelfde boodschap (verse leads met een reden, per vak), met eigen stem én eigen
+  // kaarten. De render kiest telkens een verse (blijvende anti-herhaling), zodat geen twee renders
+  // gelijk zijn. Kaart-rollen in vaste volgorde [hook, pijn, oplossing, waarde, cta]; PORTAAL_SEQUENCE
+  // plaatst ze met de opname-stukjes ertussen. GEEN meetmethode noemen (bedrijfsgeheim): enkel het
+  // signaal en de waarde. De opname werkt als beeld, niet als het verhaal.
   portaal: [
-    {
+    { // A — het juiste moment
       voice: [
         "Heb jij een online marketingbureau? Dan weet je hoe lastig het is om aan goede nieuwe klanten te komen.",
         "Je belt bedrijven koud, zonder te weten wat er speelt, of waarom ze jou juist nu nodig hebben.",
         "UncleRank houdt Nederlandse bedrijven in de gaten en geeft jou bedrijven met een vers signaal, per vak: SEO, SEA, web, content en reclame.",
         "Zo bel je niet meer koud, maar precies op het moment dat een bedrijf jou nodig heeft, met de reden erbij.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Online marketingbureau?",    sub: "Nieuwe klanten vinden\nis het lastigste wat er is." },
+        { key: "pijn",      title: "Koud bellen werkt niet",     sub: "Je weet niet wat er speelt,\nof waarom ze jou nu nodig hebben." },
+        { key: "oplossing", title: "Maak kennis\nmet UncleRank", sub: "Bedrijven met een vers signaal,\nkant-en-klaar per vak." },
+        { key: "waarde",    title: "Bel op het juiste moment",   sub: "Niet koud, maar precies\nals een bedrijf je nodig heeft." },
+        { key: "cta",       title: "Probeer het gratis",         sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // B — koud bellen is gokken
+      voice: [
+        "Je belt een bedrijf koud, maar je weet niet wat er bij ze speelt.",
+        "Misschien draait alles prima en verspil je je tijd, misschien bel je net te laat.",
+        "UncleRank laat je alleen bedrijven zien waar nu aantoonbaar iets mis is, per vak: SEO, SEA, web, content en reclame.",
+        "Zo bel je op het juiste moment, met een reden die klopt.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Koud bellen is gokken",  sub: "Je weet niet wat er\nbij ze speelt." },
+        { key: "pijn",      title: "Te vroeg of te laat",    sub: "Je verspilt je tijd,\nof je belt net te laat." },
+        { key: "oplossing", title: "UncleRank weet het wél", sub: "Alleen bedrijven waar nu\naantoonbaar iets mis is." },
+        { key: "waarde",    title: "Het juiste moment",      sub: "Een reden die klopt,\nper vak." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // C — een lijst is geen lead
+      voice: [
+        "Een lijst met namen koop je overal, dat is een telefoonboek.",
+        "Een echte lead is een bedrijf waar iets mis is dat jij kunt oplossen.",
+        "UncleRank meet Nederlandse bedrijven door en geeft je alleen die, per vak: SEO, SEA, web, content en reclame.",
+        "Geen koude naam, maar een bedrijf met een reden om nu te bellen.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Een lijst is geen lead", sub: "Namen koop je overal.\nDat is een telefoonboek." },
+        { key: "pijn",      title: "Namen zeggen niks",      sub: "Je weet niet wie\neen probleem heeft." },
+        { key: "oplossing", title: "UncleRank wél",          sub: "Alleen bedrijven waar iets mis is\ndat jij oplost, per vak." },
+        { key: "waarde",    title: "Geen koude naam",        sub: "Een bedrijf met een reden\nom nu te bellen." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // D — elk vak z'n eigen signaal
+      voice: [
+        "Elk bureau zoekt iets anders in een bedrijf.",
+        "Een webbouwer wil een verouderde site, een SEO-bureau een bedrijf dat slecht gevonden wordt.",
+        "UncleRank zet per vak de juiste bedrijven voor je klaar, met het signaal erbij.",
+        "Jij belt alleen wie jouw dienst echt nodig heeft.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Elk vak z'n eigen signaal",      sub: "Elk bureau zoekt iets\nanders in een bedrijf." },
+        { key: "pijn",      title: "Niet elk bedrijf is jouw klant", sub: "Een webbouwer wil iets anders\ndan een SEO-bureau." },
+        { key: "oplossing", title: "UncleRank sorteert dat",         sub: "Per vak de juiste bedrijven,\nmet het signaal erbij." },
+        { key: "waarde",    title: "Alleen wie jou nodig heeft",     sub: "Jij belt alleen wie jouw\ndienst echt nodig heeft." },
+        { key: "cta",       title: "Probeer het gratis",             sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // E — verloren uren
+      voice: [
+        "Hoeveel uur verlies je aan bedrijven die toch nooit klant werden?",
+        "Bellen zonder te weten wat er speelt is gokken met je tijd.",
+        "UncleRank geeft je alleen bedrijven waar aantoonbaar iets mis is, per vak: SEO, SEA, web, content en reclame.",
+        "Zo gaat je tijd naar gesprekken die ergens over gaan.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Hoeveel uur verlies je?", sub: "Aan bedrijven die toch\nnooit klant werden." },
+        { key: "pijn",      title: "Gokken met je tijd",      sub: "Bellen zonder te weten\nwat er speelt." },
+        { key: "oplossing", title: "UncleRank filtert dat",   sub: "Alleen bedrijven waar\naantoonbaar iets mis is." },
+        { key: "waarde",    title: "Gesprekken die tellen",   sub: "Je tijd naar de juiste\nbedrijven, per vak." },
+        { key: "cta",       title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // F — een verandering is een open deur
+      voice: [
+        "Een bedrijf dat net stopte met adverteren, is een open deur voor een ads-bureau.",
+        "Maar dat zie je niet als je het koud benadert.",
+        "UncleRank pikt dat soort veranderingen op en zet ze per vak voor je klaar.",
+        "Zo kom je binnen precies wanneer het bedrijf je nodig heeft.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Een open deur",         sub: "Een bedrijf dat net stopte\nmet adverteren." },
+        { key: "pijn",      title: "Je ziet het niet",      sub: "Niet als je koud\nbinnenkomt." },
+        { key: "oplossing", title: "UncleRank pikt het op",  sub: "Veranderingen bij bedrijven,\nper vak klaargezet." },
+        { key: "waarde",    title: "Precies op tijd",       sub: "Je komt binnen wanneer\nhet bedrijf je nodig heeft." },
+        { key: "cta",       title: "Probeer het gratis",    sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
   ],
@@ -214,6 +305,26 @@ function pickVariant(templateId) {
   do { i = Math.floor(Math.random() * vs.length); } while (i === LAST_VARIANT[templateId]);
   LAST_VARIANT[templateId] = i;
   return i;
+}
+// BLIJVENDE anti-herhaling over renders heen (ook na herstart): welke varianten recent gebruikt zijn
+// staat in een klein state-bestand, zodat je niet twee keer snel dezelfde invalshoek rendert. Blokkeert
+// ~60% van de pool; valt terug op de hele pool als alles recent is. Per type een eigen geschiedenis.
+function pickFreshVariant(ROOT, templateId, n) {
+  if (!n || n <= 1) return 0;
+  const sf = path.resolve(ROOT, "assets", "unclerank", ".ur-state.json");
+  let st = {};
+  try { st = JSON.parse(fs.readFileSync(sf, "utf8")) || {}; } catch {}
+  const hist = Array.isArray(st[templateId]) ? st[templateId] : [];
+  const keep = Math.max(1, Math.floor(n * 0.6));
+  const recent = hist.slice(-keep);
+  let avail = [];
+  for (let i = 0; i < n; i++) if (!recent.includes(i)) avail.push(i);
+  if (!avail.length) avail = Array.from({ length: n }, (_, i) => i);
+  const pick = avail[Math.floor(Math.random() * avail.length)];
+  hist.push(pick); while (hist.length > n) hist.shift();
+  st[templateId] = hist;
+  try { fs.mkdirSync(path.dirname(sf), { recursive: true }); fs.writeFileSync(sf, JSON.stringify(st)); } catch {}
+  return pick;
 }
 // Laad stem-wavs + muziekbodem additief in het render-object (Truthward: render.music + audio.tracks).
 // Raakt de kern NIET: de engine legt render.music onder de video en overlayAudio mixt de stem erover.
@@ -255,18 +366,9 @@ function root(W, H, inner) {
 // ---- PORTAAL-MONTAGE: tekstkaarten tussen de schermopname -----------------------------------
 // De 4 kaarten vertellen het verhaal (momentopname -> wij meten dagelijks -> beweging over tijd ->
 // geen leadlijst). De opname-stukjes komen ertussen als illustratie. Titel mag 2 regels via "\n".
-// De URL op de CTA-kaart (laatste kaart). Pas dit aan als de bureaus-pagina een andere URL krijgt.
-const UR_CTA_URL = "portaal.unclerank.com/bureaus";
-const PORTAAL_CARDS = [
-  { key: "context", title: "Online marketingbureau?",      sub: "Nieuwe klanten vinden\nis het lastigste wat er is." },
-  { key: "pijn",    title: "Koud bellen werkt niet",       sub: "Je weet niet wat er speelt,\nof waarom ze jou nu nodig hebben." },
-  { key: "watdoen", title: "Maak kennis\nmet UncleRank",   sub: "Bedrijven met een vers signaal,\nkant-en-klaar per vak." },
-  { key: "waarde",  title: "Bel op het juiste moment",     sub: "Niet koud, maar precies\nals een bedrijf je nodig heeft." },
-  { key: "cta",     title: "Probeer het gratis",           sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
-];
-// Volgorde van de montage: context + pijn zijn tekst-only; de opname-stukjes (het echte portaal) komen
+// Volgorde van de montage: hook + pijn zijn tekst-only; de opname-stukjes (het echte portaal) komen
 // pas bij de oplossing en de waarde. Elk item heeft een gewicht voor de duur-verdeling (kaarten korter,
-// opname-stukjes iets langer). card = index in PORTAAL_CARDS.
+// opname-stukjes iets langer). card = index in de kaarten van de gekozen variant.
 const PORTAAL_SEQUENCE = [
   { kind: "card", i: 0, w: 1.3 },   // context: "online marketingbureau?"
   { kind: "card", i: 1, w: 1.2 },   // pijn: "koud bellen werkt niet"
@@ -748,7 +850,7 @@ export function makeBrand({ ROOT, config } = {}) {
     // blijft staan voor eventueel later hergebruik; type is uit de studio-lijst gehaald.
     // { id: "roi", name: "Eén klant en 't is terugverdiend", music: ["upbeat", "calm", "lofi"], defaults: {} },
     { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
-    { id: "portaal", name: "Portaal-opname (verse data)", music: [], defaults: {} },
+    { id: "portaal", name: "Het aanbod (verse leads)", music: [], defaults: {} },
     { id: "kring", name: "De kring uitgelegd", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "bureaus", name: "Voor wie: 5 bureautypes", music: ["calm", "lofi", "upbeat"], defaults: {} },
     { id: "exclusief", name: "3 weken exclusief", music: ["calm", "lofi", "upbeat"], defaults: {} },
@@ -787,20 +889,27 @@ export function makeBrand({ ROOT, config } = {}) {
     const final = path.join(work, "portal-final.mp4");
     const ENC = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(FPS), "-preset", "veryfast"];
 
+    // 0) kies een VERSE variant (andere invalshoek dan recent), blijvend over renders heen. Elke
+    //    variant heeft z'n eigen stem (eigen voice-map vXX) én z'n eigen kaarten.
+    const POOL = UR_VARIANTS.portaal || [];
+    const vi = pickFreshVariant(ROOT, "portaal", POOL.length);
+    const variant = POOL[vi] || {};
+    const CARDS = Array.isArray(variant.cards) && variant.cards.length ? variant.cards : [];
+    if (log) log(`● variant ${String.fromCharCode(65 + vi)} van ${POOL.length} gekozen`);
+
     // 1) NL-stem genereren (de vertelling). Duur bepaalt de totale lengte; de opname-stukjes volgen.
     let voiceWav = "", T = Number(opts.seconds) || 20;
     try {
-      const vdir = voiceDir(ROOT, "portaal", 0);
+      const vdir = voiceDir(ROOT, "portaal", vi);
       const wavp = path.join(vdir, "voice.wav");
       const linesFile = path.join(vdir, "_lines.json");
-      const variant = (UR_VARIANTS.portaal || [])[0];
       const wantLines = (variant && Array.isArray(variant.voice)) ? JSON.stringify(variant.voice) : "";
       let haveLines = null; try { haveLines = await fs.promises.readFile(linesFile, "utf8"); } catch {}
       if ((opts.versStem) || !fs.existsSync(wavp) || (wantLines && haveLines !== wantLines)) {
         await fs.promises.mkdir(vdir, { recursive: true });
         if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
-        if (log) log("● UR-stem genereren (portaal, NL) — dit duurt even…");
-        const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", "portaal", "--variant", "0", "--root", ROOT];
+        if (log) log("● UR-stem genereren (het aanbod, NL) — dit duurt even…");
+        const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", "portaal", "--variant", String(vi), "--root", ROOT];
         if (wantLines) args.push("--lines", linesFile);
         if (opts.voice) args.push("--voice", String(opts.voice));
         await runStreamed(PY, args, { ...process.env, FFMPEG }, log, "· stem:");
@@ -866,7 +975,7 @@ export function makeBrand({ ROOT, config } = {}) {
     for (let i = 0; i < SEQ.length; i++) {
       const s = SEQ[i];
       if (s.kind === "card") {
-        push(await cardSeg(PORTAAL_CARDS[s.i], durOf[i], i));
+        push(await cardSeg(CARDS[s.i] || {}, durOf[i], i));
       } else {
         push(await clipSeg(clipAt, durOf[i], i));
         clipAt += durOf[i];
