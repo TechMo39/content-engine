@@ -1435,30 +1435,36 @@ export function makeBrand({ ROOT, config } = {}) {
     //     een foto via Wikimedia) en zet het klaar. Dat beeld komt ONDER de tekst te liggen (zelfde
     //     logica als Truthward). ADDITIEF: vindt een zoekterm niks, of draait dit zonder internet (cloud),
     //     dan staat die kaart simpelweg niet in de manifest en valt hij terug op de gewone tekstkaart.
-    const beeldByIdx = {};
+    const BEELD_PER = 5;                 // hoeveel beelden per kaart klaargezet worden om uit te rouleren
+    const beeldPoolByIdx = {};           // i -> [{kind, path}, ...]  (de poel per kaart)
+    const hasQ = (q) => (Array.isArray(q) ? q.some((x) => (x || "").trim()) : (q || "").trim());
     const QUERIES = Array.isArray(variant.queries) ? variant.queries : null;
-    if (QUERIES && QUERIES.some((q) => (q || "").trim())) {
+    if (QUERIES && QUERIES.some(hasQ)) {
       try {
         const bdir = path.resolve(ROOT, "assets", "unclerank", "beeld", templateId, "v" + vi);
         const qFile = path.join(bdir, "_queries.json");
         const manFile = path.join(bdir, "_beeld.json");
-        const wantQ = JSON.stringify(QUERIES);
+        const wantQ = JSON.stringify({ queries: QUERIES, per: BEELD_PER });
         let haveQ = null; try { haveQ = await fs.promises.readFile(qFile, "utf8"); } catch {}
-        // alleen (opnieuw) zoeken als het nog niet bestaat of de zoektermen zijn gewijzigd
+        // ophalen gebeurt ÉÉN keer (poel gecachet). Alleen opnieuw zoeken als het nog niet bestaat
+        // of de zoektermen zijn gewijzigd. De rotatie zelf gebeurt per render, uit de gecachete poel.
         if (opts.versBeeld || !fs.existsSync(manFile) || haveQ !== wantQ) {
           if (log) log("● beeld zoeken (" + templateId + ", rechtenvrij), dit kan even duren…");
           const bargs = [path.resolve(ROOT, "tools/ur_beeld.py"), "--type", templateId,
-            "--variant", String(vi), "--queries", wantQ, "--root", ROOT];
+            "--variant", String(vi), "--queries", JSON.stringify(QUERIES), "--per", String(BEELD_PER), "--root", ROOT];
           try { await runStreamed(PY, bargs, { ...process.env, FFMPEG }, log, "· beeld:"); }
           catch (e) { if (log) log("beeld-stap overgeslagen: " + e.message); }
         }
         const man = JSON.parse(await fs.promises.readFile(manFile, "utf8"));
         for (const it of (man.items || [])) {
-          const fp = path.join(bdir, it.file);
-          if (fs.existsSync(fp)) beeldByIdx[it.i] = { kind: it.kind, path: fp };
+          const pool = (it.media || [])
+            .map((m) => ({ kind: m.kind, path: path.join(bdir, m.file) }))
+            .filter((m) => fs.existsSync(m.path));
+          if (pool.length) beeldPoolByIdx[it.i] = pool;
         }
-        const nB = Object.keys(beeldByIdx).length;
-        if (log && nB) log(`● ${nB} kaart(en) met beeld eronder; de rest blijft tekst`);
+        const nB = Object.keys(beeldPoolByIdx).length;
+        const nTot = Object.values(beeldPoolByIdx).reduce((a, p) => a + p.length, 0);
+        if (log && nB) log(`● ${nB} kaart(en) met beeld (${nTot} in de poel, rouleert per render); de rest blijft tekst`);
       } catch (e) { if (log) log("beeld overgeslagen (alles tekst): " + e.message); }
     }
 
@@ -1474,7 +1480,10 @@ export function makeBrand({ ROOT, config } = {}) {
     for (let i = 0; i < CARDS.length; i++) {
       const card = CARDS[i] || {};
       const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}.mp4`);
-      const media = beeldByIdx[i];
+      // verse keuze uit de poel van deze kaart (zelfde blijvende anti-herhaling als de varianten),
+      // zodat dezelfde variant bij elke render ander beeld krijgt zonder dat iemand iets aanpast
+      const pool = beeldPoolByIdx[i];
+      const media = (pool && pool.length) ? pool[pickFreshVariant(ROOT, `${templateId}:beeld:v${vi}:c${i}`, pool.length)] : null;
       let done = false;
       // a) MET beeld eronder: scale/crop naar 9:16, bijschrift (transparant + scrim) erover
       if (media) {

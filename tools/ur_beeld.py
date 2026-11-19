@@ -1,24 +1,37 @@
 #!/usr/bin/env python3
-# ur_beeld.py - zoekt op basis van het script per kaart RECHTENVRIJ beeld en zet het klaar als
-# achtergrond voor een UncleRank-thema (nu: "De kring"). Video via Pixabay/Pexels, anders een foto
-# via Wikimedia Commons. HERGEBRUIKT tools/channel_beeld.py (Truthward): exact dezelfde zoek-,
-# download- en normaliseer-functies, zodat het beeld net zo betrouwbaar binnenkomt als bij de channel.
+# ur_beeld.py - zoekt op basis van het script per kaart RECHTENVRIJ beeld en zet er PER KAART MEERDERE
+# klaar (een poel), zodat de render elke keer automatisch een vers beeld kan kiezen. Video via
+# Pixabay/Pexels, anders foto's via Wikimedia Commons. HERGEBRUIKT tools/channel_beeld.py (Truthward):
+# exact dezelfde zoek-, download- en normaliseer-functies, dus net zo betrouwbaar als bij de channel.
 #
-# Draait LOKAAL op Mo's laptop (internet nodig). Faalt een zoekterm, dan komt die kaart niet in de
-# manifest en valt de render voor die kaart terug op de gewone tekstkaart. Additief: het breekt niks.
+# Zelfroterend: het ophalen gebeurt ÉÉN keer (de poel wordt gecachet). Daarna rouleert de engine per
+# render een vers beeld uit de poel (zelfde anti-herhaling als de varianten). Niemand hoeft zoektermen
+# te onderhouden. Pas pas iets aan als je een heel andere invalshoek wilt.
 #
-# Gebruik (door de engine aangeroepen, niet handmatig):
-#   python tools/ur_beeld.py --type kring --variant 0 --queries '["handshake office","team meeting"]' --root .
+# Draait LOKAAL op Mo's laptop (internet nodig). Vindt een zoekterm niks, of draait dit zonder net
+# (cloud), dan blijft die kaart gewoon tekst. Additief: het breekt niks.
+#
+# Gebruik (door de engine aangeroepen):
+#   python tools/ur_beeld.py --type kring --variant 0 --queries '["handshake office", ["team meeting","colleagues talking"]]' --per 5 --root .
 import argparse, os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # zodat 'channel_beeld' importeerbaar is
 import channel_beeld as cb
+
+
+def _as_list(q):
+    # een kaart mag één zoekterm hebben of meerdere (rijkere poel); normaliseer naar een lijst strings
+    if isinstance(q, list):
+        return [str(x).strip() for x in q if str(x).strip()]
+    q = (q or "").strip()
+    return [q] if q else []
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--type", required=True, help="UR-thema, bv. kring")
     ap.add_argument("--variant", type=int, default=0)
-    ap.add_argument("--queries", required=True, help="JSON-lijst met zoektermen, één per kaart; lege string = overslaan")
+    ap.add_argument("--queries", required=True, help="JSON-lijst; per kaart een string OF een lijst strings; leeg = overslaan")
+    ap.add_argument("--per", type=int, default=5, help="hoeveel beelden per kaart klaarzetten (de poel om uit te rouleren)")
     ap.add_argument("--root", default=".")
     args = ap.parse_args()
 
@@ -35,53 +48,93 @@ def main():
     outdir = os.path.join(args.root, "assets", "unclerank", "beeld", args.type, f"v{args.variant}")
     os.makedirs(outdir, exist_ok=True)
 
+    PER = max(1, int(args.per))
     manifest = []
-    for i, q in enumerate(queries):
-        q = (q or "").strip()
-        if not q:
+    for i, raw in enumerate(queries):
+        terms = _as_list(raw)
+        if not terms:
             continue
-        print(f"=== beeld {i}: '{q}' ===")
-        got = None
-        # 1) liefst video (liggend, rechtenvrij)
-        try:
-            hit = cb.search_video(q, keys, min_dur=2)
-            if hit and hit.get("url"):
-                raw = cb._get(hit["url"])
-                fp = os.path.join(outdir, f"clip-{i}.mp4")
-                with open(fp, "wb") as f:
-                    f.write(raw)
-                cb.normalize_video(fp, args.root)   # naar <=1080p/30fps, zelfde codec; overal afspeelbaar
-                got = {"i": i, "kind": "vid", "file": os.path.basename(fp),
-                       "credit": hit.get("credit", ""), "license": hit.get("license", "")}
-                print(f"    video ok ({hit.get('credit', '')})")
-        except Exception as e:
-            print(f"    video-fout: {e}")
-        # 2) anders een foto (Wikimedia Commons: publiek domein + CC)
-        if not got:
+        print(f"=== kaart {i}: {terms} ===")
+        pool = []           # lijst van {kind, file, credit, license}
+        seen_urls = set()
+        j = 0
+
+        def _save_video(hit):
+            nonlocal j
+            url = hit.get("url")
+            if not url or url in seen_urls:
+                return False
+            seen_urls.add(url)
+            fp = os.path.join(outdir, f"clip-{i}-{j}.mp4")
+            cb_bytes = cb._get(url)
+            with open(fp, "wb") as f:
+                f.write(cb_bytes)
+            cb.normalize_video(fp, args.root)
+            pool.append({"kind": "vid", "file": os.path.basename(fp),
+                         "credit": hit.get("credit", ""), "license": hit.get("license", "")})
+            j += 1
+            return True
+
+        def _save_image(im):
+            nonlocal j
+            url = im.get("url")
+            if not url or url in seen_urls:
+                return False
+            seen_urls.add(url)
+            ext = cb.ext_for(im.get("mime", "image/jpeg"))
+            fp = os.path.join(outdir, f"img-{i}-{j}{ext}")
+            raw_bytes = cb._get(url)
+            with open(fp, "wb") as f:
+                f.write(raw_bytes)
+            pool.append({"kind": "img", "file": os.path.basename(fp),
+                         "credit": im.get("credit", ""), "license": im.get("license", "")})
+            j += 1
+            return True
+
+        # 1) liefst video's (beweging), verdeeld over de zoektermen van deze kaart
+        per_term = max(1, PER // max(1, len(terms)))
+        for t in terms:
+            if len(pool) >= PER:
+                break
             try:
-                im = cb.search_image(q)
-                if im and im.get("url"):
-                    raw = cb._get(im["url"])
-                    ext = cb.ext_for(im.get("mime", "image/jpeg"))
-                    fp = os.path.join(outdir, f"img-{i}{ext}")
-                    with open(fp, "wb") as f:
-                        f.write(raw)
-                    got = {"i": i, "kind": "img", "file": os.path.basename(fp),
-                           "credit": im.get("credit", ""), "license": im.get("license", "")}
-                    print("    foto ok")
+                for hit in cb.search_video_many(t, keys, n=per_term + 1, min_dur=2):
+                    if len(pool) >= PER:
+                        break
+                    try:
+                        _save_video(hit)
+                    except Exception as e:
+                        print(f"    video-download fout: {e}")
             except Exception as e:
-                print(f"    foto-fout: {e}")
-        if got:
-            manifest.append(got)
+                print(f"    video-zoekfout '{t}': {e}")
+        # 2) poel aanvullen met foto's als er nog ruimte is
+        if len(pool) < PER:
+            for t in terms:
+                if len(pool) >= PER:
+                    break
+                try:
+                    for im in cb.search_image_many(t, n=per_term + 1):
+                        if len(pool) >= PER:
+                            break
+                        try:
+                            _save_image(im)
+                        except Exception as e:
+                            print(f"    foto-download fout: {e}")
+                except Exception as e:
+                    print(f"    foto-zoekfout '{t}': {e}")
+
+        if pool:
+            manifest.append({"i": i, "media": pool})
+            print(f"    poel: {len(pool)} beeld(en)")
         else:
             print("    niets gevonden, deze kaart blijft tekst")
 
     with open(os.path.join(outdir, "_beeld.json"), "w", encoding="utf-8") as f:
-        json.dump({"type": args.type, "variant": args.variant, "items": manifest}, f, ensure_ascii=False, indent=2)
+        json.dump({"type": args.type, "variant": args.variant, "per": PER, "items": manifest}, f, ensure_ascii=False, indent=2)
     with open(os.path.join(outdir, "_queries.json"), "w", encoding="utf-8") as f:
-        json.dump(queries, f, ensure_ascii=False)
-    gewenst = len([q for q in queries if (q or "").strip()])
-    print(f"klaar: {len(manifest)}/{gewenst} beelden gevonden")
+        json.dump({"queries": queries, "per": PER}, f, ensure_ascii=False)
+    gewenst = len([q for q in queries if _as_list(q)])
+    total = sum(len(it["media"]) for it in manifest)
+    print(f"klaar: {len(manifest)}/{gewenst} kaarten met beeld, {total} beelden in totaal")
 
 
 if __name__ == "__main__":
