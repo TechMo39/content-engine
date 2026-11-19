@@ -783,6 +783,19 @@ function makeCaptionSvg({ W, H, title, sub, outro = false }) {
   if (outro) s += markOnly(cx, Math.round(H * 0.70), Math.round(W * 0.15), 1);
   return root(W, H, s);
 }
+// Achtergrond-"kaart" voor een portaal-shot: UR-donker + lockup boven + een label onderaan. Het
+// uitgeknipte verkoop-blok (lead-kaart, signaal, waarde, ...) komt hier GECENTREERD overheen, zo staat
+// elk deel schoon en groot in beeld — isoleren i.p.v. een zachte zoom op de hele pagina.
+function makeShotCardBg({ W, H, kicker }) {
+  let s = bg(W, H);
+  s += wordmark(W, H, 1);
+  if (kicker) {
+    const ky = Math.round(H * 0.85);
+    s += `<rect x="${Math.round(W / 2 - 44)}" y="${ky - 54}" width="88" height="6" rx="3" fill="${C.accent}"/>`;
+    s += `<text x="${W / 2}" y="${ky}" fill="${C.mut}" font-family="${SANS}" font-size="${Math.round(W * 0.042)}" font-weight="700" letter-spacing="3" text-anchor="middle">${esc(String(kicker).toUpperCase())}</text>`;
+  }
+  return root(W, H, s);
+}
 // SVG-kaart -> PNG (eigen UR-fonts, geen systeem-fonts), voor de ffmpeg-montage.
 function rasterCard(svg, W, outPng) {
   const png = new Resvg(svg, { fitTo: { mode: "width", value: W }, font: { loadSystemFonts: false, fontFiles: UR_FONT_FILES } }).render().asPng();
@@ -1359,28 +1372,40 @@ export function makeBrand({ ROOT, config } = {}) {
     // push-in op een stilstaand portaal-beeld richting het verkoop-deel (ffmpeg zoompan). De camera
     // begint AL op het blok (schermvullend) en duwt nog iets verder in, i.p.v. vanaf de volle pagina —
     // zo zie je meteen het deel dat telt. De blur zit in de pixels, dus ingezoomd blijft data vervaagd.
+    // labels onder het uitgeknipte blok, per type shot
+    const SHOT_KICKER = { lead: "Een verse lead", lead2: "Een verse lead", "dossier-kop": "Het dossier",
+      signaal: "Wat we op de site zien", waarde: "Wat de klus waard is" };
     async function pushinSeg(shot, dur, i) {
       try {
         if (!shot || !fs.existsSync(shot.path)) return null;
         const r = shot.rect || { x: 0, y: 0, w: W, h: H };
-        const Z0 = adaptiveZoom(r);                         // hoe strak het blok in beeld komt
-        // EERST uitsnijden op het blok (gecentreerd, binnen het beeld geklemd), DAN naar volle maat
-        // schalen. Zo staat elke frame vanaf het begin op het blok — geen zoompan-start-op-1.0 meer.
-        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-        let cw = Math.round(W / Z0), ch = Math.round(H / Z0);
-        cw = Math.min(W, cw + (cw % 2)); ch = Math.min(H, ch + (ch % 2));
-        let cropX = Math.round(cx - cw / 2), cropY = Math.round(cy - ch / 2);
-        cropX = Math.max(0, Math.min(W - cw, cropX));
-        cropY = Math.max(0, Math.min(H - ch, cropY));
-        const Zp = 1.06;                                    // zachte extra push voor leven
+        // 1) de EXACTE box van het blok (licht gepad, geklemd op het beeld)
+        const pad = Math.round(0.012 * W);
+        let bx = Math.max(0, Math.round(r.x - pad)), by = Math.max(0, Math.round(r.y - pad));
+        let bw = Math.min(W - bx, Math.round(r.w + 2 * pad)), bh = Math.min(H - by, Math.round(r.h + 2 * pad));
+        bw -= bw % 2; bh -= bh % 2;
+        if (bw < 24 || bh < 24) return null;
+        // 2) doelgrootte op de kaart: breed vullen, maar niet te hoog (ruimte voor lockup + label)
+        const maxW = Math.round(W * 0.90), maxH = Math.round(H * 0.60);
+        let sw = maxW, sh = Math.round(bh * (maxW / bw));
+        if (sh > maxH) { sh = maxH; sw = Math.round(bw * (maxH / bh)); }
+        sw -= sw % 2; sh -= sh % 2;
+        const oy = Math.round((H - sh) / 2 + H * 0.03);     // iets onder het midden
+        // 3) achtergrond-kaart (UR-donker + lockup + label) en het blok erop, met zachte push voor leven
+        const bgPng = path.join(work, `shotbg-${String(i).padStart(2, "0")}.png`);
+        rasterCard(makeShotCardBg({ W, H, kicker: SHOT_KICKER[shot.name] || "Uit het portaal" }), W, bgPng);
         const frames = Math.max(1, Math.round(dur * FPS));
+        const Zp = 1.05;
         const step = ((Zp - 1) / Math.max(1, Math.round(0.9 * frames))).toFixed(6);
-        const vf = `crop=${cw}:${ch}:${cropX}:${cropY},scale=${W}:${H},`
+        const fc = `[0:v]crop=${bw}:${bh}:${bx}:${by},scale=${sw}:${sh},drawbox=x=0:y=0:w=iw:h=ih:color=0x24405c@1:t=3[blk];`
+          + `[1:v][blk]overlay=(W-w)/2:${oy},`
           + `zoompan=z='min(1+${step}*on,${Zp})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':`
-          + `d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`;
+          + `d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p[v]`;
         const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-shot.mp4`);
-        const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", shot.path,
-          "-vf", vf, ...ENC, mp4], { ...process.env }, log, "· inzoom:");
+        const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error",
+          "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", shot.path,
+          "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", bgPng,
+          "-filter_complex", fc, "-map", "[v]", ...ENC, mp4], { ...process.env }, log, "· inzoom:");
         if (r2.status === 0 && fs.existsSync(mp4)) return mp4;
       } catch (e) { if (log) log("inzoom overgeslagen: " + e.message); }
       return null;
