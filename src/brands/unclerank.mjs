@@ -1283,7 +1283,7 @@ export function makeBrand({ ROOT, config } = {}) {
     if (log) log(`● variant ${String.fromCharCode(65 + vi)} van ${POOL.length} gekozen`);
 
     // 1) NL-stem genereren (de vertelling). Duur bepaalt de totale lengte; de opname-stukjes volgen.
-    let voiceWav = "", T = Number(opts.seconds) || 20;
+    let voiceWav = "", T = Number(opts.seconds) || 20, TL = null;
     try {
       const vdir = voiceDir(ROOT, "portaal", vi);
       const wavp = path.join(vdir, "voice.wav");
@@ -1301,7 +1301,7 @@ export function makeBrand({ ROOT, config } = {}) {
       }
       if (fs.existsSync(wavp)) {
         voiceWav = wavp;
-        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) T = Number(tl.total); } catch {}
+        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) { T = Number(tl.total); TL = tl; } } catch {}
       }
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
 
@@ -1394,13 +1394,10 @@ export function makeBrand({ ROOT, config } = {}) {
         // 3) achtergrond-kaart (UR-donker + lockup + label) en het blok erop, met zachte push voor leven
         const bgPng = path.join(work, `shotbg-${String(i).padStart(2, "0")}.png`);
         rasterCard(makeShotCardBg({ W, H, kicker: SHOT_KICKER[shot.name] || "Uit het portaal" }), W, bgPng);
-        const frames = Math.max(1, Math.round(dur * FPS));
-        const Zp = 1.05;
-        const step = ((Zp - 1) / Math.max(1, Math.round(0.9 * frames))).toFixed(6);
+        // STILSTAAND: geen zoompan-push (die rondt per frame af en laat de scherpe tekst trillen).
+        // Het blok staat schoon op de kaart; de montage-cuts geven het ritme.
         const fc = `[0:v]crop=${bw}:${bh}:${bx}:${by},scale=${sw}:${sh},drawbox=x=0:y=0:w=iw:h=ih:color=0x24405c@1:t=3[blk];`
-          + `[1:v][blk]overlay=(W-w)/2:${oy},`
-          + `zoompan=z='min(1+${step}*on,${Zp})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':`
-          + `d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p[v]`;
+          + `[1:v][blk]overlay=(W-w)/2:${oy}:format=auto,fps=${FPS},setsar=1,format=yuv420p[v]`;
         const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-shot.mp4`);
         const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error",
           "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", shot.path,
@@ -1421,23 +1418,51 @@ export function makeBrand({ ROOT, config } = {}) {
       const leadShots = SHOTS.filter((s) => /^lead/.test(s.name));
       const dossShots = SHOTS.filter((s) => !/^lead/.test(s.name));
       const byKey = (k) => CARDS.find((c) => c.key === k);
-      const items = [];
-      const addCard = (k) => { const c = byKey(k); if (c) items.push({ kind: "card", card: c }); };
-      const addShots = (arr) => arr.forEach((s) => items.push({ kind: "shot", shot: s }));
-      addCard("hook"); addCard("pijn"); addCard("oplossing");
-      addShots(leadShots);
-      addCard("waarde");
-      addShots(dossShots);
-      CARDS.filter((c) => !["hook", "pijn", "oplossing", "waarde", "cta"].includes(c.key)).forEach((c) => items.push({ kind: "card", card: c }));
-      addCard("cta");
-      const wOf = (it) => (it.kind === "shot" ? 1.5 : (it.card && it.card.outro ? 1.25 : 1.15));
-      const sumW2 = items.reduce((a, it) => a + wOf(it), 0);
-      const FLOOR2 = { card: 2.3, shot: 2.6 };
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const dur = Math.max(FLOOR2[it.kind] || 2.4, +((wOf(it) / sumW2) * T).toFixed(2));
-        if (it.kind === "card") push(await cardSeg(it.card, dur, i));
-        else push(await pushinSeg(it.shot, dur, i));
+      const ci = (k) => { const c = byKey(k); return c ? [{ kind: "card", card: c }] : []; };
+      const si = (arr) => arr.map((s) => ({ kind: "shot", shot: s }));
+      // BEATS = de stemregels. Elke beat bevat de kaart van die regel + de shots die erbij horen, en
+      // duurt precies zo lang als die regel wordt uitgesproken. Zo loopt de tekst op het scherm
+      // synchroon met de stem: de lead-kaarten vallen onder "de oplossing", de dossier-blokken onder
+      // "de waarde". Volgorde van de stemregels = [hook, pijn, oplossing, waarde, cta].
+      const beats = [
+        ci("hook"),
+        ci("pijn"),
+        [...ci("oplossing"), ...si(leadShots)],
+        [...ci("waarde"), ...si(dossShots)],
+        ci("cta"),
+      ];
+      // duur per beat: uit de ECHTE per-regel timing van de stem (anders eerlijk verdeeld over T)
+      const lineDur = (TL && Array.isArray(TL.lines) && TL.lines.length >= beats.length)
+        ? TL.lines.map((l) => Number(l.dur) || 0) : null;
+      let beatDur;
+      if (lineDur) {
+        beatDur = beats.map((_, b) => lineDur[b]);
+        const used = beatDur.reduce((a, d) => a + d, 0);
+        if (T > used) beatDur[beatDur.length - 1] += (T - used);   // staartstilte op de slotkaart
+      } else {
+        const wB = beats.map((it) => it.reduce((a, x) => a + (x.kind === "shot" ? 1.5 : 1.2), 0));
+        const sumB = wB.reduce((a, d) => a + d, 0) || 1;
+        beatDur = wB.map((w) => (w / sumB) * T);
+      }
+      let gi = 0;
+      for (let b = 0; b < beats.length; b++) {
+        const group = beats[b];
+        if (!group.length) continue;
+        // de regelduur verdelen binnen de beat: de kaart iets ruimer dan een shot, met een leesbodem
+        const wIn = group.map((it) => (it.kind === "shot" ? 1.0 : 1.3));
+        const sumIn = wIn.reduce((a, d) => a + d, 0) || 1;
+        let durs = wIn.map((w) => (w / sumIn) * beatDur[b]);
+        // leesbodem per onderdeel, zonder de beat-lengte (en dus de sync) te overschrijden
+        const FLO = group.map((it) => (it.kind === "shot" ? 2.0 : 1.8));
+        durs = durs.map((d, k) => Math.max(d, FLO[k]));
+        const scale = beatDur[b] / durs.reduce((a, d) => a + d, 0);
+        if (scale < 1) durs = durs.map((d) => d * scale);
+        for (let k = 0; k < group.length; k++) {
+          const it = group[k], dur = +durs[k].toFixed(2);
+          if (it.kind === "card") push(await cardSeg(it.card, dur, gi));
+          else push(await pushinSeg(it.shot, dur, gi));
+          gi++;
+        }
       }
     } else {
       let clipAt = 0;
