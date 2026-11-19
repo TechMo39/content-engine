@@ -617,7 +617,7 @@ const server = http.createServer(async (req, res) => {
     // UMMA TIJDLIJN — de gedeelde databron voor de nieuwe scène-editor: het _timeline.json dat
     // umma_voice.py per stem schrijft (per scène de zinnen met exacte tijden). Puur lezen.
     if (u.pathname === "/api/channel-timeline" && req.method === "GET") {
-      const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
+      const story = (u.searchParams.get("story") || "chose").replace(/[^\w-]/g, "");
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
       const p = path.resolve(ROOT, "assets/channels", CH, "voice", story, voice, "_timeline.json");
       if (existsSync(p)) { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" }); res.end(await fs.readFile(p)); return; }
@@ -628,7 +628,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/channel-timeline-save" && req.method === "POST") {
       const bd = await readBody(req);
       if (!bd || !Array.isArray(bd.scenes)) { json(res, { error: "ongeldige tijdlijn" }, 400); return; }
-      const story = String(bd.story || "sword").replace(/[^\w-]/g, "");
+      const story = String(bd.story || "chose").replace(/[^\w-]/g, "");
       const voice = String(bd.voice || "man").replace(/[^\w-]/g, "");
       const p = path.resolve(ROOT, "assets/channels", CH, "voice", story, voice, "_timeline.json");
       try { await fs.writeFile(p, JSON.stringify(bd, null, 2), "utf8"); json(res, { ok: true, saved: path.relative(ROOT, p).replace(/\\/g, "/") }); }
@@ -637,7 +637,7 @@ const server = http.createServer(async (req, res) => {
     }
     // UMMA STEM — een scène-wav teruggeven voor de audio-preview in de editor (01.wav .. 16.wav).
     if (u.pathname === "/api/channel-voice" && req.method === "GET") {
-      const story = (u.searchParams.get("story") || "sword").replace(/[^\w-]/g, "");
+      const story = (u.searchParams.get("story") || "chose").replace(/[^\w-]/g, "");
       const voice = (u.searchParams.get("voice") || "man").replace(/[^\w-]/g, "");
       const n = (u.searchParams.get("n") || "").replace(/[^\d]/g, "");
       if (!n) { res.writeHead(404); res.end(""); return; }
@@ -959,7 +959,7 @@ const server = http.createServer(async (req, res) => {
       if (!brand || !brand.previewFrameSVG) { res.writeHead(404); res.end(""); return; }
       try {
         const r = await brand.previewFrameSVG({
-          story: u.searchParams.get("story") || "sword",
+          story: u.searchParams.get("story") || "chose",
           voice: u.searchParams.get("voice") || "man",
           sceneNum: u.searchParams.has("scene") ? Number(u.searchParams.get("scene")) : 1,
           beatIndex: Number(u.searchParams.get("beat")) || 0,

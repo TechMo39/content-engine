@@ -132,7 +132,8 @@
  <div class="sub" id="hdrsub"></div>
  <select id="chan-pick" title="kies een kanaal" style="font-size:12px;color:var(--gold,#d6b35a);font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;max-width:160px"></select>
  <button id="chan-new" title="een nieuw kanaal aanmaken">+ kanaal</button>
- <select id="proj-pick" title="kies een project (film + stem)" style="font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;max-width:230px"></select>
+ <select id="title-pick" title="kies een video (titel)" style="font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;max-width:230px"></select>
+ <select id="ver-pick" title="kies de stem / versie" style="font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;max-width:120px"></select>
  <button id="proj-new" title="een nieuw project starten">+ nieuw</button>
  <button id="btn-voice" title="luister de 3 stemmen en kies er één">🎙 Stem</button>
  <div class="spacer"></div>
@@ -212,8 +213,8 @@
 <div class="tip" id="tip"></div>
 <div class="hint" id="hint">Channels-studio, gevoed door _timeline.json uit de engine. Klik een beeldblok om beeld te kiezen/uploaden, sleep de grepen om te schuiven, plaats SFX, keur scènes goed, en klik opslaan. De knop 'Video maken' maakt de video uit exact deze tijdlijn.</div>
 <script>
-const EMBED={"story":"","voice":"man","title":"","total_seconds":0,"total_mmss":"0:00","scenes":[]}, BEATS={};
-let STORY='sword', VOICE='man', CHANNEL='channel1';
+const EMBED={"story":"","voice":"","title":"","total_seconds":0,"total_mmss":"0:00","scenes":[]}, BEATS={};
+let STORY='', VOICE='', CHANNEL='channel1';
 // KANAAL + PROJECT. De studio laadt kanaal uit ?channel= (default channel1) en het project uit
 // ?story=&voice=. Je kiest eerst een kanaal (de kanaal-kiezer bovenin), en ziet dan de projecten
 // van dat kanaal. Geen URL-param -> channel1 + de ingebakken embed (het laatst gebouwde project).
@@ -222,6 +223,21 @@ let STORY='sword', VOICE='man', CHANNEL='channel1';
  STORY=(q.get('story')||EMBED.story||STORY).replace(/[^\w-]/g,'');
  VOICE=(q.get('voice')||EMBED.voice||VOICE).replace(/[^\w-]/g,'');})();
 const $=id=>document.getElementById(id);
+// Geen project in de URL? Spring naar het EERSTE echte project uit de lijst, zodat de studio nooit
+// terugvalt op een dood/verwijderd project (geen "sword"-spook meer, geen "fout bij laden scènes").
+(function resolveProject(){
+ const q=new URLSearchParams(location.search);
+ if(q.get('story')&&q.get('voice'))return;                 // expliciet project in de URL -> respecteren
+ fetch('/api/channel-scripts?channel='+CHANNEL).then(r=>r.ok?r.json():null).then(d=>{
+   const items=(d&&Array.isArray(d.items))?d.items:[];
+   if(!items.length)return;                                // niets om naartoe te springen
+   const it=items[0];
+   if(it.story===STORY&&it.voice===VOICE)return;           // staat al goed
+   const u=new URL(location.href);
+   u.searchParams.set('story',it.story);u.searchParams.set('voice',it.voice);u.searchParams.set('channel',CHANNEL);
+   location.replace(u.toString());
+ }).catch(()=>{});
+})();
 // formaat van de LANGE video (9:16 nu; wordt in een volgend blok 16:9). Het overzicht + de
 // getekende voorbeelden volgen dit automatisch omdat de engine het frame op dit formaat tekent.
 let FMT=(EMBED.format==='9:16'||EMBED.format==='16:9')?EMBED.format:'16:9';   // per project; komt uit de tijdlijn
@@ -859,20 +875,33 @@ function switchProject(story,voice){
  // de hele studio-staat hangt aan STORY/VOICE; schoon herladen met de nieuwe project-URL
  location.search='?story='+encodeURIComponent(story)+'&voice='+encodeURIComponent(voice)+'&channel='+CHANNEL;
 }
+// PROJMAP: per video (story) de titel + de beschikbare stemmen. De titel-dropdown toont ALLEEN de
+// titel; de versie-dropdown toont de stemmen als "Stem 1 / Stem 2 / …". Geen slugs meer in beeld.
+let PROJMAP={};
+function voicesOf(st){return (PROJMAP[st]&&PROJMAP[st].voices&&PROJMAP[st].voices.length)?PROJMAP[st].voices.slice().sort():[];}
+function fillVersions(){
+ const vp=$('ver-pick');if(!vp)return;
+ let voices=voicesOf(STORY); if(!voices.length)voices=VOICE?[VOICE]:[];
+ vp.innerHTML='';
+ voices.forEach((vo,i)=>{const o=document.createElement('option');o.value=vo;o.textContent='Stem '+(i+1);if(vo===VOICE)o.selected=true;vp.appendChild(o);});
+}
 function fillProjects(){
- const sel=$('proj-pick');if(!sel)return;
+ const tp=$('title-pick');if(!tp)return;
  fetch('/api/channel-scripts?channel='+CHANNEL+'&v='+VER).then(r=>r.ok?r.json():null).then(d=>{
    const items=(d&&Array.isArray(d.items))?d.items:[];
-   // zorg dat het HUIDIGE project altijd in de lijst staat (ook als er nog geen import-script is)
-   const cur=STORY+'/'+VOICE;
-   if(!items.some(it=>(it.story+'/'+it.voice)===cur)) items.unshift({id:cur,story:STORY,voice:VOICE,title:TL.title||STORY});
-   sel.innerHTML='';
-   items.forEach(it=>{const o=document.createElement('option');o.value=it.story+'/'+it.voice;
-     o.textContent=(it.title||it.story)+'  ·  '+it.story+'/'+it.voice;
-     if((it.story+'/'+it.voice)===cur)o.selected=true;sel.appendChild(o);});
+   PROJMAP={};
+   items.forEach(it=>{if(!PROJMAP[it.story])PROJMAP[it.story]={title:it.title||it.story,voices:[]};
+     if(!PROJMAP[it.story].voices.includes(it.voice))PROJMAP[it.story].voices.push(it.voice);});
+   // huidige video altijd tonen, ook vóór de eerste import, zodat de dropdown nooit leeg is
+   if(STORY&&!PROJMAP[STORY])PROJMAP[STORY]={title:(TL.title||STORY),voices:VOICE?[VOICE]:[]};
+   if(STORY&&VOICE&&PROJMAP[STORY]&&!PROJMAP[STORY].voices.includes(VOICE))PROJMAP[STORY].voices.unshift(VOICE);
+   tp.innerHTML='';
+   Object.keys(PROJMAP).sort().forEach(st=>{const o=document.createElement('option');o.value=st;o.textContent=PROJMAP[st].title;if(st===STORY)o.selected=true;tp.appendChild(o);});
+   fillVersions();
  }).catch(()=>{});
 }
-$('proj-pick').addEventListener('change',e=>{const [st,vo]=String(e.target.value).split('/');switchProject(st,vo);});
+$('title-pick').addEventListener('change',e=>{const st=String(e.target.value);const vs=voicesOf(st);switchProject(st,vs[0]||VOICE);});
+$('ver-pick').addEventListener('change',e=>{switchProject(STORY,String(e.target.value));});
 // KANAAL-KIEZER: vul de lijst met kanalen (uit /api/channels) en wissel bij keuze van kanaal.
 // Van kanaal wisselen herlaadt met alleen ?channel= (zodat het nieuwste project van dat kanaal laadt).
 (function initChannels(){
@@ -932,11 +961,11 @@ function openVoice(){
    voices=[...new Set(voices)].sort();
    if(!voices.length)voices=[VOICE];
    box.innerHTML='';
-   voices.forEach(vo=>{
+   voices.forEach((vo,i)=>{
      const card=document.createElement('div');
      card.style.cssText='border:2px solid '+(vo===VOICE?'var(--muz)':'var(--line)')+';border-radius:10px;background:#0b0f18;padding:12px;min-width:150px;'+(vo===VOICE?'box-shadow:0 0 0 2px var(--muz)':'');
      const nm=document.createElement('div');nm.style.cssText='font-weight:700;margin-bottom:9px;color:var(--ink)';
-     nm.textContent=vo+(vo===VOICE?'  · huidige':'');
+     nm.innerHTML='Stem '+(i+1)+(vo===VOICE?'  · huidige':'')+'<span style="display:block;font-weight:400;font-size:11px;color:var(--mut)">'+vo+'</span>';
      const play=document.createElement('button');play.textContent='► beluister';play.style.cssText='width:100%;margin-bottom:7px';
      play.onclick=()=>{if(_vpBtn===play)vpStop();else vpPlay(vo,play);};
      const pick=document.createElement('button');pick.textContent=vo===VOICE?'✓ in gebruik':'kies deze stem';
