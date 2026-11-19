@@ -123,7 +123,9 @@ function bg(W, H) {
 // Merk-lockup bovenin: de echte UR-mark + "UncleRank" (Uncle = licht, Rank = cyaan), altijd zichtbaar.
 function wordmark(W, H, op = 1) {
   if (op <= 0.001) return "";
-  const topY = Math.round(H * 0.072);
+  // Lockup lager dan de bovenrand: op TikTok/Reels zit daar de platform-UI (Volgend / Voor jou, LIVE,
+  // zoeken). Op ~0.072 werd de UR-lockup daar tussen weggedrukt; 0.14 zet 'm in de veilige zone eronder.
+  const topY = Math.round(H * 0.14);
   const mk = Math.round(W * 0.075);            // mark-grootte
   const fs = Math.round(W * 0.05);             // woordmerk-tekst
   const gap = Math.round(mk * 0.26);
