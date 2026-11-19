@@ -39,6 +39,7 @@ LEAD_SILENCE = 3.0   # stilte vooraan de intro (logo in beeld)
 TONE = {
     "rustig": dict(sil=0.55), "nadruk": dict(sil=0.80), "warm": dict(sil=0.95),
     "hook": dict(sil=0.65), "intro": dict(sil=0.70), "outro": dict(sil=0.90),
+    "vraag": dict(sil=1.80),   # de hoofdvraag: langere stilte erachter zodat hij blijft hangen (pauze)
 }
 
 # Inspreek-instellingen. Lagere cfg = rustiger tempo (Mo: "praat te snel"); hogere herhaling-rem
@@ -439,6 +440,57 @@ STORIES = {
 STORIES["chose"]["groups"] = []
 STORIES["chose"]["map"] = [
   (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["chose"]["scenes"]
+]
+
+# ---- VIDEO 2: "truth" — Is there an absolute truth, or is it all just opinion? ----
+# Volgt uit video 1 (je koos je geloof niet): maar bestaat er dan een waarheid? Antwoord via logica: ja.
+# Scene 12 = de HOOFDVRAAG groot op het scherm (toon "vraag" -> pauze; in het beeldplan getekend).
+STORIES["truth"] = {
+    "title": "Is Anything Actually True?",
+    "scenes": [
+      (0,  "intro",  "Truthward",
+           "Welcome to Truthward. One honest question at a time, followed as far as it actually goes. Tonight, the question that everything else is quietly built on."),
+      (1,  "rustig", "You did not choose it.",
+           "Think for a moment about the thing you believe most deeply. Not your taste in food or music. The big one. Why we are here. Whether there is a God, or many, or none at all. What happens in the last second of your life, and whether any of it means anything. Hold that belief in your mind, and ask one honest question. Where did it actually come from. Because most of it, you never sat down and chose. It arrived long before you could argue back. From the country you were born in. From the people who raised you. From the street you grew up on and the things you happened to live through. Change any one of those, and the belief you hold so tightly would quietly belong to someone else, and a different one would be sitting in its place, held just as hard."),
+      (2,  "nadruk", "Just your truth?",
+           "And once you see that, a heavier thought follows close behind. If your deepest belief is mostly an accident of where you were born, then why would it be any truer than the opposite belief, held just as sincerely by someone on the other side of the world. Maybe none of them is the truth. Maybe there is only your truth and their truth, a billion honest opinions with no fact underneath any of them. It sounds humble. It sounds tolerant. For a lot of people it feels like the only grown up thing left to say."),
+      (3,  "rustig", "We will not shrug.",
+           "But look at how much is resting on that one idea. If it is right, if there really is no truth of the matter, then every question worth asking is already dead, because there would be nothing out there to find. So we are not going to settle this with a feeling, or with whatever we were handed as children. We are going to walk it out, step by step, and keep only what survives. Give me the next few minutes, and we will not end on a shrug. We will end on an answer."),
+      (4,  "rustig", "Some things are taste.",
+           "Start simple, because almost all of the confusion lives right here. Two very different things hide under the word true. Sometimes, when we say something is true, we only mean it is true for us. I love this song. This city feels like home. Mint ice cream is the best there is. Nobody can correct you on those, and nobody should try, because they are not about the world out there. They are about you. Call that taste."),
+      (5,  "nadruk", "Reality has the last word.",
+           "But there is a second kind, and it works nothing like the first. The water is boiling. The bridge is unsafe. The account is empty. The earth moves around the sun. These are not reports about how you feel. They are claims about reality, and reality gets the last word, not you. You can believe with your whole heart that the account is full. The card still gets declined. Wanting it, needing it, being raised to expect it, none of that moves the number by a single cent. That is what it means for something to be actually true. It stays true when it is inconvenient, when nobody believes it, even when everybody believes the opposite."),
+      (6,  "rustig", "But the big questions?",
+           "Now the real objection, the strong one. Fine, someone says, the water and the bank account are easy, you can go and check those. But the questions you actually lose sleep over are not like that. No god, one god, many. Something after death, or nothing at all. Who could ever stand above all of it and see which one is real. No human being has that view from above. So maybe, for the things that matter most, true for me is all we will ever get. That deserves a straight answer, not a clever escape. So here it is."),
+      (7,  "nadruk", "It breaks itself.",
+           "Take the idea at its boldest. There is no absolute truth. Nothing is true for everyone. Now turn it around and aim it at itself. Is that statement true for everyone. Because if it is, we have just found one thing that is true for everyone, and the idea has knocked itself flat. And if it is not, if it is only one more opinion, then it has no hold on you at all, and you can walk straight past it. There is no third way out. The idea cannot even be spoken without breaking itself. And a claim that cannot survive being said out loud is not deep. It is a mistake wearing the costume of wisdom."),
+      (8,  "nadruk", "Nobody lives it.",
+           "That is the idea on paper. Now watch people in real life, because there is a second test, and it is harder to escape. Nobody, not one person, actually lives as if truth were only opinion. When the doctor reads the scan, you do not want her perspective, you beg her for the facts. You trust that the plane was built on real engineering and not on the pilot's mood. You read the label twice before giving medicine to a child. And here is the part that gives it away. The same person who says it is all just opinion will, the second they are robbed or lied to or betrayed, demand the truth, what actually happened, not a perspective. Reality keeps forcing its way back in. An idea you cannot speak without contradicting yourself, and cannot live by for a single hour, has already lost."),
+      (9,  "rustig", "The quiet trick.",
+           "So why does it still sound so wise. Because of one quiet trick, and once you see it you cannot unsee it. The trick is to lift the biggest questions in life and set them on the shelf marked taste, as if whether we were created or not were the same kind of thing as your favourite colour. It is not. Favourite colour is only about you. How we got here is a claim about what actually happened, out there, long before you had an opinion about it. Either the universe had a beginning or it did not. Either there is something behind it or there is not. Those were settled as facts long before you or I arrived to wonder about them, exactly the way the account already had its real balance before anyone opened the envelope."),
+      (10, "rustig", "Hard is not absent.",
+           "Now someone sharp pushes back here, and they are half right, so we have to be fair. They say, but we cannot be certain. You cannot prove these things the way you prove the water is boiling. And that is true. But everything turns on what comes next. Not being able to reach the answer easily is a completely different thing from there being no answer at all. The number in a sealed account is real while the envelope is still shut. A crime has one true story even when the detective has not solved it. Our struggle to find the truth says something about us. It says nothing about whether the truth is there. Treating our difficulty as if it were its absence is the last place this whole idea has to hide."),
+      (11, "nadruk", "One conclusion left.",
+           "So lay the three side by side. The claim that nothing is truly true cannot be said without refuting itself. No one can actually live by it. And the deepest questions we have are not matters of taste, they are claims about what is real, sitting there with an answer whether we have found it or not. After all of that, only one honest conclusion is still standing."),
+      (12, "vraag",  "Is there a truth that stays true whether you believe it or not?",
+           "And it comes down to a single question. Is there a truth that stays true whether you believe it or not?"),
+      (13, "nadruk", "Yes.",
+           "Yes. And not because it is comforting, but because reason leaves nothing else standing. The denial eats itself. No one can live without leaning on it. And the questions that matter most are claims about what is real. So there is a truth that does not wait for your agreement, because the only way to argue against it is to stand on it while you do. Reality does not take a vote. It held before you trusted it, it was whatever it was before you looked, and it will not move one inch because you wish it would."),
+      (14, "nadruk", "Only one can be true.",
+           "But do not relax, because this answer comforts no one. Look at where it leaves us. There are thousands of explanations for why we are here and what this life is. Every religion offers one. And so does the person who says there is no god at all, that it was time and chance and evolution and nothing more. They cannot all be true, because they flatly contradict each other. And if there is one real truth, then at most one of them is right, and all the rest, however sincerely they are held, are wrong. Including, and this is the hard part, the one you happened to be handed at birth."),
+      (15, "rustig", "One honest way.",
+           "Which is exactly why it is all just opinion felt so safe. It let everyone keep their own answer and never have to find out. But we have just closed that exit. One of these is actually true. So the real question is this. Out of all of them, how do we find the one that is real. And there is only one honest way to do it. The same way we did everything here tonight. Not by reaching for the answer we like, or the one we were raised with, but by taking them one at a time and holding each one up to the light."),
+      (16, "nadruk", "Cross off what breaks.",
+           "We ask every explanation the same plain questions. Does it hold together, or does it contradict itself. Does it fit what we actually see, or does it have to look away and hope we do not notice. And the moment one of them breaks, the moment it needs a lie, or a leap, or a part you are not allowed to question, reason tells us to cross it off and move on. You do not have to prove every answer wrong at once. You only have to follow the mistakes honestly, and let the false ones fall, one by one, until you see what is still standing."),
+      (17, "warm",   "We start next time.",
+           "So that is where we go next. We stop talking about truth in general, and we take the first explanation, and we put it under exactly this light. We see whether it holds, or whether it falls. One question at a time, all the way down, until only the truth is left."),
+      (18, "outro",  "Truthward",
+           "If this gave you something to sit with tonight, then stay with us. One honest question at a time, followed as far as it goes. Subscribe so you are here when we take the first explanation apart. And if you think I got something wrong, say so, because that is exactly how this gets sharper. I will see you in the next one."),
+    ],
+}
+STORIES["truth"]["groups"] = []
+STORIES["truth"]["map"] = [
+  (num, screen, ["tech: statement"]) for (num, tone, screen, voiceline) in STORIES["truth"]["scenes"]
 ]
 
 def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
