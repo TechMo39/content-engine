@@ -474,6 +474,7 @@ const UR_VARIANTS = {
         "Wat je oppakt is van jou. Wat je laat liggen, pakt iemand anders.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
+      queries: ["business professional phone call office", "empty desk waiting office", "clock time passing workplace", "runner starting line track", ""],
       cards: [
         { key: "hook",      title: "Drie weken\nvan jou alleen", sub: "Elk bedrijf dat\nje krijgt." },
         { key: "pijn",      title: "Niemand anders belt hem", sub: "Geen ander bureau\nin jouw vak." },
@@ -490,6 +491,7 @@ const UR_VARIANTS = {
         "En wie deelt, komt zelf vooraan te staan voor warme leads.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
+      queries: ["colleagues talking office meeting", "web designer laptop screen code", "handing over document office", "business people helping each other", ""],
       cards: [
         { key: "hook",      title: "Er speelt vaak\nmeer",   sub: "Dan alleen jouw\neigen vak." },
         { key: "pijn",      title: "Niet jouw dienst",       sub: "Een site die rammelt,\nterwijl jij SEO doet." },
@@ -506,6 +508,7 @@ const UR_VARIANTS = {
         "Geen koud begin, maar een warm gesprek.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
+      queries: ["cold winter phone call", "person alone phone office", "friendly business conversation handshake", "highlighted document on desk", ""],
       cards: [
         { key: "hook",      title: "Koud of warm?",          sub: "Dat scheelt alles\naan de telefoon." },
         { key: "pijn",      title: "Koud: niemand sprak hem", sub: "Een naam,\nmeer niet." },
@@ -522,6 +525,7 @@ const UR_VARIANTS = {
         "Een kring waarin iedereen aan leads komt.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
+      queries: ["business competition handshake", "person working alone late night", "team collaboration circle meeting", "community network connected people", ""],
       cards: [
         { key: "hook",      title: "Concurrent?\nOf kring?", sub: "Bureaus zien elkaar\nmeestal als concurrent." },
         { key: "pijn",      title: "In je eentje",           sub: "Zoek je alles\nzelf bij elkaar." },
@@ -538,6 +542,7 @@ const UR_VARIANTS = {
         "Geen race tegen vijftig bellers, maar een eerlijke voorsprong.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
+      queries: ["crowd of many people busy", "many hands reaching auction", "confident businessman office portrait", "runner winning race finish line", ""],
       cards: [
         { key: "hook",      title: "Eén bureau\nper bedrijf", sub: "Niet tientallen\ntegelijk." },
         { key: "pijn",      title: "Een lijst is van iedereen", sub: "Aan tientallen bureaus\ntegelijk verkocht." },
@@ -734,6 +739,46 @@ function makeCardSvg({ W, H, title, sub, outro = false }) {
     const sLines = String(sub).split("\n");
     const subY = cy + Math.round(fsT * (tLines.length / 2)) + Math.round(fsS * 1.9);
     s += block(cx, subY, sLines, { fs: fsS, w: 500, fill: C.mut });
+  }
+  if (outro) s += markOnly(cx, Math.round(H * 0.70), Math.round(W * 0.15), 1);
+  return root(W, H, s);
+}
+// TRANSPARANTE variant van de kaart: dezelfde tekst/lockup, maar ZONDER de donkere achtergrond, met
+// een leesbaarheids-scrim, zodat hij als bijschrift OVER bewegend beeld kan liggen (Truthward-logica:
+// beeld onder, tekst erover). Alles buiten de scrim/tekst is doorzichtig (Resvg bewaart de alpha).
+// Dezelfde titel-autofit als makeCardSvg, zodat tekst nooit tegen de rand loopt.
+function makeCaptionSvg({ W, H, title, sub, outro = false }) {
+  const cx = W / 2;
+  const fsS = Math.round(W * 0.039);
+  const cy = Math.round(H * (outro ? 0.42 : 0.44));
+  const tLines = String(title).split("\n");
+  const base = Math.round(W * (outro ? 0.086 : 0.074));
+  const longest = Math.max(1, ...tLines.map((l) => l.length));
+  const K = 0.62, fitW = 0.84 * W;
+  const fsT = Math.max(Math.round(W * 0.050), Math.min(base, Math.floor(fitW / (K * longest))));
+  const sLines = sub ? String(sub).split("\n") : [];
+  let s = "";
+  // 1) lichte doorzichtige tint over het hele beeld, zodat heldere beelden de tekst niet wegspoelen
+  s += `<rect x="0" y="0" width="${W}" height="${H}" fill="#07131f" opacity="0.30"/>`;
+  // 2) donkere afloop onderaan (waar vaak de meeste details zitten) voor extra contrast
+  s += `<defs><linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#07131f" stop-opacity="0"/>
+    <stop offset="0.55" stop-color="#07131f" stop-opacity="0.35"/>
+    <stop offset="1" stop-color="#07131f" stop-opacity="0.85"/></linearGradient></defs>`;
+  s += `<rect x="0" y="${Math.round(H * 0.45)}" width="${W}" height="${Math.round(H * 0.55)}" fill="url(#scrim)"/>`;
+  // 3) donker paneel achter het tekstblok (titel + sub), afgerond, half doorzichtig: altijd leesbaar
+  const nT = tLines.length, nS = sLines.length;
+  const panTop = cy - Math.round(fsT * (nT / 2)) - Math.round(fsT * 0.95);
+  const panBot = cy + Math.round(fsT * (nT / 2)) + (nS ? Math.round(fsS * (1.9 + nS * 1.25)) : Math.round(fsT * 0.3));
+  const panX = Math.round(W * 0.085), panW = Math.round(W * 0.83);
+  s += `<rect x="${panX}" y="${panTop}" width="${panW}" height="${Math.max(80, panBot - panTop)}" rx="28" fill="#07131f" opacity="0.62"/>`;
+  // 4) lockup, cyaan tik, titel, sub (identiek aan de gewone kaart)
+  s += wordmark(W, H, 1);
+  s += `<rect x="${cx - 44}" y="${cy - Math.round(fsT * (nT / 2)) - 56}" width="88" height="6" rx="3" fill="${C.accent}"/>`;
+  s += block(cx, cy, tLines, { fs: fsT, w: 800, fill: C.ink });
+  if (nS) {
+    const subY = cy + Math.round(fsT * (nT / 2)) + Math.round(fsS * 1.9);
+    s += block(cx, subY, sLines, { fs: fsS, w: 500, fill: C.ink });
   }
   if (outro) s += markOnly(cx, Math.round(H * 0.70), Math.round(W * 0.15), 1);
   return root(W, H, s);
@@ -1385,6 +1430,38 @@ export function makeBrand({ ROOT, config } = {}) {
       }
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
 
+    // 1b) BEELD (optioneel; alleen thema's met een 'queries'-lijst, nu: de kring). Per kaart zoekt
+    //     tools/ur_beeld.py op basis van het script rechtenvrij beeld (video via Pixabay/Pexels, anders
+    //     een foto via Wikimedia) en zet het klaar. Dat beeld komt ONDER de tekst te liggen (zelfde
+    //     logica als Truthward). ADDITIEF: vindt een zoekterm niks, of draait dit zonder internet (cloud),
+    //     dan staat die kaart simpelweg niet in de manifest en valt hij terug op de gewone tekstkaart.
+    const beeldByIdx = {};
+    const QUERIES = Array.isArray(variant.queries) ? variant.queries : null;
+    if (QUERIES && QUERIES.some((q) => (q || "").trim())) {
+      try {
+        const bdir = path.resolve(ROOT, "assets", "unclerank", "beeld", templateId, "v" + vi);
+        const qFile = path.join(bdir, "_queries.json");
+        const manFile = path.join(bdir, "_beeld.json");
+        const wantQ = JSON.stringify(QUERIES);
+        let haveQ = null; try { haveQ = await fs.promises.readFile(qFile, "utf8"); } catch {}
+        // alleen (opnieuw) zoeken als het nog niet bestaat of de zoektermen zijn gewijzigd
+        if (opts.versBeeld || !fs.existsSync(manFile) || haveQ !== wantQ) {
+          if (log) log("● beeld zoeken (" + templateId + ", rechtenvrij), dit kan even duren…");
+          const bargs = [path.resolve(ROOT, "tools/ur_beeld.py"), "--type", templateId,
+            "--variant", String(vi), "--queries", wantQ, "--root", ROOT];
+          try { await runStreamed(PY, bargs, { ...process.env, FFMPEG }, log, "· beeld:"); }
+          catch (e) { if (log) log("beeld-stap overgeslagen: " + e.message); }
+        }
+        const man = JSON.parse(await fs.promises.readFile(manFile, "utf8"));
+        for (const it of (man.items || [])) {
+          const fp = path.join(bdir, it.file);
+          if (fs.existsSync(fp)) beeldByIdx[it.i] = { kind: it.kind, path: fp };
+        }
+        const nB = Object.keys(beeldByIdx).length;
+        if (log && nB) log(`● ${nB} kaart(en) met beeld eronder; de rest blijft tekst`);
+      } catch (e) { if (log) log("beeld overgeslagen (alles tekst): " + e.message); }
+    }
+
     // 2) duur per kaart: over de stem verdeeld, met een leesbare bodem; hook en slot iets langer
     const nC = CARDS.length;
     const wts = CARDS.map((_, i) => (i === 0 ? 1.25 : i === nC - 1 ? 1.2 : 1.0));
@@ -1396,14 +1473,34 @@ export function makeBrand({ ROOT, config } = {}) {
     const segs = [];
     for (let i = 0; i < CARDS.length; i++) {
       const card = CARDS[i] || {};
-      try {
-        const png = path.join(work, `card-${String(i).padStart(2, "0")}-${card.key || i}.png`);
-        rasterCard(makeCardSvg({ W, H, title: card.title, sub: card.sub, outro: !!card.outro }), W, png);
-        const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}.mp4`);
-        const r = await runStreamed(FFMPEG, ["-y", "-v", "error", "-loop", "1", "-t", String(durs[i]), "-i", png,
-          "-vf", `scale=${W}:${H},fps=${FPS},format=yuv420p`, ...ENC, mp4], { ...process.env }, log, "· kaart:");
-        if (r.status === 0 && fs.existsSync(mp4)) segs.push(mp4);
-      } catch (e) { if (log) log("kaart overgeslagen: " + e.message); }
+      const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}.mp4`);
+      const media = beeldByIdx[i];
+      let done = false;
+      // a) MET beeld eronder: scale/crop naar 9:16, bijschrift (transparant + scrim) erover
+      if (media) {
+        try {
+          const cap = path.join(work, `cap-${String(i).padStart(2, "0")}.png`);
+          rasterCard(makeCaptionSvg({ W, H, title: card.title, sub: card.sub, outro: !!card.outro }), W, cap);
+          const inArgs = media.kind === "vid"
+            ? ["-stream_loop", "-1", "-t", String(durs[i]), "-i", media.path]   // video loopt tot de kaartduur
+            : ["-loop", "1", "-t", String(durs[i]), "-i", media.path];          // foto blijft staan
+          const fc = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},setsar=1[bg];`
+                   + `[bg][1:v]overlay=0:0:format=auto,format=yuv420p[v]`;
+          const r = await runStreamed(FFMPEG, ["-y", "-v", "error", ...inArgs, "-i", cap,
+            "-filter_complex", fc, "-map", "[v]", "-t", String(durs[i]), ...ENC, mp4], { ...process.env }, log, "· beeldkaart:");
+          if (r.status === 0 && fs.existsSync(mp4)) { segs.push(mp4); done = true; }
+        } catch (e) { if (log) log("beeldkaart faalde, terug naar tekst: " + e.message); }
+      }
+      // b) TERUGVAL: gewone volle tekstkaart (ongewijzigd gedrag)
+      if (!done) {
+        try {
+          const png = path.join(work, `card-${String(i).padStart(2, "0")}-${card.key || i}.png`);
+          rasterCard(makeCardSvg({ W, H, title: card.title, sub: card.sub, outro: !!card.outro }), W, png);
+          const r = await runStreamed(FFMPEG, ["-y", "-v", "error", "-loop", "1", "-t", String(durs[i]), "-i", png,
+            "-vf", `scale=${W}:${H},fps=${FPS},setsar=1,format=yuv420p`, ...ENC, mp4], { ...process.env }, log, "· kaart:");
+          if (r.status === 0 && fs.existsSync(mp4)) segs.push(mp4);
+        } catch (e) { if (log) log("kaart overgeslagen: " + e.message); }
+      }
     }
     if (!segs.length) throw new Error("geen kaart-segmenten gerenderd voor " + templateId);
 
