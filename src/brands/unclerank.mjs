@@ -474,7 +474,7 @@ const UR_VARIANTS = {
         "Wat je oppakt is van jou. Wat je laat liggen, pakt iemand anders.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
-      queries: ["business professional phone call office", "empty desk waiting office", "clock time passing workplace", "runner starting line track", ""],
+      queries: ["business team meeting office", "businessman phone call office", "colleagues working computers office", "business handshake agreement office", ""],
       cards: [
         { key: "hook",      title: "Drie weken\nvan jou alleen", sub: "Elk bedrijf dat\nje krijgt." },
         { key: "pijn",      title: "Niemand anders belt hem", sub: "Geen ander bureau\nin jouw vak." },
@@ -491,7 +491,7 @@ const UR_VARIANTS = {
         "En wie deelt, komt zelf vooraan te staan voor warme leads.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
-      queries: ["colleagues talking office meeting", "web designer laptop screen code", "handing over document office", "business people helping each other", ""],
+      queries: ["marketing team brainstorm office", "web developer coding computer office", "business people discussion meeting", "team collaboration office project", ""],
       cards: [
         { key: "hook",      title: "Er speelt vaak\nmeer",   sub: "Dan alleen jouw\neigen vak." },
         { key: "pijn",      title: "Niet jouw dienst",       sub: "Een site die rammelt,\nterwijl jij SEO doet." },
@@ -508,7 +508,7 @@ const UR_VARIANTS = {
         "Geen koud begin, maar een warm gesprek.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
-      queries: ["cold winter phone call", "person alone phone office", "friendly business conversation handshake", "highlighted document on desk", ""],
+      queries: ["call center agent headset office", "business professional confident office", "office workers laptops meeting", "business presentation whiteboard office", ""],
       cards: [
         { key: "hook",      title: "Koud of warm?",          sub: "Dat scheelt alles\naan de telefoon." },
         { key: "pijn",      title: "Koud: niemand sprak hem", sub: "Een naam,\nmeer niet." },
@@ -525,7 +525,7 @@ const UR_VARIANTS = {
         "Een kring waarin iedereen aan leads komt.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
-      queries: ["business competition handshake", "person working alone late night", "team collaboration circle meeting", "community network connected people", ""],
+      queries: ["corporate business handshake office", "businessman working alone office", "team meeting conference room business", "business people networking office", ""],
       cards: [
         { key: "hook",      title: "Concurrent?\nOf kring?", sub: "Bureaus zien elkaar\nmeestal als concurrent." },
         { key: "pijn",      title: "In je eentje",           sub: "Zoek je alles\nzelf bij elkaar." },
@@ -542,7 +542,7 @@ const UR_VARIANTS = {
         "Geen race tegen vijftig bellers, maar een eerlijke voorsprong.",
         "Probeer het portaal een week gratis. De link staat in beeld.",
       ],
-      queries: ["crowd of many people busy", "many hands reaching auction", "confident businessman office portrait", "runner winning race finish line", ""],
+      queries: ["busy corporate office people", "confident businesswoman office portrait", "business contract signing office", "corporate team success office", ""],
       cards: [
         { key: "hook",      title: "Eén bureau\nper bedrijf", sub: "Niet tientallen\ntegelijk." },
         { key: "pijn",      title: "Een lijst is van iedereen", sub: "Aan tientallen bureaus\ntegelijk verkocht." },
