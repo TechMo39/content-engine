@@ -817,6 +817,44 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    // UMMA SHORTS — maak 1-2 verticale promo-Shorts (9:16) uit de zojuist gerenderde video.
+    if (u.pathname === "/api/channel-shorts" && req.method === "POST") {
+      const bd = await readBody(req);
+      const story = String(bd.story || "").replace(/[^\w-]/g, "");
+      const voice = String(bd.voice || "").replace(/[^\w-]/g, "");
+      const count = Math.max(1, Math.min(2, parseInt(bd.count, 10) || 2));
+      const link = String(bd.url || "").slice(0, 300);
+      // video: een /out/... pad uit de render. Vertaal naar een echt bestand binnen OUT (geen traversal).
+      const rel = String(bd.video || "").replace(/^\/out\//, "").replace(/^\/+/, "");
+      let videoAbs = rel ? path.resolve(OUT, rel) : "";
+      if (!videoAbs || !videoAbs.startsWith(path.resolve(OUT)) || !existsSync(videoAbs)) {
+        // val terug op de NIEUWSTE render voor dit kanaal, zodat de knop ook werkt zonder
+        // dat er net in deze sessie is gerenderd.
+        try {
+          const dir = path.resolve(OUT, "channels", CH);
+          const files = (await fs.readdir(dir)).filter((f) => /\.mp4$/i.test(f));
+          let newest = null, mt = 0;
+          for (const f of files) { const st = await fs.stat(path.join(dir, f)); if (st.mtimeMs > mt) { mt = st.mtimeMs; newest = f; } }
+          if (newest) videoAbs = path.join(dir, newest);
+        } catch {}
+      }
+      if (!videoAbs || !existsSync(videoAbs)) {
+        json(res, { error: "geen gerenderde video gevonden — render eerst de video" }, 400); return;
+      }
+      const py = process.platform === "win32" ? "python" : "python3";
+      const a = ["tools/channel_shorts.py", "--video", videoAbs, "--root", ROOT, "--channel", CH, "--count", String(count)];
+      if (story) a.push("--story", story);
+      if (voice) a.push("--voice", voice);
+      if (link) a.push("--url", link);
+      execFile(py, a, { cwd: ROOT, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 300000 }, (err, stdout, stderr) => {
+        let shorts = [];
+        const line = String(stdout || "").split(/\r?\n/).find((l) => l.startsWith("SHORTS_JSON:"));
+        if (line) { try { shorts = JSON.parse(line.slice("SHORTS_JSON:".length)).shorts || []; } catch {} }
+        if (!shorts.length && err) { json(res, { error: "shorts maken mislukt", detail: String(stderr || err).slice(0, 500) }, 500); return; }
+        json(res, { shorts });
+      });
+      return;
+    }
     // UMMA — audio-upload (stem/SFX per scène). Slaat op in assets/channels/channel1/audio/ en geeft het
     // relatieve pad terug; de Umma-studio zet dat pad per scène in opts. Los van alles hierboven.
     if (u.pathname === "/api/channel-upload" && req.method === "POST") {

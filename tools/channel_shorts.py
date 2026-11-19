@@ -182,24 +182,31 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     base = os.path.splitext(os.path.basename(args.video))[0]
 
-    made = []
+    out_root = os.path.join(args.root, "out")
+    results = []
     for i, (st, en) in enumerate(clips, 1):
         out_path = os.path.join(outdir, f"{base}-short{i}.mp4")
         print(f"Short {i}: {st:.1f}s -> {en:.1f}s  ({en - st:.1f}s)  -> {out_path}")
         make_short(args.video, st, en, out_path)
-        made.append(out_path)
-        # tekstje met de link erbij (voor beschrijving + gerelateerde video + vastgezette comment)
-        txt = os.path.splitext(out_path)[0] + "-upload.txt"
-        with open(txt, "w", encoding="utf-8") as f:
-            f.write("SHORT-UPLOAD\n")
-            f.write("Beschrijving (plak in de Short):\n")
-            f.write("Full video on our channel. " + (args.url or "<link naar de volledige video>") + "\n\n")
-            f.write("Gerelateerde video (koppel bij upload): " + (args.url or "<link>") + "\n")
-            f.write("Vastgezette comment: Full video here -> " + (args.url or "<link>") + "\n")
+        link = args.url or "<link naar de volledige video>"
+        upload_text = ("Beschrijving (plak in de Short): Full video on our channel. " + link +
+                       "\nGerelateerde video (koppel bij upload): " + link +
+                       "\nVastgezette comment: Full video here -> " + link)
+        # tekstje ook naast de clip wegschrijven
+        with open(os.path.splitext(out_path)[0] + "-upload.txt", "w", encoding="utf-8") as f:
+            f.write("SHORT-UPLOAD\n" + upload_text + "\n")
+        try:
+            rel = os.path.relpath(out_path, out_root).replace(os.sep, "/")
+            url_path = "/out/" + rel
+        except Exception:
+            url_path = out_path
+        results.append({"url": url_path, "txt": upload_text})
 
-    print(f"\nklaar: {len(made)} short(s) in {outdir}")
+    print(f"\nklaar: {len(results)} short(s) in {outdir}")
     if not args.url:
         print("tip: geef --url mee met de link van de volledige video, dan staat die meteen in de upload-tekstjes.")
+    # machine-leesbaar voor de studio/engine
+    print("SHORTS_JSON:" + json.dumps({"shorts": results}))
 
 
 if __name__ == "__main__":

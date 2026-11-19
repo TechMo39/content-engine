@@ -190,6 +190,14 @@
   </div>
   <div class="rendermsg" id="rendermsg"></div>
   <video id="rendervid" controls></video>
+  <div id="shortsbox" style="margin-top:12px">
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input id="shortsurl" placeholder="link naar de volledige video (optioneel)" style="flex:1;min-width:180px;background:#0b0f18;border:1px solid var(--line);color:#dfe7f3;border-radius:7px;padding:7px 10px;font-size:12px"/>
+    <button class="render" id="btn-shorts" style="background:var(--beeld);border-color:var(--beeld)">&#9986; Shorts maken</button>
+   </div>
+   <div class="rendermsg" id="shortsmsg"></div>
+   <div id="shortsout" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"></div>
+  </div>
   <div class="legend">
    <span><i class="dot" style="background:var(--beeld)"></i> beeld (beats, sleep ■-grens)</span>
    <span><i class="dot" style="background:var(--tekst)"></i> tekst (sleep ▐-grens)</span>
@@ -780,11 +788,31 @@ async function doRender(){if(rendering)return;
  const scenes=SC.map(s=>({voice:s.wav,caption:s.sentences.map(x=>x.text).join(' '),tone:s.tone}));
  try{const res=await fetch('/api/render',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({brand:'channel1',template:'mix',format:FMT,opts:{type:'mix',scenes,title:TL.title,channel:CHANNEL}})});
    const d=await res.json();
-   if(d.url){rm.style.color='var(--ok)';rm.innerHTML='klaar ✓ — <a href="'+d.url+'" target="_blank" style="color:var(--beeld)">open de video</a>';const v=$('rendervid');v.src=d.url;v.style.display='block';}
+   if(d.url){rm.style.color='var(--ok)';rm.innerHTML='klaar ✓ — <a href="'+d.url+'" target="_blank" style="color:var(--beeld)">open de video</a>';const v=$('rendervid');v.src=d.url;v.style.display='block';lastRender=d.url;$('shortsbox').style.display='block';}
    else{rm.style.color='var(--sfx)';rm.textContent='render mislukt: '+(d.error||'onbekende fout');}}
  catch(err){rm.style.color='var(--sfx)';rm.textContent='render mislukt — draait de engine? ('+err.message+')';}
  rendering=false;$('btn-render').textContent='🎬 Video maken';}
 $('btn-render').addEventListener('click',doRender);
+
+// ---- SHORTS: 1-2 verticale promo-Shorts (9:16) uit de zojuist gerenderde video -----------------
+let lastRender=null;
+async function doShorts(){
+ const sm=$('shortsmsg');sm.style.color='var(--mut)';sm.textContent='shorts worden gemaakt… (knippen + omzetten naar 9:16, kan even duren)';$('btn-shorts').textContent='… bezig';$('shortsout').innerHTML='';
+ try{
+  const res=await fetch('/api/channel-shorts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({story:STORY,voice:VOICE,video:lastRender||'',url:$('shortsurl').value.trim(),count:2})});
+  const d=await res.json();
+  if(d.shorts&&d.shorts.length){
+   sm.style.color='var(--ok)';sm.textContent='klaar ✓ — '+d.shorts.length+' short(s). Download en upload als Short, met de link uit het tekstje.';
+   d.shorts.forEach((s,i)=>{const w=document.createElement('div');w.style.cssText='width:150px';
+    w.innerHTML='<video src="'+s.url+'" controls style="width:150px;border-radius:10px;border:1px solid var(--line)"></video>'
+     +'<div style="font-size:11px;margin-top:4px"><a href="'+s.url+'" download style="color:var(--beeld)">download short '+(i+1)+'</a></div>'
+     +'<textarea readonly style="width:150px;height:72px;margin-top:4px;font-size:10px;background:#0b0f18;border:1px solid var(--line);color:#cfd8e6;border-radius:6px;padding:5px"></textarea>';
+    w.querySelector('textarea').value=s.txt||'';$('shortsout').appendChild(w);});
+  } else { sm.style.color='var(--sfx)';sm.textContent='shorts maken mislukt: '+(d.error||'onbekende fout'); }
+ } catch(err){ sm.style.color='var(--sfx)';sm.textContent='shorts maken mislukt — draait de engine? ('+err.message+')'; }
+ $('btn-shorts').textContent='✂ Shorts maken';
+}
+$('btn-shorts').addEventListener('click',doShorts);
 
 // ---- OVERZICHT: contact-sheet van elke scène/beat, zoals hij in de video komt -----------------
 let ovOpen=true;
