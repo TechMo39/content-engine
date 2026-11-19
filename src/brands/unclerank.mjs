@@ -1,4 +1,4 @@
-// MERK-MODULE: UncleRank — data-animatie video's voor het portaal (AnchorRank).
+// MERK-MODULE: UncleRank, data-animatie video's voor het portaal (AnchorRank).
 //
 // Zelfstandig opgezet: elke frame is een KALE, complete SVG (geen afhankelijkheid van de tegel-
 // helpers van Tale of Tiles). De engine rastert sceneAt(frame) -> frames -> mp4, net als bij de
@@ -8,7 +8,7 @@
 // sceneAt(frame) -> volledige <svg> string voor dat frame.
 //
 // Types nu: "roi" (Eén klant betaalt je jaar), "gat" (Het harde cijfer) en "portaal" (schermopname
-// van het publieke portaal — de kring). Bron-cijfers komen uit opts of vallen terug op nette
+// van het publieke portaal, de kring). Bron-cijfers komen uit opts of vallen terug op nette
 // standaarden; de stem (Engels/Kokoro) en meer types volgen.
 
 import { spawn, spawnSync } from "node:child_process";
@@ -168,7 +168,7 @@ const UR_VARIANTS = {
       hook: ["Stop met bellen", "zonder reden."],
       offer: ["Geen gekochte lijst.", "Een dossier per bedrijf."],
       valueLabel: ["wat één gewonnen klant", "je per maand oplevert"],
-      cta: "Begin gratis — 7 dagen.",
+      cta: "Begin gratis, 7 dagen.",
       voice: [
         "Stop met bellen zonder reden.",
         "Geen gekochte lijst, maar een dossier per bedrijf, met de meting en de reden om te bellen.",
@@ -198,7 +198,7 @@ const UR_VARIANTS = {
   // plaatst ze met de opname-stukjes ertussen. GEEN meetmethode noemen (bedrijfsgeheim): enkel het
   // signaal en de waarde. De opname werkt als beeld, niet als het verhaal.
   portaal: [
-    { // A — het juiste moment
+    { // A, het juiste moment
       voice: [
         "Heb jij een online marketingbureau? Dan weet je hoe lastig het is om aan goede nieuwe klanten te komen.",
         "Je belt bedrijven koud, zonder te weten wat er speelt, of waarom ze jou juist nu nodig hebben.",
@@ -214,7 +214,7 @@ const UR_VARIANTS = {
         { key: "cta",       title: "Probeer het gratis",         sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
-    { // B — koud bellen is gokken
+    { // B, koud bellen is gokken
       voice: [
         "Je belt een bedrijf koud, maar je weet niet wat er bij ze speelt.",
         "Misschien draait alles prima en verspil je je tijd, misschien bel je net te laat.",
@@ -230,7 +230,7 @@ const UR_VARIANTS = {
         { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
-    { // C — een lijst is geen lead
+    { // C, een lijst is geen lead
       voice: [
         "Een lijst met namen koop je overal, dat is een telefoonboek.",
         "Een echte lead is een bedrijf waar iets mis is dat jij kunt oplossen.",
@@ -246,7 +246,7 @@ const UR_VARIANTS = {
         { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
-    { // D — elk vak z'n eigen signaal
+    { // D, elk vak z'n eigen signaal
       voice: [
         "Elk bureau zoekt iets anders in een bedrijf.",
         "Een webbouwer wil een verouderde site, een SEO-bureau een bedrijf dat slecht gevonden wordt.",
@@ -262,7 +262,7 @@ const UR_VARIANTS = {
         { key: "cta",       title: "Probeer het gratis",             sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
-    { // E — verloren uren
+    { // E, verloren uren
       voice: [
         "Hoeveel uur verlies je aan bedrijven die toch nooit klant werden?",
         "Bellen zonder te weten wat er speelt is gokken met je tijd.",
@@ -278,7 +278,7 @@ const UR_VARIANTS = {
         { key: "cta",       title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
-    { // F — een verandering is een open deur
+    { // F, een verandering is een open deur
       voice: [
         "Een bedrijf dat net stopte met adverteren, is een open deur voor een ads-bureau.",
         "Maar dat zie je niet als je het koud benadert.",
@@ -292,6 +292,342 @@ const UR_VARIANTS = {
         { key: "oplossing", title: "UncleRank pikt het op",  sub: "Veranderingen bij bedrijven,\nper vak klaargezet." },
         { key: "waarde",    title: "Precies op tijd",       sub: "Je komt binnen wanneer\nhet bedrijf je nodig heeft." },
         { key: "cta",       title: "Probeer het gratis",    sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+  ],
+
+  // ===== THEMA 2: "VOOR JOUW VAK", per vak het echte signaal uit het dossier (geen meetmethode) =====
+  vak: [
+    { // SEO
+      voice: [
+        "Ben jij een SEO-bureau? Dan zoek je bedrijven die slecht gevonden worden.",
+        "UncleRank meet Nederlandse bedrijven door en ziet precies waar het misgaat.",
+        "Er zoeken duizenden mensen per maand, en dit bedrijf pakt er bijna niks van. De rest gaat naar de concurrent.",
+        "Dat is jouw gesprek, met het cijfer erbij, voordat je de telefoon pakt.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "SEO-bureau?",                  sub: "Jij zoekt bedrijven die\nslecht gevonden worden." },
+        { key: "signaal",   title: "Het gat is meetbaar",          sub: "Duizenden zoekers per maand,\ndit bedrijf pakt er bijna niks." },
+        { key: "waarde",    title: "De rest gaat\nnaar de concurrent", sub: "Dat is jouw gesprek,\nmet het cijfer erbij." },
+        { key: "oplossing", title: "UncleRank zet ze klaar",       sub: "Alleen bedrijven waar\nde zoekvraag blijft liggen." },
+        { key: "cta",       title: "Probeer het gratis",           sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // SEA
+      voice: [
+        "Ben jij een SEA-specialist? Dan zoek je bedrijven met onbenutte zoekvraag.",
+        "UncleRank ziet welke bedrijven nog geen advertenties draaien, of hun budget verspillen.",
+        "Een dure klik, veel zoekvraag, en niemand die adverteert. Dat is jouw kans.",
+        "Je belt met het signaal in handen, niet koud.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "SEA-specialist?",        sub: "Jij zoekt onbenutte\nzoekvraag." },
+        { key: "signaal",   title: "Draait nog geen ads",    sub: "Veel zoekvraag,\nen niemand die adverteert." },
+        { key: "waarde",    title: "Dat is jouw kans",       sub: "Een dure klik,\nen een leeg speelveld." },
+        { key: "oplossing", title: "UncleRank wijst ze aan", sub: "Bedrijven waar een eerste\nads-traject te winnen is." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // Web
+      voice: [
+        "Ben jij een webbouwer? Dan zoek je bedrijven met een site die rammelt.",
+        "UncleRank ziet het: een trage, verouderde of zelfgebouwde site.",
+        "Dat is precies het bedrijf dat een nieuwe website nodig heeft.",
+        "Jij belt met een concrete reden, geen koud praatje.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Webbouwer?",             sub: "Jij zoekt bedrijven met\neen site die rammelt." },
+        { key: "signaal",   title: "Traag, oud of zelfbouw", sub: "UncleRank ziet\nde staat van de site." },
+        { key: "waarde",    title: "Dat bedrijf heeft jou nodig", sub: "Een nieuwe site,\nmet een concrete reden." },
+        { key: "oplossing", title: "UncleRank zet ze klaar", sub: "Alleen sites waar\naantoonbaar werk ligt." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // Content
+      voice: [
+        "Ben jij een contentspecialist? Dan zoek je bedrijven zonder verhaal.",
+        "UncleRank ziet een dode blog, lege pagina's, een dunne site.",
+        "Terwijl de markt vragen stelt die niemand bij ze beantwoordt.",
+        "Dat is jouw opening, met het gat erbij.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Contentspecialist?",     sub: "Jij zoekt bedrijven\nzonder verhaal." },
+        { key: "signaal",   title: "Dode blog, lege pagina's", sub: "Een dunne site,\nniks om op te vinden." },
+        { key: "waarde",    title: "De markt vraagt,\nzij zwijgen", sub: "Vragen die niemand\nbij ze beantwoordt." },
+        { key: "oplossing", title: "UncleRank zet ze klaar", sub: "Alleen bedrijven waar\ncontent echt iets oplost." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    { // Reclame
+      voice: [
+        "Ben jij een reclamebureau? Dan zoek je bedrijven die onzichtbaar zijn.",
+        "UncleRank ziet het: geen advertenties, nauwelijks op social, een zwak merk.",
+        "Een bedrijf dat goed draait maar dat niemand kent, dat is werk voor jou.",
+        "Je komt binnen met een reden, niet met een koud verhaal.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Reclamebureau?",         sub: "Jij zoekt bedrijven\ndie onzichtbaar zijn." },
+        { key: "signaal",   title: "Niet op social, geen ads", sub: "Een zwak merk,\nterwijl het loont." },
+        { key: "waarde",    title: "Goed bedrijf,\nniemand kent het", sub: "Dat is precies\nwerk voor jou." },
+        { key: "oplossing", title: "UncleRank zet ze klaar", sub: "Alleen bedrijven waar\nmerk en bereik liggen." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+  ],
+
+  // ===== THEMA 3: "GEEN KOUDE LIJST", kwaliteit en het verschil met een gekochte lijst =====
+  geenlijst: [
+    {
+      voice: [
+        "Een naam is geen lead.",
+        "Een telefoonnummer en een branche koop je overal, en het zegt je niks.",
+        "Een lead is een bedrijf waar iets mis is dat jij kunt oplossen.",
+        "UncleRank geeft je dat, met de reden erbij. Geen koude naam.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Een naam is geen lead",  sub: "Een nummer en een branche\nkoop je overal." },
+        { key: "pijn",      title: "Dat zegt je niks",       sub: "Je weet niet wie\neen probleem heeft." },
+        { key: "oplossing", title: "Een lead is een reden",  sub: "Een bedrijf waar iets mis is\ndat jij oplost." },
+        { key: "waarde",    title: "Met de reden erbij",     sub: "Geen koude naam,\nmaar een gesprek dat klopt." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Een gekochte lijst is duizend namen op branche en postcode.",
+        "Je weet niet wie een probleem heeft, dus je belt maar wat.",
+        "Een dossier van ons is één bedrijf, met wat er misgaat erbij.",
+        "Je weet het voordat de telefoon overgaat.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Een gekochte lijst",     sub: "Duizend namen op\nbranche en postcode." },
+        { key: "pijn",      title: "Je belt maar wat",       sub: "Je weet niet wie\neen probleem heeft." },
+        { key: "oplossing", title: "Een dossier van ons",    sub: "Eén bedrijf, met wat\ner misgaat erbij." },
+        { key: "waarde",    title: "Je weet het vooraf",     sub: "Voordat de telefoon\novergaat." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Een adressenbestand veroudert vanaf de dag dat je het krijgt.",
+        "En dezelfde regels zijn aan tientallen bureaus tegelijk verkocht.",
+        "Bij ons is de meting van deze week, en elk bedrijf drie weken van jou alleen.",
+        "Geen oude lijst, maar een vers dossier.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Een lijst veroudert",    sub: "Vanaf de dag dat\nje hem krijgt." },
+        { key: "pijn",      title: "Aan iedereen verkocht",  sub: "Dezelfde regels bij\ntientallen bureaus." },
+        { key: "oplossing", title: "Vers en exclusief",      sub: "De meting van deze week,\ndrie weken van jou." },
+        { key: "waarde",    title: "Geen oude lijst",        sub: "Maar een vers dossier,\nalleen voor jou." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Met een koude lijst weet je niks, dus vraag je het maar.",
+        "Hebben jullie misschien hulp nodig met jullie website? Zo begint geen goed gesprek.",
+        "Met een dossier open je met wat er echt mis is bij ze.",
+        "Je eerste zin gaat ergens over.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Je vraagt het maar",     sub: "Met een koude lijst\nweet je niks." },
+        { key: "pijn",      title: "Zo begint geen gesprek", sub: "Hebben jullie misschien\nhulp nodig met..." },
+        { key: "oplossing", title: "Open met wat mis is",    sub: "Een dossier geeft je\nde echte reden." },
+        { key: "waarde",    title: "Je eerste zin telt",     sub: "Die gaat ergens over,\nmeteen." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Honderd koude namen, of tien bedrijven met een reden?",
+        "Bellen zonder reden is tijd verliezen.",
+        "UncleRank kiest kwaliteit: alleen bedrijven waar het meetbaar misgaat.",
+        "Minder namen, meer gesprekken die tellen.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Honderd namen,\nof tien met een reden?", sub: "Wat lever jou\nmeer klanten op?" },
+        { key: "pijn",      title: "Zonder reden bellen",    sub: "Is gewoon\ntijd verliezen." },
+        { key: "oplossing", title: "Kwaliteit boven aantal", sub: "Alleen waar het\nmeetbaar misgaat." },
+        { key: "waarde",    title: "Gesprekken die tellen",  sub: "Minder namen,\nmeer resultaat." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+  ],
+
+  // ===== THEMA 4: "DE KRING", exclusiviteit, doorspelen, urgentie (gegrond op het portaal-model) =====
+  kring: [
+    {
+      voice: [
+        "Elk bedrijf dat je krijgt, is drie weken van jou alleen.",
+        "Geen enkel ander bureau in jouw vak belt hem in die tijd.",
+        "Bel je hem niet, dan gaat hij terug in de bak, voor een ander.",
+        "Wat je oppakt is van jou. Wat je laat liggen, pakt iemand anders.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Drie weken\nvan jou alleen", sub: "Elk bedrijf dat\nje krijgt." },
+        { key: "pijn",      title: "Niemand anders belt hem", sub: "Geen ander bureau\nin jouw vak." },
+        { key: "waarde",    title: "Wat je laat liggen,\npakt een ander", sub: "Bel je niet,\ndan gaat hij terug." },
+        { key: "oplossing", title: "Een eerlijke voorsprong", sub: "Wat je oppakt,\nis van jou." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Je hoort aan de lijn vaak dat er ook iets anders speelt.",
+        "Een site die rammelt, terwijl jij SEO doet.",
+        "Geef het met één klik door, dan krijgt een webbouwer het signaal.",
+        "En wie deelt, komt zelf vooraan te staan voor warme leads.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Er speelt vaak\nmeer",   sub: "Dan alleen jouw\neigen vak." },
+        { key: "pijn",      title: "Niet jouw dienst",       sub: "Een site die rammelt,\nterwijl jij SEO doet." },
+        { key: "oplossing", title: "Geef het door",          sub: "Met één klik krijgt\neen ander het signaal." },
+        { key: "waarde",    title: "Wie deelt, krijgt terug", sub: "Jij komt vooraan\nvoor warme leads." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Een koude lead is een naam die niemand nog sprak.",
+        "Een warme lead is een bedrijf dat een ander bureau net aan de lijn had.",
+        "Die landt bij jou, gemarkeerd, met de reden erbij.",
+        "Geen koud begin, maar een warm gesprek.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Koud of warm?",          sub: "Dat scheelt alles\naan de telefoon." },
+        { key: "pijn",      title: "Koud: niemand sprak hem", sub: "Een naam,\nmeer niet." },
+        { key: "oplossing", title: "Warm: net gesproken",    sub: "Een ander bureau had\nhem net aan de lijn." },
+        { key: "waarde",    title: "Gemarkeerd bij jou",     sub: "Met de reden erbij.\nGeen koud begin." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Bureaus zien elkaar meestal als concurrent.",
+        "Hier gunnen ze elkaar werk, en zo is het ook gebouwd.",
+        "Jij voedt de bak, en je eet er zelf uit.",
+        "Een kring waarin iedereen aan leads komt.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Concurrent?\nOf kring?", sub: "Bureaus zien elkaar\nmeestal als concurrent." },
+        { key: "pijn",      title: "In je eentje",           sub: "Zoek je alles\nzelf bij elkaar." },
+        { key: "oplossing", title: "Hier gun je elkaar werk", sub: "En zo is het\nook gebouwd." },
+        { key: "waarde",    title: "Voed de bak,\neet eruit", sub: "Iedereen komt\naan leads." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Een lijst wordt aan tientallen bureaus tegelijk verkocht.",
+        "Bij ons krijgt elk bedrijf maar één bureau in jouw vak.",
+        "Drie weken lang bel jij, en niemand anders.",
+        "Geen race tegen vijftig bellers, maar een eerlijke voorsprong.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",      title: "Eén bureau\nper bedrijf", sub: "Niet tientallen\ntegelijk." },
+        { key: "pijn",      title: "Een lijst is van iedereen", sub: "Aan tientallen bureaus\ntegelijk verkocht." },
+        { key: "oplossing", title: "Bij ons alleen jij",     sub: "Drie weken lang bel jij,\nen niemand anders." },
+        { key: "waarde",    title: "Geen race",              sub: "Een eerlijke\nvoorsprong." },
+        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+  ],
+
+  // ===== THEMA 5: "HOE HET WERKT", het model in stappen en het harde cijfer (uit bureaus.mjs) =====
+  hoewerkt: [
+    {
+      voice: [
+        "Zo werkt het. Wij meten Nederlandse bedrijven, elke week opnieuw.",
+        "Wat goed draait valt af, daar heb jij niks aan.",
+        "Wat overblijft gaat naar één bureau. Naar jou, drie weken lang.",
+        "Met de meting erbij, zodat je eerste zin ergens over gaat.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "stap1", title: "1. Wij meten",            sub: "Nederlandse bedrijven,\nelke week opnieuw." },
+        { key: "stap2", title: "2. Wat goed is,\nvalt af", sub: "Daar heb jij\nniks aan." },
+        { key: "stap3", title: "3. De rest\nkrijg jij",    sub: "Naar één bureau,\ndrie weken lang." },
+        { key: "waarde", title: "Met de meting erbij",     sub: "Je eerste zin\ngaat ergens over." },
+        { key: "cta",   title: "Probeer het gratis",       sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Stel, een koeriersdienst in Amsterdam.",
+        "Er zoeken daar bijna drieduizend mensen per maand op koerier.",
+        "Dit bedrijf pakt er ongeveer één van binnen. De rest gaat naar de concurrent.",
+        "Dat is het soort gat dat wij meten, en dat jij oplost.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",   title: "2.900",                   sub: "mensen per maand zoeken\nin Amsterdam op koerier." },
+        { key: "pijn",   title: "Eén",                     sub: "Zoveel haalt dit\nbedrijf er binnen." },
+        { key: "waarde", title: "De rest?",                sub: "Die gaat naar\nde concurrent." },
+        { key: "oplossing", title: "Dat gat meten wij",    sub: "En dat is precies\nwat jij oplost." },
+        { key: "cta",    title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Wij meten veel bedrijven door, maar sturen je niet alles.",
+        "Een bedrijf dat goed draait heeft niks aan jouw telefoontje.",
+        "Alleen waar het meetbaar misgaat blijft over.",
+        "Dat is een fractie van wat we meten, en precies jouw werk.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",   title: "Niet alles\nis een lead", sub: "Wij meten veel,\nmaar sturen je niet alles." },
+        { key: "pijn",   title: "Goed bedrijf, geen klant", sub: "Dat heeft niks aan\njouw telefoontje." },
+        { key: "oplossing", title: "Alleen wat misgaat",   sub: "Meetbaar,\nen echt." },
+        { key: "waarde", title: "Een fractie,\nprecies jouw werk", sub: "De rest filteren\nwij eruit." },
+        { key: "cta",    title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Je krijgt niet alleen een bedrijf, maar ook waaróm.",
+        "Wat er mis is, wat het ze kost, en een zin om mee te openen.",
+        "Zo bel je niet koud, maar als iemand die z'n huiswerk deed.",
+        "En de meting is van deze week, niet van vorig jaar.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",   title: "Niet alleen wie,\nook waarom", sub: "Je krijgt het hele\nverhaal erbij." },
+        { key: "signaal", title: "Wat, wat het kost,\nen hoe je opent", sub: "Alles om mee\nte bellen." },
+        { key: "waarde", title: "Alsof je je\nhuiswerk deed",  sub: "Zo bel je\nniet koud." },
+        { key: "oplossing", title: "Van deze week",         sub: "Niet van\nvorig jaar." },
+        { key: "cta",    title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+      ],
+    },
+    {
+      voice: [
+        "Eén gewonnen klant betaalt vaak je hele jaar.",
+        "Een SEO-traject loopt al snel van vijfhonderd tot tweeduizend vijfhonderd euro per maand.",
+        "Je hoeft er maar één te winnen uit alles wat je belt.",
+        "De rest is voorsprong.",
+        "Probeer het portaal een week gratis. De link staat in beeld.",
+      ],
+      cards: [
+        { key: "hook",   title: "Eén klant\nbetaalt je jaar", sub: "Uit alles wat\nje belt." },
+        { key: "waarde", title: "€500 tot €2.500",         sub: "per maand,\nvoor één SEO-traject." },
+        { key: "oplossing", title: "Je hoeft er\nmaar één", sub: "Te winnen\nuit de hele bak." },
+        { key: "slot",   title: "De rest\nis voorsprong",   sub: "Alles daarboven\nis winst." },
+        { key: "cta",    title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
       ],
     },
   ],
@@ -341,7 +677,7 @@ function attachAudio(ROOT, templates, templateId, render, vi = 0) {
     if (fs.existsSync(mp)) render.music = mp;
   } catch {}
   // stem: ÉÉN doorlopend voice.wav (hele variant in één opname, Truthward-stijl) over de muziek.
-  // De stem is in ur_voice.py al LUID genormaliseerd (loudnorm), dus hier gain 1.0 — geen clipping.
+  // De stem is in ur_voice.py al LUID genormaliseerd (loudnorm), dus hier gain 1.0, geen clipping.
   if (UR_BEATS[templateId]) {
     const w = path.join(voiceDir(ROOT, templateId, vi), "voice.wav");
     try { if (fs.existsSync(w)) render.audio = { tracks: [{ file: w, atSec: 0, gain: 1.0 }] }; } catch {}
@@ -408,8 +744,8 @@ function rasterCard(svg, W, outPng) {
   fs.writeFileSync(outPng, png);
 }
 
-// ---- TYPE: ROI — "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
-// De ECHTE pakketten (uit de verkooppagina, alle drie — niet één). Volume is het verschil.
+// ---- TYPE: ROI, "Eén klant en 't is terugverdiend" (WAARDE vs kost) -----------------------
+// De ECHTE pakketten (uit de verkooppagina, alle drie, niet één). Volume is het verschil.
 const ROI_PAKKETTEN = [
   { naam: "Start", aantal: 40, prijs: 89 },
   { naam: "Groot", aantal: 100, prijs: 179, top: true },
@@ -428,11 +764,11 @@ function buildRoi({ opts, W, H, variant, durSec }) {
   function sceneAt(frame) {
     t_ = frame / FPS; const t = t_;
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
-    // 1) HOOK — de propositie
+    // 1) HOOK, de propositie
     s += block(cx, H * 0.40, v.hook, { fs: Math.round(W * 0.07), w: 800, fill: C.ink, op: beat(0) });
-    // 2) AANBOD — geen lijst, een dossier met reden
+    // 2) AANBOD, geen lijst, een dossier met reden
     s += block(cx, H * 0.40, v.offer, { fs: fsHook, w: 800, fill: C.ink, op: beat(1) });
-    // 3) PAKKETTEN — alle drie, volume is het verschil
+    // 3) PAKKETTEN, alle drie, volume is het verschil
     const pOp = beat(2);
     if (pOp > 0.001) {
       s += tx(cx, H * 0.22, "Kies je volume", { fs: fsLbl, w: 600, fill: C.mut, op: pOp });
@@ -445,20 +781,20 @@ function buildRoi({ opts, W, H, variant, durSec }) {
       });
       s += tx(cx, H * 0.80, "een paar euro per bedrijf", { fs: fsLbl, w: 500, fill: C.mut, op: pOp });
     }
-    // 4) WAARDE — wat één gewonnen klant per maand oplevert (echt, uit de pagina), groen
+    // 4) WAARDE, wat één gewonnen klant per maand oplevert (echt, uit de pagina), groen
     const wOp = beat(3);
     if (wOp > 0.001) {
       s += tx(cx, H * 0.42, eur(ROI_KLANT_MIN) + " – " + eur(ROI_KLANT_MAX), { fs: Math.round(W * 0.11), w: 800, fill: C.green, op: wOp });
       s += block(cx, H * 0.52, v.valueLabel, { fs: fsLbl, w: 500, fill: C.mut, op: wOp });
     }
-    // 5) CTA — laatste zin, blijft staan tot het eind (video stopt hierop)
+    // 5) CTA, laatste zin, blijft staan tot het eind (video stopt hierop)
     s += tx(cx, H * 0.50, v.cta, { fs: Math.round(W * 0.06), w: 800, fill: C.ink, op: win(t, b[4], b[4] + 0.6) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec: dur, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: GAT — "Het harde cijfer" -------------------------------------------------------
+// ---- TYPE: GAT, "Het harde cijfer" -------------------------------------------------------
 function buildGat({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 13;
   const volume = Number(opts.volume) || 2900;
@@ -495,7 +831,7 @@ function ring(cx, cy, r, op) {
   return g;
 }
 
-// ---- TYPE: KRING — "De kring uitgelegd" ----------------------------------------------------
+// ---- TYPE: KRING, "De kring uitgelegd" ----------------------------------------------------
 function buildKring({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 17;
   const cx = W / 2, fsH = Math.round(W * 0.06), fsB = Math.round(W * 0.05), fsS = Math.round(W * 0.034);
@@ -513,7 +849,7 @@ function buildKring({ opts, W, H }) {
     // 4 exclusiviteit
     s += block(cx, H * 0.40, ["Each dossier:", "3 weeks, yours alone."], { fs: fsB, w: 800, fill: C.accent, op: win(t, 13.0, 14.0) });
     // 5 CTA
-    s += block(cx, H * 0.87, ["UncleRank — the circle.", "Try a week, free."], { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: win(t, 15.2, 16.0) });
+    s += block(cx, H * 0.87, ["UncleRank, the circle.", "Try a week, free."], { fs: Math.round(W * 0.04), w: 600, fill: C.ink, op: win(t, 15.2, 16.0) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
@@ -523,14 +859,14 @@ function buildKring({ opts, W, H }) {
 // regel). Gedeeld door 'bureaus' (overzicht, cyclus) en 'signalen' (diep op één vak).
 const VAK = {
   seo:     { naam: "SEO", sig: ["Ranks on page 4 for its own service", "Most of its searches go to rivals", "A homepage too thin to rank"] },
-  sea:     { naam: "SEA", sig: ["No Google Ads running, for months", "No tracking — blind to what works", "A pricey-click market he's not in"] },
+  sea:     { naam: "SEA", sig: ["No Google Ads running, for months", "No tracking, blind to what works", "A pricey-click market he's not in"] },
   web:     { naam: "Web", sig: ["Loads in 4+ seconds", "Falls apart on mobile", "A dated template build"] },
   content: { naam: "Content", sig: ["No blog, or one that died in 2022", "A homepage under 300 words", "Market questions left unanswered"] },
   reclame: { naam: "Ads & brand", sig: ["Advertises nowhere", "Nearly invisible on social", "A handful of weak reviews"] },
 };
 const VAK_ORDER = ["seo", "sea", "web", "content", "reclame"];
 
-// ---- TYPE: BUREAUS — "Wat we per vak zien" (cyclus over de 5 vakgebieden) -------------------
+// ---- TYPE: BUREAUS, "Wat we per vak zien" (cyclus over de 5 vakgebieden) -------------------
 function buildBureaus({ opts, W, H }) {
   const FPS = 30, SS = 1;
   const per = 2.6;                                   // tijd per vak op scherm
@@ -556,7 +892,7 @@ function buildBureaus({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: SIGNALEN — diep op ÉÉN vak (opts.vak = seo/sea/web/content/reclame) --------------
+// ---- TYPE: SIGNALEN, diep op ÉÉN vak (opts.vak = seo/sea/web/content/reclame) --------------
 function buildSignalen({ opts, W, H }) {
   const FPS = 30, SS = 1;
   const v = VAK[String(opts.vak || "seo").toLowerCase()] || VAK.seo;
@@ -576,13 +912,13 @@ function buildSignalen({ opts, W, H }) {
     });
     const endA = 2.2 + v.sig.length * 1.8 + 0.4;
     s += block(cx, H * 0.78, ["The flaws, already found.", "On every lead."], { fs: Math.round(W * 0.044), w: 800, fill: C.accent, op: win(t, endA, endA + 1.0) });
-    s += block(cx, H * 0.92, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, endA + 1.6, endA + 2.4) });
+    s += block(cx, H * 0.92, ["UncleRank, try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, endA + 1.6, endA + 2.4) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: ACTUEEL — "Altijd actueel" (dagelijkse verversing) ------------------------------
+// ---- TYPE: ACTUEEL, "Altijd actueel" (dagelijkse verversing) ------------------------------
 function buildActueel({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
   const cx = W / 2;
@@ -591,15 +927,15 @@ function buildActueel({ opts, W, H }) {
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
     s += block(cx, H * 0.26, ["Yesterday's lead list", "is already stale."], { fs: Math.round(W * 0.055), w: 800, fill: C.ink, op: win(t, 0.4, 1.4, 3.4, 4.2) });
     s += block(cx, H * 0.34, ["We re-check every site,", "every single day."], { fs: Math.round(W * 0.055), w: 800, fill: C.accent, op: win(t, 4.4, 5.4) });
-    s += block(cx, H * 0.56, ["So the reason you call", "is today's reason —", "not last month's."], { fs: Math.round(W * 0.044), w: 600, fill: C.ink, op: win(t, 7.4, 8.4) });
+    s += block(cx, H * 0.56, ["So the reason you call", "is today's reason -", "not last month's."], { fs: Math.round(W * 0.044), w: 600, fill: C.ink, op: win(t, 7.4, 8.4) });
     s += tx(cx, H * 0.82, "Fresh dossiers. Current flaws.", { fs: Math.round(W * 0.04), w: 700, fill: C.green, op: win(t, 10.4, 11.2) });
-    s += tx(cx, H * 0.9, "UncleRank — the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.6, 12.4) });
+    s += tx(cx, H * 0.9, "UncleRank, the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.6, 12.4) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: EXCLUSIEF — "3 weken exclusief" (schaarste) -------------------------------------
+// ---- TYPE: EXCLUSIEF, "3 weken exclusief" (schaarste) -------------------------------------
 function buildExclusief({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 13;
   const cx = W / 2, fsBig = Math.round(W * 0.15), fsLbl = Math.round(W * 0.04);
@@ -619,13 +955,13 @@ function buildExclusief({ opts, W, H }) {
     }
     s += tx(cx, H * 0.62, "yours alone", { fs: fsLbl, w: 500, fill: C.mut, op: win(t, 4.0, 4.8) });
     s += block(cx, H * 0.76, ["No bidding war.", "No shared inbox."], { fs: Math.round(W * 0.044), w: 700, fill: C.ink, op: win(t, 6.5, 7.5) });
-    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.038), w: 600, fill: C.mut, op: win(t, 10.5, 11.3) });
+    s += block(cx, H * 0.9, ["UncleRank, the circle."], { fs: Math.round(W * 0.038), w: 600, fill: C.mut, op: win(t, 10.5, 11.3) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: VOORNA — "Koude outreach vs warme kring" ---------------------------------------
+// ---- TYPE: VOORNA, "Koude outreach vs warme kring" ---------------------------------------
 function buildVoorna({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
   const colW = W * 0.42, lx = W * 0.27, rx = W * 0.73;
@@ -647,13 +983,13 @@ function buildVoorna({ opts, W, H }) {
     s += column(lx, "Cold outreach", ["Lists you bought", "No reason to call", "Ignored, every time"], C.mut, win(t, 2.0, 3.0), yTop);
     s += column(rx, "The circle", ["A real flaw, named", "A reason to call", "3 weeks, yours"], C.accent, win(t, 3.6, 4.6), yTop);
     s += tx(W / 2, H * 0.84, "One of them actually picks up.", { fs: Math.round(W * 0.04), w: 700, fill: C.green, op: win(t, 7.0, 8.0) });
-    s += tx(W / 2, H * 0.92, "UncleRank — try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.5, 10.3) });
+    s += tx(W / 2, H * 0.92, "UncleRank, try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.5, 10.3) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: HOEHETWERKT — "Hoe het werkt" (3 stappen) --------------------------------------
+// ---- TYPE: HOEHETWERKT, "Hoe het werkt" (3 stappen) --------------------------------------
 function buildHoehetwerkt({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
   const cx = W / 2, fsH = Math.round(W * 0.056), fsN = Math.round(W * 0.06), fsR = Math.round(W * 0.04);
@@ -676,13 +1012,13 @@ function buildHoehetwerkt({ opts, W, H }) {
       s += tx(x0 + W * 0.1, y - fsN * 0.18, st[1], { fs: fsR, w: 800, fill: C.ink, op, anchor: "start" });
       s += tx(x0 + W * 0.1, y + fsR * 0.6, st[2], { fs: Math.round(fsR * 0.74), w: 500, fill: C.mut, op, anchor: "start" });
     });
-    s += block(cx, H * 0.9, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.0, 12.0) });
+    s += block(cx, H * 0.9, ["UncleRank, try a week, free."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.0, 12.0) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: BEZWAAR — "Is dit niet gewoon een lead-lijst?" ---------------------------------
+// ---- TYPE: BEZWAAR, "Is dit niet gewoon een lead-lijst?" ---------------------------------
 function buildBezwaar({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
   const cx = W / 2;
@@ -693,19 +1029,19 @@ function buildBezwaar({ opts, W, H }) {
     s += tx(cx, H * 0.34, "No.", { fs: Math.round(W * 0.14), w: 800, fill: "#ffffff", op: win(t, 4.6, 5.6) });
     const lines = [
       ["Every lead comes with its flaw.", 7.0],
-      ["A reason to call — not a name.", 8.6],
+      ["A reason to call, not a name.", 8.6],
       ["3 weeks, yours alone.", 10.2],
     ];
     lines.forEach((l, i) => {
       s += tx(cx, H * 0.52 + i * H * 0.08, l[0], { fs: Math.round(W * 0.042), w: 700, fill: i === 2 ? C.accent : C.ink, op: win(t, l[1], l[1] + 0.9) });
     });
-    s += block(cx, H * 0.88, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
+    s += block(cx, H * 0.88, ["UncleRank, the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: MANKEMENT — "Een naam is geen lead" (cyclus van gebreken) -----------------------
+// ---- TYPE: MANKEMENT, "Een naam is geen lead" (cyclus van gebreken) -----------------------
 function buildMankement({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
   const cx = W / 2;
@@ -719,14 +1055,14 @@ function buildMankement({ opts, W, H }) {
       const a = 2.6 + i * 1.7;
       s += tx(cx, H * 0.5, f, { fs: Math.round(W * 0.056), w: 800, fill: C.accent, op: win(t, a, a + 0.5, a + 1.1, a + 1.6) });
     });
-    s += block(cx, H * 0.72, ["Every one —", "a reason to call."], { fs: Math.round(W * 0.05), w: 800, fill: "#ffffff", op: win(t, 9.8, 10.8) });
-    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.5, 13.3) });
+    s += block(cx, H * 0.72, ["Every one -", "a reason to call."], { fs: Math.round(W * 0.05), w: 800, fill: "#ffffff", op: win(t, 9.8, 10.8) });
+    s += block(cx, H * 0.9, ["UncleRank, the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.5, 13.3) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: REKENSOM — "Wat kost een warme lead hier?" -------------------------------------
+// ---- TYPE: REKENSOM, "Wat kost een warme lead hier?" -------------------------------------
 function buildRekensom({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 14;
   const kostMnd = Number(opts.kostMnd) || 89;
@@ -746,7 +1082,7 @@ function buildRekensom({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: GRATISWEEK — het aanbod / CTA --------------------------------------------------
+// ---- TYPE: GRATISWEEK, het aanbod / CTA --------------------------------------------------
 function buildGratisweek({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 12;
   const cx = W / 2;
@@ -768,7 +1104,7 @@ function buildGratisweek({ opts, W, H }) {
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: OMDRAAI — de pivot (scan-tool -> lead-lijst voor bureaus) ----------------------
+// ---- TYPE: OMDRAAI, de pivot (scan-tool -> lead-lijst voor bureaus) ----------------------
 function buildOmdraai({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
   const cx = W / 2;
@@ -779,13 +1115,13 @@ function buildOmdraai({ opts, W, H }) {
     s += tx(cx, H * 0.34, "We flipped it.", { fs: Math.round(W * 0.1), w: 800, fill: C.accent, op: win(t, 4.8, 5.8) });
     s += block(cx, H * 0.56, ["Now the agency gets the list:", "who to call, and why."], { fs: Math.round(W * 0.046), w: 700, fill: C.ink, op: win(t, 7.4, 8.4) });
     s += block(cx, H * 0.74, ["Their flaw, already found.", "Your opening line, already written."], { fs: Math.round(W * 0.036), w: 500, fill: C.mut, op: win(t, 10.0, 11.0) });
-    s += block(cx, H * 0.9, ["UncleRank — the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.6, 13.4) });
+    s += block(cx, H * 0.9, ["UncleRank, the circle."], { fs: Math.round(W * 0.036), w: 600, fill: C.mut, op: win(t, 12.6, 13.4) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: VOLUME — "elke ochtend nieuwe dossiers" (tellende cijfer) -----------------------
+// ---- TYPE: VOLUME, "elke ochtend nieuwe dossiers" (tellende cijfer) -----------------------
 function buildVolume({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 13;
   const target = Number(opts.aantal) || 10;
@@ -802,13 +1138,13 @@ function buildVolume({ opts, W, H }) {
     }
     s += block(cx, H * 0.62, ["new dossiers.", "Already checked."], { fs: Math.round(W * 0.044), w: 600, fill: C.accent, op: win(t, 4.4, 5.4) });
     s += block(cx, H * 0.8, ["You don't hunt.", "You just pick up the phone."], { fs: Math.round(W * 0.042), w: 700, fill: C.ink, op: win(t, 7.0, 8.0) });
-    s += block(cx, H * 0.92, ["UncleRank — try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 10.0, 10.8) });
+    s += block(cx, H * 0.92, ["UncleRank, try a week, free."], { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 10.0, 10.8) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: DELEN — "Delen loont" (de give-and-take van de kring) --------------------------
+// ---- TYPE: DELEN, "Delen loont" (de give-and-take van de kring) --------------------------
 function buildDelen({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 15;
   const cx = W / 2;
@@ -817,15 +1153,15 @@ function buildDelen({ opts, W, H }) {
     let s = bg(W, H) + wordmark(W, H, win(t, 0.2, 1.0));
     s += block(cx, H * 0.26, ["You spot a flaw", "that isn't your trade."], { fs: Math.round(W * 0.052), w: 800, fill: C.ink, op: win(t, 0.4, 1.4) });
     s += block(cx, H * 0.46, ["Pass it to the circle.", "We make the intro."], { fs: Math.round(W * 0.05), w: 700, fill: C.accent, op: win(t, 3.2, 4.2) });
-    s += block(cx, H * 0.64, ["Share, and you move up —", "hot leads come back to you."], { fs: Math.round(W * 0.042), w: 600, fill: C.ink, op: win(t, 6.4, 7.4) });
+    s += block(cx, H * 0.64, ["Share, and you move up -", "hot leads come back to you."], { fs: Math.round(W * 0.042), w: 600, fill: C.ink, op: win(t, 6.4, 7.4) });
     s += tx(cx, H * 0.82, "Everyone feeds the pot they eat from.", { fs: Math.round(W * 0.036), w: 700, fill: C.green, op: win(t, 10.0, 11.0) });
-    s += tx(cx, H * 0.9, "UncleRank — the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
+    s += tx(cx, H * 0.9, "UncleRank, the circle.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 11.8, 12.6) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
 }
 
-// ---- TYPE: RESULTAAT — "Eén telefoontje" (de hele loop) -----------------------------------
+// ---- TYPE: RESULTAAT, "Eén telefoontje" (de hele loop) -----------------------------------
 function buildResultaat({ opts, W, H }) {
   const FPS = 30, SS = 1, durSec = Number(opts.durSec) || 12;
   const cx = W / 2, fs = Math.round(W * 0.062);
@@ -836,7 +1172,7 @@ function buildResultaat({ opts, W, H }) {
     s += tx(cx, H * 0.46, "One call that lands.", { fs, w: 800, fill: C.ink, op: win(t, 2.6, 3.6) });
     s += tx(cx, H * 0.6, "One new client.", { fs: Math.round(W * 0.072), w: 800, fill: C.accent, op: win(t, 4.6, 5.6) });
     s += block(cx, H * 0.78, ["That's the whole loop.", "No cold lists. No luck."], { fs: Math.round(W * 0.04), w: 600, fill: C.mut, op: win(t, 7.4, 8.4) });
-    s += tx(cx, H * 0.9, "UncleRank — try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.6, 10.4) });
+    s += tx(cx, H * 0.9, "UncleRank, try a week, free.", { fs: Math.round(W * 0.034), w: 600, fill: C.mut, op: win(t, 9.6, 10.4) });
     return root(W, H, s);
   }
   return { W, H, FPS, SS, durSec, sceneAt, music: null, clicks: [] };
@@ -845,27 +1181,18 @@ function buildResultaat({ opts, W, H }) {
 export function makeBrand({ ROOT, config } = {}) {
   loadMark(ROOT);   // UR-mark eenmalig inladen als data-URI (voor het woordmerk/lockup)
   const branding = { navy: C.bg0, accent: C.accent };
+  // DE VIJF THEMA'S (Mo's indeling, 19 nov). Elk thema is één type met een eigen variant-pool die
+  // rouleert (blijvende anti-herhaling), zodat geen twee renders gelijk zijn. "Het aanbod" gebruikt de
+  // portaal-opname als beeld; de andere vier zijn kaart-montages (tekstkaarten + stem). De oude losse
+  // type-builders (gat, bureaus, bezwaar, mankement, omdraai, exclusief, voorna, volume, signalen,
+  // actueel, delen, resultaat, rekensom, gratisweek, roi, hoehetwerkt) blijven als code staan maar zijn
+  // uit de studio-lijst; hun inhoud is opgegaan in de thema-pools hierboven (UR_VARIANTS).
   const templates = [
-    // GEARCHIVEERD (17 nov) — te ad-achtig, niet de LinkedIn-contenttoon. Code (buildRoi + UR_VARIANTS.roi)
-    // blijft staan voor eventueel later hergebruik; type is uit de studio-lijst gehaald.
-    // { id: "roi", name: "Eén klant en 't is terugverdiend", music: ["upbeat", "calm", "lofi"], defaults: {} },
-    { id: "gat", name: "Het gat (het harde cijfer)", music: ["upbeat", "calm", "lofi"], defaults: {} },
-    { id: "portaal", name: "Het aanbod (verse leads)", music: [], defaults: {} },
-    { id: "kring", name: "De kring uitgelegd", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "bureaus", name: "Voor wie: 5 bureautypes", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "exclusief", name: "3 weken exclusief", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "voorna", name: "Koud vs warm (kring)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "hoehetwerkt", name: "Hoe het werkt (3 stappen)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "bezwaar", name: "Is dit niet gewoon een lijst?", music: ["upbeat", "lofi", "calm"], defaults: {} },
-    { id: "mankement", name: "Een naam is geen lead", music: ["upbeat", "lofi", "calm"], defaults: {} },
-    { id: "rekensom", name: "Wat kost een warme lead", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "gratisweek", name: "Gratis week (aanbod)", music: ["upbeat", "lofi", "calm"], defaults: {} },
-    { id: "omdraai", name: "De omdraai (de pivot)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "volume", name: "Elke ochtend nieuw", music: ["upbeat", "lofi", "calm"], defaults: {} },
-    { id: "signalen", name: "Wat we vinden (per vak)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "actueel", name: "Altijd actueel (dagelijks)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "delen", name: "Delen loont (kring)", music: ["calm", "lofi", "upbeat"], defaults: {} },
-    { id: "resultaat", name: "Eén telefoontje", music: ["upbeat", "lofi", "calm"], defaults: {} },
+    { id: "portaal",  name: "Het aanbod (verse leads)",        music: [], defaults: {} },
+    { id: "vak",      name: "Voor jouw vak (per discipline)",  music: [], defaults: {} },
+    { id: "geenlijst", name: "Geen koude lijst",               music: [], defaults: {} },
+    { id: "kring",    name: "De kring (exclusief)",            music: [], defaults: {} },
+    { id: "hoewerkt", name: "Hoe het werkt",                   music: [], defaults: {} },
   ];
   // De Studio wil een onderwerp kunnen kiezen; UncleRank is type-gedreven, dus één dummy-onderwerp.
   async function listSubjects() { return [{ id: "ur", thumb: null }]; }
@@ -908,7 +1235,7 @@ export function makeBrand({ ROOT, config } = {}) {
       if ((opts.versStem) || !fs.existsSync(wavp) || (wantLines && haveLines !== wantLines)) {
         await fs.promises.mkdir(vdir, { recursive: true });
         if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
-        if (log) log("● UR-stem genereren (het aanbod, NL) — dit duurt even…");
+        if (log) log("● UR-stem genereren (het aanbod, NL), dit duurt even…");
         const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", "portaal", "--variant", String(vi), "--root", ROOT];
         if (wantLines) args.push("--lines", linesFile);
         if (opts.voice) args.push("--voice", String(opts.voice));
@@ -1013,6 +1340,96 @@ export function makeBrand({ ROOT, config } = {}) {
     return { prebuilt: final, music: "", lang: "nl", cleanup: work };
   }
 
+  // KAART-MONTAGE voor de thema's zonder opname (Voor jouw vak, Geen koude lijst, De kring, Hoe het
+  // werkt). Zelfde bewezen kaartlogica als "Het aanbod", maar zonder recorder: kies een verse variant
+  // (blijvende anti-herhaling), spreek de stem in, render elke kaart, plak ze, leg de stem erover. De
+  // video volgt de stem. Elke variant heeft eigen stem (eigen vXX-map) én eigen kaarten.
+  async function makeCardMontageRender(templateId, { opts = {}, format = "9:16", log } = {}) {
+    const PY = process.env.UR_PYTHON || "python";
+    const [W, H] = FORMATS[format] || FORMATS["9:16"];
+    const FPS = 30;
+    const outDir = (config && config.outDir) ? config.outDir : "out";
+    const work = path.resolve(ROOT, outDir, "." + templateId + "-" + Date.now());
+    await fs.promises.mkdir(work, { recursive: true });
+    const final = path.join(work, templateId + "-final.mp4");
+    const ENC = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(FPS), "-preset", "veryfast"];
+
+    // 0) verse variant
+    const POOL = UR_VARIANTS[templateId] || [];
+    const vi = pickFreshVariant(ROOT, templateId, POOL.length);
+    const variant = POOL[vi] || {};
+    const CARDS = Array.isArray(variant.cards) && variant.cards.length ? variant.cards : [];
+    if (log) log(`● ${templateId}: variant ${vi + 1} van ${POOL.length} gekozen`);
+    if (!CARDS.length) throw new Error("geen kaarten voor " + templateId + " variant " + vi);
+
+    // 1) stem (eigen mapje per variant); de duur bepaalt de totale lengte
+    let voiceWav = "", T = Number(opts.seconds) || 18;
+    try {
+      const vdir = voiceDir(ROOT, templateId, vi);
+      const wavp = path.join(vdir, "voice.wav");
+      const linesFile = path.join(vdir, "_lines.json");
+      const wantLines = Array.isArray(variant.voice) ? JSON.stringify(variant.voice) : "";
+      let haveLines = null; try { haveLines = await fs.promises.readFile(linesFile, "utf8"); } catch {}
+      if ((opts.versStem) || !fs.existsSync(wavp) || (wantLines && haveLines !== wantLines)) {
+        await fs.promises.mkdir(vdir, { recursive: true });
+        if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
+        if (log) log("● UR-stem genereren (" + templateId + ", NL), dit duurt even…");
+        const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", templateId, "--variant", String(vi), "--root", ROOT];
+        if (wantLines) args.push("--lines", linesFile);
+        if (opts.voice) args.push("--voice", String(opts.voice));
+        await runStreamed(PY, args, { ...process.env, FFMPEG }, log, "· stem:");
+      }
+      if (fs.existsSync(wavp)) {
+        voiceWav = wavp;
+        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) T = Number(tl.total); } catch {}
+      }
+    } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
+
+    // 2) duur per kaart: over de stem verdeeld, met een leesbare bodem; hook en slot iets langer
+    const nC = CARDS.length;
+    const wts = CARDS.map((_, i) => (i === 0 ? 1.25 : i === nC - 1 ? 1.2 : 1.0));
+    const sumW = wts.reduce((a, b) => a + b, 0);
+    const durs = wts.map((w) => Math.max(2.4, +((w / sumW) * T).toFixed(2)));
+
+    // 3) elke kaart -> segment (zelfde codec/res/fps)
+    if (log) log("● kaarten renderen…");
+    const segs = [];
+    for (let i = 0; i < CARDS.length; i++) {
+      const card = CARDS[i] || {};
+      try {
+        const png = path.join(work, `card-${String(i).padStart(2, "0")}-${card.key || i}.png`);
+        rasterCard(makeCardSvg({ W, H, title: card.title, sub: card.sub, outro: !!card.outro }), W, png);
+        const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}.mp4`);
+        const r = await runStreamed(FFMPEG, ["-y", "-v", "error", "-loop", "1", "-t", String(durs[i]), "-i", png,
+          "-vf", `scale=${W}:${H},fps=${FPS},format=yuv420p`, ...ENC, mp4], { ...process.env }, log, "· kaart:");
+        if (r.status === 0 && fs.existsSync(mp4)) segs.push(mp4);
+      } catch (e) { if (log) log("kaart overgeslagen: " + e.message); }
+    }
+    if (!segs.length) throw new Error("geen kaart-segmenten gerenderd voor " + templateId);
+
+    // 4) plakken
+    let base = segs[0];
+    if (segs.length >= 2) {
+      const montage = path.join(work, templateId + "-montage.mp4");
+      const listFile = path.join(work, "concat.txt");
+      await fs.promises.writeFile(listFile, segs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"), "utf8");
+      const rc = await runStreamed(FFMPEG, ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", listFile, ...ENC, montage], { ...process.env }, log, "· plakken:");
+      if (rc.status === 0 && fs.existsSync(montage)) base = montage;
+    }
+
+    // 5) vertelstem over de montage (video leidend; apad + shortest houdt de slot-kaart heel)
+    if (voiceWav && fs.existsSync(voiceWav)) {
+      if (log) log("● vertelstem over de montage leggen…");
+      const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-i", base, "-i", voiceWav,
+        "-filter_complex", "[1:a]apad[a]", "-map", "0:v", "-map", "[a]",
+        "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", "-shortest", final], { ...process.env }, log, "· mix:");
+      if (r2.status !== 0) { if (log) log("mix faalde, montage zonder stem"); await fs.promises.copyFile(base, final); }
+    } else {
+      await fs.promises.copyFile(base, final);
+    }
+    return { prebuilt: final, music: "", lang: "nl", cleanup: work };
+  }
+
   const BUILDERS = {
     roi: buildRoi, gat: buildGat, kring: buildKring, bureaus: buildBureaus, exclusief: buildExclusief,
     voorna: buildVoorna, hoehetwerkt: buildHoehetwerkt, bezwaar: buildBezwaar, mankement: buildMankement,
@@ -1021,7 +1438,7 @@ export function makeBrand({ ROOT, config } = {}) {
   };
   // Stem + muziek worden BIJ DE RENDER aangemaakt (niet handmatig in Git Bash): de engine roept
   // ur_audio.py (muziekbodem, eenmalig per mood) en ur_voice.py (NL-stem) zelf aan, met voortgang
-  // in het studio-log — net zoals de portaal-opname. Faalt een stap, dan rendert de video stil door.
+  // in het studio-log, net zoals de portaal-opname. Faalt een stap, dan rendert de video stil door.
   // Genereert muziek + stem BIJ DE RENDER en geeft de totale STEM-DUUR terug (de video volgt de stem).
   async function ensureAudioAssets(templateId, vi, opts, log) {
     const PY = process.env.UR_PYTHON || "python";
@@ -1050,7 +1467,7 @@ export function makeBrand({ ROOT, config } = {}) {
       if ((opts && opts.versStem) || !fs.existsSync(wavp) || stale) {
         await fs.promises.mkdir(vdir, { recursive: true });
         if (wantLines) await fs.promises.writeFile(linesFile, wantLines, "utf8");
-        if (log) log(stale ? "● Script gewijzigd — UR-stem opnieuw inspreken…" : "● UR-stem genereren (Chatterbox, NL) — dit duurt even…");
+        if (log) log(stale ? "● Script gewijzigd, UR-stem opnieuw inspreken…" : "● UR-stem genereren (Chatterbox, NL), dit duurt even…");
         const args = [path.resolve(ROOT, "tools/ur_voice.py"), "--type", templateId, "--variant", String(vi), "--root", ROOT];
         if (wantLines) args.push("--lines", linesFile);
         if (opts && opts.voice) args.push("--voice", String(opts.voice));
@@ -1066,6 +1483,7 @@ export function makeBrand({ ROOT, config } = {}) {
   async function makeRender({ templateId = "roi", opts = {}, format = "9:16", log } = {}) {
     const [W, H] = FORMATS[format] || FORMATS["9:16"];
     if (templateId === "portaal") return await makePortalRender({ opts, format, log });
+    if (["vak", "geenlijst", "kring", "hoewerkt"].includes(templateId)) return await makeCardMontageRender(templateId, { opts, format, log });
     const fn = BUILDERS[templateId] || buildRoi;
     const vi = pickVariant(templateId);                                  // afwisseling per render
     const variant = (UR_VARIANTS[templateId] || [])[vi];
@@ -1075,7 +1493,7 @@ export function makeBrand({ ROOT, config } = {}) {
     return attachAudio(ROOT, templates, templateId, render, vi);
   }
   // De engine roept bij het laden brand.init(log) aan (zoals taleoftiles). UncleRank is type-
-  // gedreven en heeft niets te laden, dus init is een no-op — maar moet wél bestaan.
+  // gedreven en heeft niets te laden, dus init is een no-op, maar moet wél bestaan.
   async function init() { return; }
   return {
     id: "unclerank", name: "UncleRank", footer: "unclerank.com",
