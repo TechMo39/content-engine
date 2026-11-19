@@ -1314,7 +1314,16 @@ export function makeBrand({ ROOT, config } = {}) {
     const raw = path.join(work, "portal-walkthrough.mp4");
     const r1 = await runStreamed(node, [recorder], recEnv, log, "· opname:");
     const haveRec = (r1.status === 0 && fs.existsSync(raw));
-    if (!haveRec && log) log("opname faalde, montage met alleen tekstkaarten");
+    // gerichte stills (de slimme weg: push-in op de verkoop-delen). Maakte de recorder ze, dan gebruiken
+    // we die; anders vallen we terug op stukjes uit de walkthrough-opname, of op alleen tekstkaarten.
+    let SHOTS = [];
+    try {
+      const sj = JSON.parse(await fs.promises.readFile(path.join(work, "portal-shots.json"), "utf8"));
+      SHOTS = (sj.shots || []).map((s) => ({ ...s, path: path.join(work, s.file) })).filter((s) => fs.existsSync(s.path));
+    } catch {}
+    const haveShots = SHOTS.length > 0;
+    if (haveShots && log) log(`● ${SHOTS.length} gerichte beelden gevonden — push-in op de verkoop-delen`);
+    else if (!haveRec && log) log("opname faalde, montage met alleen tekstkaarten");
 
     // 4) segment-helpers (allemaal zelfde codec/res/fps -> veilig aan elkaar te plakken)
     async function cardSeg(card, dur, i) {
@@ -1339,18 +1348,71 @@ export function makeBrand({ ROOT, config } = {}) {
       } catch (e) { if (log) log("clip overgeslagen: " + e.message); }
       return null;
     }
+    // adaptieve zoom: smal element = dieper inzoomen, breed element (volle kaart) = zacht, zodat de
+    // randen (bv. het label) niet wegvallen. Nooit helemaal plat, nooit te hard.
+    function adaptiveZoom(r) {
+      const z = Math.min(W / Math.max(1, r.w + 0.10 * W), H / Math.max(1, r.h + 0.10 * H));
+      return Math.max(1.12, Math.min(1.7, z));
+    }
+    // push-in op een stilstaand portaal-beeld richting de bounding-box van het verkoop-deel (ffmpeg
+    // zoompan). De blur zit in de pixels, dus ingezoomd blijft de data vervaagd.
+    async function pushinSeg(shot, dur, i) {
+      try {
+        if (!shot || !fs.existsSync(shot.path)) return null;
+        const r = shot.rect || { x: 0, y: 0, w: W, h: H };
+        const Z = adaptiveZoom(r);
+        const cx = Math.round(r.x + r.w / 2), cy = Math.round(r.y + r.h / 2);
+        const frames = Math.max(1, Math.round(dur * FPS));
+        const step = ((Z - 1) / Math.max(1, Math.round(0.82 * frames))).toFixed(5);
+        const vf = `zoompan=z='min(1+${step}*on,${Z.toFixed(3)})':`
+          + `x='max(0,min(iw-iw/zoom,${cx}-(iw/zoom)/2))':`
+          + `y='max(0,min(ih-ih/zoom,${cy}-(ih/zoom)/2))':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`;
+        const mp4 = path.join(work, `seg-${String(i).padStart(2, "0")}-shot.mp4`);
+        const r2 = await runStreamed(FFMPEG, ["-y", "-v", "error", "-framerate", String(FPS), "-loop", "1", "-t", String(dur), "-i", shot.path,
+          "-vf", vf, ...ENC, mp4], { ...process.env }, log, "· inzoom:");
+        if (r2.status === 0 && fs.existsSync(mp4)) return mp4;
+      } catch (e) { if (log) log("inzoom overgeslagen: " + e.message); }
+      return null;
+    }
 
-    // 5) de montage in volgorde opbouwen: kaarten tekst-only, opname-stukjes uit de ene opname geknipt
-    if (log) log("● montage bouwen (tekstkaarten + opname-stukjes)…");
+    // 5) de montage opbouwen. MET gerichte beelden: de kaarten zijn de ruggengraat en de push-ins
+    //    komen op de plek waar ze iets bewijzen — de lead-kaarten na "de oplossing", de dossier-
+    //    blokken (waarom nu / signaal / waarde) na "de waarde". ZONDER: de oude volgorde met stukjes
+    //    uit één walkthrough. Faalt een onderdeel, dan valt het stil weg; de rest loopt door.
+    if (log) log("● montage bouwen…");
     const segs = []; const push = (p) => { if (p) segs.push(p); };
-    let clipAt = 0;
-    for (let i = 0; i < SEQ.length; i++) {
-      const s = SEQ[i];
-      if (s.kind === "card") {
-        push(await cardSeg(CARDS[s.i] || {}, durOf[i], i));
-      } else {
-        push(await clipSeg(clipAt, durOf[i], i));
-        clipAt += durOf[i];
+    if (haveShots) {
+      const leadShots = SHOTS.filter((s) => /^lead/.test(s.name));
+      const dossShots = SHOTS.filter((s) => !/^lead/.test(s.name));
+      const byKey = (k) => CARDS.find((c) => c.key === k);
+      const items = [];
+      const addCard = (k) => { const c = byKey(k); if (c) items.push({ kind: "card", card: c }); };
+      const addShots = (arr) => arr.forEach((s) => items.push({ kind: "shot", shot: s }));
+      addCard("hook"); addCard("pijn"); addCard("oplossing");
+      addShots(leadShots);
+      addCard("waarde");
+      addShots(dossShots);
+      CARDS.filter((c) => !["hook", "pijn", "oplossing", "waarde", "cta"].includes(c.key)).forEach((c) => items.push({ kind: "card", card: c }));
+      addCard("cta");
+      const wOf = (it) => (it.kind === "shot" ? 1.5 : (it.card && it.card.outro ? 1.25 : 1.15));
+      const sumW2 = items.reduce((a, it) => a + wOf(it), 0);
+      const FLOOR2 = { card: 2.3, shot: 2.6 };
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const dur = Math.max(FLOOR2[it.kind] || 2.4, +((wOf(it) / sumW2) * T).toFixed(2));
+        if (it.kind === "card") push(await cardSeg(it.card, dur, i));
+        else push(await pushinSeg(it.shot, dur, i));
+      }
+    } else {
+      let clipAt = 0;
+      for (let i = 0; i < SEQ.length; i++) {
+        const s = SEQ[i];
+        if (s.kind === "card") {
+          push(await cardSeg(CARDS[s.i] || {}, durOf[i], i));
+        } else {
+          push(await clipSeg(clipAt, durOf[i], i));
+          clipAt += durOf[i];
+        }
       }
     }
 

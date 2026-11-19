@@ -1,38 +1,30 @@
 // tools/portal-capture.mjs
 // -------------------------------------------------------------------------
-// APARTE recorder voor de UncleRank-content: neemt het PUBLIEKE portaal op
-// (portaal.unclerank.com) als vloeiende scroll-walkthrough, frame-voor-frame
-// (screenshot per frame -> ffmpeg -> mp4). 9:16, 1080x1920.
+// SLIMME recorder voor de UncleRank-content. Neemt het portaal INGELOGD op, maar niet meer als
+// platte scroll: hij mikt op de delen die VERKOPEN en zet er per deel een stilstaand beeld van klaar
+// met de bounding-box van het element erbij. De engine (makePortalRender) maakt daar daarna een
+// rustige push-in (inzoomen) van met ffmpeg-zoompan, waarbij de zoom zich aanpast aan de grootte van
+// het element. Zo zie je gericht: een hot lead met z'n vak + reden, en in het dossier "Waarom nu",
+// "Wat er op hun site staat" (het signaal) en "Wat de klus waard is" (de euro-waarde).
 //
-// Staat LOS van tools/site-capture.mjs (die is Tale-of-Tiles-specifiek en
-// draait 's nachts automatisch). Deze raakt die niet aan en deelt er niks mee.
+// Alle herleidbare bedrijfs-/contactdata blijft vervaagd (naam, telefoon, domein, e-mail) — in de
+// stills én wanneer erop ingezoomd wordt (de blur zit in de pixels). Branche en stad blijven staan.
 //
-// Draait op JOUW laptop (die bereikt de site + heeft de browser). Levert een
-// RUWE mp4 + markers.json; de content-ready stap (hook/snelheid/caption/muziek)
-// doet het bestaande tools/finish.mjs er daarna overheen, ONGEWIJZIGD, via env.
+// Draait op JOUW laptop (bereikt de site + heeft de browser + de login-sessie). Lukt het gericht
+// vastleggen niet (andere opmaak, niet ingelogd, geen dossier), dan valt hij netjes terug op de oude
+// vloeiende scroll-walkthrough, zodat een render nooit leeg is.
 //
-// Gebruik (standalone test):
-//   npx playwright install chromium            (eenmalig)
-//   FFMPEG=./node_modules/ffmpeg-static/ffmpeg \
-//   UR_PORTAL_URL=https://portaal.unclerank.com UR_OUT=./out \
-//   node tools/portal-capture.mjs
+// Uitvoer in UR_OUT:
+//   portal-shots.json         { w, h, fps, shots:[{name, file, rect:{x,y,w,h}}] }  (de slimme weg)
+//   shot-NN-*.png             de stills per doel
+//   portal-walkthrough.mp4    alleen als terugval (geen enkel doel gevonden)
 //
-// Env:
-//   UR_PORTAL_URL  publieke pagina om op te nemen (standaard portaal.unclerank.com)
-//   UR_FPS         frames/sec (standaard 18)
-//   UR_OUT         uitvoermap (standaard ./out)
-//   UR_SECONDS     totale scroll-duur in sec (standaard 14) — ruw, finish.mjs ramp't later
-//   UR_W / UR_H    formaat (standaard 1080x1920, 9:16)
-//   UR_PORTAL_STATE  pad naar opgeslagen login (Playwright storageState .json). Bestaat-ie, dan
-//                    neemt de recorder INGELOGD op. Maak 'm eenmalig met de login-stand hieronder.
-//   FFMPEG         pad naar ffmpeg (anders "ffmpeg" op PATH)
-//   PW_CHROME      pad naar een chrome/chromium als playwright's eigen build ontbreekt
+// Env: UR_PORTAL_URL, UR_PORTAL_STATE (login storageState), UR_OUT, UR_W/UR_H, UR_SECONDS (terugval-
+//      scrollduur), UR_FPS, UR_BLUR (komma-selectors), FFMPEG, PW_CHROME. --login = sessie opslaan.
 //
-// EENMALIG INLOGGEN (portaal zit achter login):
+// EENMALIG INLOGGEN:
 //   UR_PORTAL_STATE=assets/unclerank/portal-state.json \
 //   UR_PORTAL_URL=https://portaal.unclerank.com node tools/portal-capture.mjs --login
-//   -> opent een ZICHTBARE browser; log in; druk daarna Enter in de terminal. De sessie wordt
-//      opgeslagen in UR_PORTAL_STATE en bij elke opname hergebruikt (geen wachtwoord in env).
 // -------------------------------------------------------------------------
 
 import { chromium } from "playwright";
@@ -51,61 +43,27 @@ const W     = Number(process.env.UR_W || 1080);
 const H     = Number(process.env.UR_H || 1920);
 const ffmpegBin = process.env.FFMPEG || "ffmpeg";
 
-// ALLE herleidbare bedrijfs-/contactdata vervagen (naam, telefoon, domein, e-mail), in de lijst
-// én het dossier. Selectors uit het UncleRank-portaal (vandaag.mjs / dossier.mjs / ui.mjs).
-// Branche en stad blijven (generiek, niet herleidbaar). Overschrijfbaar via UR_BLUR (komma-lijst).
+// ALLE herleidbare bedrijfs-/contactdata vervagen (naam, telefoon, domein, e-mail), in de lijst én
+// het dossier. Branche en stad blijven (generiek). Overschrijfbaar via UR_BLUR.
 const BLUR_SEL = process.env.UR_BLUR || [
-  ".kaart .naam",                                // bedrijfsnaam in de lijst
-  ".kaart .onder .mono",                         // telefoon in de lijst
-  ".kaart .onder span:not(.mono):not(:has(b))",  // domein in de lijst (branche-span heeft <b>, blijft)
-  ".balk .naam",                                 // accountnaam in de balk
-  ".dkop h1",                                    // bedrijfsnaam in het dossier
-  ".bel a",                                      // telefoon + e-mail + domein in het dossier
-  "a[href^='mailto:']",                          // alle e-maillinks, overal
-  "a[href^='tel:']",                             // alle bel-links, overal
+  ".kaart .naam",
+  ".kaart .onder .mono",
+  ".kaart .onder span:not(.mono):not(:has(b))",
+  ".balk .naam",
+  ".dkop h1",
+  ".bel a",
+  "a[href^='mailto:']",
+  "a[href^='tel:']",
 ].join(", ");
-// Doorklikken naar een dossier: de hele lead-kaart is een link (<a class="kaart" href="/dossier?…">).
-// Standaard aan; UR_OPEN_DOSSIER=0 zet het uit. De HOT lead herkennen we aan z'n label.
-const OPEN_DOSSIER = process.env.UR_OPEN_DOSSIER !== "0";
 
 const log = (...a) => console.log(...a);
-const ease = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }; // smoothstep
+const ease = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "urportal-"));
 
-  let frame = 0;
-  // markers: tijdstip (sec) per fase. We hergebruiken de SLEUTELS die finish.mjs
-  // verwacht (patternStart/colorStart/nameStart/preview/scenes), zodat de hook
-  // en de snelheidsramp daar landen waar het verhaal z'n climax heeft (de kring/
-  // dossier-onthulling onderaan). finish.mjs heeft nette terugval als er een mist.
-  const marks = { fps: FPS };
-  const mark = (k) => { marks[k] = +(frame / FPS).toFixed(2); };
-
-  const shot = async (page) => {
-    await page.screenshot({
-      path: path.join(tmp, `f${String(frame++).padStart(5, "0")}.png`),
-      clip: { x: 0, y: 0, width: W, height: H },
-    }).catch(() => {});
-  };
-
-  // Vloeiend scrollen van de huidige positie naar toY over `sec` seconden,
-  // frame-voor-frame. Geen pagina-specifieke selectors -> werkt op elke pagina.
-  const scrollToY = async (page, toY, sec) => {
-    const from = await page.evaluate(() => window.scrollY);
-    const n = Math.max(1, Math.round(sec * FPS));
-    for (let i = 0; i < n; i++) {
-      const y = from + (toY - from) * ease(i / (n - 1 || 1));
-      await page.evaluate((yy) => window.scrollTo(0, yy), Math.round(y));
-      await shot(page);
-    }
-  };
-  // Een paar frames stil blijven staan (adempauze bij een sectie).
-  const hold = async (page, sec) => { const n = Math.max(1, Math.round(sec * FPS)); for (let i = 0; i < n; i++) await shot(page); };
-
-  // ---- EENMALIGE LOGIN-STAND: zichtbare browser, jij logt in, wij bewaren de sessie ----
+  // ---- EENMALIGE LOGIN-STAND -------------------------------------------------------------------
   if (LOGIN) {
     if (!STATE) { console.error("zet UR_PORTAL_STATE op een pad om de login in op te slaan"); process.exit(1); }
     const b = await chromium.launch({ headless: false, args: ["--disable-dev-shm-usage"] });
@@ -129,106 +87,145 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     launchOpts.args.unshift("--headless=new");
   }
   const browser = await chromium.launch(launchOpts);
-  // ingelogde sessie meeladen als die er is, anders gewoon publiek
   const haveState = STATE && fs.existsSync(STATE);
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, storageState: haveState ? STATE : undefined });
   const page = await ctx.newPage();
 
-  // BEDRIJFSNAMEN VERVAGEN + scrollbar weg, via init-script zodat het op ELKE pagina geldt
-  // (de lijst én het dossier waar we naartoe klikken), vóór de eerste paint.
+  // Bedrijfsdata vervagen + scrollbar weg, via init-script op ELKE pagina (lijst én dossier).
   await page.addInitScript((sel) => {
-    // Elke selector krijgt z'n EIGEN regel: zo sloopt één niet-ondersteunde selector de rest niet,
-    // en blijft de blur staan ook als het portaal later iets aan de opmaak verandert.
     const parts = String(sel).split(",").map((s) => s.trim()).filter(Boolean);
     const css = parts.map((p) => p + "{filter:blur(9px) !important}").join(" ")
-      + " ::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none}";
+      + " ::-webkit-scrollbar{width:0;height:0} html{scrollbar-width:none} *{scroll-behavior:auto !important}";
     const add = () => { const s = document.createElement("style"); s.textContent = css; (document.head || document.documentElement).appendChild(s); };
     if (document.head) add(); else document.addEventListener("DOMContentLoaded", add);
   }, BLUR_SEL);
 
-  log("portaal-opname: " + URL + (haveState ? " (ingelogd)" : ""));
+  log("portaal-opname: " + URL + (haveState ? " (ingelogd)" : " (NIET ingelogd — zet UR_PORTAL_STATE)"));
   await page.goto(URL, { waitUntil: "networkidle", timeout: 60000 }).catch(async () => {
     await page.goto(URL, { waitUntil: "domcontentloaded", timeout: 60000 });
   });
   await page.evaluate(() => window.scrollTo(0, 0));
   await sleep(600);
 
-  // Scroll de HUIDIGE pagina vloeiend van boven naar beneden, frame-voor-frame. Robuust:
-  // natuurlijke blokken (kaarten/vakken/secties) als ankers, anders gelijke stappen.
-  const scrollThrough = async (secs) => {
-    const geo = await page.evaluate((vh) => {
-      const full = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-      const seen = new Set(); let tops = [];
-      document.querySelectorAll("section, header, footer, main > div, .kaart, .vak, [class*='block']").forEach((el) => {
+  // ---- helpers -------------------------------------------------------------------------------
+  let shotN = 0;
+  const shots = [];
+  // Zet een element verticaal in het midden, laat de pagina tot rust komen, screenshot de viewport,
+  // en bewaar de bounding-box van het element (viewport-coördinaten) zodat de engine erop kan inzoomen.
+  const captureTarget = async (name, selector, nth = 0) => {
+    try {
+      const rect = await page.evaluate(({ sel, k }) => {
+        const els = Array.from(document.querySelectorAll(sel));
+        const el = els[k];
+        if (!el) return null;
+        el.scrollIntoView({ block: "center", inline: "nearest" });
+        return null; // rect lezen we NA het settelen opnieuw
+      }, { sel: selector, k: nth });
+      await sleep(450);
+      const box = await page.evaluate(({ sel, k }) => {
+        const el = Array.from(document.querySelectorAll(sel))[k];
+        if (!el) return null;
         const r = el.getBoundingClientRect();
-        if (r.height < vh * 0.18) return;
-        const y = Math.round(window.scrollY + r.top);
-        if (y < 0 || y > full) return;
-        const b = Math.round(y / 40); if (seen.has(b)) return; seen.add(b); tops.push(y);
-      });
-      tops.sort((a, b) => a - b); return { full, tops };
-    }, H);
-    const maxY = Math.max(0, geo.full - H);
-    let stops = (geo.tops || []).filter((y) => y <= maxY);
-    if (stops.length < 3) { stops = []; for (let i = 1; i <= 5; i++) stops.push(Math.round(maxY * i / 5)); }
-    if (stops.length > 6) { const keep = []; const st = (stops.length - 1) / 5; for (let i = 0; i < 6; i++) keep.push(stops[Math.round(i * st)]); stops = keep; }
-    if (stops[stops.length - 1] < maxY - 8) stops.push(maxY);
-    stops = [...new Set(stops)].sort((a, b) => a - b);
-    const per = Math.max(0.7, secs / Math.max(1, stops.length));
-    for (const y of stops) { await scrollToY(page, y, per); await hold(page, 0.4); }
+        if (r.width < 8 || r.height < 8) return null;
+        return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+      }, { sel: selector, k: nth });
+      if (!box) return false;
+      // box binnen de viewport klemmen
+      const rc = {
+        x: Math.max(0, Math.min(W - 1, box.x)),
+        y: Math.max(0, Math.min(H - 1, box.y)),
+        w: Math.max(8, Math.min(W, box.w)),
+        h: Math.max(8, Math.min(H, box.h)),
+      };
+      if (rc.x + rc.w > W) rc.w = W - rc.x;
+      if (rc.y + rc.h > H) rc.h = H - rc.y;
+      const file = `shot-${String(shotN++).padStart(2, "0")}-${name}.png`;
+      await page.screenshot({ path: path.join(OUT, file), clip: { x: 0, y: 0, width: W, height: H } });
+      shots.push({ name, file, rect: rc });
+      log(`  ✓ ${name}  box ${rc.w}x${rc.h} @ ${rc.x},${rc.y}`);
+      return true;
+    } catch (e) {
+      log(`  · ${name} overgeslagen: ${e.message}`);
+      return false;
+    }
   };
 
-  // de heetste lead kiezen: een gemeld dossier ("Uit een gesprek") is het sterkst, dan een
-  // "bellen"-label, anders de eerste kaart. Zelfde keuze voor scrollen én klikken.
+  // ---- 1) LIJST: een paar representatieve lead-kaarten (vak + reden + label), hotste eerst --------
+  // volgorde van voorkeur per kaart; we pakken tot 2 kaarten zodat je vak-variatie ziet
+  const CARD_SEL = ".kaart:has(.label.bellen), .kaart:has(.label.gesprek), a.kaart, .kaart";
+  const nCards = await page.evaluate((sel) => document.querySelectorAll(sel).length, CARD_SEL).catch(() => 0);
+  if (nCards > 0) {
+    await captureTarget("lead", CARD_SEL, 0);
+    if (nCards > 2) await captureTarget("lead2", CARD_SEL, 2);
+  }
+
+  // ---- 2) DOSSIER: doorklikken op de hotste kaart en de verkoop-blokken inzoomen -----------------
   const HOT = ".kaart:has(.label.gesprek), .kaart:has(.label.bellen), a.kaart";
-  const listSecs = OPEN_DOSSIER ? SECS * 0.45 : SECS;
-
-  // 1) LIJST: wie bel je vandaag, en waarom
-  mark("patternStart");
-  await hold(page, 0.7);
-  mark("colorStart");
-  await scrollThrough(listSecs);
-
-  // 2) HOT LEAD openen en het dossier laten zien (waarom nu / wat er mis is / wat 't waard is)
-  let opened = false;
-  if (OPEN_DOSSIER) {
+  try {
     const hasHot = await page.evaluate((sel) => !!document.querySelector(sel), HOT);
     if (hasHot) {
       await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.scrollIntoView({ block: "center" }); }, HOT);
-      await hold(page, 0.5);
-      mark("nameStart");            // overgang naar het dossier
+      await sleep(300);
       await Promise.all([
         page.waitForNavigation({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {}),
         page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.click(); }, HOT),
       ]);
       await sleep(700);
       await page.evaluate(() => window.scrollTo(0, 0));
-      await hold(page, 0.6);
-      mark("preview");             // dossier in beeld
-      await scrollThrough(SECS * 0.55);
-      opened = true;
+      await sleep(300);
+      // de blokken die verkopen, in verhaalvolgorde (uit dossier.mjs: .vak met .vakkop):
+      await captureTarget("dossier-kop", ".dkop", 0);                         // wie + vak + label
+      // "Waarom nu" / "Uit een gesprek"
+      if (!(await captureTarget("waarom", ".vak.waarom", 0)))
+        await captureTarget("waarom", ".vak.gemeld", 0);
+      // "Wat er op hun site staat" = het signaal (blok met .vondsten)
+      await captureTarget("signaal", ".vak:has(.vondsten)", 0);
+      // "Wat de klus waard is" = de euro-waarde (blok met .klus; we mikken op het bedrag)
+      if (!(await captureTarget("waarde", ".vak:has(.klus) .klus", 0)))
+        await captureTarget("waarde", ".vak:has(.klus)", 0);
     }
-  }
-  if (!opened) mark("nameStart");
-  mark("scenes");                  // payoff voor de hook
-  await hold(page, 0.9);
-  mark("end");
+  } catch (e) { log("dossier-stap overgeslagen: " + e.message); }
 
+  // ---- shots wegschrijven, of terugvallen op de oude scroll-walkthrough --------------------------
+  if (shots.length) {
+    fs.writeFileSync(path.join(OUT, "portal-shots.json"), JSON.stringify({ w: W, h: H, fps: 30, shots }, null, 2));
+    log(`klaar: ${shots.length} gericht beeld -> portal-shots.json`);
+    await browser.close();
+    process.exit(0);
+  }
+
+  // ===== TERUGVAL: oude vloeiende scroll-walkthrough naar één mp4 (zodat een render nooit leeg is) ==
+  log("geen gerichte beelden gevonden — terugval naar scroll-walkthrough");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "urportal-"));
+  let frame = 0;
+  const shot = async () => {
+    await page.screenshot({ path: path.join(tmp, `f${String(frame++).padStart(5, "0")}.png`), clip: { x: 0, y: 0, width: W, height: H } }).catch(() => {});
+  };
+  const scrollToY = async (toY, sec) => {
+    const from = await page.evaluate(() => window.scrollY);
+    const n = Math.max(1, Math.round(sec * FPS));
+    for (let i = 0; i < n; i++) {
+      const y = from + (toY - from) * ease(i / (n - 1 || 1));
+      await page.evaluate((yy) => window.scrollTo(0, yy), Math.round(y));
+      await shot();
+    }
+  };
+  const hold = async (sec) => { const n = Math.max(1, Math.round(sec * FPS)); for (let i = 0; i < n; i++) await shot(); };
+  const maxY = await page.evaluate((vh) => Math.max(0, Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - vh), H);
+  const stops = []; for (let i = 1; i <= 5; i++) stops.push(Math.round(maxY * i / 5));
+  const per = Math.max(0.7, SECS / Math.max(1, stops.length));
+  await hold(0.7);
+  for (const y of stops) { await scrollToY(y, per); await hold(0.4); }
   await browser.close();
 
-  // markers wegschrijven naast de ruwe mp4 (voor de content-ready stap)
-  try { fs.writeFileSync(path.join(OUT, "portal-walkthrough.markers.json"), JSON.stringify(marks)); } catch {}
-
-  // frames -> mp4
   log("frames: " + frame + " -> mp4");
   await new Promise((res, rej) => {
     const args = ["-y", "-framerate", String(FPS), "-i", path.join(tmp, "f%05d.png"),
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", `scale=${W}:${H}`,
-      path.join(OUT, "portal-walkthrough.mp4")];
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", `scale=${W}:${H}`, path.join(OUT, "portal-walkthrough.mp4")];
     const pr = spawn(ffmpegBin, args, { stdio: "ignore", windowsHide: true });
     pr.on("error", rej);
     pr.on("close", (c) => (c === 0 ? res() : rej(new Error("ffmpeg " + c))));
   });
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-  log("klaar: " + path.join(OUT, "portal-walkthrough.mp4"));
+  log("klaar (terugval): " + path.join(OUT, "portal-walkthrough.mp4"));
 })().catch((e) => { console.error("portaal-opname faalde: " + (e && e.message || e)); process.exit(1); });
