@@ -48,9 +48,43 @@ SFX_CHOSE = [
  {"scene":12, "q":["cinematic riser","ambient riser","riser","cinematic transition","whoosh"]},      # twijfel open -> video 2
 ]
 
+# PLAN "truth" - "Is Anything Actually True?" (video 2, 19 scenes: 0=intro ... 18=outro).
+# Nuchter en logisch opgebouwd, GEEN triomf. Zacht bed dat de redenering volgt: rustig -> spanning bij
+# het ontleden -> stilte rond de hoofdvraag (scene 12) -> stevig maar ingetogen bij het antwoord ->
+# gewicht bij "maar een kan waar zijn" -> open/hoopvol naar video 3.
+TRACKS_TRUTH = {
+ "quiet":   "soft reflective ambient piano",                 # intro + haak + "ieders eigen waarheid"
+ "warm":    "warm contemplative ambient strings",            # we eindigen op een antwoord + smaak
+ "tension": "subtle tension ambient drone introspective",    # werkelijkheid, de tegenwerping, valt om
+ "build":   "building suspense ambient low pulse",           # niemand leeft zo, de truc, geen zekerheid
+ "suspend": "sparse suspended ambient tone minimal",         # één conclusie + de hoofdvraag (rust/pauze)
+ "resolve": "grounded resolving ambient strings calm",       # het antwoord: ja, stevig maar ingetogen
+ "weight":  "somber reflective ambient drone heavy",         # maar een kan waar zijn + de methode
+ "open":    "soft ambient piano unresolved hopeful",         # we gaan door -> video 3, outro (open)
+}
+BLOCKS_TRUTH = [
+ {"from":0,  "to":2,  "track":"quiet"},     # intro, de haak, "ieders eigen waarheid"
+ {"from":3,  "to":4,  "track":"warm"},      # we eindigen op een antwoord, smaak
+ {"from":5,  "to":7,  "track":"tension"},   # werkelijkheid heeft het laatste woord, de tegenwerping, valt om
+ {"from":8,  "to":10, "track":"build"},     # niemand leeft zo, de stille truc, geen zekerheid
+ {"from":11, "to":12, "track":"suspend"},   # één conclusie, de hoofdvraag + pauze
+ {"from":13, "to":13, "track":"resolve"},   # het antwoord: ja
+ {"from":14, "to":16, "track":"weight"},    # maar een kan waar zijn, de enige eerlijke manier, afschrijven
+ {"from":17, "to":18, "track":"open"},      # we beginnen volgende keer, outro -> open
+]
+# SFX subtiel en filmisch (meer voelen dan horen), alleen op de kantelpunten, NOOIT triomf.
+# Per punt een LIJST zoektermen van specifiek naar breed (Freesound geeft op lange combinaties vaak 0).
+SFX_TRUTH = [
+ {"scene":7,  "q":["cinematic impact","deep boom","subtle impact","cinematic transition","impact"]},  # de gedachte valt om
+ {"scene":11, "q":["cinematic riser","ambient riser","riser","cinematic transition","whoosh"]},        # opbouw naar de hoofdvraag
+ {"scene":13, "q":["cinematic swell","ambient swell","soft swell","cinematic transition","swell"]},    # het antwoord landt
+ {"scene":17, "q":["cinematic riser","ambient riser","riser","cinematic transition","whoosh"]},        # door naar video 3
+]
+
 # verhaal-id -> plan. Onbekend verhaal = geen plan (niets gedaan).
 PLANS = {
  "chose": {"tracks": TRACKS_CHOSE, "blocks": BLOCKS_CHOSE, "sfx": SFX_CHOSE},
+ "truth": {"tracks": TRACKS_TRUTH, "blocks": BLOCKS_TRUTH, "sfx": SFX_TRUTH},
 }
 
 def load_key(root):
