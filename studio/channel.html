@@ -301,6 +301,14 @@ const cardOf=si=>document.querySelector('.scard[data-si="'+si+'"]');
 let MIX={v:1,m:1,s:1};
 function normGain(g){g=g||{};const c=x=>{x=parseFloat(x);return (isFinite(x)&&x>=0)?x:1;};return {v:c(g.v),m:c(g.m),s:c(g.s)};}
 function gOf(si){const s=SC[si],sg=(s&&s.gain)||{v:1,m:1,s:1};return {v:MIX.v*sg.v,m:MIX.m*sg.m,s:MIX.s*sg.s};}
+// Een <audio>.volume kan max 1.0 (dus "harder dan 100%" werkte niet). Daarom sturen we elk
+// audio-element door een WebAudio GainNode, die WEL boven 1.0 kan. Valt WebAudio weg, dan terug
+// naar .volume (geklemd op 1.0).
+let _AC=null;
+function ensureAC(){ try{ if(!_AC)_AC=new (window.AudioContext||window.webkitAudioContext)(); if(_AC&&_AC.state==='suspended')_AC.resume(); }catch(e){ _AC=null; } return _AC; }
+function waGain(a){ if(!a)return null; if(a._g)return a._g; const ac=ensureAC(); if(!ac)return null;
+ try{ const src=ac.createMediaElementSource(a); const g=ac.createGain(); src.connect(g); g.connect(ac.destination); a._g=g; return g; }catch(e){ return null; } }
+function setGain(a,val){ val=Math.max(0,val||0); const g=waGain(a); if(g){ try{g.gain.value=val;}catch(e){} } else if(a){ try{a.volume=Math.min(1,val);}catch(e){} } }
 function mixHTML(si,g){g=normGain(g);
  const row=(k,ic,ti,mx)=>'<label title="'+ti+'">'+ic+'<input type="range" class="mixr" data-mix="'+k+'" data-si="'+si+'" min="0" max="'+mx+'" step="5" value="'+Math.round(g[k]*100)+'"><i>'+Math.round(g[k]*100)+'%</i></label>';
  return '<span class="mix" title="fijn-afstelling voor DEZE scène, bovenop de film-mix">'+row('v','&#127908;','stem-volume',150)+row('m','&#9834;','muziek-volume',200)+row('s','&#128165;','sfx-volume',200)+'</span>';
@@ -476,19 +484,19 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  else if(!vd.paused){try{vd.pause();}catch(e){}}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}}
- {const va=voiceAudio[s.scene];if(va){try{va.volume=Math.min(1,gOf(si).v);}catch(e){}}}   // stem-volume per scène (live)
+ {const va=voiceAudio[s.scene];if(va){setGain(va,gOf(si).v);}}   // stem-volume per scène (live)
  // volgende scène's stem alvast inladen (binnen 3s van de grens) zodat er geen stilte-gat valt
  const nsi=si+1;if(nsi<SC.length){const ns=SC[nsi],dt=ns.start-t;if(dt>0&&dt<3){const na=voiceAudio[ns.scene];if(na&&na.readyState<3){try{na.preload='auto';na.load();}catch(e){}}}}
  manageMusic();fireSfx();}
 function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
  if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
- if(bi>=0&&playing){const b=musicBlocks[bi];try{b.audio.volume=Math.min(1,0.22*gOf(sceneAt(t)).m);}catch(e){}if(b.audio.paused){
+ if(bi>=0&&playing){const b=musicBlocks[bi];setGain(b.audio,0.22*gOf(sceneAt(t)).m);if(b.audio.paused){
    // EERST afspelen (zodat de muziek daadwerkelijk start), DAARNA pas seeken als het element genoeg
    // data heeft en de afwijking groot is. currentTime zetten vóór play() op een nog-niet-geladen
    // mp3 kan het element blijven laten seeken; daarom andersom. .catch om geen losse promise-fout.
    b.audio.play().then(()=>{const d=b.audio.duration||0,want=d?((t-b.start)%d):(t-b.start);
      if(b.audio.readyState>=2&&Math.abs(b.audio.currentTime-want)>0.5){try{b.audio.currentTime=want;}catch(e){}}}).catch(()=>{});}}}
-function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;x.audio.volume=Math.min(1,0.4*gOf(x.si).s);}catch(e){}x.audio.play().catch(()=>{});}}}
+function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;setGain(x.audio,0.4*gOf(x.si).s);}catch(e){}x.audio.play().catch(()=>{});}}}
 function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=playEnd||t>=total){t=Math.min(t,total);stop();}placePlayhead();syncAudio();
  raf=requestAnimationFrame(tick);}
@@ -502,7 +510,7 @@ function prepAudio(els,onReady){els=els.filter(Boolean);const pend=els.filter(a=
  pend.forEach(a=>{const h=()=>{a.removeEventListener('canplaythrough',h);a.removeEventListener('canplay',h);if(--left<=0){clearTimeout(to);fin();}};
   a.addEventListener('canplaythrough',h);a.addEventListener('canplay',h);try{a.preload='auto';a.load();}catch(e){}});}
 let playGen=0;
-function _play(){playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
+function _play(){ensureAC();playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
  const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}
  manageMusic();raf=requestAnimationFrame(tick);}
 function play(onbtn){if(playing)return;const g=++playGen;const btn=onbtn||$('btn-play');const orig=btn.textContent;btn.textContent='… laden';
@@ -523,9 +531,9 @@ function autoAudio(){
  SC.forEach(s=>{const a=new Audio('/api/channel-voice?story='+STORY+'&voice='+VOICE+'&n='+String(s.scene).padStart(2,'0')+'&channel='+CHANNEL+'&v='+VER);
    a.preload='none';a.addEventListener('error',()=>{});voiceAudio[s.scene]=a;});
  // MUZIEK PER BLOK uit de tijdlijn (TL.music = [{start,end,file,mood}]); elk blok z'n eigen track
- musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.22;a.preload='none';a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
+ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.preload='none';a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};});
  // SFX op de gemeten momenten (scene.start + f.t); alleen effecten met een bestand
- sfxList=[];SC.forEach((s,si)=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=Math.min(1,0.4*gOf(si).s);a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false,si});}});});
+ sfxList=[];SC.forEach((s,si)=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false,si});}});});
  updAudioLabel();
 }
 $('ld-voice').addEventListener('change',e=>{for(const f of e.target.files){const m=f.name.match(/(\d+)/);if(!m)continue;voiceAudio[+m[1]]=new Audio(URL.createObjectURL(f));}updAudioLabel();});
@@ -669,8 +677,8 @@ function renderCands(cands){
 
 // ======== MUZIEK + SFX: "kies uit 3", zelfde opzet als de beeld-picker ========
 // Audio-sporen opnieuw opbouwen na een keuze (zelfde logica als in autoAudio).
-function rebuildMusic(){ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=0.22;a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};}); }
-function rebuildSfxAudio(){ sfxList=[];SC.forEach((s,si)=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.volume=Math.min(1,0.4*gOf(si).s);a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false,si});}});}); }
+function rebuildMusic(){ musicBlocks=(TL.music||[]).filter(b=>b&&b.file).map(b=>{const a=new Audio('/api/channel-audio?f='+encodeURIComponent(bn(b.file))+'&channel='+CHANNEL+'&v='+VER);a.addEventListener('error',()=>{});return {start:+b.start||0,end:+b.end||total,audio:a};}); }
+function rebuildSfxAudio(){ sfxList=[];SC.forEach((s,si)=>{(s.sfx||[]).forEach(f=>{if(f&&f.file){const a=new Audio('/api/channel-sfx?f='+encodeURIComponent(bn(f.file))+'&channel='+CHANNEL+'&v='+VER);a.addEventListener('error',()=>{});sfxList.push({at:(+s.start||0)+(+f.t||0),audio:a,fired:false,si});}});}); }
 
 // Gedeelde renderer: 3 audio-chips met ▶ beluisteren; klik op de chip = kiezen.
 let audPrev=null;
