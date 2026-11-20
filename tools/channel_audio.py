@@ -17,7 +17,7 @@
 #
 # MUZIEK staat per BLOK (groep scenes), niet per scene -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
-import argparse, os, re, json, time, urllib.parse, urllib.request, urllib.error
+import argparse, os, re, json, time, urllib.parse, urllib.request, urllib.error, subprocess, shutil, tempfile
 
 API = "https://freesound.org/apiv2"
 
@@ -294,6 +294,46 @@ def download(url, outpath):
     data = _get(url)
     with open(outpath, "wb") as f: f.write(data)
 
+# ---- LOUDNESS-NORMALISATIE --------------------------------------------------------------------
+# Chatterbox levert elke clip op een iets ander volume (onstabiel), en opgehaalde muziek is wisselend
+# hard gemasterd. Daarom trekken we alles naar VASTE niveaus: stem naar de VOORGROND, muziek naar een
+# zachte ACHTERGROND. Zo klinkt elke video gelijk en staat de stem altijd boven de muziek.
+VOICE_LUFS = -16.0   # stem: helder op de voorgrond
+MUSIC_LUFS = -20.0   # muziek: consistent, zacht (de 0.22-gain in preview/render maakt 'm nog zachter)
+_FFMPEG = None
+
+def _ffmpeg_path(root):
+    p = os.environ.get("FFMPEG_PATH")
+    if p and os.path.exists(p):
+        return p
+    for rel in ("node_modules/ffmpeg-static/ffmpeg.exe", "node_modules/ffmpeg-static/ffmpeg"):
+        cand = os.path.join(root, rel)
+        if os.path.exists(cand):
+            return cand
+    return shutil.which("ffmpeg")
+
+def loudnorm(root, path, lufs):
+    # Normaliseer EEN audiobestand naar <lufs> integrated loudness, in-place, duur blijft gelijk.
+    global _FFMPEG
+    if _FFMPEG is None:
+        _FFMPEG = _ffmpeg_path(root)
+    if not _FFMPEG or not os.path.exists(path):
+        return False
+    ext = os.path.splitext(path)[1].lower()
+    enc = ["-c:a", "pcm_s16le"] if ext == ".wav" else ["-c:a", "libmp3lame", "-b:a", "192k"]
+    fd, tmp = tempfile.mkstemp(suffix=ext); os.close(fd)
+    cmd = [_FFMPEG, "-y", "-i", path, "-af", f"loudnorm=I={lufs}:TP=-1.5:LRA=11", "-ar", "44100"] + enc + [tmp]
+    try:
+        r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if r.returncode == 0 and os.path.getsize(tmp) > 0:
+            shutil.move(tmp, path); return True
+    except Exception:
+        pass
+    if os.path.exists(tmp):
+        try: os.remove(tmp)
+        except Exception: pass
+    return False
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="chose"); ap.add_argument("--voice", default="v3")
@@ -301,6 +341,8 @@ def main():
     ap.add_argument("--channel", default="channel1", help="kanaal-map onder assets/channels/")
     ap.add_argument("--sfx-only", dest="sfx_only", action="store_true",
                     help="alleen SFX (her)zoeken en plaatsen; muziek in de tijdlijn ongemoeid laten")
+    ap.add_argument("--level", action="store_true",
+                    help="trek bestaande stem + muziek van deze film op niveau (normaliseer in-place), zonder opnieuw te zoeken of inspreken")
     # studio-modus (door de engine aangeroepen): N kandidaten zoeken en stagen i.p.v. de tijdlijn vullen
     ap.add_argument("--candidates", type=int, default=0, help="studio-modus: N kandidaat-audiobestanden zoeken")
     ap.add_argument("--what", default="", help="studio-modus: 'music' of 'sfx'")
@@ -331,6 +373,22 @@ def main():
     scenes = tl.get("scenes", [])
     by_num = {s.get("scene"): s for s in scenes}
 
+    # --level: normaliseer de BESTAANDE audio van deze film in-place en stop. Geen zoeken/download,
+    # geen opnieuw inspreken. Stem -> voorgrond, muziek -> zacht. Lost "stem te zacht / muziek te hard" op.
+    if args.level:
+        nv = nm = 0
+        for s in scenes:
+            vp = s.get("wav")
+            if vp and loudnorm(args.root, os.path.join(args.root, vp), VOICE_LUFS): nv += 1
+        done = set()
+        for b in (tl.get("music") or []):
+            mp = b.get("file")
+            if mp and mp not in done and loudnorm(args.root, os.path.join(args.root, mp), MUSIC_LUFS):
+                done.add(mp); nm += 1
+        print(f"genormaliseerd: {nv} stem-clips -> {VOICE_LUFS:.0f} LUFS (voorgrond), {nm} muziekbedden -> {MUSIC_LUFS:.0f} LUFS (zacht).")
+        print("Herlaad de studio en speel af; de stem staat nu helder boven de muziek. Niks opnieuw ingesproken.")
+        return
+
     mdir = os.path.join(args.root, "assets", "channels", args.channel, "muziek")
     sdir = os.path.join(args.root, "assets", "channels", args.channel, "sfx")
     os.makedirs(mdir, exist_ok=True); os.makedirs(sdir, exist_ok=True)
@@ -357,6 +415,7 @@ def main():
                 download(hit["url"], fpath)
             except Exception as e:
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
+            loudnorm(args.root, fpath, MUSIC_LUFS)   # elk bed naar hetzelfde zachte niveau
             track_file[name] = rel
             credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
             print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
