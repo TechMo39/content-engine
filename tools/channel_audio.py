@@ -17,7 +17,7 @@
 #
 # MUZIEK staat per BLOK (groep scenes), niet per scene -> niet te veel afwisseling. SFX alleen op de
 # gekozen momenten. Jij hoort het terug op de montagetafel en vervangt de missers.
-import argparse, os, re, json, time, urllib.parse, urllib.request, urllib.error, subprocess, shutil, tempfile
+import argparse, os, re, json, time, urllib.parse, urllib.request, urllib.error, subprocess, shutil, tempfile, random
 
 API = "https://freesound.org/apiv2"
 
@@ -252,6 +252,54 @@ def search_many(q, key, n, prefer_long=False):
                 return picked
     return picked
 
+# POULE voor de studio-keuze: haal een GROTE, wisselend-geordende set op (andere sortering + pagina per
+# keer), zodat "3 andere" echt andere muziek geeft i.p.v. telkens dezelfde top-3.
+_FS_SORTS = ["score", "downloads_desc", "rating_desc", "created_desc"]
+def search_pool(q, key, prefer_long=False, want=24):
+    kind = "music" if prefer_long else "sfx"
+    sort = random.choice(_FS_SORTS); page0 = random.randint(1, 3)
+    pool = []; seen = set()
+    for qq in _query_ladder(q, kind):
+        for pg in (page0, 1, 2):
+            params = {"query": qq, "page_size": 60, "page": pg, "token": key, "sort": sort,
+                      "fields": "id,name,username,duration,previews,license"}
+            url = API + "/search/text/?" + urllib.parse.urlencode(params)
+            try:
+                d = json.loads(_get(url).decode("utf-8", "replace"))
+            except Exception:
+                continue
+            for r in d.get("results", []):
+                lab = _license_label(r.get("license", ""))
+                if not lab:
+                    continue
+                pv = (r.get("previews") or {})
+                hq = pv.get("preview-hq-mp3"); lq = pv.get("preview-lq-mp3")
+                if not (hq or lq):
+                    continue
+                dur = r.get("duration", 0) or 0
+                if prefer_long and not (12 <= dur <= 300):
+                    continue
+                if (not prefer_long) and dur > 30:
+                    continue
+                pref = (lq or hq) if prefer_long else (hq or lq)
+                if pref in seen:
+                    continue
+                seen.add(pref)
+                pool.append({"url": pref, "name": r.get("name", ""), "user": r.get("username", ""), "dur": dur, "lic": lab})
+            if len(pool) >= want:
+                break
+        if len(pool) >= want:
+            break
+    return pool
+
+def _varied_pick(q, key, n, prefer_long=False):
+    # Kies n WILLEKEURIGE uit de poule; valt terug op de gewone top-n als de poule te klein is.
+    pool = search_pool(q, key, prefer_long=prefer_long)
+    if len(pool) <= n:
+        return pool or search_many(q, key, n, prefer_long=prefer_long)
+    random.shuffle(pool)
+    return pool[:n]
+
 def _stage(hits, outdir, base, n):
     # Download de kandidaten naar <base>1.mp3, <base>2.mp3, ... en geef de bestandsnamen terug.
     out = []
@@ -276,14 +324,14 @@ def run_candidates(args, key):
         os.makedirs(outdir, exist_ok=True)
         base = f"{args.story}__muziek__c"
         q = args.q or "soft reflective ambient piano"
-        hits = search_many(q, key, n, prefer_long=True)
+        hits = _varied_pick(q, key, n, prefer_long=True)
     else:
         outdir = os.path.join(args.root, "assets", "channels", args.channel, "sfx")
         os.makedirs(outdir, exist_ok=True)
         pid = re.sub(r"[^\w-]", "", (args.pid or "x")) or "x"
         base = f"sfx__{pid}__c"
         q = args.q or "cinematic transition"
-        hits = search_many(q, key, n, prefer_long=False)
+        hits = _varied_pick(q, key, n, prefer_long=False)
     files = _stage(hits, outdir, base, n)
     reason = "" if files else "geen bruikbare geluiden gevonden voor deze zoekterm"
     print("CANDIDATES_JSON:" + json.dumps({"candidates": [{"file": f} for f in files], "reason": reason}))
@@ -298,8 +346,9 @@ def download(url, outpath):
 # Chatterbox levert elke clip op een iets ander volume (onstabiel), en opgehaalde muziek is wisselend
 # hard gemasterd. Daarom trekken we alles naar VASTE niveaus: stem naar de VOORGROND, muziek naar een
 # zachte ACHTERGROND. Zo klinkt elke video gelijk en staat de stem altijd boven de muziek.
-VOICE_LUFS = -16.0   # stem: helder op de voorgrond
-MUSIC_LUFS = -20.0   # muziek: consistent, zacht (de 0.22-gain in preview/render maakt 'm nog zachter)
+VOICE_LUFS = -16.0   # stem: helder op de voorgrond (standaard; te overschrijven met --voice-lufs)
+MUSIC_LUFS = -28.0   # muziek: ver onder de stem (standaard; te overschrijven met --music-lufs).
+                     # Lager getal = zachter. De 0.22-gain in preview/render maakt 'm nog zachter.
 _FFMPEG = None
 
 def _ffmpeg_path(root):
@@ -312,8 +361,10 @@ def _ffmpeg_path(root):
             return cand
     return shutil.which("ffmpeg")
 
-def loudnorm(root, path, lufs):
+def loudnorm(root, path, lufs, pre_af=""):
     # Normaliseer EEN audiobestand naar <lufs> integrated loudness, in-place, duur blijft gelijk.
+    # pre_af = optionele extra filters (bv. stem-EQ) VOOR de loudness-normalisatie, zodat de uiteindelijke
+    # luidheid gelijk blijft hoe je ook EQ't.
     global _FFMPEG
     if _FFMPEG is None:
         _FFMPEG = _ffmpeg_path(root)
@@ -322,7 +373,8 @@ def loudnorm(root, path, lufs):
     ext = os.path.splitext(path)[1].lower()
     enc = ["-c:a", "pcm_s16le"] if ext == ".wav" else ["-c:a", "libmp3lame", "-b:a", "192k"]
     fd, tmp = tempfile.mkstemp(suffix=ext); os.close(fd)
-    cmd = [_FFMPEG, "-y", "-i", path, "-af", f"loudnorm=I={lufs}:TP=-1.5:LRA=11", "-ar", "44100"] + enc + [tmp]
+    af = (pre_af + "," if pre_af else "") + f"loudnorm=I={lufs}:TP=-1.5:LRA=11"
+    cmd = [_FFMPEG, "-y", "-i", path, "-af", af, "-ar", "44100"] + enc + [tmp]
     try:
         r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if r.returncode == 0 and os.path.getsize(tmp) > 0:
@@ -343,6 +395,13 @@ def main():
                     help="alleen SFX (her)zoeken en plaatsen; muziek in de tijdlijn ongemoeid laten")
     ap.add_argument("--level", action="store_true",
                     help="trek bestaande stem + muziek van deze film op niveau (normaliseer in-place), zonder opnieuw te zoeken of inspreken")
+    ap.add_argument("--voice-lufs", dest="voice_lufs", type=float, default=VOICE_LUFS, help="stem-niveau (standaard -16; hoger = harder)")
+    ap.add_argument("--music-lufs", dest="music_lufs", type=float, default=MUSIC_LUFS, help="muziek-niveau (standaard -28; LAGER = zachter)")
+    # stem-TOON (EQ), alleen bij --level. dB's, 0 = uit. Positief = meer ervan.
+    ap.add_argument("--voice-bass", dest="voice_bass", type=float, default=0.0, help="meer BAS in de stem (dB, bv. 3)")
+    ap.add_argument("--voice-body", dest="voice_body", type=float, default=0.0, help="meer VOLHEID/body in de stem (dB, bv. 2.5)")
+    ap.add_argument("--voice-presence", dest="voice_presence", type=float, default=0.0, help="meer HELDERHEID/aanwezigheid (dB, bv. 2)")
+    ap.add_argument("--voice-full", dest="voice_full", action="store_true", help="preset: voller + iets harder in een keer (bas+body+helder, -14 LUFS)")
     # studio-modus (door de engine aangeroepen): N kandidaten zoeken en stagen i.p.v. de tijdlijn vullen
     ap.add_argument("--candidates", type=int, default=0, help="studio-modus: N kandidaat-audiobestanden zoeken")
     ap.add_argument("--what", default="", help="studio-modus: 'music' of 'sfx'")
@@ -379,13 +438,13 @@ def main():
         nv = nm = 0
         for s in scenes:
             vp = s.get("wav")
-            if vp and loudnorm(args.root, os.path.join(args.root, vp), VOICE_LUFS): nv += 1
+            if vp and loudnorm(args.root, os.path.join(args.root, vp), args.voice_lufs): nv += 1
         done = set()
         for b in (tl.get("music") or []):
             mp = b.get("file")
-            if mp and mp not in done and loudnorm(args.root, os.path.join(args.root, mp), MUSIC_LUFS):
+            if mp and mp not in done and loudnorm(args.root, os.path.join(args.root, mp), args.music_lufs):
                 done.add(mp); nm += 1
-        print(f"genormaliseerd: {nv} stem-clips -> {VOICE_LUFS:.0f} LUFS (voorgrond), {nm} muziekbedden -> {MUSIC_LUFS:.0f} LUFS (zacht).")
+        print(f"genormaliseerd: {nv} stem-clips -> {args.voice_lufs:.0f} LUFS (voorgrond), {nm} muziekbedden -> {args.music_lufs:.0f} LUFS (zacht).")
         print("Herlaad de studio en speel af; de stem staat nu helder boven de muziek. Niks opnieuw ingesproken.")
         return
 
@@ -415,7 +474,7 @@ def main():
                 download(hit["url"], fpath)
             except Exception as e:
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-            loudnorm(args.root, fpath, MUSIC_LUFS)   # elk bed naar hetzelfde zachte niveau
+            loudnorm(args.root, fpath, args.music_lufs)   # elk bed naar hetzelfde zachte niveau
             track_file[name] = rel
             credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
             print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
