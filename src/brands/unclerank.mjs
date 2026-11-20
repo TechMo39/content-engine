@@ -1640,7 +1640,7 @@ export function makeBrand({ ROOT, config } = {}) {
     if (!CARDS.length) throw new Error("geen kaarten voor " + templateId + " variant " + vi);
 
     // 1) stem (eigen mapje per variant); de duur bepaalt de totale lengte
-    let voiceWav = "", T = Number(opts.seconds) || 18;
+    let voiceWav = "", T = Number(opts.seconds) || 18, TL = null;
     try {
       const vdir = voiceDir(ROOT, templateId, vi);
       const wavp = path.join(vdir, "voice.wav");
@@ -1658,7 +1658,7 @@ export function makeBrand({ ROOT, config } = {}) {
       }
       if (fs.existsSync(wavp)) {
         voiceWav = wavp;
-        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) T = Number(tl.total); } catch {}
+        try { const tl = JSON.parse(await fs.promises.readFile(path.join(vdir, "_timeline.json"), "utf8")); if (tl && tl.total) { T = Number(tl.total); TL = tl; } } catch {}
       }
     } catch (e) { if (log) log("stem-stap overgeslagen: " + e.message); }
 
@@ -1700,11 +1700,18 @@ export function makeBrand({ ROOT, config } = {}) {
       } catch (e) { if (log) log("beeld overgeslagen (alles tekst): " + e.message); }
     }
 
-    // 2) duur per kaart: over de stem verdeeld, met een leesbare bodem; hook en slot iets langer
+    // 2) duur per kaart. Kaart i hoort bij stemregel i, dus als de stem per-regel timing meegeeft (nieuwe
+    //    ur_voice: elke regel apart ingesproken met een pauze), zetten we elke kaart precies zo lang als
+    //    z'n regel + adem -> beeld en stem lopen gelijk. Anders eerlijk verdeeld over de totale duur.
     const nC = CARDS.length;
-    const wts = CARDS.map((_, i) => (i === 0 ? 1.25 : i === nC - 1 ? 1.2 : 1.0));
-    const sumW = wts.reduce((a, b) => a + b, 0);
-    const durs = wts.map((w) => Math.max(2.4, +((w / sumW) * T).toFixed(2)));
+    let durs;
+    if (TL && Array.isArray(TL.lines) && TL.lines.length >= nC) {
+      durs = CARDS.map((_, i) => Math.max(1.8, +(Number(TL.lines[i].dur) || 0).toFixed(2)));
+    } else {
+      const wts = CARDS.map((_, i) => (i === 0 ? 1.25 : i === nC - 1 ? 1.2 : 1.0));
+      const sumW = wts.reduce((a, b) => a + b, 0);
+      durs = wts.map((w) => Math.max(2.4, +((w / sumW) * T).toFixed(2)));
+    }
 
     // 3) elke kaart -> segment (zelfde codec/res/fps)
     if (log) log("● kaarten renderen…");
