@@ -606,7 +606,7 @@ def build_story(story_id, voice, root, only=-1, fmt="16:9", channel="channel1"):
     print(f"  klaar: {len(made)} fragment(en)")
 
 def main():
-    global DENOISE, DENOISE_DB
+    global DENOISE, DENOISE_DB, BASE_SEED
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="chose")
     ap.add_argument("--voice", default="alle", choices=list(VOICES.keys()) + ["alle"])
@@ -616,9 +616,11 @@ def main():
     ap.add_argument("--channel", default="channel1")
     ap.add_argument("--no-denoise", dest="denoise", action="store_false", help="ruisreductie uit")
     ap.add_argument("--denoise-db", type=int, default=DENOISE_DB, help="dB ruisreductie (zacht ~12)")
+    ap.add_argument("--seed", type=int, default=BASE_SEED, help="basis-seed; verander 'm (bv. --seed 2) om een gevlagde scene met --only anders in te spreken")
     args = ap.parse_args()
     DENOISE = args.denoise
     DENOISE_DB = args.denoise_db
+    BASE_SEED = args.seed
 
     try:
         import chatterbox.mtl_tts  # noqa
