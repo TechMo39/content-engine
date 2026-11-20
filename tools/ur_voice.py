@@ -37,7 +37,7 @@ def phon(s):
 
 TAIL_SIL  = 0.45   # adem aan het eind
 LEAD_SIL  = 0.45   # aanloop zodat het eerste woord niet abrupt begint
-PAUSE     = 0.65   # STILTE TUSSEN REGELS - dit geeft de rust die Mo mist
+PAUSE     = 0.85   # STILTE TUSSEN REGELS - ruimte/rust tussen de punten (Mo: "laat ze rustig praten")
 SLOWER_CFG = 0.20  # rustiger tempo (lager cfg = langzamer)
 LOUDNORM = "loudnorm=I=-13:TP=-1.5:LRA=11"
 

@@ -198,100 +198,100 @@ const UR_VARIANTS = {
   // plaatst ze met de opname-stukjes ertussen. GEEN meetmethode noemen (bedrijfsgeheim): enkel het
   // signaal en de waarde. De opname werkt als beeld, niet als het verhaal.
   portaal: [
-    { // A, het juiste moment
+    { // A, timing is alles
       voice: [
-        "Heb jij een online marketingbureau? Dan weet je hoe lastig het is om aan goede nieuwe klanten te komen.",
-        "Je belt bedrijven koud, zonder te weten wat er speelt, of waarom ze jou juist nu nodig hebben.",
-        "UncleRank houdt Nederlandse bedrijven in de gaten en geeft jou bedrijven met een vers signaal, per vak: SEO, SEA, web, content en reclame.",
-        "Zo bel je niet meer koud, maar precies op het moment dat een bedrijf jou nodig heeft, met de reden erbij.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
+        "Heb jij een online marketingbureau? Dan ken je dit probleem maar al te goed.",
+        "Je hebt een dienst die werkt. Alleen zit je agenda niet vanzelf vol.",
+        "Dus bel je bedrijven. Koud. Van een lijst die je ergens vandaan hebt.",
+        "En negen van de tien keer krijg je nee. Niet omdat jouw dienst niet deugt.",
+        "Maar omdat je op het verkeerde moment belt. Datzelfde bedrijf had vorige maand misschien ja gezegd.",
+        "Want bij koud bellen draait alles om timing. En timing kun je niet raden.",
+        "Daar is UncleRank voor. Wij houden Nederlandse bedrijven continu in de gaten.",
+        "En we zien het zodra er iets verandert waar jij, met jouw vak, precies op aansluit.",
+        "Een voorbeeld. Een bedrijf stopt met adverteren. Voor een advertentiebureau is dat het moment om te bellen.",
+        "Zulke signalen krijg jij elke week, netjes gesorteerd op jouw vak: SEO, SEA, web, content of reclame.",
+        "Zo bel je nooit meer blind, maar een bedrijf waar nu echt iets speelt, met de reden erbij.",
+        "En dat hoor je meteen. Geen koud gesprek, maar een gesprek dat ergens over gaat.",
+        "Benieuwd welke bedrijven dat vandaag zijn? Probeer het portaal een week gratis. De link staat in beeld.",
       ],
       cards: [
-        { key: "hook",      title: "Online marketingbureau?",    sub: "Nieuwe klanten vinden\nis het lastigste wat er is." },
-        { key: "pijn",      title: "Koud bellen werkt niet",     sub: "Je weet niet wat er speelt,\nof waarom ze jou nu nodig hebben." },
-        { key: "oplossing", title: "Maak kennis\nmet UncleRank", sub: "Bedrijven met een vers signaal,\nkant-en-klaar per vak." },
-        { key: "waarde",    title: "Bel op het juiste moment",   sub: "Niet koud, maar precies\nals een bedrijf je nodig heeft." },
-        { key: "cta",       title: "Probeer het gratis",         sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+        { key: "hook",  title: "Heb jij een\nmarketingbureau?", sub: "Dan ken je\ndit probleem." },
+        { key: "l2",    title: "Je dienst\nwerkt",              sub: "Maar je agenda\nvult niet vanzelf." },
+        { key: "l3",    title: "Dus bel je\nkoud",              sub: "Van een\nlijst." },
+        { key: "l4",    title: "Negen keer\nnee",               sub: "Niet omdat je\ndienst slecht is." },
+        { key: "l5",    title: "Verkeerde\nmoment",             sub: "Daar gaat\nhet mis." },
+        { key: "l6",    title: "Alles draait\nom timing",       sub: "En die raad\nje niet." },
+        { key: "l7",    title: "Daarom:\nUncleRank",            sub: "Wij volgen\nde bedrijven." },
+        { key: "l8",    title: "Er verandert\niets",            sub: "Precies\njouw kans." },
+        { key: "l9",    title: "Stopt met\nadverteren", sub: "Het moment\nvoor jou.", shot: "lead" },
+        { key: "l10",   title: "Elke week,\nper vak", sub: "SEO, SEA, web,\ncontent, reclame.", shot: "signaal" },
+        { key: "l11",   title: "Nooit meer\nblind bellen",      sub: "Met de reden\nerbij." },
+        { key: "l12",   title: "Dat hoor\nje meteen",           sub: "Een echt\ngesprek." },
+        { key: "cta",   title: "Benieuwd?",                     sub: UR_CTA_URL, outro: true },
       ],
     },
-    { // B, koud bellen is gokken
+    { // B, een lijst is geen lead
       voice: [
-        "Je belt een bedrijf koud, maar je weet niet wat er bij ze speelt.",
-        "Misschien draait alles prima en verspil je je tijd, misschien bel je net te laat.",
-        "UncleRank laat je alleen bedrijven zien waar nu aantoonbaar iets mis is, per vak: SEO, SEA, web, content en reclame.",
-        "Zo bel je op het juiste moment, met een reden die klopt.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
+        "Iedereen kan een lijst met bedrijven kopen. Maar dat is een telefoonboek, geen leads.",
+        "Je weet van die namen helemaal niets. Niet of ze iets nodig hebben, niet of het nu speelt.",
+        "Dus bel je ze allemaal af, en de meeste hebben geen idee waarom je belt.",
+        "Dat is zonde van jouw tijd, en zonde van je naam bij dat bedrijf.",
+        "Een echte lead is iets heel anders. Dat is een bedrijf waar nu iets mis is dat jij kunt oplossen.",
+        "En laat dat precies zijn wat UncleRank voor je vindt.",
+        "Wij houden Nederlandse bedrijven in de gaten en zien wanneer er iets verandert.",
+        "Bijvoorbeeld een website die al maanden stilstaat. Voor een webbouwer een open deur.",
+        "Of een bedrijf dat slecht gevonden wordt. Voor een SEO-bureau precies jouw klant.",
+        "Elk signaal komt bij je binnen met de reden erbij, gesorteerd op jouw vak.",
+        "Geen koude namen meer, maar bedrijven met een concrete reden om nu te bellen.",
+        "Je belt minder, maar je raakt veel vaker. Dat scheelt je uren per week.",
+        "Wil je zien welke bedrijven dat vandaag zijn? Probeer het portaal een week gratis. De link staat in beeld.",
       ],
       cards: [
-        { key: "hook",      title: "Koud bellen is gokken",  sub: "Je weet niet wat er\nbij ze speelt." },
-        { key: "pijn",      title: "Te vroeg of te laat",    sub: "Je verspilt je tijd,\nof je belt net te laat." },
-        { key: "oplossing", title: "UncleRank weet het wél", sub: "Alleen bedrijven waar nu\naantoonbaar iets mis is." },
-        { key: "waarde",    title: "Het juiste moment",      sub: "Een reden die klopt,\nper vak." },
-        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+        { key: "hook", title: "Een lijst\nis geen lead",  sub: "Dat is een\ntelefoonboek." },
+        { key: "l2",   title: "Je weet er\nniks van",      sub: "Nodig? Speelt\nhet nu?" },
+        { key: "l3",   title: "Dus bel je\nalles af",      sub: "Niemand weet\nwaarom je belt." },
+        { key: "l4",   title: "Zonde van\nje tijd",        sub: "En van je naam\nbij dat bedrijf." },
+        { key: "l5",   title: "Een echte\nlead",           sub: "Een bedrijf waar\nnu iets mis is." },
+        { key: "l6",   title: "Dat vindt\nUncleRank",      sub: "Voor\njou." },
+        { key: "l7",   title: "Wij volgen\nde bedrijven",  sub: "En zien als er\niets verandert." },
+        { key: "l8",   title: "Site staat\nmaanden stil", sub: "Open deur\nvoor een webbouwer.", shot: "lead" },
+        { key: "l9",   title: "Slecht\ngevonden", sub: "Precies jouw\nSEO-klant.", shot: "lead2" },
+        { key: "l10",  title: "Met de reden\nerbij", sub: "Gesorteerd\nop jouw vak.", shot: "signaal" },
+        { key: "l11",  title: "Geen koude\nnamen meer",    sub: "Een concrete\nreden." },
+        { key: "l12",  title: "Minder bellen,\nvaker raak", sub: "Scheelt je\nuren." },
+        { key: "cta",  title: "Benieuwd?",                 sub: UR_CTA_URL, outro: true },
       ],
     },
-    { // C, een lijst is geen lead
+    { // C, het moment dat het klopt
       voice: [
-        "Een lijst met namen koop je overal, dat is een telefoonboek.",
-        "Een echte lead is een bedrijf waar iets mis is dat jij kunt oplossen.",
-        "UncleRank meet Nederlandse bedrijven door en geeft je alleen die, per vak: SEO, SEA, web, content en reclame.",
-        "Geen koude naam, maar een bedrijf met een reden om nu te bellen.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
+        "Stel je belt een bedrijf, en je voelt meteen: dit klopt. Ze luisteren, het gesprek loopt.",
+        "Dat gebeurt niet vaak bij koud bellen. Meestal bel je iemand die nergens op zit te wachten.",
+        "Het verschil zit niet in jouw praatje. Het zit in het moment waarop je belt.",
+        "Een bedrijf dat vorige week nog tevreden was, kan deze week een probleem hebben.",
+        "En precies op dat soort momenten wil jij aan de lijn zijn. Als eerste.",
+        "Dat is wat UncleRank doet. Wij houden Nederlandse bedrijven in de gaten.",
+        "En zodra er iets verandert waar jij iets mee kunt, zie jij dat.",
+        "Een bedrijf dat net stopte met adverteren. Een site die ineens pagina's verliest.",
+        "Allemaal signalen dat er nu iets speelt, klaargezet per vak: SEO, SEA, web, content of reclame.",
+        "Jij belt dus niet meer koud, maar op het moment dat het bedrijf je het hardst nodig heeft.",
+        "En dat hoor je terug in elk gesprek. Warmer, korter, en veel vaker raak.",
+        "Een zo'n klant verdient je abonnement al terug, vaak in de eerste maand.",
+        "Wil je het zelf zien? Probeer het portaal een week gratis. De link staat in beeld.",
       ],
       cards: [
-        { key: "hook",      title: "Een lijst is geen lead", sub: "Namen koop je overal.\nDat is een telefoonboek." },
-        { key: "pijn",      title: "Namen zeggen niks",      sub: "Je weet niet wie\neen probleem heeft." },
-        { key: "oplossing", title: "UncleRank wél",          sub: "Alleen bedrijven waar iets mis is\ndat jij oplost, per vak." },
-        { key: "waarde",    title: "Geen koude naam",        sub: "Een bedrijf met een reden\nom nu te bellen." },
-        { key: "cta",       title: "Probeer het gratis",     sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
-      ],
-    },
-    { // D, elk vak z'n eigen signaal
-      voice: [
-        "Elk bureau zoekt iets anders in een bedrijf.",
-        "Een webbouwer wil een verouderde site, een SEO-bureau een bedrijf dat slecht gevonden wordt.",
-        "UncleRank zet per vak de juiste bedrijven voor je klaar, met het signaal erbij.",
-        "Jij belt alleen wie jouw dienst echt nodig heeft.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
-      ],
-      cards: [
-        { key: "hook",      title: "Elk vak z'n eigen signaal",      sub: "Elk bureau zoekt iets\nanders in een bedrijf." },
-        { key: "pijn",      title: "Niet elk bedrijf is jouw klant", sub: "Een webbouwer wil iets anders\ndan een SEO-bureau." },
-        { key: "oplossing", title: "UncleRank sorteert dat",         sub: "Per vak de juiste bedrijven,\nmet het signaal erbij." },
-        { key: "waarde",    title: "Alleen wie jou nodig heeft",     sub: "Jij belt alleen wie jouw\ndienst echt nodig heeft." },
-        { key: "cta",       title: "Probeer het gratis",             sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
-      ],
-    },
-    { // E, verloren uren
-      voice: [
-        "Hoeveel uur verlies je aan bedrijven die toch nooit klant werden?",
-        "Bellen zonder te weten wat er speelt is gokken met je tijd.",
-        "UncleRank geeft je alleen bedrijven waar aantoonbaar iets mis is, per vak: SEO, SEA, web, content en reclame.",
-        "Zo gaat je tijd naar gesprekken die ergens over gaan.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
-      ],
-      cards: [
-        { key: "hook",      title: "Hoeveel uur verlies je?", sub: "Aan bedrijven die toch\nnooit klant werden." },
-        { key: "pijn",      title: "Gokken met je tijd",      sub: "Bellen zonder te weten\nwat er speelt." },
-        { key: "oplossing", title: "UncleRank filtert dat",   sub: "Alleen bedrijven waar\naantoonbaar iets mis is." },
-        { key: "waarde",    title: "Gesprekken die tellen",   sub: "Je tijd naar de juiste\nbedrijven, per vak." },
-        { key: "cta",       title: "Probeer het gratis",      sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
-      ],
-    },
-    { // F, een verandering is een open deur
-      voice: [
-        "Een bedrijf dat net stopte met adverteren, is een open deur voor een ads-bureau.",
-        "Maar dat zie je niet als je het koud benadert.",
-        "UncleRank pikt dat soort veranderingen op en zet ze per vak voor je klaar.",
-        "Zo kom je binnen precies wanneer het bedrijf je nodig heeft.",
-        "Probeer het portaal een week gratis. De link staat in beeld.",
-      ],
-      cards: [
-        { key: "hook",      title: "Een open deur",         sub: "Een bedrijf dat net stopte\nmet adverteren." },
-        { key: "pijn",      title: "Je ziet het niet",      sub: "Niet als je koud\nbinnenkomt." },
-        { key: "oplossing", title: "UncleRank pikt het op",  sub: "Veranderingen bij bedrijven,\nper vak klaargezet." },
-        { key: "waarde",    title: "Precies op tijd",       sub: "Je komt binnen wanneer\nhet bedrijf je nodig heeft." },
-        { key: "cta",       title: "Probeer het gratis",    sub: "Een week lang.\n" + UR_CTA_URL, outro: true },
+        { key: "hook", title: "Soms klopt\neen gesprek",  sub: "Ze luisteren,\nhet loopt." },
+        { key: "l2",   title: "Zo gaat het\nzelden",       sub: "Bij koud\nbellen." },
+        { key: "l3",   title: "Niet je\npraatje",          sub: "Maar het\nmoment." },
+        { key: "l4",   title: "Vorige week\ntevreden",     sub: "Deze week\neen probleem." },
+        { key: "l5",   title: "Daar wil\nje zijn",         sub: "Als\neerste." },
+        { key: "l6",   title: "Dat doet\nUncleRank",       sub: "Wij volgen\nde bedrijven." },
+        { key: "l7",   title: "Er verandert\niets", sub: "Jij ziet\nhet.", shot: "dossier-kop" },
+        { key: "l8",   title: "Ads gestopt.\nPagina's weg.", sub: "De\nsignalen.", shot: "signaal" },
+        { key: "l9",   title: "Nu speelt\nhet", sub: "Per vak\nklaargezet.", shot: "waarde" },
+        { key: "l10",  title: "Niet meer\nkoud",           sub: "Maar op het\njuiste moment." },
+        { key: "l11",  title: "Warmer,\nkorter",           sub: "Veel vaker\nraak." },
+        { key: "l12",  title: "Een klant",                 sub: "Verdient je\nabonnement terug." },
+        { key: "cta",  title: "Zelf zien?",                sub: UR_CTA_URL, outro: true },
       ],
     },
   ],
@@ -1523,55 +1523,23 @@ export function makeBrand({ ROOT, config } = {}) {
     //    uit één walkthrough. Faalt een onderdeel, dan valt het stil weg; de rest loopt door.
     if (log) log("● montage bouwen…");
     const segs = []; const push = (p) => { if (p) segs.push(p); };
-    if (haveShots) {
-      const leadShots = SHOTS.filter((s) => /^lead/.test(s.name));
-      const dossShots = SHOTS.filter((s) => !/^lead/.test(s.name));
-      const byKey = (k) => CARDS.find((c) => c.key === k);
-      const ci = (k) => { const c = byKey(k); return c ? [{ kind: "card", card: c }] : []; };
-      const si = (arr) => arr.map((s) => ({ kind: "shot", shot: s }));
-      // BEATS = de stemregels. Elke beat bevat de kaart van die regel + de shots die erbij horen, en
-      // duurt precies zo lang als die regel wordt uitgesproken. Zo loopt de tekst op het scherm
-      // synchroon met de stem: de lead-kaarten vallen onder "de oplossing", de dossier-blokken onder
-      // "de waarde". Volgorde van de stemregels = [hook, pijn, oplossing, waarde, cta].
-      const beats = [
-        ci("hook"),
-        ci("pijn"),
-        [...ci("oplossing"), ...si(leadShots)],
-        [...ci("waarde"), ...si(dossShots)],
-        ci("cta"),
-      ];
-      // duur per beat: uit de ECHTE per-regel timing van de stem (anders eerlijk verdeeld over T)
-      const lineDur = (TL && Array.isArray(TL.lines) && TL.lines.length >= beats.length)
+    // ÉÉN onderdeel per stemregel (kaart i hoort bij regel i). Heeft een kaart een shot-slot
+    // (card.shot = "lead"/"signaal"/...) én is dat portaal-beeld opgehaald, dan tonen we dáár het
+    // uitgeknipte portaal-blok i.p.v. de tekstkaart; anders gewoon de tekstkaart (volwaardige terugval).
+    // Elk onderdeel duurt precies zo lang als z'n regel + adem -> beeld en stem lopen gelijk, en de
+    // lengte van de video volgt de (nu langere) stem. Zo niet beschikbaar: oude walkthrough-cut.
+    const perLine = CARDS.length > 0;
+    if (perLine) {
+      const shotByName = {}; for (const s of SHOTS) shotByName[s.name] = s;
+      const lineDur = (TL && Array.isArray(TL.lines) && TL.lines.length >= CARDS.length)
         ? TL.lines.map((l) => Number(l.dur) || 0) : null;
-      let beatDur;
-      if (lineDur) {
-        beatDur = beats.map((_, b) => lineDur[b]);
-        const used = beatDur.reduce((a, d) => a + d, 0);
-        if (T > used) beatDur[beatDur.length - 1] += (T - used);   // staartstilte op de slotkaart
-      } else {
-        const wB = beats.map((it) => it.reduce((a, x) => a + (x.kind === "shot" ? 1.5 : 1.2), 0));
-        const sumB = wB.reduce((a, d) => a + d, 0) || 1;
-        beatDur = wB.map((w) => (w / sumB) * T);
-      }
-      let gi = 0;
-      for (let b = 0; b < beats.length; b++) {
-        const group = beats[b];
-        if (!group.length) continue;
-        // de regelduur verdelen binnen de beat: de kaart iets ruimer dan een shot, met een leesbodem
-        const wIn = group.map((it) => (it.kind === "shot" ? 1.0 : 1.3));
-        const sumIn = wIn.reduce((a, d) => a + d, 0) || 1;
-        let durs = wIn.map((w) => (w / sumIn) * beatDur[b]);
-        // leesbodem per onderdeel, zonder de beat-lengte (en dus de sync) te overschrijden
-        const FLO = group.map((it) => (it.kind === "shot" ? 2.0 : 1.8));
-        durs = durs.map((d, k) => Math.max(d, FLO[k]));
-        const scale = beatDur[b] / durs.reduce((a, d) => a + d, 0);
-        if (scale < 1) durs = durs.map((d) => d * scale);
-        for (let k = 0; k < group.length; k++) {
-          const it = group[k], dur = +durs[k].toFixed(2);
-          if (it.kind === "card") push(await cardSeg(it.card, dur, gi));
-          else push(await pushinSeg(it.shot, dur, gi));
-          gi++;
-        }
+      for (let i = 0; i < CARDS.length; i++) {
+        const card = CARDS[i] || {};
+        const dur = lineDur ? Math.max(1.8, +Number(lineDur[i] || 0).toFixed(2))
+                            : Math.max(2.4, +(T / CARDS.length).toFixed(2));
+        const shot = card.shot ? shotByName[card.shot] : null;
+        if (shot) push(await pushinSeg(shot, dur, i));
+        else push(await cardSeg(card, dur, i));
       }
     } else {
       let clipAt = 0;
