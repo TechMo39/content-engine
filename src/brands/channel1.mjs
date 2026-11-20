@@ -1525,21 +1525,21 @@ export function makeBrand({ ROOT = "." } = {}) {
           const ms = Math.round(start * 1000);
           const fo = Math.max(0, bdur - 0.6).toFixed(2);
           inputs.push("-stream_loop", "-1", "-i", bf);
-          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=${(MUS_BASE*MIXg.m).toFixed(3)},afade=t=in:st=0:d=${fin},afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
+          aFiltersPush(`[${idx}:a]atrim=0:${bdur.toFixed(2)},volume=1.0,afade=t=in:st=0:d=${fin},afade=t=out:st=${fo}:d=0.6,adelay=${ms}|${ms}[m${idx}]`);
           bedLabels.push(`[m${idx}]`); idx++;
         }
       } else {
         const music = opts.music ? path.resolve(ROOT, "assets/channels/" + CURRENT_CH + "/muziek", opts.music) : await pickUmmaMusic(total);
         if (music && await exists(music)) {
           inputs.push("-stream_loop", "-1", "-i", music);
-          aFiltersPush(`[${idx}:a]volume=${(MUS_BASE*MIXg.m).toFixed(3)},atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
+          aFiltersPush(`[${idx}:a]volume=1.0,atrim=0:${total.toFixed(2)}[m]`); bedLabels.push("[m]"); idx++;
         }
       }
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
         if (s && s.voice) { const vf = path.resolve(ROOT, s.voice); if (await exists(vf)) {
           inputs.push("-i", vf);
-          aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)},volume=${(MIXg.v*gidx(i).v).toFixed(3)}[v${i}]`); voiceLabels.push(`[v${i}]`); idx++;
+          aFiltersPush(`[${idx}:a]adelay=${Math.round(starts[i] * 1000)}|${Math.round(starts[i] * 1000)}[v${i}]`); voiceLabels.push(`[v${i}]`); idx++;
         }}
         // SFX: op hun moment (scène-start + t) uit de tijdlijn; anders de oude enkele s.sfx.
         const sfxList = (tlAudio && tlAudio.sfxByIndex && tlAudio.sfxByIndex[i]) || (s && s.sfx ? [{ t: 0, file: s.sfx }] : []);
@@ -1547,7 +1547,7 @@ export function makeBrand({ ROOT = "." } = {}) {
           const xf = resolveAudio(fx.file); if (!(xf && await exists(xf))) continue;
           const at = Math.round((starts[i] + (Number(fx.t) || 0)) * 1000);
           inputs.push("-i", xf);
-          aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=${(SFX_BASE*MIXg.s*gidx(i).s).toFixed(3)}[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
+          aFiltersPush(`[${idx}:a]adelay=${at}|${at},volume=1.0[x${idx}]`); bedLabels.push(`[x${idx}]`); idx++;
         }
         // CTA-CHIMES op de intro, synced met de iconen (cta_tick.wav per icoon, cta_sub.wav voor abonneer).
         if (s && s.tone === "intro") {

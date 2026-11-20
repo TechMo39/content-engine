@@ -347,8 +347,8 @@ def download(url, outpath):
 # hard gemasterd. Daarom trekken we alles naar VASTE niveaus: stem naar de VOORGROND, muziek naar een
 # zachte ACHTERGROND. Zo klinkt elke video gelijk en staat de stem altijd boven de muziek.
 VOICE_LUFS = -16.0   # stem: helder op de voorgrond (standaard; te overschrijven met --voice-lufs)
-MUSIC_LUFS = -28.0   # muziek: ver onder de stem (standaard; te overschrijven met --music-lufs).
-                     # Lager getal = zachter. De 0.22-gain in preview/render maakt 'm nog zachter.
+MUSIC_LUFS = -26.0   # muziek: ONDERLAAG, ~10 dB onder de stem
+SFX_LUFS   = -18.0   # SFX: dicht tegen stem-niveau (iets eronder)
 _FFMPEG = None
 
 def _ffmpeg_path(root):
@@ -386,6 +386,24 @@ def loudnorm(root, path, lufs, pre_af=""):
         except Exception: pass
     return False
 
+def level_all(tl, root, v_lufs=VOICE_LUFS, m_lufs=MUSIC_LUFS, s_lufs=SFX_LUFS):
+    # METER: trek elke stem-clip, elk muziekbed en elke SFX naar een VAST niveau. Zo is scene 1 even
+    # hard als scene 2 (geen rare overgangen), muziek blijft onderlaag, SFX dicht tegen de stem.
+    nv = nm = ns = 0
+    for s in tl.get("scenes", []):
+        wp = s.get("wav")
+        if wp and loudnorm(root, os.path.join(root, wp), v_lufs): nv += 1
+    done = set()
+    for b in (tl.get("music") or []):
+        mp = b.get("file")
+        if mp and mp not in done and loudnorm(root, os.path.join(root, mp), m_lufs):
+            done.add(mp); nm += 1
+    for s in tl.get("scenes", []):
+        for fx in (s.get("sfx") or []):
+            fp = fx.get("file")
+            if fp and loudnorm(root, os.path.join(root, fp), s_lufs): ns += 1
+    return nv, nm, ns
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--story", default="chose"); ap.add_argument("--voice", default="v3")
@@ -396,7 +414,8 @@ def main():
     ap.add_argument("--level", action="store_true",
                     help="trek bestaande stem + muziek van deze film op niveau (normaliseer in-place), zonder opnieuw te zoeken of inspreken")
     ap.add_argument("--voice-lufs", dest="voice_lufs", type=float, default=VOICE_LUFS, help="stem-niveau (standaard -16; hoger = harder)")
-    ap.add_argument("--music-lufs", dest="music_lufs", type=float, default=MUSIC_LUFS, help="muziek-niveau (standaard -28; LAGER = zachter)")
+    ap.add_argument("--music-lufs", dest="music_lufs", type=float, default=MUSIC_LUFS, help="muziek-niveau (standaard -26; LAGER = zachter)")
+    ap.add_argument("--sfx-lufs", dest="sfx_lufs", type=float, default=SFX_LUFS, help="sfx-niveau (standaard -18; dicht tegen de stem)")
     # stem-TOON (EQ), alleen bij --level. dB's, 0 = uit. Positief = meer ervan.
     ap.add_argument("--voice-bass", dest="voice_bass", type=float, default=0.0, help="meer BAS in de stem (dB, bv. 3)")
     ap.add_argument("--voice-body", dest="voice_body", type=float, default=0.0, help="meer VOLHEID/body in de stem (dB, bv. 2.5)")
@@ -435,17 +454,8 @@ def main():
     # --level: normaliseer de BESTAANDE audio van deze film in-place en stop. Geen zoeken/download,
     # geen opnieuw inspreken. Stem -> voorgrond, muziek -> zacht. Lost "stem te zacht / muziek te hard" op.
     if args.level:
-        nv = nm = 0
-        for s in scenes:
-            vp = s.get("wav")
-            if vp and loudnorm(args.root, os.path.join(args.root, vp), args.voice_lufs): nv += 1
-        done = set()
-        for b in (tl.get("music") or []):
-            mp = b.get("file")
-            if mp and mp not in done and loudnorm(args.root, os.path.join(args.root, mp), args.music_lufs):
-                done.add(mp); nm += 1
-        print(f"genormaliseerd: {nv} stem-clips -> {args.voice_lufs:.0f} LUFS (voorgrond), {nm} muziekbedden -> {args.music_lufs:.0f} LUFS (zacht).")
-        print("Herlaad de studio en speel af; de stem staat nu helder boven de muziek. Niks opnieuw ingesproken.")
+        nv, nm, ns = level_all(tl, args.root, args.voice_lufs, args.music_lufs, args.sfx_lufs)
+        print(f"niveaus gelijkgetrokken: stem {nv}x -> {args.voice_lufs:.0f}, muziek {nm}x -> {args.music_lufs:.0f}, sfx {ns}x -> {args.sfx_lufs:.0f} LUFS. Herlaad de studio en druk play.")
         return
 
     mdir = os.path.join(args.root, "assets", "channels", args.channel, "muziek")
@@ -474,7 +484,6 @@ def main():
                 download(hit["url"], fpath)
             except Exception as e:
                 print(f"    downloadfout: {e}"); n_fail += 1; time.sleep(1.2); continue
-            loudnorm(args.root, fpath, args.music_lufs)   # elk bed naar hetzelfde zachte niveau
             track_file[name] = rel
             credits.append(f"muziek '{name}': {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
             print(f"    -> {fname}  ({hit['lic']}, {hit['dur']:.0f}s)"); n_mus += 1; time.sleep(1.2)
@@ -523,6 +532,10 @@ def main():
         s["sfx"].append({"t": t, "name": "end", "file": "assets/channels/" + args.channel + "/sfx/" + fname})
         credits.append(f"sfx scene {sx['scene']}: {hit['name']} by {hit['user']} (Freesound, {hit['lic']})")
         print(f"    -> {fname}  ({hit['lic']})"); n_sfx += 1; time.sleep(1.2)
+
+    # METER (automatisch): alle stem/muziek/sfx naar vaste niveaus, zodat play meteen goed klinkt.
+    nv, nm, ns = level_all(tl, args.root)
+    print(f"niveaus gelijkgetrokken: stem {nv}x -> {VOICE_LUFS:.0f}, muziek {nm}x -> {MUSIC_LUFS:.0f}, sfx {ns}x -> {SFX_LUFS:.0f} LUFS")
 
     with open(tlpath, "w", encoding="utf-8") as f:
         json.dump(tl, f, ensure_ascii=False, indent=2)

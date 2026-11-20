@@ -36,7 +36,7 @@
  .scard.active{border-color:var(--play);box-shadow:0 0 0 1px rgba(255,90,60,.3)}
  .shead{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:12.5px;flex-wrap:wrap}
  .shead .n{font-weight:650}.shead .tone{color:var(--mut)}.shead .rng{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums;font-size:11.5px}
- .mix{display:inline-flex;align-items:center;gap:10px;padding:2px 8px;background:#0b0f18;border:1px solid var(--line);border-radius:8px}
+ .mix{display:none}   /* volumeknoppen uit: de meter (channel_audio) regelt de niveaus automatisch */
  .mix label{display:inline-flex;align-items:center;gap:4px;color:var(--mut);font-size:11px;cursor:pointer}
  .mix input[type=range]{width:60px;accent-color:var(--muz);cursor:pointer}
  .mix i{font-style:normal;min-width:30px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
@@ -165,7 +165,7 @@
   <div class="now">scène <b id="pv-scn">1</b> · beeld-beat <b id="pv-bn">1</b></div>
   <div class="mix gmix" title="volume voor de HELE film — stem / muziek / sfx. Zet je één keer; per scène kun je nog fijn-afstellen.">
    <span style="color:var(--mut);font-size:11px;margin-right:2px">film-geluid</span>
-   <label title="stem-volume (hele film)">&#127908;<input type="range" id="gmv" min="0" max="150" step="5" value="100"><i id="gmvl">100%</i></label>
+   <label title="stem-volume (hele film)">&#127908;<input type="range" id="gmv" min="0" max="100" step="5" value="100"><i id="gmvl">100%</i></label>
    <label title="muziek-volume (hele film)">&#9834;<input type="range" id="gmm" min="0" max="200" step="5" value="100"><i id="gmml">100%</i></label>
    <label title="sfx-volume (hele film)">&#128165;<input type="range" id="gms" min="0" max="200" step="5" value="100"><i id="gmsl">100%</i></label>
   </div>
@@ -301,17 +301,12 @@ const cardOf=si=>document.querySelector('.scard[data-si="'+si+'"]');
 let MIX={v:1,m:1,s:1};
 function normGain(g){g=g||{};const c=x=>{x=parseFloat(x);return (isFinite(x)&&x>=0)?x:1;};return {v:c(g.v),m:c(g.m),s:c(g.s)};}
 function gOf(si){const s=SC[si],sg=(s&&s.gain)||{v:1,m:1,s:1};return {v:MIX.v*sg.v,m:MIX.m*sg.m,s:MIX.s*sg.s};}
-// Een <audio>.volume kan max 1.0 (dus "harder dan 100%" werkte niet). Daarom sturen we elk
-// audio-element door een WebAudio GainNode, die WEL boven 1.0 kan. Valt WebAudio weg, dan terug
-// naar .volume (geklemd op 1.0).
-let _AC=null;
-function ensureAC(){ try{ if(!_AC)_AC=new (window.AudioContext||window.webkitAudioContext)(); if(_AC&&_AC.state==='suspended')_AC.resume(); }catch(e){ _AC=null; } return _AC; }
-function waGain(a){ if(!a)return null; if(a._g)return a._g; const ac=ensureAC(); if(!ac)return null;
- try{ const src=ac.createMediaElementSource(a); const g=ac.createGain(); src.connect(g); g.connect(ac.destination); a._g=g; return g; }catch(e){ return null; } }
-function setGain(a,val){ val=Math.max(0,val||0); const g=waGain(a); if(g){ try{g.gain.value=val;}catch(e){} } else if(a){ try{a.volume=Math.min(1,val);}catch(e){} } }
+// Volume per element via .volume (0..1). Harder dan 100% kan de browser-preview niet; de
+// render past de exacte niveaus wel toe. Differentieer tussen scenes door de luidere ZACHTER te zetten.
+function setGain(a,val){ if(a){ try{a.volume=Math.min(1,Math.max(0,val||0));}catch(e){} } }
 function mixHTML(si,g){g=normGain(g);
  const row=(k,ic,ti,mx)=>'<label title="'+ti+'">'+ic+'<input type="range" class="mixr" data-mix="'+k+'" data-si="'+si+'" min="0" max="'+mx+'" step="5" value="'+Math.round(g[k]*100)+'"><i>'+Math.round(g[k]*100)+'%</i></label>';
- return '<span class="mix" title="fijn-afstelling voor DEZE scène, bovenop de film-mix">'+row('v','&#127908;','stem-volume',150)+row('m','&#9834;','muziek-volume',200)+row('s','&#128165;','sfx-volume',200)+'</span>';
+ return '<span class="mix" title="fijn-afstelling voor DEZE scène, bovenop de film-mix">'+row('v','&#127908;','stem-volume',100)+row('m','&#9834;','muziek-volume',200)+row('s','&#128165;','sfx-volume',200)+'</span>';
 }
 // zet de globale film-mix-schuiven op de huidige MIX-waarden
 function syncGmix(){const set=(id,lid,val)=>{const e=$(id);if(e)e.value=Math.round(val*100);const l=$(lid);if(l)l.textContent=Math.round(val*100)+'%';};
@@ -484,19 +479,19 @@ function updatePreview(si,local){const s=SC[si];$('pv-clock').textContent=fmt(t)
  else if(!vd.paused){try{vd.pause();}catch(e){}}}
 function syncAudio(){const si=sceneAt(t),s=SC[si];
  if(si!==curScene){for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}curScene=si;const a=voiceAudio[s.scene];if(a&&playing){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}}
- {const va=voiceAudio[s.scene];if(va){setGain(va,gOf(si).v);}}   // stem-volume per scène (live)
+ {const va=voiceAudio[s.scene];if(va){setGain(va,1);}}   // stem op genormaliseerd niveau
  // volgende scène's stem alvast inladen (binnen 3s van de grens) zodat er geen stilte-gat valt
  const nsi=si+1;if(nsi<SC.length){const ns=SC[nsi],dt=ns.start-t;if(dt>0&&dt<3){const na=voiceAudio[ns.scene];if(na&&na.readyState<3){try{na.preload='auto';na.load();}catch(e){}}}}
  manageMusic();fireSfx();}
 function manageMusic(){let bi=-1;for(let i=0;i<musicBlocks.length;i++){const b=musicBlocks[i];if(t>=b.start&&t<b.end){bi=i;break;}}
  if(bi!==curBlock){musicBlocks.forEach((b,i)=>{if(i!==bi){try{b.audio.pause();}catch(e){}}});curBlock=bi;}
- if(bi>=0&&playing){const b=musicBlocks[bi];setGain(b.audio,0.22*gOf(sceneAt(t)).m);if(b.audio.paused){
+ if(bi>=0&&playing){const b=musicBlocks[bi];setGain(b.audio,1);if(b.audio.paused){
    // EERST afspelen (zodat de muziek daadwerkelijk start), DAARNA pas seeken als het element genoeg
    // data heeft en de afwijking groot is. currentTime zetten vóór play() op een nog-niet-geladen
    // mp3 kan het element blijven laten seeken; daarom andersom. .catch om geen losse promise-fout.
    b.audio.play().then(()=>{const d=b.audio.duration||0,want=d?((t-b.start)%d):(t-b.start);
      if(b.audio.readyState>=2&&Math.abs(b.audio.currentTime-want)>0.5){try{b.audio.currentTime=want;}catch(e){}}}).catch(()=>{});}}}
-function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;setGain(x.audio,0.4*gOf(x.si).s);}catch(e){}x.audio.play().catch(()=>{});}}}
+function fireSfx(){if(!playing)return;for(const x of sfxList){if(!x.fired&&t>=x.at&&t<x.at+0.6){x.fired=true;try{x.audio.currentTime=0;setGain(x.audio,1);}catch(e){}x.audio.play().catch(()=>{});}}}
 function resetSfx(){for(const x of sfxList)x.fired=(t>x.at+0.05);}
 function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;if(t>=playEnd||t>=total){t=Math.min(t,total);stop();}placePlayhead();syncAudio();
  raf=requestAnimationFrame(tick);}
@@ -505,16 +500,20 @@ function tick(ts){if(!playing)return;if(!last)last=ts;t+=(ts-last)/1000;last=ts;
 // loopt de tijd. Na 12s geven we het op en starten we tóch (dan is er iets anders mis). ----
 function audReady(a){return !!(a&&a.readyState>=3);}
 function neededAudioAt(tt){const s=SC[sceneAt(tt)],list=[];if(voiceAudio[s.scene])list.push(voiceAudio[s.scene]);for(const b of musicBlocks){if(tt>=b.start&&tt<b.end){list.push(b.audio);break;}}return list;}
-function prepAudio(els,onReady){els=els.filter(Boolean);const pend=els.filter(a=>!audReady(a));if(!pend.length){onReady();return;}
- let done=false,left=pend.length;const fin=()=>{if(done)return;done=true;onReady();};const to=setTimeout(fin,12000);
- pend.forEach(a=>{const h=()=>{a.removeEventListener('canplaythrough',h);a.removeEventListener('canplay',h);if(--left<=0){clearTimeout(to);fin();}};
-  a.addEventListener('canplaythrough',h);a.addEventListener('canplay',h);try{a.preload='auto';a.load();}catch(e){}});}
+function prepAudio(els,onReady,onFail){els=els.filter(Boolean);
+ els.forEach(a=>{try{a.preload='auto';a.load();}catch(e){}});
+ if(els.every(audReady)){onReady();return;}
+ let done=false;const t0=Date.now();
+ const iv=setInterval(()=>{ if(done)return;
+  if(els.every(audReady)){done=true;clearInterval(iv);onReady();return;}
+  if(Date.now()-t0>12000){done=true;clearInterval(iv);(onFail||onReady)();} },120);}
 let playGen=0;
-function _play(){ensureAC();playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
+function _play(){playing=true;last=0;curScene=-1;curBlock=-1;resetSfx();$('btn-play').textContent='❚❚ pauze';
  const s=SC[sceneAt(t)],a=voiceAudio[s.scene];if(a){try{a.currentTime=Math.max(0,t-s.start);const _pp=a.play();if(_pp&&_pp.catch)_pp.catch(()=>{});}catch(e){}}
  manageMusic();raf=requestAnimationFrame(tick);}
 function play(onbtn){if(playing)return;const g=++playGen;const btn=onbtn||$('btn-play');const orig=btn.textContent;btn.textContent='… laden';
- prepAudio(neededAudioAt(t),()=>{ if(btn!==$('btn-play'))btn.textContent=orig; if(g!==playGen)return; _play(); });}
+ prepAudio(neededAudioAt(t),()=>{ if(btn!==$('btn-play'))btn.textContent=orig; if(g!==playGen)return; _play(); },
+  ()=>{ if(btn!==$('btn-play'))btn.textContent=orig; if(g!==playGen)return; const m=$('rendermsg'); if(m)m.textContent='geluid kon niet laden — klik nog eens om opnieuw te proberen.'; });}
 function stop(){playGen++;playing=false;if(raf)cancelAnimationFrame(raf);$('btn-play').textContent='► afspelen';
  for(const k in voiceAudio){try{voiceAudio[k].pause();}catch(e){}}musicBlocks.forEach(b=>{try{b.audio.pause();}catch(e){}});}
 $('btn-play').addEventListener('click',()=>{if(playing){stop();}else{playEnd=total;play();}});
