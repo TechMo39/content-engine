@@ -139,6 +139,59 @@ PLAN_BY["chose"] = {
 KAART_BY["chose"]  = {}   # geen kaarten voor chose
 GROUPS_BY["chose"] = {}
 
+# truth = "Is Anything Actually True?" (video 2). 19 scenes: 0=intro (getekend merk),
+# 1..17 = inhoud (beeld ophalen), 12 = GETEKENDE grote vraag (statement, geen opgehaald beeld),
+# 18=outro (getekend merk). GEEN kaarten. Abstract/filmisch, gezichten vermijden. Splits zijn een
+# startpunt op de zin-indeling; fijn-tunen in de studio op de echte zinsgrenzen.
+SPLITS_BY["truth"] = {
+ 0:[], 1:[3,6,10], 2:[1,4], 3:[1,3], 4:[2,5], 5:[4,7,9], 6:[2,6], 7:[3,7], 8:[2,5,7],
+ 9:[2,5], 10:[3,6,9], 11:[2], 12:[], 13:[1,4], 14:[2,5], 15:[2,5], 16:[2,4], 17:[1], 18:[],
+}
+LABELS_BY["truth"] = {
+ 0:["intro (merk)"],
+ 1:["de grote vraag, de kosmos","een overtuiging vastgehouden","het kwam vóór je kon kiezen","waar je vandaan komt"],
+ 2:["een zwaardere gedachte","ieders eigen waarheid","klinkt bescheiden"],
+ 3:["alles hangt eraan","stap voor stap","we eindigen op een antwoord"],
+ 4:["twee soorten waar","smaak: lied, thuis, ijs","dat is smaak"],
+ 5:["water, saldo, de aarde","feiten over de werkelijkheid","de kaart wordt geweigerd","blijft waar, ongemakkelijk"],
+ 6:["de echte tegenwerping","de grote vragen","een eerlijk antwoord verdient het"],
+ 7:["de gedachte op scherp","wijs 'm naar zichzelf","valt om"],
+ 8:["de tweede test: het leven","vliegtuig, dokter, medicijn","niemand leeft zo","gerechtigheid geëist"],
+ 9:["de stille truc","smaak vs feit","wat echt gebeurde, lang geleden"],
+ 10:["geen zekerheid","moeilijk is niet afwezig","de envelop, de detective","de laatste schuilplaats"],
+ 11:["de drie naast elkaar","één conclusie blijft staan"],
+ 12:["de hoofdvraag (groot)"],
+ 13:["ja, met noodzaak","de ontkenning eet zichzelf","de werkelijkheid stemt niet"],
+ 14:["troost niemand","duizenden verklaringen","er kan er maar één waar zijn"],
+ 15:["de uitgang is dicht","één is echt waar","de enige eerlijke manier"],
+ 16:["dezelfde nuchtere vragen","het moment dat het breekt","laat de valse vallen"],
+ 17:["de eerste verklaring","valt hij of houdt hij stand"],
+ 18:["outro (merk)"],
+}
+PLAN_BY["truth"] = {
+ 0:[("drawn","")],
+ 1:[("video","deep space stars galaxy slow drift"),("video","single candle flame flickering darkness"),("video","close up open hands receiving soft light"),("video","old family home warm lit window dusk")],
+ 2:[("video","two diverging paths forest fork"),("video","many small scattered lights in darkness"),("video","soft pastel clouds drifting calm sky")],
+ 3:[("video","single domino about to tip row"),("video","footsteps walking stone path steady"),("video","sunrise breaking over horizon hopeful")],
+ 4:[("video","two coffee cups contrast on table"),("video","colorful ice cream scoop close up"),("video","abstract warm color swatches blur")],
+ 5:[("video","water boiling in pot bubbling close up"),("video","planet earth rotating slowly in space"),("video","card declined on payment terminal"),("video","lone rock against crashing ocean waves")],
+ 6:[("video","silhouette hand raised to object"),("video","vast overwhelming night sky stars scale"),("video","old book pages turning close up")],
+ 7:[("video","mirror reflecting into mirror infinite"),("video","endless spiral tunnel rotating dark"),("video","glass pane cracking shattering slow motion")],
+ 8:[("video","busy city street people walking everyday"),("video","airplane taking off runway sky"),("video","medical scan on lightbox close up"),("video","wooden gavel on desk justice close up")],
+ 9:[("video","hands sleight of hand playing cards"),("video","balance scale weighing two objects"),("video","abstract cosmic explosion origin light")],
+ 10:[("video","question mark in fog uncertainty abstract"),("video","sealed envelope on desk close up"),("video","magnifying glass over clues on desk"),("video","hand reaching through thick fog")],
+ 11:[("video","three smooth stones balanced stacked"),("video","single spotlight on empty dark stage")],
+ 12:[("drawn","")],
+ 13:[("video","strong sunrise light breaking through clouds"),("video","spiral collapsing inward abstract dark"),("video","solid rock mountain unmoving firm")],
+ 14:[("video","many doors along a long hallway"),("video","crossroads with many signposts directions"),("video","single key among many keys close up")],
+ 15:[("video","exit door slowly closing dark"),("video","one lit candle among unlit candles"),("video","hand holding object up to the light")],
+ 16:[("video","checklist pen marking boxes close up"),("video","concrete structure cracking collapsing"),("video","dominoes falling one by one row")],
+ 17:[("video","single path leading forward to horizon"),("video","magnifying glass examining object in light")],
+ 18:[("drawn","")],
+}
+KAART_BY["truth"]  = {}
+GROUPS_BY["truth"] = {}
+
 # actieve plan-globals (gezet door select_story_plan vlak voordat de tool draait)
 SPLITS = SPLITS_BY["chose"]
 LABELS = LABELS_BY["chose"]
