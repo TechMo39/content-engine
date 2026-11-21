@@ -23,10 +23,13 @@ cv.LANG = "nl"   # NL-stem (Truthward draait op "en")
 # --- uitspraak-correcties, ALLEEN voor de stem (kaarten blijven de echte term tonen) ----------------
 # Pas gerust aan als iets nog raar klinkt; "lead"->"lied" is zeker goed.
 PHON = [
+    (r"\bUncleRank\b", "Onkel Renk"),   # merknaam fonetisch (kaarten tonen "UncleRank")
+    (r"\bUncle Rank\b", "Onkel Renk"),
     (r"\bleads\b", "lieds"),
     (r"\blead\b", "lied"),
-    (r"\bSEO\b", "es-ee-oo"),
-    (r"\bSEA\b", "es-ee-aa"),
+    # afkortingen letter voor letter (NL-letternamen, met spaties zodat ze niet samensmelten):
+    (r"\bSEO\b", "es ee oo"),
+    (r"\bSEA\b", "es ee aa"),
     (r"\bads\b", "edds"),
     (r"\bSaaS\b", "sas"),
 ]
